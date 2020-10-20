@@ -1,0 +1,12 @@
+adlfs
+dask[complete]
+fsspec
+google-cloud-storage
+gcsfs
+intake
+intake-esm
+intake-xarray
+scikit-downscale
+scikit-learn
+xarray
+zarr
