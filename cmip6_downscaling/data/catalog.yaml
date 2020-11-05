@@ -1,0 +1,31 @@
+plugins:
+  source:
+    - module: intake_xarray
+
+sources:
+
+  regridded_cmip:
+    metadata:
+      title: regridded climate data
+    driver: zarr
+    parameters:
+      key:
+        description: global climate model key, e.g. 'CMIP.BCC.BCC-CSM2-MR.historical.Amon.gn'
+        type: str
+        default: CMIP.BCC.BCC-CSM2-MR.historical.Amon.gn
+    args:
+      urlpath: 'https://carbonplan.blob.core.windows.net/carbonplan-scratch/regridded-cmip-data/{{ key }}'
+      consolidated: True
+
+  bias_corrected_cmip:
+    metadata:
+      title: bias corrected climate data
+    driver: zarr
+    parameters:
+      key:
+        description: global climate model key, e.g. 'CMIP.BCC.BCC-CSM2-MR.historical.Amon.gn'
+        type: str
+        default: CMIP.BCC.BCC-CSM2-MR.historical.Amon.gn
+    args:
+      urlpath: 'https://carbonplan.blob.core.windows.net/carbonplan-scratch/downscaling/bias-correction/{{ key }}'
+      consolidated: True

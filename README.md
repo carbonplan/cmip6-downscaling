@@ -23,14 +23,13 @@ This repository includes our tools/scripts/models/etc for mapping forest carbon 
 ## install
 
 ```shell
-# TODO
+pip install -e .
 ```
 
 ## usage
 
 ```python
-# TODO
-...
+from cmip6_downscaling.methods import ...
 ```
 
 ## license
