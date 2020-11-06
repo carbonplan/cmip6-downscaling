@@ -14,17 +14,19 @@ future_time = slice('2015', '2120')
 
 # variable names
 update_vars = ['area', 'crs', 'mask']
-ds_vars = ['tasmin', 'tasmax', 'pr']
-t_vars = ['tmin', 'tmax']
-p_var = 'ppt'
+absolute_vars = ['tmin', 'tmax']
+relative_vars = ['ppt', 'srad', 'vap']
 
 # output chunks (for dask/zarr)
 out_chunks = {'time': 198, 'x': 121, 'y': 74}
 
+# target
+target = 'cmip6/bias-corrected/conus/monthly/4000m/{key}.zarr'
+
 
 def preprocess(ds):
-    ds = ds.rename({'tasmax': 'tmax', 'tasmin': 'tmin', 'pr': 'ppt'})
-    ds[p_var] *= xr.Variable('time', ds.indexes['time'].days_in_month * SEC_PER_DAY)
+    ds = ds.rename({'tasmax': 'tmax', 'tasmin': 'tmin', 'pr': 'ppt', 'rsds': 'srad'})
+    ds[relative_vars] *= xr.Variable('time', ds.indexes['time'].days_in_month * SEC_PER_DAY)
     ds['tmin'] -= KELVIN
     ds['tmax'] -= KELVIN
 
@@ -54,14 +56,14 @@ if __name__ == '__main__':
         X_ds = hist_ds.sel(time=train_time)
 
         # fit the historical model
-        t_model.fit(X_ds[t_vars], y_ds[t_vars])
-        p_model.fit(X_ds[p_var], y_ds[p_var])
+        t_model.fit(X_ds[absolute_vars], y_ds[absolute_vars])
+        p_model.fit(X_ds[relative_vars], y_ds[relative_vars])
 
         # predict for the historical data
-        y_hat_ds = t_model.predict(hist_ds[t_vars])
-        y_hat_ds[p_var] = p_model.predict(hist_ds[p_var])
+        y_hat_ds = t_model.predict(hist_ds[absolute_vars])
+        y_hat_ds[relative_vars] = p_model.predict(hist_ds[relative_vars])
 
-        store = get_store(hist_key)
+        store = get_store(target.format(key=hist_key))
         if skip_existing and '.zmetadata' in store:
             print(f'{hist_key} in store, skipping...')
         else:
@@ -73,10 +75,12 @@ if __name__ == '__main__':
             future_ds = project_cat[key].pipe(preprocess).sel(time=future_time)
 
             # predict for the historical data
-            y_hat_ds = t_model.predict(future_ds[t_vars])
-            y_hat_ds[p_var] = p_model.predict(future_ds[p_var])
+            y_hat_ds = t_model.predict(future_ds[absolute_vars])
+            y_hat_ds[relative_vars] = p_model.predict(future_ds[relative_vars])
 
-            store = get_store(key)
+            y_hat_ds = y_hat_ds.drop('month')
+
+            store = get_store(target.format(key=key))
             if skip_existing and '.zmetadata' in store:
                 print(f'{key} in store, skipping...')
             else:

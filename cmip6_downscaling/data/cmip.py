@@ -12,13 +12,13 @@ def make_model_dict(hist_subset, ssp_subset):
     for key_hist in hist_subset:
         left, right = key_hist.rsplit('historical')
         left_scen = left.replace('CMIP', 'ScenarioMIP')
-        if not hist_subset[key_hist].df.nunique()['variable_id'] >= 3:
+        if not hist_subset[key_hist].df.nunique()['variable_id'] >= 5:
             continue
         for key_ssp in ssp_subset:
             if (
                 left_scen in key_ssp
                 and right in key_ssp
-                and ssp_subset[key_ssp].df.nunique()['variable_id'] >= 3
+                and ssp_subset[key_ssp].df.nunique()['variable_id'] >= 5
             ):
                 d[key_hist].append(key_ssp)
     model_dict = {k: list(set(v)) for k, v in d.items()}
@@ -44,14 +44,34 @@ def rename(ds):
     return ds
 
 
+def maybe_drop_band_vars(ds):
+    if 'lat_bnds' in ds:
+        ds = ds.drop('lat_bnds')
+    if 'lon_bnds' in ds:
+        ds = ds.drop('lon_bnds')
+    return ds
+
+
 def preprocess_hist(ds):
     # consider using cmip6_preprocessing here
-    return ds.pipe(rename).pipe(subset_conus).pipe(fix_lons).sel(time=slice('1960', '2014'))
+    return (
+        ds.pipe(rename)
+        .pipe(subset_conus)
+        .pipe(fix_lons)
+        .pipe(maybe_drop_band_vars)
+        .sel(time=slice('1950', '2015'))
+    )
 
 
 def preprocess_ssp(ds):
     # consider using cmip6_preprocessing here
-    return ds.pipe(rename).pipe(subset_conus).pipe(fix_lons).sel(time=slice('2015', '2100'))
+    return (
+        ds.pipe(rename)
+        .pipe(subset_conus)
+        .pipe(fix_lons)
+        .pipe(maybe_drop_band_vars)
+        .sel(time=slice('2015', '2120'))
+    )
 
 
 def cmip():
@@ -63,10 +83,9 @@ def cmip():
     full_subset = col.search(
         activity_id=['CMIP', 'ScenarioMIP'],
         experiment_id=['historical', 'ssp245', 'ssp370', 'ssp585'],
-        member_id='r1i1p1f1',  # remove this at some point
         table_id='Amon',
         grid_label='gn',
-        variable_id=['pr', 'tasmin', 'tasmax'],
+        variable_id=['pr', 'tasmin', 'tasmax', 'rsds', 'hur'],
     )
 
     # get historical simulations
@@ -101,6 +120,7 @@ def cmip():
     return model_dict, data
 
 
+# we can probably remove this function soon
 def sample_data():
 
     samples = [
