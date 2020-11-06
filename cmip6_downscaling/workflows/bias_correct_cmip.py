@@ -18,7 +18,7 @@ absolute_vars = ['tmin', 'tmax']
 relative_vars = ['ppt', 'srad', 'vap']
 
 # output chunks (for dask/zarr)
-out_chunks = {'time': 198, 'x': 121, 'y': 74}
+out_chunks = {'time': 198, 'x': 50, 'y': 50}
 
 # target
 target = 'cmip6/bias-corrected/conus/monthly/4000m/{key}.zarr'
