@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 
+import dask
 import xesmf
 from carbonplan.data import cat
+from dask.distributed import Client
 
 from cmip6_downscaling.data.cmip import cmip
 from cmip6_downscaling.workflows.utils import get_store
@@ -13,8 +15,12 @@ trange = slice('1950', '2120')
 
 def regrid_one_model(source_ds, target_grid, method='bilinear', reuse_weights=True):
     ''' simple wrapper around xesmf '''
-    regridder = xesmf.Regridder(source_ds, target_grid, method=method, reuse_weights=reuse_weights)
-    return regridder(source_ds)
+    with dask.config.set(scheduler='threads'):
+        regridder = xesmf.Regridder(
+            source_ds, target_grid, method=method, reuse_weights=reuse_weights
+        )
+        out = regridder(source_ds)
+    return out
 
 
 def slim_cmip_key(key, member_id):
@@ -24,6 +30,9 @@ def slim_cmip_key(key, member_id):
 
 
 if __name__ == '__main__':
+    # client = Client(n_workers=16, threads_per_worker=1)
+    # print(client)
+    # print(client.dashboard_link)
     skip_existing = True
     model_dict, data = cmip()
 
@@ -37,6 +46,7 @@ if __name__ == '__main__':
         keys_to_regrid.extend(fkeys)
     print(f'regridding {len(keys_to_regrid)} keys')
 
+    failed = {}
     for key in keys_to_regrid:
 
         # get source dataset
@@ -52,6 +62,7 @@ if __name__ == '__main__':
             if skip_existing and '.zmetadata' in store:
                 print(f'{out_key} in store, skipping...')
                 continue
+            store.clear()
 
             # perform the regridding
             print(f'regridding {out_key}')
@@ -61,4 +72,9 @@ if __name__ == '__main__':
 
             # write output dataset to store
             ds.update(grid_ds[update_vars])
-            ds.to_zarr(store, mode='w', consolidated=True)
+            try:
+                ds.to_zarr(store, mode='w', consolidated=True)
+            except Exception as e:
+                print(key, e)
+                failed[key] = e
+print(failed)

@@ -1,10 +1,23 @@
 import math
 
+import numba
 import numpy as np
 import pandas as pd
 
 
-def snowmod(tmean, ppt, radiation=None, snowpack_prev=None, albedo=0.23, albedo_snow=0.8):
+# @numba.njit
+def mf(t, t0=-4.604, t1=16.329):
+    '''this is for radiation in MJ/m^2/day'''
+    return np.minimum(np.maximum((t - t0) / (t1 - t0), 0), 1)
+
+
+# @numba.njit
+def linrmelt(temp, radiation, b0=-398.4, b1=81.75, b2=25.05):
+    return np.maximum((b0 + temp * b1 + radiation * b2), 0)
+
+
+# @numba.njit
+def snowmod(tmean, ppt, radiation, snowpack_prev=None, albedo=0.23, albedo_snow=0.8):
     """Calculate monthly estimate snowfall and snowmelt.
 
     This function computes monthly estimated snowfall and snowmelt. Output includes end-of-month snowpack,
@@ -12,15 +25,17 @@ def snowmod(tmean, ppt, radiation=None, snowpack_prev=None, albedo=0.23, albedo_
 
     Parameters
     ----------
-    tmean : array_like(float)
+    tmean : float
         Mean monthly temperatures in C
-    radiation : array_like(float)
+    ppt : float
+        Monthly precipitation in mm
+    radiation : float
         Shortwave solar radiation in MJ/m^2/day
-    snowpack_prev : array_like(float), optional
+    snowpack_prev : float, optional
         Snowpack at the beginning of the month. If None this is taken to be zero.
-    albedo : scalar(float)
+    albedo : float
         Albedo in the absence of snow cover.
-    albedo_snow : scalar(float)
+    albedo_snow : float
         Albedo given snow cover
 
     Returns
@@ -30,19 +45,10 @@ def snowmod(tmean, ppt, radiation=None, snowpack_prev=None, albedo=0.23, albedo_
     """
 
     if snowpack_prev is None:
-        snowpack_prev = np.zeros_like(tmean)
+        snowpack_prev = 0
 
-    # this is for radiation in MJ/m^2/day
-    def mf(t, t0, t1):
-        return np.minimum(np.maximum((t - t0) / (t1 - t0), 0), 1)
-
-    def linrmelt(temp, radiation, b0, b1, b2):
-        return np.maximum((b0 + temp * b1 + radiation * b2), 0)
-
-    parvec = np.array([-4.604, 6.329, -398.4, 81.75, 25.05])
-
-    mfsnow = mf(tmean, parvec[0], parvec[1])
-    mfmelt = linrmelt(tmean, radiation, parvec[2], parvec[3], parvec[4])
+    mfsnow = mf(tmean)
+    mfmelt = linrmelt(tmean, radiation)
 
     # calculate values
     snow = (1 - mfsnow) * ppt
@@ -52,13 +58,16 @@ def snowmod(tmean, ppt, radiation=None, snowpack_prev=None, albedo=0.23, albedo_
     h2o_input = rain + melt
 
     # make vector of albedo values
-    albedo = np.full_like(tmean, albedo)
     where_snow = np.logical_or(snowpack > 0, snowpack_prev > 0)
-    albedo[where_snow] = albedo_snow
+    if snowpack > 0 or snowpack_prev > 0:
+        out_albedo = albedo_snow
+    else:
+        out_albedo = albedo
 
-    return pd.Dataframe(dict(snowpack=snowpack, input=h2o_input, albedo=albedo))
+    return dict(snowpack=snowpack, h2o_input=h2o_input, albedo=albedo_snow)
 
 
+# @numba.njit
 def monthly_et0(radiation, tmax, tmin, wind, dpt, tmean_prev, lat, elev, month, albedo=0.23):
     """Calculate monthly Reference ET estimates using the Penman-Montieth equation
 
@@ -76,7 +85,7 @@ def monthly_et0(radiation, tmax, tmin, wind, dpt, tmean_prev, lat, elev, month, 
         Monthly average minimum temperature in C
     wind : array_like(float)
         Monthly average wind speed in m/s at 10m above ground
-    wind : array_like(float)
+    dpt : array_like(float)
         Dewpoint temperature in C
     tmean_prev : array_like(float)
         Mean temp of previous month in C
@@ -117,8 +126,13 @@ def monthly_et0(radiation, tmax, tmin, wind, dpt, tmean_prev, lat, elev, month, 
     b4 = (Th - T0) / (Th - Tl)
     b3 = 1 / ((T0 - Tl) * (Th - T0) ** b4)
     ks = np.maximum(np.minimum(b3 * (tmean - Tl) * (Th - tmean) ** b4, 1), ks_min)
-    ks[np.isnan(ks)] = ks_min
-    ks[tmean >= thresh] = 1
+
+    # ks[np.isnan(ks)] = ks_min
+    # ks[tmean >= thresh] = 1
+    if np.isnan(ks):
+        ks = ks_min
+    if tmean >= thresh:
+        ks = 1
 
     # convert to stomatal resistance.
     sr = sr / ks
@@ -136,9 +150,10 @@ def monthly_et0(radiation, tmax, tmin, wind, dpt, tmean_prev, lat, elev, month, 
     )
     ea = 0.6108 * np.exp(dpt * 17.27 / (dpt + 237.3))
     vpd = es - ea
-    vpd[
-        vpd < 0
-    ] = 0  # added because this can be negative if dewpoint temperature is greater than mean temp (implying vapor pressure greater than saturation).
+    vpd = np.maximum(0, vpd)
+    # vpd[
+    #     vpd < 0
+    # ] = 0  # added because this can be negative if dewpoint temperature is greater than mean temp (implying vapor pressure greater than saturation).
 
     # delta - Slope of the saturation vapor pressure vs. air temperature curve at the average hourly air temperature
     delta = (4098 * es) / (tmean + 237.3) ** 2
@@ -151,7 +166,7 @@ def monthly_et0(radiation, tmax, tmin, wind, dpt, tmean_prev, lat, elev, month, 
 
     # Calculate potential max solar radiation or clear sky radiation
     GSC = 0.082  # MJ m -2 min-1 (solar constant)
-    phi = np.np.pi * lat / 180
+    phi = np.pi * lat / 180
     dr = 1 + 0.033 * np.cos(2 * np.pi / 365 * doy)
     delt = 0.409 * np.sin(2 * np.pi / 365 * doy - 1.39)
     omegas = np.arccos(-np.tan(phi) * np.tan(delt))
@@ -170,7 +185,7 @@ def monthly_et0(radiation, tmax, tmin, wind, dpt, tmean_prev, lat, elev, month, 
     # radfraction is a measure of relative shortwave radiation, or of
     # possible radiation (cloudy vs. clear-sky)
     radfraction = radiation / Rso
-    radfraction[radfraction > 1] = 1
+    radfraction = np.maximum(1, radfraction)
 
     # longwave  and net radiation
     longw = (
@@ -193,6 +208,7 @@ def monthly_et0(radiation, tmax, tmin, wind, dpt, tmean_prev, lat, elev, month, 
     return et0
 
 
+# @numba.njit
 def aetmod(et0, h2o_input, awc, soil_prev=None):
     """Calculate monthly actual evapotranspiration (AET)
 
@@ -215,26 +231,27 @@ def aetmod(et0, h2o_input, awc, soil_prev=None):
         Dataframe with columns {aet, def, soil, runoff}
     """
 
-    runoff = np.full_like(et0, np.nan)
-    deficit = np.full_like(et0, np.nan)
-    aet = np.full_like(et0, np.nan)
-    soil = np.full_like(et0, np.nan)
     if soil_prev is None:
-        soil_prev = np.zeros_like(et0)
-
+        soil_prev = 0
     deltasoil = h2o_input - et0  # positive=excess H2O, negative=H2O deficit
 
-    surplus = deltasoil >= 0
-    if np.any(surplus):
-        aet[surplus] = et0[surplus]
-        deficit[surplus] = 0
-        soil[surplus] = np.minimum(
-            soil_prev[surplus] + deltasoil[surplus], awc[surplus]
+    if deltasoil >= 0:
+        # Case when there is a moisture surplus
+        aet = et0
+        deficit = 0
+        soil = np.minimum(
+            soil_prev + deltasoil, awc
         )  # increment soil moisture, but not above water holding capacity
-        runoff[surplus] = np.maximum(
-            soil_prev[surplus] + deltasoil[surplus] - awc[surplus], 0
+        runoff = np.maximum(
+            soil_prev + deltasoil - awc, 0
         )  # when awc is exceeded, send the rest to runoff
+    else:  # deltasoil < 0
+        # Case where there is a moisture deficit: soil moisture is reduced
+        # this is the net change in soil moisture (neg)
+        soildrawdown = soil_prev * (1 - np.exp(deltasoil / awc))
+        aet = np.minimum(h2o_input + soildrawdown, et0)
+        deficit = et0 - aet
+        soil = soil_prev - soildrawdown
+        runoff = 0
 
-    df = pd.DataFrame({"aet": aet, "def": deficit, "soil": soil, "runoff": runoff})
-
-    return df
+    return {"aet": aet, "soil": soil, "runoff": runoff}

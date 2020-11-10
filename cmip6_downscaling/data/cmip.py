@@ -2,8 +2,17 @@ import os
 from collections import defaultdict
 
 import intake
+import pandas as pd
 import xarray as xr
 import zarr
+from intake_esm.merge_util import AggregationError
+
+variable_ids = ['pr', 'tasmin', 'tasmax', 'rsds', 'hurs', 'ps']
+
+
+def check_variable_ids_in_df(df):
+    unique_vars = df['variable_id'].unique()
+    return all(v in unique_vars for v in variable_ids)
 
 
 def make_model_dict(hist_subset, ssp_subset):
@@ -12,13 +21,13 @@ def make_model_dict(hist_subset, ssp_subset):
     for key_hist in hist_subset:
         left, right = key_hist.rsplit('historical')
         left_scen = left.replace('CMIP', 'ScenarioMIP')
-        if not hist_subset[key_hist].df.nunique()['variable_id'] >= 5:
+        if not check_variable_ids_in_df(hist_subset[key_hist].df):
             continue
         for key_ssp in ssp_subset:
             if (
                 left_scen in key_ssp
                 and right in key_ssp
-                and ssp_subset[key_ssp].df.nunique()['variable_id'] >= 5
+                and check_variable_ids_in_df(ssp_subset[key_ssp].df)
             ):
                 d[key_hist].append(key_ssp)
     model_dict = {k: list(set(v)) for k, v in d.items()}
@@ -30,6 +39,14 @@ def fix_lons(ds):
     lon = ds.lon.copy()
     lon.values[lon.values > 180] -= 360
     ds['lon'] = lon
+    return ds
+
+
+def fix_times(ds):
+    '''convert time coord to pandas datetime index'''
+    times = ds.indexes['time']
+    new_times = pd.date_range(start=times[0].strftime('%Y-%m'), periods=ds.dims['time'], freq='MS')
+    ds['time'] = new_times
     return ds
 
 
@@ -45,10 +62,12 @@ def rename(ds):
 
 
 def maybe_drop_band_vars(ds):
-    if 'lat_bnds' in ds:
+    if ('lat_bnds' in ds) or ('lat_bnds' in ds.coords):
         ds = ds.drop('lat_bnds')
-    if 'lon_bnds' in ds:
+    if ('lon_bnds' in ds) or ('lon_bnds' in ds.coords):
         ds = ds.drop('lon_bnds')
+    if ('time_bnds' in ds) or ('time_bnds' in ds.coords):
+        ds = ds.drop('time_bnds')
     return ds
 
 
@@ -56,10 +75,11 @@ def preprocess_hist(ds):
     # consider using cmip6_preprocessing here
     return (
         ds.pipe(rename)
+        .sel(time=slice('1950', '2015'))
         .pipe(subset_conus)
         .pipe(fix_lons)
+        .pipe(fix_times)
         .pipe(maybe_drop_band_vars)
-        .sel(time=slice('1950', '2015'))
     )
 
 
@@ -67,10 +87,11 @@ def preprocess_ssp(ds):
     # consider using cmip6_preprocessing here
     return (
         ds.pipe(rename)
+        .sel(time=slice('2015', '2120'))
         .pipe(subset_conus)
         .pipe(fix_lons)
+        .pipe(fix_times)
         .pipe(maybe_drop_band_vars)
-        .sel(time=slice('2015', '2120'))
     )
 
 
@@ -85,7 +106,7 @@ def cmip():
         experiment_id=['historical', 'ssp245', 'ssp370', 'ssp585'],
         table_id='Amon',
         grid_label='gn',
-        variable_id=['pr', 'tasmin', 'tasmax', 'rsds', 'hur'],
+        variable_id=variable_ids,
     )
 
     # get historical simulations
@@ -109,13 +130,38 @@ def cmip():
         valid_keys.extend([k] + v)
 
     data = {}
+    # zarr_kwargs = dict(consolidated=True, use_cftime=True) # requires xarray >= 0.16.1
     zarr_kwargs = dict(consolidated=True)
-    data.update(hist_subset.to_dataset_dict(zarr_kwargs=zarr_kwargs, preprocess=preprocess_hist))
-    data.update(ssp_subset.to_dataset_dict(zarr_kwargs=zarr_kwargs, preprocess=preprocess_ssp))
+
+    failed = {}
+    for hist_key, ssp_keys in model_dict.items():
+        print(hist_key)
+        try:
+            data[hist_key] = hist_subset[hist_key](
+                zarr_kwargs=zarr_kwargs, preprocess=preprocess_hist
+            ).to_dask()
+        except (OSError, AggregationError) as e:
+            print(f'key failed: {hist_key}')
+            failed[hist_key] = e
+            continue
+
+        for ssp_key in ssp_keys:
+            print(ssp_key)
+            try:
+                data[ssp_key] = ssp_subset[ssp_key](
+                    zarr_kwargs=zarr_kwargs, preprocess=preprocess_ssp
+                ).to_dask()
+            except (OSError, AggregationError) as e:
+                print(f'key failed: {ssp_key}')
+                failed[ssp_key] = e
+    # data.update(hist_subset.to_dataset_dict(zarr_kwargs=zarr_kwargs, preprocess=preprocess_hist))
+    # data.update(ssp_subset.to_dataset_dict(zarr_kwargs=zarr_kwargs, preprocess=preprocess_ssp))
 
     for k in list(data):
         if k not in valid_keys:
             del data[k]
+
+    print(f'done with cmip but these keys failed: {failed}')
 
     return model_dict, data
 
