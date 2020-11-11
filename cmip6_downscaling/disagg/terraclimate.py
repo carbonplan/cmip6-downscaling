@@ -1,22 +1,38 @@
 import math
 
-import numba
 import numpy as np
-import pandas as pd
+
+days_in_month = np.array([31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31])
+d2 = np.array([31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365])
+d1 = np.array([1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335])
 
 
-# @numba.njit
-def mf(t, t0=-4.604, t1=16.329):
-    '''this is for radiation in MJ/m^2/day'''
-    return np.minimum(np.maximum((t - t0) / (t1 - t0), 0), 1)
+# def mf_1(t, t0=-4.604, t1=6.329):
+#     return np.minimum(np.maximum((t - t0) / (t1 - t0), 0), 1)
 
 
-# @numba.njit
+def mf(t):
+    # ann params from Dai 2008
+    a = -47.8337
+    b = -0.6866
+    c = 1.4913
+    d = 1.0420
+
+    # bounds from Dobrowski 2013
+    if t < -4.604:
+        f = 0.0
+    elif t > 6.329:
+        f = 1.0
+    else:
+        # parametric form from Dai 2008
+        f = a * (np.tanh(b * (t - c)) - d) / 100.0
+    return f
+
+
 def linrmelt(temp, radiation, b0=-398.4, b1=81.75, b2=25.05):
     return np.maximum((b0 + temp * b1 + radiation * b2), 0)
 
 
-# @numba.njit
 def snowmod(tmean, ppt, radiation, snowpack_prev=None, albedo=0.23, albedo_snow=0.8):
     """Calculate monthly estimate snowfall and snowmelt.
 
@@ -28,7 +44,7 @@ def snowmod(tmean, ppt, radiation, snowpack_prev=None, albedo=0.23, albedo_snow=
     tmean : float
         Mean monthly temperatures in C
     ppt : float
-        Monthly precipitation in mm
+        Monthly accumulated precipitation in mm
     radiation : float
         Shortwave solar radiation in MJ/m^2/day
     snowpack_prev : float, optional
@@ -58,16 +74,14 @@ def snowmod(tmean, ppt, radiation, snowpack_prev=None, albedo=0.23, albedo_snow=
     h2o_input = rain + melt
 
     # make vector of albedo values
-    where_snow = np.logical_or(snowpack > 0, snowpack_prev > 0)
     if snowpack > 0 or snowpack_prev > 0:
         out_albedo = albedo_snow
     else:
         out_albedo = albedo
 
-    return dict(snowpack=snowpack, h2o_input=h2o_input, albedo=albedo_snow)
+    return dict(snowpack=snowpack, h2o_input=h2o_input, albedo=out_albedo, snowfall=snow)
 
 
-# @numba.njit
 def monthly_et0(radiation, tmax, tmin, wind, dpt, tmean_prev, lat, elev, month, albedo=0.23):
     """Calculate monthly Reference ET estimates using the Penman-Montieth equation
 
@@ -102,9 +116,6 @@ def monthly_et0(radiation, tmax, tmin, wind, dpt, tmean_prev, lat, elev, month, 
     eto : array_like(float)
     """
 
-    days_in_month = np.array([31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31])
-    d2 = np.array([31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365])
-    d1 = np.array([1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335])
     doy = (d1[month] + d2[month]) / 2  # use middle day of month to represent monthly average.
     n_days = days_in_month[month]
 
@@ -208,7 +219,6 @@ def monthly_et0(radiation, tmax, tmin, wind, dpt, tmean_prev, lat, elev, month, 
     return et0
 
 
-# @numba.njit
 def aetmod(et0, h2o_input, awc, soil_prev=None):
     """Calculate monthly actual evapotranspiration (AET)
 
@@ -231,6 +241,13 @@ def aetmod(et0, h2o_input, awc, soil_prev=None):
         Dataframe with columns {aet, def, soil, runoff}
     """
 
+    awc = np.maximum(awc, 10.0)
+    if np.isnan(awc):
+        awc = 50.0
+
+    runoff = 0.05 * h2o_input
+    h2o_input -= runoff
+
     if soil_prev is None:
         soil_prev = 0
     deltasoil = h2o_input - et0  # positive=excess H2O, negative=H2O deficit
@@ -242,7 +259,7 @@ def aetmod(et0, h2o_input, awc, soil_prev=None):
         soil = np.minimum(
             soil_prev + deltasoil, awc
         )  # increment soil moisture, but not above water holding capacity
-        runoff = np.maximum(
+        runoff += np.maximum(
             soil_prev + deltasoil - awc, 0
         )  # when awc is exceeded, send the rest to runoff
     else:  # deltasoil < 0
@@ -252,6 +269,5 @@ def aetmod(et0, h2o_input, awc, soil_prev=None):
         aet = np.minimum(h2o_input + soildrawdown, et0)
         deficit = et0 - aet
         soil = soil_prev - soildrawdown
-        runoff = 0
 
-    return {"aet": aet, "soil": soil, "runoff": runoff}
+    return {"aet": aet, "soil": soil, "runoff": runoff, "deficit": deficit}
