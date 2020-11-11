@@ -19,10 +19,13 @@ def mf(t):
     d = 1.0420
 
     # bounds from Dobrowski 2013
-    if t < -4.604:
+    t0 = -4.604
+    t1 = 6.329
+
+    if t < t0:
         f = 0.0
-    elif t > 6.329:
-        f = 1.0
+    elif t > t1:
+        f = 1
     else:
         # parametric form from Dai 2008
         f = a * (np.tanh(b * (t - c)) - d) / 100.0
@@ -56,8 +59,8 @@ def snowmod(tmean, ppt, radiation, snowpack_prev=None, albedo=0.23, albedo_snow=
 
     Returns
     -------
-    df: pd.DataFrame
-        Dataframe with three columns for end-of-month snowpack, H2O input (rain plus snowmelt), and albedo.
+    data: dict
+        End-of-month snowpack, H2O input (rain plus snowmelt), and albedo.
     """
 
     if snowpack_prev is None:
@@ -79,7 +82,7 @@ def snowmod(tmean, ppt, radiation, snowpack_prev=None, albedo=0.23, albedo_snow=
     else:
         out_albedo = albedo
 
-    return dict(snowpack=snowpack, h2o_input=h2o_input, albedo=out_albedo, snowfall=snow)
+    return dict(snowpack=snowpack, h2o_input=h2o_input, albedo=out_albedo)
 
 
 def monthly_et0(radiation, tmax, tmin, wind, dpt, tmean_prev, lat, elev, month, albedo=0.23):
@@ -91,29 +94,30 @@ def monthly_et0(radiation, tmax, tmin, wind, dpt, tmean_prev, lat, elev, month, 
 
     Parameters
     ----------
-    radiation : array_like(float)
+    radiation : float
         Monthly average shortwave radiation in MJ/m^2/day
-    tmax : array_like(float)
+    tmax : float
         Monthly average maximum temperature in C
-    tmin : array_like(float)
+    tmin : float
         Monthly average minimum temperature in C
-    wind : array_like(float)
+    wind : float
         Monthly average wind speed in m/s at 10m above ground
-    dpt : array_like(float)
+    dpt : float
         Dewpoint temperature in C
-    tmean_prev : array_like(float)
+    tmean_prev : float
         Mean temp of previous month in C
-    lat : array_like(float) or scalar(float)
+    lat : float
         Latitude in degrees
-    elev : array_like(float) or scalar(float)
+    elev : float
         Elevation in meters
-    month : scalar(int)
-    albedo : array_like(float) or scalar(float)
+    month : int
+        Month of year (0 indexed)
+    albedo : float
         Surface albedo, default=0.23
 
     Returns
     -------
-    eto : array_like(float)
+    eto : float
     """
 
     doy = (d1[month] + d2[month]) / 2  # use middle day of month to represent monthly average.
@@ -226,19 +230,19 @@ def aetmod(et0, h2o_input, awc, soil_prev=None):
 
     Parameters
     ----------
-    eto : array_like(float)
+    eto : float
         Monthly reference evapotranspiration in mm
-    h2o_input : array_like(float)
+    h2o_input : float
         Monthly water input to soil in mm
-    awc : array_like(float)
+    awc : float
         Soil water capacity in mm
-    soil_prev : array_like(float), optional
+    soil_prev : float, optional
         Soil water content for the previous month (mm)
 
     Returns
     -------
-    df : pd.DataFrame
-        Dataframe with columns {aet, def, soil, runoff}
+    data : dict
+        aet, def, soil, and runoff
     """
 
     awc = np.maximum(awc, 10.0)
