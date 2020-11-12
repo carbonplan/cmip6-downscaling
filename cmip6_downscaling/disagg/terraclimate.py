@@ -7,33 +7,21 @@ d2 = np.array([31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365])
 d1 = np.array([1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335])
 
 
-# def mf_1(t, t0=-4.604, t1=6.329):
-#     return np.minimum(np.maximum((t - t0) / (t1 - t0), 0), 1)
-
-
-def mf(t):
-    # ann params from Dai 2008
-    a = -47.8337
-    b = -0.6866
-    c = 1.4913
-    d = 1.0420
-
-    # bounds from Dobrowski 2013
-    t0 = -4.604
-    t1 = 6.329
-
+def mf(t, t0=-2, t1=6.5):
     if t < t0:
-        f = 0.0
+        f = 0
     elif t > t1:
         f = 1
     else:
+        # see also https://github.com/abatz/WATERBALANCE/blob/master/runsnow.m
+        # ann params from Dai 2008, Table 1a (row 1)
+        a = -48.2292
+        b = 0.7205
+        c = 1.1662
+        d = 1.0223
         # parametric form from Dai 2008
-        f = a * (np.tanh(b * (t - c)) - d) / 100.0
+        f = 1 - (a * (np.tanh(b * (t - c)) - d) / 100.0)
     return f
-
-
-def linrmelt(temp, radiation, b0=-398.4, b1=81.75, b2=25.05):
-    return np.maximum((b0 + temp * b1 + radiation * b2), 0)
 
 
 def snowmod(tmean, ppt, radiation, snowpack_prev=None, albedo=0.23, albedo_snow=0.8):
@@ -67,14 +55,16 @@ def snowmod(tmean, ppt, radiation, snowpack_prev=None, albedo=0.23, albedo_snow=
         snowpack_prev = 0
 
     mfsnow = mf(tmean)
-    mfmelt = linrmelt(tmean, radiation)
 
     # calculate values
-    snow = (1 - mfsnow) * ppt
     rain = mfsnow * ppt
-    melt = np.minimum(mfmelt, snow + snowpack_prev)
+    snow = ppt - rain
+    melt = mfsnow * (snow + snowpack_prev)
     snowpack = snowpack_prev + snow - melt
     h2o_input = rain + melt
+    fractrain = rain / h2o_input
+    if ~np.isfinite(fractrain):
+        fractrain = 0.0
 
     # make vector of albedo values
     if snowpack > 0 or snowpack_prev > 0:
@@ -82,7 +72,16 @@ def snowmod(tmean, ppt, radiation, snowpack_prev=None, albedo=0.23, albedo_snow=
     else:
         out_albedo = albedo
 
-    return dict(snowpack=snowpack, h2o_input=h2o_input, albedo=out_albedo)
+    extra_runoff = 0.05 * h2o_input
+    h2o_input -= extra_runoff
+
+    return dict(
+        snowpack=snowpack,
+        h2o_input=h2o_input,
+        albedo=out_albedo,
+        fractrain=fractrain,
+        extra_runoff=extra_runoff,
+    )
 
 
 def monthly_et0(radiation, tmax, tmin, wind, dpt, tmean_prev, lat, elev, month, albedo=0.23):
