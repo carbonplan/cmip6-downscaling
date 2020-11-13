@@ -81,6 +81,7 @@ def snowmod(tmean, ppt, radiation, snowpack_prev=None, albedo=0.23, albedo_snow=
         albedo=out_albedo,
         fractrain=fractrain,
         extra_runoff=extra_runoff,
+        mfsnow=mfsnow,
     )
 
 
@@ -220,6 +221,131 @@ def monthly_et0(radiation, tmax, tmin, wind, dpt, tmean_prev, lat, elev, month, 
     )
 
     return et0
+
+
+def hydromod(t_mean, ppt, pet, awc, soil, snow_storage, mfsnow):
+    """
+    Run simple hydro model to calculate water balance terms. This is
+    a translation from matlab into python of a simple hydro model
+    written by John Abatzoglou. The original model is located here:
+    https://github.com/abatz/WATERBALANCE/blob/master/hydro_tax_ro.m
+
+    This function computes monthly estimated water balance terms given
+    specified parameters and states.
+
+    Parameters
+    ----------
+    t_mean : float
+        Mean monthly temperatures in C
+    ppt : float
+        Monthly accumulated precipitation in mm
+    pet : float
+        Potential evapotranspiration
+    awc : float
+        Available water content (constant)
+    soil : float
+        Soil water storage at beginning of month.
+    snow_storage : float
+        Snow storage at beginning of month.
+    mfsnow: float
+        Melt fraction of snow as calculated in snow model.
+    Returns
+    -------
+    df: pd.DataFrame
+        Dataframe with three columns for end-of-month snowpack, H2O input (rain plus snowmelt), and albedo.
+    """
+    melt_fraction = mfsnow
+    snowfall = (1 - melt_fraction) * ppt
+    melt = melt_fraction * (snowfall + snow_storage)
+    rain = ppt - snowfall
+    input_h2o = rain + melt
+    extra_runoff = input_h2o * 0.05
+    input_h2o *= 0.95
+
+    snow_drives_hydrology = True
+
+    if snow_drives_hydrology:
+        runoff_snow = min(extra_runoff, melt)
+        r_rain = extra_runoff - runoff_snow
+        rain_input = rain - r_rain
+        excess_after_liquid = max(0, rain_input - pet)
+
+    snow_storage = (1 - melt_fraction) * (snowfall + snow_storage)
+    delta_soil = input_h2o - pet
+
+    if (delta_soil < 0) and (snow_storage > -delta_soil):
+        # if snowstorage has enough to fulfill delta_soil,
+        # remove the delta_soil from snow_storage, assign it to
+        # snow_drink and then zero-out delta_soil
+        snow_storage += delta_soil
+        snow_drink = -delta_soil
+        delta_soil = 0
+    elif (delta_soil < 0) and (snow_storage < -delta_soil):
+        # if snow_storage doesn't have enough capacity to fulfill
+        # the delta_soil need, bring delta_soil closer to zero by drinking
+        # snow_storage and then zero-out snow_storage
+        delta_soil += snow_storage
+        snow_drink = snow_storage
+        snow_storage = 0
+    else:
+        snow_drink = 0
+    ## question for joe: what about corner case of soil_moisture=0 - john's never
+    # acknowledges that - but maybe it's a matlab thing that > includes >= or something
+    # now you've drunk your snowpack you'll draw from soil_moisture
+    if -delta_soil > soil:
+        # if the need is greater than availability in soil then
+        # constrain it to soil (this holds the water balance)
+        delta_soil = -soil
+        drain_soil = 0
+    elif delta_soil < 0:
+        # if delta_soil is negative a.k.a. soil will drain
+        drain_soil = delta_soil * (1 - np.exp(-soil / awc))
+    elif delta_soil >= 0:
+        drain_soil = 0
+
+    demand = pet
+    supply = input_h2o + snow_drink
+
+    if demand >= supply:
+        # if there is more evaporative demand than supply,
+        # aet will be constrained by the soil drainage
+        # and your deficit will be the difference between
+        # pet and aet
+        aet = supply - drain_soil
+        deficit = pet - aet
+        runoff = 0
+        soil = soil + drain_soil
+    else:
+        # if there is enough water to satisfy pet then
+        # aet will match pet and there is no deficit
+        aet = pet
+        deficit = 0
+
+    # this boolean is hardcoded true right now
+
+    if snow_drives_hydrology:
+        excess = max(0, soil + delta_soil - awc)
+        excess_rain_only = max(0, soil + excess_after_liquid - awc)
+        if (demand < supply) and (soil + delta_soil > awc):
+            # if supply exceeds demand and the updated soil water is greater than
+            # the available capacity
+            runoff = excess
+            runoff_snow += excess - excess_rain_only
+            soil = awc
+        elif (demand < supply) and (soil + delta_soil <= awc):
+            # if supply exceeds demand and updated soil water
+            # is less than available water capacity
+            soil += delta_soil
+            runoff = 0
+
+    return {
+        'aet': aet,
+        'deficit': deficit,
+        'runoff': runoff,
+        'snow_storage': snow_storage,
+        'soil': soil,
+        'runoff_snow': runoff_snow,
+    }
 
 
 def aetmod(et0, h2o_input, awc, soil_prev=None):
