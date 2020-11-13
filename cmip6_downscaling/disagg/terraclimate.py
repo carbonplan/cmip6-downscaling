@@ -62,9 +62,11 @@ def snowmod(tmean, ppt, radiation, snowpack_prev=None, albedo=0.23, albedo_snow=
     melt = mfsnow * (snow + snowpack_prev)
     snowpack = snowpack_prev + snow - melt
     h2o_input = rain + melt
-    fractrain = rain / h2o_input
-    if ~np.isfinite(fractrain):
+
+    if h2o_input <= 0:
         fractrain = 0.0
+    else:
+        fractrain = rain / h2o_input
 
     # make vector of albedo values
     if snowpack > 0 or snowpack_prev > 0:
@@ -158,7 +160,7 @@ def monthly_et0(radiation, tmax, tmin, wind, dpt, tmean_prev, lat, elev, month, 
     )  # (log((2-2/3*0.12)/(0.123*0.12))*log((2-2/3*0.12)/(0.1*0.123*0.12)))/(0.41**2*wind) # equal to 208/wind for hh=hw=2.
     rs = sr / (0.5 * 24 * 0.12)  # value of 70 when sr=100
 
-    # Saturation vapor pressure ,
+    # Saturation vapor pressure
     es = (
         0.6108 * np.exp(tmin * 17.27 / (tmin + 237.3)) / 2
         + 0.6108 * np.exp(tmax * 17.27 / (tmax + 237.3)) / 2
@@ -251,8 +253,8 @@ def hydromod(t_mean, ppt, pet, awc, soil, snow_storage, mfsnow):
         Melt fraction of snow as calculated in snow model.
     Returns
     -------
-    df: pd.DataFrame
-        Dataframe with three columns for end-of-month snowpack, H2O input (rain plus snowmelt), and albedo.
+    data: dict
+        Dictionary with data values for aet, deficit, runoff, snow_storage, soil, and runoff_snow
     """
     melt_fraction = mfsnow
     snowfall = (1 - melt_fraction) * ppt
@@ -289,18 +291,21 @@ def hydromod(t_mean, ppt, pet, awc, soil, snow_storage, mfsnow):
         snow_storage = 0
     else:
         snow_drink = 0
+
     ## question for joe: what about corner case of soil_moisture=0 - john's never
     # acknowledges that - but maybe it's a matlab thing that > includes >= or something
     # now you've drunk your snowpack you'll draw from soil_moisture
-    if -delta_soil > soil:
+    f1 = delta_soil < 0
+    ff = -delta_soil > soil
+
+    if ff:
         # if the need is greater than availability in soil then
         # constrain it to soil (this holds the water balance)
         delta_soil = -soil
-        drain_soil = 0
-    elif delta_soil < 0:
+    if f1:
         # if delta_soil is negative a.k.a. soil will drain
         drain_soil = delta_soil * (1 - np.exp(-soil / awc))
-    elif delta_soil >= 0:
+    else:
         drain_soil = 0
 
     demand = pet
@@ -322,7 +327,6 @@ def hydromod(t_mean, ppt, pet, awc, soil, snow_storage, mfsnow):
         deficit = 0
 
     # this boolean is hardcoded true right now
-
     if snow_drives_hydrology:
         excess = max(0, soil + delta_soil - awc)
         excess_rain_only = max(0, soil + excess_after_liquid - awc)
