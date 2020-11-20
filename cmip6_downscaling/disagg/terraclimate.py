@@ -87,31 +87,6 @@ def snowmod(tmean, ppt, radiation, snowpack_prev=None, albedo=0.23, albedo_snow=
     )
 
 
-def calcVPD(ta, p=1013.25):
-    """
-    This function computes the vapor pressure at satuation at air
-    temperature Ta (deg C). From Gill (1982), Atmos-Ocean Dynamics, 606.
-
-    Parameters
-    ---------
-    ta : float
-        air temperature in C
-    p: float
-        pressure (optional) in mb
-
-    Returns
-    -----------
-    vpd: float
-        saturation vapour pressure in mb
-    """
-    ta = ta - 273.16
-    ew = 10 ** (((0.7859 + 0.03477 * ta) / (1 + 0.00412 * ta)))
-    fw = 1 + 1e-6 * p * (4.5 + 0.0006 * ta ** 2)
-    vpd = fw * ew * 100
-
-    return vpd
-
-
 def monthly_PET(
     radiation,
     tmax,
@@ -122,9 +97,7 @@ def monthly_PET(
     lat,
     elev,
     month,
-    vap=None,
     albedo=0.23,
-    read_in_vap=False,
 ):
     """Calculate monthly Reference ET estimates using the Penman-Montieth equation
 
@@ -209,17 +182,7 @@ def monthly_PET(
         + 0.6108 * np.exp(tmax * 17.27 / (tmax + 237.3)) / 2
     )
     ea = 0.6108 * np.exp(dpt * 17.27 / (dpt + 237.3))
-
-    if read_in_vap:
-        vpn = calcVPD(tmin + 273.15, P)
-        vpx = calcVPD(tmax + 273.15, P)
-        vpn /= 1000
-        vpx /= 1000
-        # we don't actually have vap so maybe
-        # these lines won't work
-        vpd = vpn / 2 + vpx / 2 - vap
-    else:
-        vpd = es - ea
+    vpd = es - ea
 
     vpd = np.maximum(
         0, vpd
