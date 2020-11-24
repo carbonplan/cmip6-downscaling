@@ -87,12 +87,26 @@ def snowmod(tmean, ppt, radiation, snowpack_prev=None, albedo=0.23, albedo_snow=
     )
 
 
-def monthly_et0(radiation, tmax, tmin, wind, dpt, tmean_prev, lat, elev, month, albedo=0.23):
+def monthly_PET(
+    radiation,
+    tmax,
+    tmin,
+    wind,
+    dpt,
+    tmean_prev,
+    lat,
+    elev,
+    month,
+    albedo=0.23,
+):
     """Calculate monthly Reference ET estimates using the Penman-Montieth equation
 
     This function runs Reference ET estimates for monthly timesteps using methods based on
     the Penman-Montieth equation as presented in Allen et al (1998).  It incorporates a
     modification which adjusts stomatal conductance downwards at temperatures below 5 C.
+
+    This version has been ported over from John Abatzoglou's implementation used
+    for Terraclimate (https://github.com/abatz/WATERBALANCE)
 
     Parameters
     ----------
@@ -127,8 +141,7 @@ def monthly_et0(radiation, tmax, tmin, wind, dpt, tmean_prev, lat, elev, month, 
 
     # calculate soil heat flux (total for the month) using change in temperature from previous month
     tmean = (tmax + tmin) / 2
-    G = 0.14 * (tmean - tmean_prev)
-
+    G = 0.14 * (tmean - tmean_prev) * n_days  # KEY CHANGE
     # convert to wind height at 2m
     hw = 10  # height of wind measurements
     wind = wind * (4.87 / math.log(67 * hw - 5.42))  # convert to wind height at 2m
@@ -161,23 +174,26 @@ def monthly_et0(radiation, tmax, tmin, wind, dpt, tmean_prev, lat, elev, month, 
     rs = sr / (0.5 * 24 * 0.12)  # value of 70 when sr=100
 
     # Saturation vapor pressure
+
+    P = 101.3 * ((293 - 0.0065 * elev) / 293) ** 5.26  # Barometric pressure in kPa
+
     es = (
         0.6108 * np.exp(tmin * 17.27 / (tmin + 237.3)) / 2
         + 0.6108 * np.exp(tmax * 17.27 / (tmax + 237.3)) / 2
     )
     ea = 0.6108 * np.exp(dpt * 17.27 / (dpt + 237.3))
     vpd = es - ea
-    vpd = np.maximum(0, vpd)
-    # vpd[
-    #     vpd < 0
-    # ] = 0  # added because this can be negative if dewpoint temperature is greater than mean temp (implying vapor pressure greater than saturation).
+
+    vpd = np.maximum(
+        0, vpd
+    )  # added because this can be negative if dewpoint temperature is greater than mean temp (implying vapor pressure greater than saturation).
 
     # delta - Slope of the saturation vapor pressure vs. air temperature curve at the average hourly air temperature
     delta = (4098 * es) / (tmean + 237.3) ** 2
 
-    P = 101.3 * ((293 - 0.0065 * elev) / 293) ** 5.26  # Barometric pressure in kPa
     lhv = 2.501 - 2.361e-3 * tmean  # latent heat of vaporization
     cp = 1.013 * 10 ** -3  # specific heat of air
+    # Changing this to who it is in John's petvpd
     gamma = cp * P / (0.622 * lhv)  # Psychrometer constant (kPa C-1)
     pa = P / (1.01 * (tmean + 273) * 0.287)  # mean air density at constant pressure
 
@@ -198,31 +214,30 @@ def monthly_et0(radiation, tmax, tmin, wind, dpt, tmean_prev, lat, elev, month, 
     Rso = Ra * (
         0.75 + 2e-5 * elev
     )  # For a cloudless day, Rs is roughly 75% of extraterrestrial radiation (Ra)
-
+    Rso = np.maximum(0, Rso)
     # radfraction is a measure of relative shortwave radiation, or of
     # possible radiation (cloudy vs. clear-sky)
     radfraction = radiation / Rso
-    radfraction = np.maximum(1, radfraction)
+    radfraction = np.minimum(1, radfraction)
 
     # longwave  and net radiation
     longw = (
         4.903e-9
-        * n_days
         * ((tmax + 273.15) ** 4 + (tmin + 273.15) ** 4)
         / 2
         * (0.34 - 0.14 * np.sqrt(ea))
         * (1.35 * radfraction - 0.35)
     )
-    netrad = radiation * n_days * (1 - albedo) - longw
+    netrad = (radiation * (1 - albedo) - longw) * n_days
 
-    # ET0
-    et0 = (
+    # PET
+    pet = (
         0.408
         * ((delta * (netrad - G)) + (pa * cp * vpd / ra * 3600 * 24 * n_days))
         / (delta + gamma * (1 + rs / ra))
     )
 
-    return et0
+    return pet
 
 
 def hydromod(t_mean, ppt, pet, awc, soil, snow_storage, mfsnow):
