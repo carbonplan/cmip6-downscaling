@@ -1,17 +1,16 @@
 #!/usr/bin/env python
 
 import os
-from carbonplan.data import cat
+import warnings
 
-import dask
-from dask.distributed import Client
-from climate_indices import indices
-from cmip6_downscaling.workflows.utils import get_store
-import zarr
 import numba
-import xarray as xr
 import numpy as np
+import xarray as xr
+import zarr
+from climate_indices import indices
 from skdownscale.pointwise_models.core import xenumerate
+
+from cmip6_downscaling.workflows.utils import get_store
 
 target = 'obs/conus/monthly/4000m/terraclimate_plus.zarr'
 
@@ -21,10 +20,13 @@ INCH_TO_MM = 0.0393701
 WM2_TO_MGM2D = 86400 / 1e6
 MISSING = -9999
 
+
 # set threading options
 def _set_thread_settings():
     numba.set_num_threads(1)
     os.environ['OMP_NUM_THREADS'] = '1'
+
+
 _set_thread_settings()
 
 
@@ -45,26 +47,35 @@ def calc_indices(ds_small, calib_start=1960, calib_end=2009):
     ds = create_template(ds_small['ppt'], index_vars)
 
     start_year = ds_small['time'].dt.year[0].data.item()
-    
+
     for index, mask_val in xenumerate(ds_small['mask']):
         if not mask_val.data.item():
             # skip values outside the mask
             continue
 
         ds_point = ds_small[['tavg', 'ppt', 'awc']].loc[index]
-        
+
         try:
             pet = indices.pet(ds_point['tavg'].data, ds_point['lat'].data, start_year)
-            pdsi = indices.pdsi(ds_point['ppt'].data * INCH_TO_MM, pet * INCH_TO_MM, ds_point['awc'].data * INCH_TO_MM, start_year, calib_start, calib_end)[0]
+            pdsi = indices.pdsi(
+                ds_point['ppt'].data * INCH_TO_MM,
+                pet * INCH_TO_MM,
+                ds_point['awc'].data * INCH_TO_MM,
+                start_year,
+                calib_start,
+                calib_end,
+            )[0]
         except Exception as e:
             # TODO: figure out exactly why a very few grid cells are failing with a divide by zero error.
-            warnings.warn(f'PET/PDSI calculation raised an exception, inserting missing values ({MISSING}) to keep going. Error: \n{e}')
+            warnings.warn(
+                f'PET/PDSI calculation raised an exception, inserting missing values ({MISSING}) to keep going. Error: \n{e}'
+            )
             pet = MISSING
             pdsi = MISSING
 
         ds['pet'].loc[index] = pet
         ds['pdsi'].loc[index] = pdsi
-    
+
     return ds
 
 
@@ -101,7 +112,8 @@ if __name__ == '__main__':
         'carbonplan-scratch',
         prefix='rechunker/terraclimate/target.zarr/',
         account_name="carbonplan",
-        account_key=os.environ["BLOB_ACCOUNT_KEY"])
+        account_key=os.environ["BLOB_ACCOUNT_KEY"],
+    )
     ds_conus = xr.open_zarr(mapper, consolidated=True)
 
     # open awc raster

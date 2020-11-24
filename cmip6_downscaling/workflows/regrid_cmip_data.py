@@ -3,7 +3,6 @@
 import dask
 import xesmf
 from carbonplan.data import cat
-from dask.distributed import Client
 
 from cmip6_downscaling.data.cmip import cmip
 from cmip6_downscaling.workflows.utils import get_store
@@ -11,6 +10,7 @@ from cmip6_downscaling.workflows.utils import get_store
 target = 'cmip6/regridded/conus/monthly/4000m/{key}.zarr'
 update_vars = ['area', 'crs', 'mask']
 trange = slice('1950', '2120')
+max_members = 5
 
 
 def regrid_one_model(source_ds, target_grid, method='bilinear', reuse_weights=True):
@@ -30,9 +30,6 @@ def slim_cmip_key(key, member_id):
 
 
 if __name__ == '__main__':
-    # client = Client(n_workers=16, threads_per_worker=1)
-    # print(client)
-    # print(client.dashboard_link)
     skip_existing = True
     model_dict, data = cmip()
 
@@ -47,12 +44,13 @@ if __name__ == '__main__':
     print(f'regridding {len(keys_to_regrid)} keys')
 
     failed = {}
+    all_keys = []
     for key in keys_to_regrid:
 
         # get source dataset
         source_ds = data[key].sel(time=trange)
         print(source_ds)
-        for member_id in source_ds['member_id'].data:
+        for i, member_id in enumerate(source_ds['member_id'].data):
 
             # create output store
             out_key = slim_cmip_key(key, member_id)
@@ -61,7 +59,11 @@ if __name__ == '__main__':
             # skip if existing
             if skip_existing and '.zmetadata' in store:
                 print(f'{out_key} in store, skipping...')
+                all_keys.append(out_key)
                 continue
+
+            if i > (max_members - 1):
+                break
             store.clear()
 
             # perform the regridding
@@ -74,7 +76,9 @@ if __name__ == '__main__':
             ds.update(grid_ds[update_vars])
             try:
                 ds.to_zarr(store, mode='w', consolidated=True)
+                all_keys.append(out_key)
             except Exception as e:
                 print(key, e)
                 failed[key] = e
 print(failed)
+print(all_keys)
