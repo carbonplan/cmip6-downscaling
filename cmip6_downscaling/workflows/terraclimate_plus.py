@@ -1,24 +1,27 @@
 #!/usr/bin/env python
 
 import os
-import warnings
 
 import numba
 import numpy as np
 import xarray as xr
 import zarr
-from climate_indices import indices
-from skdownscale.pointwise_models.core import xenumerate
+from carbonplan.data import cat
 
+from cmip6_downscaling.disagg import derived_variables, terraclimate
 from cmip6_downscaling.workflows.utils import get_store
+
+# from skdownscale.pointwise_models.core import xenumerate
+
 
 target = 'obs/conus/monthly/4000m/terraclimate_plus.zarr'
 
 xy_region = {'x': slice(200, 210), 'y': slice(200, 210)}
-index_vars = ['pdsi', 'pet']
-INCH_TO_MM = 0.0393701
-WM2_TO_MGM2D = 86400 / 1e6
-MISSING = -9999
+force_vars = ['tmean', 'ppt', 'tmax', 'tmin', 'ws', 'tdew', 'srad']
+extra_vars = ['vap', 'vpd', 'rh']
+model_vars = ['aet', 'def', 'pdsi', 'pet', 'q', 'soil', 'swe']
+aux_vars = ['awc', 'elevation', 'mask']
+out_vars = force_vars + extra_vars + model_vars
 
 
 # set threading options
@@ -31,74 +34,71 @@ _set_thread_settings()
 
 
 def create_template(like_da, var_names):
-
     ds = xr.Dataset()
     for v in var_names:
         ds[v] = xr.full_like(like_da, np.nan)
     return ds
 
 
-def calc_indices(ds_small, calib_start=1960, calib_end=2009):
+def run_terraclimate_model(ds_in):
     _set_thread_settings()
 
-    for v in ['mask', 'awc', 'tavg', 'ppt']:
-        assert v in ds_small, ds_small
+    ds_out = create_template(ds_in['ppt'], model_vars)
 
-    ds = create_template(ds_small['ppt'], index_vars)
-
-    start_year = ds_small['time'].dt.year[0].data.item()
-
-    for index, mask_val in xenumerate(ds_small['mask']):
-        if not mask_val.data.item():
+    for index, mask_val in np.ndenumerate(ds_in['mask'].data):
+        y, x = index
+        if not mask_val:
             # skip values outside the mask
             continue
 
-        ds_point = ds_small[['tavg', 'ppt', 'awc']].loc[index]
+        # extract aux vars
+        awc = ds_in['awc'][index].data
+        elev = ds_in['elevation'][index].data
+        lat = ds_in['lat'][index].data
 
-        try:
-            pet = indices.pet(ds_point['tavg'].data, ds_point['lat'].data, start_year)
-            pdsi = indices.pdsi(
-                ds_point['ppt'].data * INCH_TO_MM,
-                pet * INCH_TO_MM,
-                ds_point['awc'].data * INCH_TO_MM,
-                start_year,
-                calib_start,
-                calib_end,
-            )[0]
-        except Exception as e:
-            # TODO: figure out exactly why a very few grid cells are failing with a divide by zero error.
-            warnings.warn(
-                f'PET/PDSI calculation raised an exception, inserting missing values ({MISSING}) to keep going. Error: \n{e}'
-            )
-            pet = MISSING
-            pdsi = MISSING
+        # run terraclimate model
+        df_point = ds_in[force_vars].isel(y=y, x=x).to_dataframe()
+        df_out = terraclimate.model(df_point, awc, lat, elev)
 
-        ds['pet'].loc[index] = pet
-        ds['pdsi'].loc[index] = pdsi
+        # copy results to dataset
+        for v in model_vars:
+            ds_out[v].data[:, y, x] = df_out[v].values
 
-    return ds
+    return ds_out
 
 
-def disagg(ds):
-
+def preprocess(ds):
     ds_in = ds.copy()
 
     # make sure coords are all pre-loaded
+    ds_in['mask'] = ds_in['mask'].load()
     ds_in['lon'] = ds_in['lon'].load()
     ds_in['lat'] = ds_in['lat'].load()
     for v in ['lon', 'lat']:
         if 'chunks' in ds_in[v].encoding:
             del ds_in[v].encoding['chunks']
+    return ds_in
 
-    if 'tavg' not in ds_in:
-        ds_in['tavg'] = (ds_in['tmax'] + ds_in['tmin']) / 2
 
-    template = create_template(ds_in['tmax'], index_vars)
+def disagg(ds):
+    # cleanup dataset and load coordinates
+    ds_in = preprocess(ds)
 
-    index_in_vars = ['tavg', 'ppt', 'mask', 'awc']
-    ds_disagg_out = ds_in[index_in_vars].map_blocks(calc_indices, template=template)
+    # derive physical quantities
+    ds_in = derived_variables.process(ds_in)
 
-    return ds_disagg_out
+    # create a template dataset that we can pass to map blocks
+    template = create_template(ds_in['ppt'], model_vars)
+
+    # run the model using map_blocks
+    in_vars = force_vars + aux_vars
+    ds_disagg_out = ds_in[in_vars].map_blocks(run_terraclimate_model, template=template)
+
+    # copy vars from input dataset to output dataset
+    for v in in_vars + extra_vars:
+        ds_disagg_out[v] = ds_in[v]
+
+    return ds_disagg_out[out_vars]
 
 
 if __name__ == '__main__':
@@ -114,27 +114,30 @@ if __name__ == '__main__':
         account_name="carbonplan",
         account_key=os.environ["BLOB_ACCOUNT_KEY"],
     )
-    ds_conus = xr.open_zarr(mapper, consolidated=True)
 
-    # open awc raster
-    awc = xr.open_rasterio('/home/jovyan/awc_4000m.tif').load().drop(['x', 'y']).squeeze(drop=True)
+    # open grid dataset
+    ds_grid = cat.grids.conus4k.to_dask()
 
-    # combine and mask
-    ds_conus['awc'] = awc
-    ds_conus['mask'] = xr.where(awc < 255, 1, 0)  # we should probably use the grid file for this
-    ds_conus = ds_conus.where(ds_conus['mask'])
+    # open terraclimate data
+    # todo: pull aux fields from rechunker version
+    ds_aux = cat.terraclimate.terraclimate.to_dask()
+    ds_in = xr.open_zarr(mapper, consolidated=True)
+
+    ds_in['mask'] = ds_grid['mask']
+    ds_in['awc'] = ds_aux['awc']
+    ds_in['elevation'] = ds_aux['elevation']
 
     if xy_region:
-        ds_conus = ds_conus.isel(**xy_region)
+        ds_in = ds_in.isel(**xy_region)
 
     # do the disaggregation
-    ds_conus = ds_conus[['ppt', 'tmax', 'tmin', 'awc', 'mask']]
-    ds_out = disagg(ds_conus)
-    # print(ds_out.load())
+    ds_out = disagg(ds_in)
+
+    print(ds_out.load())
 
     store = get_store(target)
     store.clear()
 
-    # write = ds_out.to_zarr(store, compute=False, mode='w')
-    # write.compute(retries=1)
-    # zarr.consolidate_metadata(store)
+    write = ds_out.to_zarr(store, compute=False, mode='w')
+    write.compute(retries=1)
+    zarr.consolidate_metadata(store)

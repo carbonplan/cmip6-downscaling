@@ -1,13 +1,27 @@
 import math
+from typing import Dict, Optional
 
+import numba
 import numpy as np
+import pandas as pd
+from climate_indices import palmer
 
-days_in_month = np.array([31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31])
-d2 = np.array([31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365])
-d1 = np.array([1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335])
+from ..constants import KELVIN, MGM2D_PER_WM2, MIN_PER_DAY, MM_PER_IN, SEC_PER_DAY
+
+days_in_month = np.array([0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31])
+d2 = np.array([0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365])
+d1 = np.array([0, 1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335])
+
+DAYS_PER_YEAR = 365
+GSC = 0.082  # MJ m -2 min-1 (solar constant)
 
 
-def mf(t, t0=-2, t1=6.5):
+def by_month(x):
+    return x.month
+
+
+@numba.njit
+def mf(t: float, t0: float = -2, t1: float = 6.5) -> float:
     if t < t0:
         f = 0
     elif t > t1:
@@ -24,7 +38,15 @@ def mf(t, t0=-2, t1=6.5):
     return f
 
 
-def snowmod(tmean, ppt, radiation, snowpack_prev=None, albedo=0.23, albedo_snow=0.8):
+@numba.njit
+def snowmod(
+    tmean: float,
+    ppt: float,
+    radiation: float,
+    snowpack_prev: Optional[float] = None,
+    albedo: float = 0.23,
+    albedo_snow: float = 0.8,
+) -> Dict[str, float]:
     """Calculate monthly estimate snowfall and snowmelt.
 
     This function computes monthly estimated snowfall and snowmelt. Output includes end-of-month snowpack,
@@ -77,28 +99,29 @@ def snowmod(tmean, ppt, radiation, snowpack_prev=None, albedo=0.23, albedo_snow=
     extra_runoff = 0.05 * h2o_input
     h2o_input -= extra_runoff
 
-    return dict(
-        snowpack=snowpack,
-        h2o_input=h2o_input,
-        albedo=out_albedo,
-        fractrain=fractrain,
-        extra_runoff=extra_runoff,
-        mfsnow=mfsnow,
-    )
+    return {
+        'swe': snowpack,
+        'h2o_input': h2o_input,
+        'albedo': out_albedo,
+        'fractrain': fractrain,
+        'extra_runoff': extra_runoff,
+        'mfsnow': mfsnow,
+    }
 
 
-def monthly_PET(
-    radiation,
-    tmax,
-    tmin,
-    wind,
-    dpt,
-    tmean_prev,
-    lat,
-    elev,
-    month,
-    albedo=0.23,
-):
+@numba.njit
+def monthly_pet(
+    radiation: float,
+    tmax: float,
+    tmin: float,
+    wind: float,
+    dpt: float,
+    tmean_prev: float,
+    lat: float,
+    elev: float,
+    month: float,
+    albedo: float = 0.23,
+) -> float:
     """Calculate monthly Reference ET estimates using the Penman-Montieth equation
 
     This function runs Reference ET estimates for monthly timesteps using methods based on
@@ -123,11 +146,11 @@ def monthly_PET(
     tmean_prev : float
         Mean temp of previous month in C
     lat : float
-        Latitude in degrees
+        Latitude (degrees)
     elev : float
-        Elevation in meters
+        Elevation (meters)
     month : int
-        Month of year (0 indexed)
+        Month of year
     albedo : float
         Surface albedo, default=0.23
 
@@ -174,7 +197,6 @@ def monthly_PET(
     rs = sr / (0.5 * 24 * 0.12)  # value of 70 when sr=100
 
     # Saturation vapor pressure
-
     P = 101.3 * ((293 - 0.0065 * elev) / 293) ** 5.26  # Barometric pressure in kPa
 
     es = (
@@ -193,19 +215,17 @@ def monthly_PET(
 
     lhv = 2.501 - 2.361e-3 * tmean  # latent heat of vaporization
     cp = 1.013 * 10 ** -3  # specific heat of air
-    # Changing this to who it is in John's petvpd
+
     gamma = cp * P / (0.622 * lhv)  # Psychrometer constant (kPa C-1)
-    pa = P / (1.01 * (tmean + 273) * 0.287)  # mean air density at constant pressure
+    pa = P / (1.01 * (tmean + KELVIN) * 0.287)  # mean air density at constant pressure
 
     # Calculate potential max solar radiation or clear sky radiation
-    GSC = 0.082  # MJ m -2 min-1 (solar constant)
     phi = np.pi * lat / 180
-    dr = 1 + 0.033 * np.cos(2 * np.pi / 365 * doy)
-    delt = 0.409 * np.sin(2 * np.pi / 365 * doy - 1.39)
+    dr = 1 + 0.033 * np.cos(2 * np.pi / DAYS_PER_YEAR * doy)
+    delt = 0.409 * np.sin(2 * np.pi / DAYS_PER_YEAR * doy - 1.39)
     omegas = np.arccos(-np.tan(phi) * np.tan(delt))
     Ra = (
-        24
-        * 60
+        MIN_PER_DAY
         / np.pi
         * GSC
         * dr
@@ -223,7 +243,7 @@ def monthly_PET(
     # longwave  and net radiation
     longw = (
         4.903e-9
-        * ((tmax + 273.15) ** 4 + (tmin + 273.15) ** 4)
+        * ((tmax + KELVIN) ** 4 + (tmin + KELVIN) ** 4)
         / 2
         * (0.34 - 0.14 * np.sqrt(ea))
         * (1.35 * radfraction - 0.35)
@@ -233,14 +253,23 @@ def monthly_PET(
     # PET
     pet = (
         0.408
-        * ((delta * (netrad - G)) + (pa * cp * vpd / ra * 3600 * 24 * n_days))
+        * ((delta * (netrad - G)) + (pa * cp * vpd / ra * SEC_PER_DAY * n_days))
         / (delta + gamma * (1 + rs / ra))
     )
 
     return pet
 
 
-def hydromod(t_mean, ppt, pet, awc, soil, snow_storage, mfsnow):
+@numba.jit
+def hydromod(
+    t_mean: float,
+    ppt: float,
+    pet: float,
+    awc: float,
+    soil: float,
+    snow_storage: float,
+    mfsnow: float,
+) -> Dict[str, float]:
     """
     Run simple hydro model to calculate water balance terms. This is
     a translation from matlab into python of a simple hydro model
@@ -264,12 +293,12 @@ def hydromod(t_mean, ppt, pet, awc, soil, snow_storage, mfsnow):
         Soil water storage at beginning of month.
     snow_storage : float
         Snow storage at beginning of month.
-    mfsnow: float
+    mfsnow : float
         Melt fraction of snow as calculated in snow model.
     Returns
     -------
-    data: dict
-        Dictionary with data values for aet, deficit, runoff, snow_storage, soil, and runoff_snow
+    data : dict
+        Dictionary with data values for aet, def, q, snow_storage, soil, and runoff_snow
     """
     melt_fraction = mfsnow
     snowfall = (1 - melt_fraction) * ppt
@@ -279,13 +308,10 @@ def hydromod(t_mean, ppt, pet, awc, soil, snow_storage, mfsnow):
     extra_runoff = input_h2o * 0.05
     input_h2o *= 0.95
 
-    snow_drives_hydrology = True
-
-    if snow_drives_hydrology:
-        runoff_snow = min(extra_runoff, melt)
-        r_rain = extra_runoff - runoff_snow
-        rain_input = rain - r_rain
-        excess_after_liquid = max(0, rain_input - pet)
+    runoff_snow = min(extra_runoff, melt)
+    r_rain = extra_runoff - runoff_snow
+    rain_input = rain - r_rain
+    excess_after_liquid = max(0, rain_input - pet)
 
     snow_storage = (1 - melt_fraction) * (snowfall + snow_storage)
     delta_soil = input_h2o - pet
@@ -341,33 +367,34 @@ def hydromod(t_mean, ppt, pet, awc, soil, snow_storage, mfsnow):
         aet = pet
         deficit = 0
 
-    # this boolean is hardcoded true right now
-    if snow_drives_hydrology:
-        excess = max(0, soil + delta_soil - awc)
-        excess_rain_only = max(0, soil + excess_after_liquid - awc)
-        if (demand < supply) and (soil + delta_soil > awc):
-            # if supply exceeds demand and the updated soil water is greater than
-            # the available capacity
-            runoff = excess
-            runoff_snow += excess - excess_rain_only
-            soil = awc
-        elif (demand < supply) and (soil + delta_soil <= awc):
-            # if supply exceeds demand and updated soil water
-            # is less than available water capacity
-            soil += delta_soil
-            runoff = 0
+    excess = max(0, soil + delta_soil - awc)
+    excess_rain_only = max(0, soil + excess_after_liquid - awc)
+    if (demand < supply) and (soil + delta_soil > awc):
+        # if supply exceeds demand and the updated soil water is greater than
+        # the available capacity
+        runoff = excess
+        runoff_snow += excess - excess_rain_only
+        soil = awc
+    elif (demand < supply) and (soil + delta_soil <= awc):
+        # if supply exceeds demand and updated soil water
+        # is less than available water capacity
+        soil += delta_soil
+        runoff = 0
 
     return {
         'aet': aet,
-        'deficit': deficit,
-        'runoff': runoff,
+        'def': deficit,
+        'q': runoff,
         'snow_storage': snow_storage,
         'soil': soil,
         'runoff_snow': runoff_snow,
     }
 
 
-def aetmod(et0, h2o_input, awc, soil_prev=None):
+@numba.njit
+def aetmod(
+    et0: float, h2o_input: float, awc: float, soil_prev: Optional[float] = None
+) -> Dict[str, float]:
     """Calculate monthly actual evapotranspiration (AET)
 
     This function computes AET given ET0, H2O input, soil water capacity, and beginning-of-month soil moisture
@@ -379,7 +406,7 @@ def aetmod(et0, h2o_input, awc, soil_prev=None):
     h2o_input : float
         Monthly water input to soil in mm
     awc : float
-        Soil water capacity in mm
+        Soil water capacity (mm)
     soil_prev : float, optional
         Soil water content for the previous month (mm)
 
@@ -418,4 +445,151 @@ def aetmod(et0, h2o_input, awc, soil_prev=None):
         deficit = et0 - aet
         soil = soil_prev - soildrawdown
 
-    return {"aet": aet, "soil": soil, "runoff": runoff, "deficit": deficit}
+    return {"aet": aet, "soil": soil, "q": runoff, "def": deficit}
+
+
+@numba.jit
+def pdsi(
+    ppt: pd.Series, pet: pd.Series, awc: float, pad_years: int = 10, y1: int = 1970, y2: int = 2000
+) -> np.ndarray:
+    """Calculate the Palmer Drought Severity Index (PDSI)
+
+    Parameters
+    ----------
+    ppt : pd.Series
+        Monthly precipitation timeseries (mm)
+    pet : pd.Series
+        Monthly PET timeseries (mm)
+    awc : float
+        Soil water capacity (mm)
+    pad_years : int
+        Number of years of the climatology to prepend to the timeseries of ppt and pet
+    y1 : int
+        Start year for climate normal period
+    y2 : int
+        End year for climate normal period
+
+    Returns
+    -------
+    pdsi : pd.Series
+        Timeseries of PDSI (unitless)
+    """
+
+    pad_months = pad_years * 12
+    y0 = ppt.index.year[0] - pad_years  # start year (with pad)
+
+    # calculate the climatology for ppt and pet (for only the climate normal period)
+    df = pd.concat([pet, ppt], axis=1)
+    climatology = df.loc[str(y1) : str(y2)].groupby(by=by_month).mean()
+
+    # repeat climatology for pad_years, then begine the time series
+    ppt_extended = np.concatenate([np.tile(climatology['ppt'].values, pad_years), ppt.values])
+    ppt_extended /= MM_PER_IN
+    pet_extended = np.concatenate([np.tile(climatology['pet'].values, pad_years), pet.values])
+    pet_extended /= MM_PER_IN
+
+    return pd.Series(
+        palmer.pdsi(ppt_extended, pet_extended, awc / MM_PER_IN, y0, y1, y2)[0][pad_months:],
+        index=ppt.index,
+    )
+
+
+@numba.jit
+def model(
+    df: pd.DataFrame,
+    awc: float,
+    lat: float,
+    elev: float,
+    snowpack_prev: Optional[float] = None,
+    soil_prev: Optional[float] = None,
+    tmean_prev: Optional[float] = None,
+) -> pd.DataFrame:
+    """Terraclimate hydrology model
+
+    Given a dataframe of monthly hydrometeorologic data, return a new dataframe of derived
+    variables including {aet (mm), def (mm), pet (mm), q (mm), soil (mm), swe (mm)}.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input data containing columns {tmean (C), ppt (mm), srad (w m-2), tmax (C), tmin (C),
+        ws (m s-1), tdew (C)}. Must include a valid DatetimeIndex.
+    awc : float
+        Soil water capacity (mm)
+    lat : float
+        Latitude (degrees)
+    elev : float
+        Elevation (meters)
+    snowpack_prev : float, optional
+        Snowpack at the beginning of the month. If None this is taken to be zero.
+    soil_prev : float, optional
+        Soil water content for the previous month (mm)
+
+    Returns
+    -------
+    out_df : pd.DataFrame
+        aet (mm), def (mm), pet (mm), q (mm), soil (mm), swe (mm)
+    """
+
+    out_df = pd.DataFrame(
+        index=df.index, columns=['aet', 'def', 'pet', 'q', 'soil', 'swe'], dtype=float
+    )
+
+    if snowpack_prev is None:
+        snowpack_prev = 0.0
+    if tmean_prev is None:
+        tmean_prev = df['tmean'][0]
+    if soil_prev is None:
+        soil_prev = awc
+
+    for i, row in df.iterrows():
+
+        radiation = row['srad'] * MGM2D_PER_WM2
+
+        # run snow routine
+        snow_out = snowmod(
+            row['tmean'], row['ppt'], radiation=radiation, snowpack_prev=snowpack_prev
+        )
+
+        # run pet routine
+        pet = monthly_pet(
+            radiation,
+            row['tmax'],
+            row['tmin'],
+            row['ws'],
+            row['tdew'],
+            tmean_prev,
+            lat,
+            elev,
+            i.month,
+        )
+
+        pet *= snow_out['mfsnow']
+
+        # run simple hydrology model
+        hydro_out = hydromod(
+            row['tmean'],
+            row['ppt'],  # ori, should this be snow_out['h2o_input']?
+            pet,
+            awc,
+            soil_prev,
+            snow_out['swe'],
+            snow_out['mfsnow'],
+        )
+
+        # populate output dataframe
+        out_df.loc[i, 'aet'] = hydro_out['aet']
+        out_df.loc[i, 'def'] = hydro_out['def']
+        out_df.loc[i, 'pet'] = pet
+        out_df.loc[i, 'q'] = hydro_out['q']
+        out_df.loc[i, 'soil'] = hydro_out['soil']
+        out_df.loc[i, 'swe'] = snow_out['swe']
+
+        # save state variables
+        tmean_prev = row['tmean']
+        snowpack_prev = snow_out['swe']
+        soil_prev = hydro_out['soil']
+
+    out_df['pdsi'] = pdsi(df['ppt'], out_df['pet'], awc)
+
+    return out_df
