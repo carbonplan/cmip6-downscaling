@@ -1,37 +1,125 @@
 import numpy as np
+import xarray as xr
 
 from ..constants import KELVIN
 
 sat_pressure_0c = 6.112  # [milibar]
 
+KPA_TO_MILIBAR = 10
+
 
 def dewpoint(e):
+    """Calculate the ambient dewpoint given the vapor pressure.
+
+    Parameters
+    ----------
+    e : scalar or array-like
+        Water vapor partial pressure [milibar]
+
+    Returns
+    -------
+    dewpoint : scalar or array-like
+        dewpoint temperature [C]
+
+    See Also
+    --------
+    metpy.calc.dewpoint
+    """
     e_milibar = e  # [milibar]
     val = np.log(e_milibar / sat_pressure_0c)
     return 243.5 * val / (17.67 - val)  # dewpoint temperature [C]
 
 
 def saturation_vapor_pressure(temperature):
+    """Calculate the saturation water vapor (partial) pressure.
+
+    Parameters
+    ----------
+    temperature : scalar or array-like
+        air temperature [K]
+
+    Returns
+    -------
+    svp : scalar or array-like
+        The saturation water vapor (partial) pressure [milibar]
+
+    See Also
+    --------
+    metpy.calc.saturation_vapor_pressure
+    """
     # temperature [k]
-    return sat_pressure_0c * np.exp(17.67 * (temperature - KELVIN) / (temperature - 29.65))
+    return sat_pressure_0c * np.exp(
+        17.67 * (temperature - KELVIN) / (temperature - 29.65)
+    )  # [milibar]
 
 
 def dewpoint_from_relative_humidity(temperature, rh):
+    """Calculate the ambient dewpoint given air temperature and relative humidity.
+
+    Parameters
+    ----------
+    temperature : scalar or array-like
+        air temperature [C]
+    rh : scalar or array-like
+        relative humidity expressed as a ratio in the range 0 < rh <= 1
+
+    Returns
+    -------
+    dewpoint : scalar or array-like
+        The dewpoint temperature [C]
+
+    See Also
+    --------
+    metpy.calc.dewpoint_from_relative_humidity
+    """
     return dewpoint(rh * saturation_vapor_pressure(temperature + KELVIN))
 
 
 def relative_humidity_from_dewpoint(temperature, dewpt):
+    """Calculate the relative humidity.
+
+    Uses temperature and dewpoint in celsius to calculate relative
+    humidity using the ratio of vapor pressure to saturation vapor pressures.
+
+    Parameters
+    ----------
+    temperature : scalar or array-like
+        air temperature [K]
+    dewpt : scalar or array-like
+        dewpoint temperature [K]
+
+    Returns
+    -------
+    scalar or array-like
+        relative humidity
+
+    See Also
+    --------
+    metpyt.calc.relative_humidity_from_dewpoint
+    """
     e = saturation_vapor_pressure(dewpt)
     e_s = saturation_vapor_pressure(temperature)
     return e / e_s
 
 
-def process(ds):
+def process(ds: xr.Dataset) -> xr.Dataset:
+    """Calculate missing derived variables
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Dataset to
+
+    Returns
+    -------
+    ds : xr.Dataset
+        Output dataset, includes the follwoing variables: {'tmean', 'vap', 'rh', 'tdew', 'vpd'}
+    """
 
     if 'tmean' not in ds:
-        ds['tmean'] = (ds['tmax'] + ds['tmin']) / 2
+        ds['tmean'] = (ds['tmax'] + ds['tmin']) / 2  # [C]
 
-    sat_vp = saturation_vapor_pressure(ds['tmean'] + KELVIN)
+    sat_vp = saturation_vapor_pressure(ds['tmean'] + KELVIN) / KPA_TO_MILIBAR
 
     if 'vap' not in ds and 'rh' in ds:
         ds['vap'] = ds['rh'] * sat_vp
@@ -41,7 +129,7 @@ def process(ds):
 
     if 'tdew' not in ds and 'vap' in ds:
         # calc tdew
-        ds['tdew'] = dewpoint(ds['vap'] * 10.0)
+        ds['tdew'] = dewpoint(ds['vap'] * KPA_TO_MILIBAR)
 
     if 'tdew' not in ds and 'rh' in ds:
         ds['tdew'] = dewpoint_from_relative_humidity(ds['tmean'] + KELVIN, ds['rh'])

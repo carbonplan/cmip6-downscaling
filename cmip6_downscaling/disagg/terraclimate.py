@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from climate_indices import palmer
 
+from .. import CLIMATE_NORMAL_PERIOD
 from ..constants import KELVIN, MGM2D_PER_WM2, MIN_PER_DAY, MM_PER_IN, SEC_PER_DAY
 
 days_in_month = np.array([0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31])
@@ -14,6 +15,7 @@ d1 = np.array([0, 1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335])
 
 DAYS_PER_YEAR = 365
 GSC = 0.082  # MJ m -2 min-1 (solar constant)
+MISSING = -9999
 
 
 def by_month(x):
@@ -300,6 +302,12 @@ def hydromod(
     data : dict
         Dictionary with data values for aet, def, q, snow_storage, soil, and runoff_snow
     """
+
+    # Initialize output vars
+    aet = 0.0
+    runoff = 0.0
+    deficit = 0.0
+
     melt_fraction = mfsnow
     snowfall = (1 - melt_fraction) * ppt
     melt = melt_fraction * (snowfall + snow_storage)
@@ -391,66 +399,70 @@ def hydromod(
     }
 
 
-@numba.njit
-def aetmod(
-    et0: float, h2o_input: float, awc: float, soil_prev: Optional[float] = None
-) -> Dict[str, float]:
-    """Calculate monthly actual evapotranspiration (AET)
+# @numba.njit
+# def aetmod(
+#     et0: float, h2o_input: float, awc: float, soil_prev: Optional[float] = None
+# ) -> Dict[str, float]:
+#     """Calculate monthly actual evapotranspiration (AET)
 
-    This function computes AET given ET0, H2O input, soil water capacity, and beginning-of-month soil moisture
+#     This function computes AET given ET0, H2O input, soil water capacity, and beginning-of-month soil moisture
 
-    Parameters
-    ----------
-    eto : float
-        Monthly reference evapotranspiration in mm
-    h2o_input : float
-        Monthly water input to soil in mm
-    awc : float
-        Soil water capacity (mm)
-    soil_prev : float, optional
-        Soil water content for the previous month (mm)
+#     Parameters
+#     ----------
+#     eto : float
+#         Monthly reference evapotranspiration in mm
+#     h2o_input : float
+#         Monthly water input to soil in mm
+#     awc : float
+#         Soil water capacity (mm)
+#     soil_prev : float, optional
+#         Soil water content for the previous month (mm)
 
-    Returns
-    -------
-    data : dict
-        aet, def, soil, and runoff
-    """
+#     Returns
+#     -------
+#     data : dict
+#         aet, def, soil, and runoff
+#     """
 
-    awc = np.maximum(awc, 10.0)
-    if np.isnan(awc):
-        awc = 50.0
+#     awc = np.maximum(awc, 10.0)
+#     if np.isnan(awc):
+#         awc = 50.0
 
-    runoff = 0.05 * h2o_input
-    h2o_input -= runoff
+#     runoff = 0.05 * h2o_input
+#     h2o_input -= runoff
 
-    if soil_prev is None:
-        soil_prev = 0
-    deltasoil = h2o_input - et0  # positive=excess H2O, negative=H2O deficit
+#     if soil_prev is None:
+#         soil_prev = 0
+#     deltasoil = h2o_input - et0  # positive=excess H2O, negative=H2O deficit
 
-    if deltasoil >= 0:
-        # Case when there is a moisture surplus
-        aet = et0
-        deficit = 0
-        soil = np.minimum(
-            soil_prev + deltasoil, awc
-        )  # increment soil moisture, but not above water holding capacity
-        runoff += np.maximum(
-            soil_prev + deltasoil - awc, 0
-        )  # when awc is exceeded, send the rest to runoff
-    else:  # deltasoil < 0
-        # Case where there is a moisture deficit: soil moisture is reduced
-        # this is the net change in soil moisture (neg)
-        soildrawdown = soil_prev * (1 - np.exp(deltasoil / awc))
-        aet = np.minimum(h2o_input + soildrawdown, et0)
-        deficit = et0 - aet
-        soil = soil_prev - soildrawdown
+#     if deltasoil >= 0:
+#         # Case when there is a moisture surplus
+#         aet = et0
+#         deficit = 0
+#         soil = np.minimum(
+#             soil_prev + deltasoil, awc
+#         )  # increment soil moisture, but not above water holding capacity
+#         runoff += np.maximum(
+#             soil_prev + deltasoil - awc, 0
+#         )  # when awc is exceeded, send the rest to runoff
+#     else:  # deltasoil < 0
+#         # Case where there is a moisture deficit: soil moisture is reduced
+#         # this is the net change in soil moisture (neg)
+#         soildrawdown = soil_prev * (1 - np.exp(deltasoil / awc))
+#         aet = np.minimum(h2o_input + soildrawdown, et0)
+#         deficit = et0 - aet
+#         soil = soil_prev - soildrawdown
 
-    return {"aet": aet, "soil": soil, "q": runoff, "def": deficit}
+#     return {"aet": aet, "soil": soil, "q": runoff, "def": deficit}
 
 
-@numba.jit
 def pdsi(
-    ppt: pd.Series, pet: pd.Series, awc: float, pad_years: int = 10, y1: int = 1970, y2: int = 2000
+    ppt: pd.Series,
+    pet: pd.Series,
+    awc: float,
+    pad_years: int = 10,
+    y1: int = CLIMATE_NORMAL_PERIOD[0],
+    y2: int = CLIMATE_NORMAL_PERIOD[1],
 ) -> np.ndarray:
     """Calculate the Palmer Drought Severity Index (PDSI)
 
@@ -488,10 +500,15 @@ def pdsi(
     pet_extended = np.concatenate([np.tile(climatology['pet'].values, pad_years), pet.values])
     pet_extended /= MM_PER_IN
 
-    return pd.Series(
-        palmer.pdsi(ppt_extended, pet_extended, awc / MM_PER_IN, y0, y1, y2)[0][pad_months:],
-        index=ppt.index,
-    )
+    try:
+        out = pd.Series(
+            palmer.pdsi(ppt_extended, pet_extended, awc / MM_PER_IN, y0, y1, y2)[0][pad_months:],
+            index=ppt.index,
+        )
+    except ZeroDivisionError:
+        out = (ppt * 0) + MISSING
+
+    return out
 
 
 @numba.jit
@@ -532,7 +549,7 @@ def model(
     """
 
     out_df = pd.DataFrame(
-        index=df.index, columns=['aet', 'def', 'pet', 'q', 'soil', 'swe'], dtype=float
+        index=df.index, columns=['aet', 'def', 'pet', 'q', 'soil', 'swe'], dtype=np.float32
     )
 
     if snowpack_prev is None:
