@@ -22,7 +22,7 @@ def by_month(x):
     return x.month
 
 
-@numba.njit
+@numba.njit(nogil=True, cache=True)
 def mf(t: float, t0: float = -2, t1: float = 6.5) -> float:
     if t < t0:
         f = 0
@@ -40,7 +40,7 @@ def mf(t: float, t0: float = -2, t1: float = 6.5) -> float:
     return f
 
 
-@numba.njit
+@numba.njit(nogil=True, cache=True)
 def snowmod(
     tmean: float,
     ppt: float,
@@ -111,7 +111,7 @@ def snowmod(
     }
 
 
-@numba.njit
+@numba.njit(nogil=True, cache=True)
 def monthly_pet(
     radiation: float,
     tmax: float,
@@ -262,7 +262,7 @@ def monthly_pet(
     return pet
 
 
-@numba.jit
+@numba.jit(nogil=True, cache=True)
 def hydromod(
     t_mean: float,
     ppt: float,
@@ -399,7 +399,7 @@ def hydromod(
     }
 
 
-# @numba.njit
+# @numba.njit(nogil=True, cache=True)
 # def aetmod(
 #     et0: float, h2o_input: float, awc: float, soil_prev: Optional[float] = None
 # ) -> Dict[str, float]:
@@ -511,7 +511,7 @@ def pdsi(
     return out
 
 
-@numba.jit
+@numba.jit(nogil=True, cache=True)
 def model(
     df: pd.DataFrame,
     awc: float,

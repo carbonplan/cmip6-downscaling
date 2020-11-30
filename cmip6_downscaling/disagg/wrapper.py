@@ -23,7 +23,9 @@ def _set_thread_settings():
 _set_thread_settings()
 
 
-def create_template(like_da: xr.DataArray, var_names: Iterable[str]) -> xr.Dataset:
+def create_template(
+    like_da: xr.DataArray, var_names: Iterable[str], fill_val: float = np.nan
+) -> xr.Dataset:
     """Create an empty dataset with the given variables in it
 
     Parameters
@@ -41,7 +43,7 @@ def create_template(like_da: xr.DataArray, var_names: Iterable[str]) -> xr.Datas
 
     ds = xr.Dataset()
     for v in var_names:
-        ds[v] = xr.full_like(like_da, np.nan, dtype=np.float32)
+        ds[v] = xr.full_like(like_da, fill_val, dtype=np.float32)
     return ds
 
 
@@ -82,6 +84,7 @@ def run_terraclimate_model(ds_in: xr.Dataset) -> xr.Dataset:
 
         # run terraclimate model
         df_point = ds_in[force_vars].isel(y=y, x=x).to_dataframe()
+
         df_out = terraclimate.model(df_point, awc, lat, elev)
 
         # copy results to dataset
@@ -96,7 +99,7 @@ def preprocess(ds: xr.Dataset) -> xr.Dataset:
     ds_in = ds.copy()
 
     # make sure coords are all pre-loaded
-    ds_in['mask'] = ds_in['mask'].load()
+    # ds_in['mask'] = ds_in['mask'].persist()
     ds_in['lon'] = ds_in['lon'].load()
     ds_in['lat'] = ds_in['lat'].load()
     for v in ['lon', 'lat']:
