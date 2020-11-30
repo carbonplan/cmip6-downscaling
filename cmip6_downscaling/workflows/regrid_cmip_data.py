@@ -11,6 +11,7 @@ target = 'cmip6/regridded/conus/monthly/4000m/{key}.zarr'
 update_vars = ['area', 'crs', 'mask']
 trange = slice('1950', '2120')
 max_members = 5
+skip_existing = True
 
 
 def regrid_one_model(source_ds, target_grid, method='bilinear', reuse_weights=True):
@@ -30,7 +31,6 @@ def slim_cmip_key(key, member_id):
 
 
 if __name__ == '__main__':
-    skip_existing = True
     model_dict, data = cmip()
 
     # target grid

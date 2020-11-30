@@ -6,7 +6,7 @@ import numpy as np
 import xarray as xr
 import zarr
 from carbonplan.data import cat
-from dask.distributed import Client
+from dask_gateway import Gateway
 
 from cmip6_downscaling.disagg.wrapper import disagg
 from cmip6_downscaling.workflows.share import chunks, xy_region
@@ -67,13 +67,18 @@ def main():
     store = get_store(target)
     store.clear()
 
-    write = ds_out.to_zarr(store, compute=False, mode='w')
+    write = ds_out[['pdsi', 'aet', 'def', 'pet']].to_zarr(store, compute=False, mode='w')
     write.compute(retries=1)
     zarr.consolidate_metadata(store)
 
 
 if __name__ == '__main__':
-    with Client(n_workers=12, threads_per_worker=1) as client:
+    # with Client(n_workers=12, threads_per_worker=1) as client:
+    gateway = Gateway()
+    with gateway.new_cluster(worker_cores=1, worker_memory=12) as cluster:
+        client = cluster.get_client()
+        cluster.adapt(minimum=5, maximum=100)
+
         print(client)
         print(client.dashboard_link)
 
