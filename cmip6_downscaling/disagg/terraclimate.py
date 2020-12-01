@@ -41,77 +41,6 @@ def mf(t: float, t0: float = -2, t1: float = 6.5) -> float:
 
 
 @numba.njit(nogil=True, cache=True)
-def snowmod(
-    tmean: float,
-    ppt: float,
-    radiation: float,
-    snowpack_prev: Optional[float] = None,
-    albedo: float = 0.23,
-    albedo_snow: float = 0.8,
-) -> Dict[str, float]:
-    """Calculate monthly estimate snowfall and snowmelt.
-
-    This function computes monthly estimated snowfall and snowmelt. Output includes end-of-month snowpack,
-    water "input" (snowmelt plus rain), and albedo.
-
-    Parameters
-    ----------
-    tmean : float
-        Mean monthly temperatures in C
-    ppt : float
-        Monthly accumulated precipitation in mm
-    radiation : float
-        Shortwave solar radiation in MJ/m^2/day
-    snowpack_prev : float, optional
-        Snowpack at the beginning of the month. If None this is taken to be zero.
-    albedo : float
-        Albedo in the absence of snow cover.
-    albedo_snow : float
-        Albedo given snow cover
-
-    Returns
-    -------
-    data: dict
-        End-of-month snowpack, H2O input (rain plus snowmelt), and albedo.
-    """
-
-    if snowpack_prev is None:
-        snowpack_prev = 0
-
-    mfsnow = mf(tmean)
-
-    # calculate values
-    rain = mfsnow * ppt
-    snow = ppt - rain
-    melt = mfsnow * (snow + snowpack_prev)
-    snowpack = snowpack_prev + snow - melt
-    h2o_input = rain + melt
-
-    if h2o_input <= 0:
-        fractrain = 0.0
-    else:
-        fractrain = rain / h2o_input
-
-    # make vector of albedo values
-    if snowpack > 0 or snowpack_prev > 0:
-        out_albedo = albedo_snow
-    else:
-        out_albedo = albedo
-
-    extra_runoff = 0.05 * h2o_input
-    h2o_input -= extra_runoff
-
-    return {
-        'swe': snowpack,
-        'h2o_input': h2o_input,
-        'albedo': out_albedo,
-        'fractrain': fractrain,
-        'extra_runoff': extra_runoff,
-        'mfsnow': mfsnow,
-    }
-
-
-@numba.njit(nogil=True, cache=True)
 def monthly_pet(
     radiation: float,
     tmax: float,
@@ -304,9 +233,9 @@ def hydromod(
     """
 
     # Initialize output vars
-    aet = 0.0
-    runoff = 0.0
-    deficit = 0.0
+    aet = np.nan
+    runoff = np.nan
+    deficit = np.nan
 
     melt_fraction = mfsnow
     snowfall = (1 - melt_fraction) * ppt
@@ -316,22 +245,28 @@ def hydromod(
     extra_runoff = input_h2o * 0.05
     input_h2o *= 0.95
 
-    runoff_snow = min(extra_runoff, melt)
+    runoff_snow = min(extra_runoff, melt)  # wierd
     r_rain = extra_runoff - runoff_snow
     rain_input = rain - r_rain
+    # then we do a check in which IF there is enough rain contribution
+    # to the soil (after we deduct the rain contribution toward fast runoff)
+    # to fulfill the PET demands, the excess of rain becomes "excess_after_liquid"
+    # otherwise (if there is less rain than PET needs, there is no excess_after_liquid)
     excess_after_liquid = max(0, rain_input - pet)
 
     snow_storage = (1 - melt_fraction) * (snowfall + snow_storage)
+    # change in soil is determined by difference from available increase
+    # in h2o and pet
     delta_soil = input_h2o - pet
 
-    if (delta_soil < 0) and (snow_storage > -delta_soil):
+    if (delta_soil < 0) and (snow_storage > 0) and (snow_storage > -delta_soil):
         # if snowstorage has enough to fulfill delta_soil,
         # remove the delta_soil from snow_storage, assign it to
         # snow_drink and then zero-out delta_soil
         snow_storage += delta_soil
         snow_drink = -delta_soil
         delta_soil = 0
-    elif (delta_soil < 0) and (snow_storage < -delta_soil):
+    elif (delta_soil < 0) and (snow_storage > 0) and (snow_storage < -delta_soil):
         # if snow_storage doesn't have enough capacity to fulfill
         # the delta_soil need, bring delta_soil closer to zero by drinking
         # snow_storage and then zero-out snow_storage
@@ -357,6 +292,10 @@ def hydromod(
     else:
         drain_soil = 0
 
+    # In this model aet is calculated based upon a demand/supply
+    # relationship where demand is PET and supply is the sum of
+    # input_h2o and snow_drink (with input_h2o being 95% of the
+    # runoff from melt+rain and snow_drink is like a sublimation term)
     demand = pet
     supply = input_h2o + snow_drink
 
@@ -368,7 +307,7 @@ def hydromod(
         aet = supply - drain_soil
         deficit = pet - aet
         runoff = 0
-        soil = soil + drain_soil
+        soil = soil + drain_soil  # remove from soil
     else:
         # if there is enough water to satisfy pet then
         # aet will match pet and there is no deficit
@@ -377,17 +316,19 @@ def hydromod(
 
     excess = max(0, soil + delta_soil - awc)
     excess_rain_only = max(0, soil + excess_after_liquid - awc)
-    if (demand < supply) and (soil + delta_soil > awc):
+    if (demand < supply) and ((soil + delta_soil) > awc):
         # if supply exceeds demand and the updated soil water is greater than
         # the available capacity
         runoff = excess
         runoff_snow += excess - excess_rain_only
         soil = awc
-    elif (demand < supply) and (soil + delta_soil <= awc):
+    elif (demand < supply) and ((soil + delta_soil) <= awc):
         # if supply exceeds demand and updated soil water
-        # is less than available water capacity
+        # is less than available water capacity you update
+        # the soil by the change in soil
         soil += delta_soil
         runoff = 0
+    runoff += extra_runoff
 
     return {
         'aet': aet,
@@ -395,65 +336,7 @@ def hydromod(
         'q': runoff,
         'snow_storage': snow_storage,
         'soil': soil,
-        'runoff_snow': runoff_snow,
     }
-
-
-# @numba.njit(nogil=True, cache=True)
-# def aetmod(
-#     et0: float, h2o_input: float, awc: float, soil_prev: Optional[float] = None
-# ) -> Dict[str, float]:
-#     """Calculate monthly actual evapotranspiration (AET)
-
-#     This function computes AET given ET0, H2O input, soil water capacity, and beginning-of-month soil moisture
-
-#     Parameters
-#     ----------
-#     eto : float
-#         Monthly reference evapotranspiration in mm
-#     h2o_input : float
-#         Monthly water input to soil in mm
-#     awc : float
-#         Soil water capacity (mm)
-#     soil_prev : float, optional
-#         Soil water content for the previous month (mm)
-
-#     Returns
-#     -------
-#     data : dict
-#         aet, def, soil, and runoff
-#     """
-
-#     awc = np.maximum(awc, 10.0)
-#     if np.isnan(awc):
-#         awc = 50.0
-
-#     runoff = 0.05 * h2o_input
-#     h2o_input -= runoff
-
-#     if soil_prev is None:
-#         soil_prev = 0
-#     deltasoil = h2o_input - et0  # positive=excess H2O, negative=H2O deficit
-
-#     if deltasoil >= 0:
-#         # Case when there is a moisture surplus
-#         aet = et0
-#         deficit = 0
-#         soil = np.minimum(
-#             soil_prev + deltasoil, awc
-#         )  # increment soil moisture, but not above water holding capacity
-#         runoff += np.maximum(
-#             soil_prev + deltasoil - awc, 0
-#         )  # when awc is exceeded, send the rest to runoff
-#     else:  # deltasoil < 0
-#         # Case where there is a moisture deficit: soil moisture is reduced
-#         # this is the net change in soil moisture (neg)
-#         soildrawdown = soil_prev * (1 - np.exp(deltasoil / awc))
-#         aet = np.minimum(h2o_input + soildrawdown, et0)
-#         deficit = et0 - aet
-#         soil = soil_prev - soildrawdown
-
-#     return {"aet": aet, "soil": soil, "q": runoff, "def": deficit}
 
 
 def pdsi(
@@ -564,9 +447,7 @@ def model(
         radiation = row['srad'] * MGM2D_PER_WM2
 
         # run snow routine
-        snow_out = snowmod(
-            row['tmean'], row['ppt'], radiation=radiation, snowpack_prev=snowpack_prev
-        )
+        mfsnow = mf(row['tmean'])
 
         # run pet routine
         pet = monthly_pet(
@@ -581,17 +462,17 @@ def model(
             i.month,
         )
 
-        pet *= snow_out['mfsnow']
+        pet *= mfsnow
 
         # run simple hydrology model
         hydro_out = hydromod(
             row['tmean'],
-            row['ppt'],  # ori, should this be snow_out['h2o_input']?
+            row['ppt'],
             pet,
             awc,
             soil_prev,
-            snow_out['swe'],
-            snow_out['mfsnow'],
+            snowpack_prev,
+            mfsnow,
         )
 
         # populate output dataframe
@@ -600,11 +481,11 @@ def model(
         out_df.loc[i, 'pet'] = pet
         out_df.loc[i, 'q'] = hydro_out['q']
         out_df.loc[i, 'soil'] = hydro_out['soil']
-        out_df.loc[i, 'swe'] = snow_out['swe']
+        out_df.loc[i, 'swe'] = hydro_out['snow_storage']
 
         # save state variables
         tmean_prev = row['tmean']
-        snowpack_prev = snow_out['swe']
+        snowpack_prev = hydro_out['snow_storage']
         soil_prev = hydro_out['soil']
 
     out_df['pdsi'] = pdsi(df['ppt'], out_df['pet'], awc)
