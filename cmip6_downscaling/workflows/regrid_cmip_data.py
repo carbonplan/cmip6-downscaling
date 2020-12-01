@@ -7,7 +7,7 @@ from carbonplan.data import cat
 from cmip6_downscaling.data.cmip import cmip
 from cmip6_downscaling.workflows.utils import get_store
 
-target = 'cmip6/regridded/conus/monthly/4000m/{key}.zarr'
+target = 'cmip6/regridded/conus/4000m/monthly/{key}.zarr'
 update_vars = ['area', 'crs', 'mask']
 trange = slice('1950', '2120')
 max_members = 5

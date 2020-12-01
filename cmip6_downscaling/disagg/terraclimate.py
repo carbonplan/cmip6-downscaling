@@ -431,10 +431,6 @@ def model(
         aet (mm), def (mm), pet (mm), q (mm), soil (mm), swe (mm)
     """
 
-    out_df = pd.DataFrame(
-        index=df.index, columns=['aet', 'def', 'pet', 'q', 'soil', 'swe'], dtype=np.float32
-    )
-
     if snowpack_prev is None:
         snowpack_prev = 0.0
     if tmean_prev is None:
@@ -476,18 +472,18 @@ def model(
         )
 
         # populate output dataframe
-        out_df.loc[i, 'aet'] = hydro_out['aet']
-        out_df.loc[i, 'def'] = hydro_out['def']
-        out_df.loc[i, 'pet'] = pet
-        out_df.loc[i, 'q'] = hydro_out['q']
-        out_df.loc[i, 'soil'] = hydro_out['soil']
-        out_df.loc[i, 'swe'] = hydro_out['snow_storage']
+        df.at[i, 'aet'] = hydro_out['aet']
+        df.at[i, 'def'] = hydro_out['def']
+        df.at[i, 'pet'] = pet
+        df.at[i, 'q'] = hydro_out['q']
+        df.at[i, 'soil'] = hydro_out['soil']
+        df.at[i, 'swe'] = hydro_out['snow_storage']
 
         # save state variables
         tmean_prev = row['tmean']
         snowpack_prev = hydro_out['snow_storage']
         soil_prev = hydro_out['soil']
 
-    out_df['pdsi'] = pdsi(df['ppt'], out_df['pet'], awc)
+    df['pdsi'] = pdsi(df['ppt'], df['pet'], awc)
 
-    return out_df
+    return df

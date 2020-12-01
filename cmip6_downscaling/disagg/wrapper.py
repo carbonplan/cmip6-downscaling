@@ -1,8 +1,10 @@
 import os
 from typing import Iterable
 
+import dask
 import numba
 import numpy as np
+import pandas as pd
 import xarray as xr
 
 from cmip6_downscaling.disagg import derived_variables, terraclimate
@@ -62,50 +64,56 @@ def run_terraclimate_model(ds_in: xr.Dataset) -> xr.Dataset:
     """
     _set_thread_settings()
 
+    ds_in = calc_valid_mask(ds_in)
+
+    # derive physical quantities
+    ds_in = derived_variables.process(ds_in).load()
+
     ds_out = create_template(ds_in['ppt'], model_vars)
 
-    for index, mask_val in np.ndenumerate(ds_in['mask'].data):
-        y, x = index
-        if not mask_val:
-            # skip values outside the mask
-            continue
+    df_point = pd.DataFrame(
+        index=ds_in.indexes['time'], columns=force_vars + model_vars, dtype=np.float32
+    )
 
-        # extract aux vars
-        awc = ds_in['awc'][index].data
-        elev = ds_in['elevation'][index].data
-        lat = ds_in['lat'][index].data
+    with dask.config.set(scheduler='single-threaded'):
 
-        if awc <= 0 or np.isnan(awc):
-            print(f'invalid awc value {awc} for this point {ds_in.isel(x=x, y=y)}')
-            continue
-        if elev <= -420 or np.isnan(elev):
-            print(f'invalid elev value {elev} for this point {ds_in.isel(x=x, y=y)}')
-            continue
+        for index, mask_val in np.ndenumerate(ds_in['mask'].values):
+            if not mask_val:
+                # skip values outside the mask
+                continue
+            y, x = index
 
-        # run terraclimate model
-        df_point = ds_in[force_vars].isel(y=y, x=x).to_dataframe()
+            # extract aux vars
+            awc = ds_in['awc'].values[y, x]
+            elev = ds_in['elevation'].values[y, x]
+            lat = ds_in['lat'].values[y, x]
 
-        df_out = terraclimate.model(df_point, awc, lat, elev)
+            # extract forcing variables
+            for v in force_vars:
+                df_point[v] = ds_in[v].values[:, y, x]
 
-        # copy results to dataset
-        for v in model_vars:
-            ds_out[v].data[:, y, x] = df_out[v].values
+            # run terraclimate model
+            df_point = terraclimate.model(df_point, awc, lat, elev)
+
+            # copy results to dataset
+            for v in model_vars:
+                ds_out[v].values[:, y, x] = df_point[v].to_numpy()
+
+            df_point[model_vars] = np.nan
 
     return ds_out
 
 
-def preprocess(ds: xr.Dataset) -> xr.Dataset:
-    """ helper function to preprocess input dataset """
-    ds_in = ds.copy()
-
-    # make sure coords are all pre-loaded
-    # ds_in['mask'] = ds_in['mask'].persist()
-    ds_in['lon'] = ds_in['lon'].load()
-    ds_in['lat'] = ds_in['lat'].load()
-    for v in ['lon', 'lat']:
-        if 'chunks' in ds_in[v].encoding:
-            del ds_in[v].encoding['chunks']
-    return ds_in
+def calc_valid_mask(ds: xr.Dataset) -> xr.Dataset:
+    """ helper function to calculate a valid mask for given input variables """
+    # Temporary fix to correct for mismatched masks (along coasts)
+    ds['mask'] = (
+        ds['mask'].astype(bool)
+        * ds['awc'].notnull()
+        * ds['elevation'].notnull()
+        * ds['ppt'].isel(time=-1).notnull()
+    )
+    return ds
 
 
 def disagg(ds: xr.Dataset) -> xr.Dataset:
@@ -121,21 +129,15 @@ def disagg(ds: xr.Dataset) -> xr.Dataset:
     ds_disagg_out : xr.Dataset
         Output dataset, includes the follwoing variables: {aet, def, pdsi, pet, q, soil, swe}
     """
-    # cleanup dataset and load coordinates
-    ds_in = preprocess(ds)
-
-    # derive physical quantities
-    ds_in = derived_variables.process(ds_in)
 
     # create a template dataset that we can pass to map blocks
-    template = create_template(ds_in['ppt'], model_vars)
+    template = create_template(ds['ppt'], model_vars)
 
     # run the model using map_blocks
-    in_vars = force_vars + aux_vars
-    ds_disagg_out = ds_in[in_vars].map_blocks(run_terraclimate_model, template=template)
+    ds_disagg_out = ds.map_blocks(run_terraclimate_model, template=template)
 
     # copy vars from input dataset to output dataset
-    for v in in_vars + extra_vars:
-        ds_disagg_out[v] = ds_in[v]
+    # for v in in_vars + extra_vars:
+    #     ds_disagg_out[v] = ds_in[v]
 
     return ds_disagg_out
