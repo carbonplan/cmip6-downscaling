@@ -1,6 +1,12 @@
 VALID_CORRECTIONS = ['absolute', 'relative']
 
 
+def maybe_ensemble_mean(ds):
+    if 'member' in ds.dims:
+        return ds.mean('member')
+    return ds
+
+
 class MontlyBiasCorrection:
     """simple estimator class to handling monthly bias correction
 
@@ -32,7 +38,7 @@ class MontlyBiasCorrection:
             Training targets.
         """
 
-        self.x_climatology_ = X.groupby('time.month').mean()
+        self.x_climatology_ = X.pipe(maybe_ensemble_mean).groupby('time.month').mean()
         self.y_climatology_ = y.groupby('time.month').mean()
 
         if self.correction == 'absolute':
@@ -60,4 +66,12 @@ class MontlyBiasCorrection:
         else:
             raise ValueError(f'Invalid correction: {self.correction}')
 
-        return corrected
+        return corrected.drop('month')
+
+    def persist(self):
+        """ Persist correction to dask arrays"""
+        self.correction_ = self.correction_.persist()
+
+    def compute(self):
+        """ Load correction as numpy arrays"""
+        self.correction_ = self.correction_.compute()
