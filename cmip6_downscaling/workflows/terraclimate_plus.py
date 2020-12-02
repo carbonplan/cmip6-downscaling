@@ -12,6 +12,8 @@ from cmip6_downscaling.disagg.wrapper import disagg
 from cmip6_downscaling.workflows.share import xy_region
 from cmip6_downscaling.workflows.utils import get_store
 
+awc_fill = 50  # mm
+
 out_vars = [
     'aet',
     'pdsi',
@@ -50,7 +52,9 @@ def main():
     ds_in['lat'] = ds_in['lat'].load()
 
     # Temporary fix to correct awc data
-    ds_in['awc'] = np.maximum(ds_in['awc'], ds_in['soil'].max('time')).load()
+    max_soil = ds_in['soil'].max('time').load()
+    ds_in['awc'] = ds_in['awc'].where(ds_in['awc'] > 0).fillna(awc_fill)
+    ds_in['awc'] = np.maximum(ds_in['awc'], max_soil)
 
     if xy_region:
         ds_in = ds_in.isel(**xy_region)
@@ -65,17 +69,20 @@ def main():
     # do the disaggregation
     ds_out = disagg(ds_in[in_vars])
 
-    print(ds_out[out_vars])
-    print('ds_out size: ', ds_out[out_vars].nbytes / 1e9)
+    for v in aux_vars:
+        ds_out[v] = ds_out[v].chunk({'x': 50, 'y': 50})
 
-    for v in ['lon', 'lat']:
+    print(ds_out)
+    print('ds_out size: ', ds_out.nbytes / 1e9)
+
+    for v in ds_out.variables:
         if 'chunks' in ds_out[v].encoding:
             del ds_out[v].encoding['chunks']
 
     store = get_store(target)
     store.clear()
 
-    write = ds_out[out_vars].to_zarr(store, compute=False, mode='w')
+    write = ds_out.to_zarr(store, compute=False, mode='w')
     write.compute(retries=1)
     zarr.consolidate_metadata(store)
 

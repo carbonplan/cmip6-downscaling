@@ -9,10 +9,23 @@ import xarray as xr
 
 from cmip6_downscaling.disagg import derived_variables, terraclimate
 
-force_vars = ['tmean', 'ppt', 'tmax', 'tmin', 'ws', 'tdew', 'srad']
-extra_vars = ['vap', 'vpd', 'rh']
+# minimum set of input variables
+input_vars = ['ppt', 'tmax', 'tmin', 'ws', 'srad']
+
+# variables required by terraclimate
+force_vars = input_vars + ['tmean', 'tdew']
+
+# derived variables to be included in the output
+derived_vars = ['rh', 'tdew', 'tmean', 'vap', 'vpd']
+
+# variables calculated by terraclimate
 model_vars = ['aet', 'def', 'pdsi', 'pet', 'q', 'soil', 'swe']
+
+# aux variables required by wrapper (and/or terraclimate)
 aux_vars = ['awc', 'elevation', 'mask']
+
+# variables returned by the wrapper function
+wrapper_vars = derived_vars + model_vars
 
 
 # set threading options
@@ -101,6 +114,10 @@ def run_terraclimate_model(ds_in: xr.Dataset) -> xr.Dataset:
 
             df_point[model_vars] = np.nan
 
+    for v in wrapper_vars:
+        if v not in ds_out:
+            ds_out[v] = ds_in[v]
+
     return ds_out
 
 
@@ -131,13 +148,14 @@ def disagg(ds: xr.Dataset) -> xr.Dataset:
     """
 
     # create a template dataset that we can pass to map blocks
-    template = create_template(ds['ppt'], model_vars)
+    template = create_template(ds['ppt'], wrapper_vars)
 
     # run the model using map_blocks
     ds_disagg_out = ds.map_blocks(run_terraclimate_model, template=template)
 
-    # copy vars from input dataset to output dataset
-    # for v in in_vars + extra_vars:
-    #     ds_disagg_out[v] = ds_in[v]
+    # make sure the output dataset has all the input and aux variables in it
+    for v in set(aux_vars + list(ds.data_vars)):
+        if v not in ds_disagg_out:
+            ds_disagg_out[v] = ds[v]
 
     return ds_disagg_out

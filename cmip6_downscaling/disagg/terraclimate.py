@@ -7,7 +7,7 @@ import pandas as pd
 from climate_indices import palmer
 
 from .. import CLIMATE_NORMAL_PERIOD
-from ..constants import KELVIN, MGM2D_PER_WM2, MIN_PER_DAY, MM_PER_IN, SEC_PER_DAY
+from ..constants import KELVIN, MGM2D_PER_WM2, MIN_PER_DAY, MM_PER_IN, MONTHS_PER_YEAR, SEC_PER_DAY
 
 days_in_month = np.array([0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31])
 d2 = np.array([0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365])
@@ -23,7 +23,7 @@ def by_month(x):
 
 
 @numba.njit(nogil=True, cache=True)
-def mf(t: float, t0: float = -2, t1: float = 6.5) -> float:
+def mf(t: float, t0: float = -2.0, t1: float = 6.5) -> float:
     if t < t0:
         f = 0
     elif t > t1:
@@ -225,7 +225,7 @@ def hydromod(
     swe : float
         Snow storage at beginning of month.
     mfsnow : float
-        Melt fraction of snow as calculated in snow model.
+        Melt fraction of snow and/or rain/snow fraction.
     Returns
     -------
     data : dict
@@ -333,6 +333,13 @@ def pdsi(
 ) -> np.ndarray:
     """Calculate the Palmer Drought Severity Index (PDSI)
 
+    This is a simple wrapper of the climate_idicies package implementation of pdsi. The wrapper
+    includes a spin up period (`pad_years`) using a repeated climatology calculated between `y1`
+    and `y2`.
+
+    Note that this is not a perfect reproduction of the Terraclimate PDSI implementation. See
+    https://github.com/carbonplan/cmip6-downscaling/issues/4 for more details.
+
     Parameters
     ----------
     ppt : pd.Series
@@ -354,7 +361,7 @@ def pdsi(
         Timeseries of PDSI (unitless)
     """
 
-    pad_months = pad_years * 12
+    pad_months = pad_years * MONTHS_PER_YEAR
     y0 = ppt.index.year[0] - pad_years  # start year (with pad)
 
     # calculate the climatology for ppt and pet (for only the climate normal period)
@@ -442,6 +449,7 @@ def model(
             i.month,
         )
 
+        # Reduce PET when there is snow
         pet *= mfsnow
 
         # run simple hydrology model

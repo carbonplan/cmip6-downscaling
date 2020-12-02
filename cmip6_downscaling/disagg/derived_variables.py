@@ -1,11 +1,9 @@
 import numpy as np
 import xarray as xr
 
-from ..constants import KELVIN
+from ..constants import KELVIN, MB_PER_KPA
 
 sat_pressure_0c = 6.112  # [milibar]
-
-KPA_TO_MILIBAR = 10
 
 
 def dewpoint(e):
@@ -119,7 +117,7 @@ def process(ds: xr.Dataset) -> xr.Dataset:
     if 'tmean' not in ds:
         ds['tmean'] = (ds['tmax'] + ds['tmin']) / 2  # [C]
 
-    sat_vp = saturation_vapor_pressure(ds['tmean'] + KELVIN) / KPA_TO_MILIBAR
+    sat_vp = saturation_vapor_pressure(ds['tmean'] + KELVIN) / MB_PER_KPA
 
     if 'vap' not in ds and 'rh' in ds:
         ds['vap'] = ds['rh'] * sat_vp
@@ -129,7 +127,7 @@ def process(ds: xr.Dataset) -> xr.Dataset:
 
     if 'tdew' not in ds and 'vap' in ds:
         # calc tdew
-        ds['tdew'] = dewpoint(ds['vap'] * KPA_TO_MILIBAR)
+        ds['tdew'] = dewpoint(ds['vap'] * MB_PER_KPA)
 
     if 'tdew' not in ds and 'rh' in ds:
         ds['tdew'] = dewpoint_from_relative_humidity(ds['tmean'] + KELVIN, ds['rh'])

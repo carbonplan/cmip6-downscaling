@@ -13,7 +13,7 @@ from carbonplan.data import cat
 from dask_gateway import Gateway
 
 from cmip6_downscaling import CLIMATE_NORMAL_PERIOD
-from cmip6_downscaling.constants import KELVIN, SEC_PER_DAY
+from cmip6_downscaling.constants import KELVIN, PERCENT, SEC_PER_DAY
 from cmip6_downscaling.disagg import derived_variables
 from cmip6_downscaling.methods.bias_correction import MontlyBiasCorrection
 from cmip6_downscaling.workflows.share import chunks, future_time, hist_time, xy_region
@@ -63,7 +63,7 @@ def process_cmip(ds):
 
     ds['tmax'] -= KELVIN
     ds['tmin'] -= KELVIN
-    ds['rh'] /= 100
+    ds['rh'] /= PERCENT
     ds['ppt'] *= xr.Variable('time', ds.indexes['time'].days_in_month * SEC_PER_DAY)
 
     keys = absolute_vars + relative_vars
