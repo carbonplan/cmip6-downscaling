@@ -229,32 +229,17 @@ def hydromod(
     Returns
     -------
     data : dict
-        Dictionary with data values for aet, def, q, snow_storage, soil, and runoff_snow
+        Dictionary with data values for aet, def, q, swe, and soil
     """
 
-    # Initialize output vars
-    aet = np.nan
-    runoff = np.nan
-    deficit = np.nan
-
-    melt_fraction = mfsnow
-    snowfall = (1 - melt_fraction) * ppt
-    melt = melt_fraction * (snowfall + snow_storage)
+    snowfall = (1 - mfsnow) * ppt
+    melt = mfsnow * (snowfall + snow_storage)
     rain = ppt - snowfall
     input_h2o = rain + melt
     extra_runoff = input_h2o * 0.05
     input_h2o *= 0.95
 
-    runoff_snow = min(extra_runoff, melt)  # wierd
-    r_rain = extra_runoff - runoff_snow
-    rain_input = rain - r_rain
-    # then we do a check in which IF there is enough rain contribution
-    # to the soil (after we deduct the rain contribution toward fast runoff)
-    # to fulfill the PET demands, the excess of rain becomes "excess_after_liquid"
-    # otherwise (if there is less rain than PET needs, there is no excess_after_liquid)
-    excess_after_liquid = max(0, rain_input - pet)
-
-    snow_storage = (1 - melt_fraction) * (snowfall + snow_storage)
+    snow_storage = (1 - mfsnow) * (snowfall + snow_storage)
     # change in soil is determined by difference from available increase
     # in h2o and pet
     delta_soil = input_h2o - pet
@@ -276,17 +261,12 @@ def hydromod(
     else:
         snow_drink = 0
 
-    ## question for joe: what about corner case of soil_moisture=0 - john's never
-    # acknowledges that - but maybe it's a matlab thing that > includes >= or something
-    # now you've drunk your snowpack you'll draw from soil_moisture
-    f1 = delta_soil < 0
-    ff = -delta_soil > soil
-
-    if ff:
+    if -delta_soil > soil:
         # if the need is greater than availability in soil then
         # constrain it to soil (this holds the water balance)
         delta_soil = -soil
-    if f1:
+
+    if delta_soil < 0:
         # if delta_soil is negative a.k.a. soil will drain
         drain_soil = delta_soil * (1 - np.exp(-soil / awc))
     else:
@@ -296,10 +276,9 @@ def hydromod(
     # relationship where demand is PET and supply is the sum of
     # input_h2o and snow_drink (with input_h2o being 95% of the
     # runoff from melt+rain and snow_drink is like a sublimation term)
-    demand = pet
     supply = input_h2o + snow_drink
 
-    if demand >= supply:
+    if pet >= supply:
         # if there is more evaporative demand than supply,
         # aet will be constrained by the soil drainage
         # and your deficit will be the difference between
@@ -314,27 +293,32 @@ def hydromod(
         aet = pet
         deficit = 0
 
-    excess = max(0, soil + delta_soil - awc)
-    excess_rain_only = max(0, soil + excess_after_liquid - awc)
-    if (demand < supply) and ((soil + delta_soil) > awc):
-        # if supply exceeds demand and the updated soil water is greater than
-        # the available capacity
-        runoff = excess
-        runoff_snow += excess - excess_rain_only
-        soil = awc
-    elif (demand < supply) and ((soil + delta_soil) <= awc):
-        # if supply exceeds demand and updated soil water
-        # is less than available water capacity you update
-        # the soil by the change in soil
-        soil += delta_soil
-        runoff = 0
+        if (soil + delta_soil) > awc:
+            # if supply exceeds demand and the updated soil water is greater than
+            # the available capacity
+            runoff = max(0, soil + delta_soil - awc)
+            runoff_snow = min(extra_runoff, melt)
+
+            rain_input = rain - extra_runoff - runoff_snow
+            excess_after_liquid = max(0, rain_input - pet)
+            excess_rain_only = max(0, soil + excess_after_liquid - awc)
+            runoff_snow += runoff - excess_rain_only
+            soil = awc
+        else:
+            # if supply exceeds demand and updated soil water
+            # is less than available water capacity you update
+            # the soil by the change in soil
+            soil += delta_soil
+            runoff = 0
+
+    # add the extra runoff component
     runoff += extra_runoff
 
     return {
         'aet': aet,
         'def': deficit,
         'q': runoff,
-        'snow_storage': snow_storage,
+        'swe': snow_storage,
         'soil': soil,
     }
 
@@ -477,11 +461,11 @@ def model(
         df.at[i, 'pet'] = pet
         df.at[i, 'q'] = hydro_out['q']
         df.at[i, 'soil'] = hydro_out['soil']
-        df.at[i, 'swe'] = hydro_out['snow_storage']
+        df.at[i, 'swe'] = hydro_out['swe']
 
         # save state variables
         tmean_prev = row['tmean']
-        snowpack_prev = hydro_out['snow_storage']
+        snowpack_prev = hydro_out['swe']
         soil_prev = hydro_out['soil']
 
     df['pdsi'] = pdsi(df['ppt'], df['pet'], awc)

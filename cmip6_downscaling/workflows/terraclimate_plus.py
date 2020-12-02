@@ -30,7 +30,7 @@ def main():
     # rechunked version
     mapper = zarr.storage.ABSStore(
         'carbonplan-scratch',
-        prefix='rechunker/terraclimate/target.zarr/',
+        prefix='rechunker/terraclimate/target.zarr',
         account_name="carbonplan",
         account_key=os.environ["BLOB_ACCOUNT_KEY"],
     )

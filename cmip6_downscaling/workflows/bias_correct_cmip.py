@@ -9,6 +9,8 @@ import pandas as pd
 import xarray as xr
 import zarr
 from adlfs import AzureBlobFileSystem
+from carbonplan.data import cat
+from dask_gateway import Gateway
 
 from cmip6_downscaling import CLIMATE_NORMAL_PERIOD
 from cmip6_downscaling.constants import KELVIN, SEC_PER_DAY
@@ -32,14 +34,16 @@ update_vars = ['area', 'crs', 'mask']
 # output chunks (for dask/zarr)
 rename_dict = {'pr': 'ppt', 'tasmax': 'tmax', 'tasmin': 'tmin', 'rsds': 'srad', 'hurs': 'rh'}
 
-skip_existing = True
-dry_run = False
+skip_existing = False
+dry_run = True
+
+dask.config.set(**{'array.slicing.split_large_chunks': False})
 
 # file system
 fs = AzureBlobFileSystem(account_name='carbonplan', account_key=os.environ['BLOB_ACCOUNT_KEY'])
 
 # target
-target = 'cmip6/bias-corrected/conus/monthly/4000m/{key}.zarr'
+target = 'cmip6/bias-corrected/conus/4000m/monthly/{key}.zarr'
 
 
 def load_coords(ds):
@@ -103,24 +107,23 @@ def get_regridded_stores():
 def get_obs():
 
     mapper = zarr.storage.ABSStore(
-        'carbonplan-downscaling',
-        prefix='obs/conus/monthly/4000m/terraclimate_plus.zarr',
+        'carbonplan-scratch',
+        prefix='rechunker/terraclimate/target.zarr',
         account_name="carbonplan",
         account_key=os.environ["BLOB_ACCOUNT_KEY"],
     )
     ds = xr.open_zarr(mapper, consolidated=True)
+
+    ds_grid = cat.grids.conus4k.to_dask()
+    ds['x'] = ds_grid['x']
+    ds['y'] = ds_grid['y']
 
     # temporary fix
     ds = derived_variables.process(ds)
     return ds[bc_vars].chunk(chunks)
 
 
-if __name__ == '__main__':
-    from dask.distributed import Client
-
-    client = Client(n_workers=36, threads_per_worker=1)
-    print(client)
-    print(client.dashboard_link)
+def main():
 
     # dict of cmip data (raw) - just used for the simulation keys
     df = get_regridded_stores()
@@ -128,8 +131,7 @@ if __name__ == '__main__':
     absolute_model = MontlyBiasCorrection(correction='absolute')
     relative_model = MontlyBiasCorrection(correction='relative')
 
-    # grid_ds = cat.grids.conus4k.to_dask().load()
-    y_hist = get_obs().pipe(load_coords)  # .update(grid_ds[update_vars])
+    y_hist = get_obs().pipe(load_coords)
 
     if xy_region:
         y_hist = y_hist.isel(**xy_region)
@@ -155,8 +157,8 @@ if __name__ == '__main__':
         print('absolute_model:\n', absolute_model.correction_)
 
         # try pre-loading the corrections
-        absolute_model.persist()
-        relative_model.persist()
+        absolute_model.compute()
+        relative_model.compute()
 
         print('x_hist:\n', x_hist)
 
@@ -195,6 +197,8 @@ if __name__ == '__main__':
                 # predict this emsemble member
                 y_scen = absolute_model.predict(x_scen[absolute_vars])
                 y_scen.update(relative_model.predict(x_scen[relative_vars]))
+
+                y_scen = y_scen.chunk(chunks)
                 print('y_scen:\n', y_scen)
 
                 if dry_run:
@@ -202,6 +206,18 @@ if __name__ == '__main__':
                     continue
                 else:
                     store.clear()
-                    y_scen.to_zarr(store, consolidated=True, mode='w')
-
+                    write = y_scen.to_zarr(store, compute=False, mode='w')
+                    write.compute(retries=1)
+                    zarr.consolidate_metadata(store)
                 break  # for now, only bias correct the first member
+
+
+if __name__ == '__main__':
+    gateway = Gateway()
+    with gateway.new_cluster() as cluster:
+        client = cluster.get_client()
+        cluster.adapt(minimum=5, maximum=100)
+        print(client)
+        print(client.dashboard_link)
+
+        main()
