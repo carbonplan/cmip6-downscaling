@@ -198,7 +198,7 @@ def hydromod(
     pet: float,
     awc: float,
     soil: float,
-    snow_storage: float,
+    swe: float,
     mfsnow: float,
 ) -> Dict[str, float]:
     """
@@ -222,7 +222,7 @@ def hydromod(
         Available water content (constant)
     soil : float
         Soil water storage at beginning of month.
-    snow_storage : float
+    swe : float
         Snow storage at beginning of month.
     mfsnow : float
         Melt fraction of snow as calculated in snow model.
@@ -233,31 +233,31 @@ def hydromod(
     """
 
     snowfall = (1 - mfsnow) * ppt
-    melt = mfsnow * (snowfall + snow_storage)
     rain = ppt - snowfall
+    melt = mfsnow * (snowfall + swe)
     input_h2o = rain + melt
     extra_runoff = input_h2o * 0.05
     input_h2o *= 0.95
 
-    snow_storage = (1 - mfsnow) * (snowfall + snow_storage)
+    swe = (1 - mfsnow) * (snowfall + swe)
     # change in soil is determined by difference from available increase
     # in h2o and pet
     delta_soil = input_h2o - pet
 
-    if (delta_soil < 0) and (snow_storage > 0) and (snow_storage > -delta_soil):
-        # if snowstorage has enough to fulfill delta_soil,
-        # remove the delta_soil from snow_storage, assign it to
+    if (delta_soil < 0) and (swe > 0) and (swe > -delta_soil):
+        # if swe has enough to fulfill delta_soil,
+        # remove the delta_soil from swe, assign it to
         # snow_drink and then zero-out delta_soil
-        snow_storage += delta_soil
+        swe += delta_soil
         snow_drink = -delta_soil
         delta_soil = 0
-    elif (delta_soil < 0) and (snow_storage > 0) and (snow_storage < -delta_soil):
-        # if snow_storage doesn't have enough capacity to fulfill
+    elif (delta_soil < 0) and (swe > 0) and (swe < -delta_soil):
+        # if swe doesn't have enough capacity to fulfill
         # the delta_soil need, bring delta_soil closer to zero by drinking
-        # snow_storage and then zero-out snow_storage
-        delta_soil += snow_storage
-        snow_drink = snow_storage
-        snow_storage = 0
+        # swe and then zero-out swe
+        delta_soil += swe
+        snow_drink = swe
+        swe = 0
     else:
         snow_drink = 0
 
@@ -318,7 +318,7 @@ def hydromod(
         'aet': aet,
         'def': deficit,
         'q': runoff,
-        'swe': snow_storage,
+        'swe': swe,
         'soil': soil,
     }
 
