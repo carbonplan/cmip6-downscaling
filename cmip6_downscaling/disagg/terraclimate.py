@@ -15,7 +15,7 @@ d1 = np.array([0, 1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335])
 
 DAYS_PER_YEAR = 365
 GSC = 0.082  # MJ m -2 min-1 (solar constant)
-MISSING = -9999
+SMALL_PPT = 1e-10  # fill value for months with zero precipitation
 
 
 def by_month(x):
@@ -374,13 +374,16 @@ def pdsi(
     pet_extended = np.concatenate([np.tile(climatology['pet'].values, pad_years), pet.values])
     pet_extended /= MM_PER_IN
 
-    try:
-        out = pd.Series(
-            palmer.pdsi(ppt_extended, pet_extended, awc / MM_PER_IN, y0, y1, y2)[0][pad_months:],
-            index=ppt.index,
-        )
-    except ZeroDivisionError:
-        out = (ppt * 0) + MISSING
+    # set all zero ppt months to SMALL_PPT: this gets around a divide by zero
+    # in the pdsi function below.
+    ppt_zeros = ppt_extended <= 0
+    if ppt_zeros.any():
+        ppt_extended[ppt_zeros] = SMALL_PPT
+
+    out = pd.Series(
+        palmer.pdsi(ppt_extended, pet_extended, awc / MM_PER_IN, y0, y1, y2)[0][pad_months:],
+        index=ppt.index,
+    )
 
     return out
 
