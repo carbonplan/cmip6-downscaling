@@ -52,6 +52,7 @@ class MontlyBiasCorrection:
 
     def predict(self, X):
         """Apply transforms to the data, and predict with the final estimator
+
         Parameters
         ----------
         X : xarray.DataArray or xarray.Dataset
@@ -68,10 +69,12 @@ class MontlyBiasCorrection:
 
         return corrected.drop('month')
 
-    def persist(self):
+    def persist(self, **kwargs):
         """ Persist correction to dask arrays"""
-        self.correction_ = self.correction_.persist()
+        self.correction_ = self.correction_.persist(**kwargs)
+        return self
 
-    def compute(self):
+    def compute(self, **kwargs):
         """ Load correction as numpy arrays"""
-        self.correction_ = self.correction_.compute()
+        self.correction_ = self.correction_.compute(**kwargs)
+        return self
