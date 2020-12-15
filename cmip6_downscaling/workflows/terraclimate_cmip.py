@@ -30,7 +30,7 @@ out_vars = [
 force_vars = ['tmax', 'tmin', 'srad', 'ppt', 'rh']
 aux_vars = ['mask', 'awc', 'elevation']
 in_vars = force_vars + aux_vars + ['ws']
-skip_existing = False
+skip_existing = True
 
 
 def preprocess(ds: xr.Dataset) -> xr.Dataset:
@@ -262,7 +262,7 @@ if __name__ == '__main__':
 
         df = pd.read_csv('../../notebooks/ssps_with_matching_historical_members.csv')
 
-        for i, row in df[3:].iterrows():
+        for i, row in df.iterrows():
             task = main(row.model, row.scenario, row.member, compute=False)
-            dask.compute(task, retries=2)
+            dask.compute(task, retries=10)
             client.restart()
