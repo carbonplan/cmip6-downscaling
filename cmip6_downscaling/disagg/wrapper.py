@@ -80,7 +80,7 @@ def run_terraclimate_model(ds_in: xr.Dataset) -> xr.Dataset:
     ds_in = calc_valid_mask(ds_in)
 
     # derive physical quantities
-    ds_in = derived_variables.process(ds_in).load()
+    ds_in = derived_variables.process(ds_in)
 
     ds_out = create_template(ds_in['ppt'], model_vars)
 

@@ -9,7 +9,7 @@ import pandas as pd
 import xarray as xr
 import zarr
 from adlfs import AzureBlobFileSystem
-from dask_gateway import Gateway
+from dask.distributed import Client
 
 from cmip6_downscaling import CLIMATE_NORMAL_PERIOD
 from cmip6_downscaling.constants import KELVIN, PERCENT, SEC_PER_DAY
@@ -44,10 +44,9 @@ fs = AzureBlobFileSystem(account_name='carbonplan', account_key=os.environ['BLOB
 target = 'cmip6/bias-corrected/conus/4000m/monthly/{key}.zarr'
 
 
-def load_coords(ds):
-    for v in ds.coords:
-        if isinstance(ds[v].data, dask.array.Array):
-            ds[v] = ds[v].load()
+def load_coords(ds: xr.Dataset) -> xr.Dataset:
+    ''' helper function to pre-load coordinates '''
+    ds = ds.update(ds[list(ds.coords)].load())
     for v in ds.variables:
         if 'chunks' in ds[v].encoding:
             del ds[v].encoding['chunks']
@@ -195,37 +194,31 @@ def main(model, scenario, member, members):
 
 
 if __name__ == '__main__':
-    # with dask.config.set(scheduler='threads'):
-    # from dask.distributed import Client
 
-    # with Client(threads_per_worker=1, n_workers=24, memory_limit='12 G') as client:
-    gateway = Gateway()
-    with gateway.new_cluster(worker_cores=1, worker_memory=10) as cluster:
-        client = cluster.get_client()
-        cluster.adapt(minimum=5, maximum=100)
-    print(client)
-    print(client.dashboard_link)
+    with Client(threads_per_worker=1, memory_limit='12 G') as client:
+        print(client)
+        print(client.dashboard_link)
 
-    df = get_regridded_stores()
+        df = get_regridded_stores()
 
-    df2 = pd.read_csv('../../notebooks/ssps_with_matching_historical_members.csv')
+        df2 = pd.read_csv('../../notebooks/ssps_with_matching_historical_members.csv')
 
-    for model, dfgroup in df2.groupby('model'):
-        hist_members = []
-        print(model)
+        for model, dfgroup in df2.groupby('model'):
+            hist_members = []
+            print(model)
 
-        for i, row in dfgroup.iterrows():
+            for i, row in dfgroup.iterrows():
 
-            # get list of historical members
-            members = df[(df.model == model) & (df.scenario == 'historical')].member.tolist()
+                # get list of historical members
+                members = df[(df.model == model) & (df.scenario == 'historical')].member.tolist()
 
-            # maybe run the historical case -- if it hasn't already been run
-            if row.member not in hist_members:
-                # run historical member
-                main(model, 'historical', row.member, members)
+                # maybe run the historical case -- if it hasn't already been run
+                if row.member not in hist_members:
+                    # run historical member
+                    main(model, 'historical', row.member, members)
 
-                # store this key so we don't run it again
-                hist_members.append(row.member)
+                    # store this key so we don't run it again
+                    hist_members.append(row.member)
 
-            # now run the scenario member
-            main(model, row.scenario, row.member, members)
+                # now run the scenario member
+                main(model, row.scenario, row.member, members)
