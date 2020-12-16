@@ -24,13 +24,14 @@ def seasonal_cycle_std(obj):
 #         obj_quantile = obj_coarse.quantile(q=q).mean(('x', 'y'))
 
 
-def calc(x_obj, y_obj):
+def calc(obj, compute=False):
 
     metrics = {}
-
-    metrics['x_time_mean'] = time_mean(x_obj)
-    metrics['y_time_mean'] = time_mean(y_obj)
-    metrics['x_seasonal_cycle_mean'] = seasonal_cycle_mean(x_obj)
-    metrics['y_seasonal_cycle_mean'] = seasonal_cycle_mean(y_obj)
+    if compute:
+        metrics['time_mean'] = time_mean(obj).compute()
+        metrics['seasonal_cycle_mean'] = seasonal_cycle_mean(obj).compute()
+    else:
+        metrics['time_mean'] = time_mean(obj)
+        metrics['seasonal_cycle_mean'] = seasonal_cycle_mean(obj)
 
     return metrics
