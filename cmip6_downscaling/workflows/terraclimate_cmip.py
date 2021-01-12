@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-import itertools
 import os
 from typing import Dict, List
 
@@ -11,7 +10,15 @@ import zarr
 from dask_gateway import Gateway
 
 from cmip6_downscaling.disagg.wrapper import create_template, run_terraclimate_model
-from cmip6_downscaling.workflows.share import chunks
+from cmip6_downscaling.workflows.share import (
+    chunks,
+    dummy_store,
+    finish_store,
+    get_regions,
+    load_coords,
+    maybe_slice_region,
+    preprocess,
+)
 from cmip6_downscaling.workflows.utils import get_store
 
 out_vars = [
@@ -30,43 +37,7 @@ out_vars = [
 force_vars = ['tmax', 'tmin', 'srad', 'ppt', 'rh']
 aux_vars = ['mask', 'awc', 'elevation']
 in_vars = force_vars + aux_vars + ['ws']
-skip_existing = True
-
-
-def preprocess(ds: xr.Dataset) -> xr.Dataset:
-    ''' preprocess datasets after loading them '''
-    if 'month' in ds:
-        ds = ds.drop('month')
-    return ds
-
-
-def load_coords(ds: xr.Dataset) -> xr.Dataset:
-    ''' helper function to pre-load coordinates '''
-    return ds.update(ds[list(ds.coords)].load())
-
-
-def maybe_slice_region(ds: xr.Dataset, region: Dict) -> xr.Dataset:
-    """helper function to pull out region of dataset"""
-    if region:
-        return ds.isel(**region)
-    return ds
-
-
-def get_slices(length: int, chunk_size: int) -> List:
-    '''helper function to create a list of slices along one axis'''
-    xi = range(0, length, chunk_size)
-
-    slices = [slice(left, right) for left, right in zip(xi, xi[1:])] + [slice(xi[-1], length + 1)]
-    return slices
-
-
-def get_regions(ds: xr.Dataset) -> xr.Dataset:
-    ''' create a list of regions (dict of slices) '''
-    x_slices = get_slices(ds.dims['x'], chunks['x'])
-    y_slices = get_slices(ds.dims['y'], chunks['y'])
-    t_slices = [slice(None)]
-    keys = ['x', 'y', 'time']
-    return [dict(zip(keys, s)) for s in itertools.product(x_slices, y_slices, t_slices)]
+skip_existing = False
 
 
 def get_obs(region: dict = None, account_key: str = None) -> xr.Dataset:
@@ -181,33 +152,18 @@ def block_wrapper(model: str, scenario: str, member: str, region: Dict, account_
         Secret key giving Zarr access to Azure store
     """
     print(region)
-    try:
-        with dask.config.set(scheduler='single-threaded'):
-            obs = get_obs(region=region)
-            ds_in = get_cmip(model, scenario, member, region=region)
-            ds_in['ws'] = xr.zeros_like(ds_in['ppt']) + 2.0
-            for v in aux_vars:
-                ds_in[v] = obs[v]
-            ds_in = ds_in[in_vars].load()
+    with dask.config.set(scheduler='single-threaded'):
+        obs = get_obs(region=region)
+        ds_in = get_cmip(model, scenario, member, region=region)
+        ds_in['ws'] = xr.zeros_like(ds_in['ppt']) + 2.0
+        for v in aux_vars:
+            ds_in[v] = obs[v]
+        ds_in = ds_in[in_vars].load()
 
-            ds_out = run_terraclimate_model(ds_in)[out_vars]
+        ds_out = run_terraclimate_model(ds_in)[out_vars]
 
-            out_mapper = get_out_mapper(model, scenario, member, account_key)
-            ds_out.to_zarr(out_mapper, mode='a', region=region)
-    except:
-        pass
-
-
-@dask.delayed(pure=True, traverse=False)
-def finish_store(store, regions):
-    zarr.consolidate_metadata(store)
-    return store
-
-
-@dask.delayed(pure=True, traverse=False)
-def dummy_store(store):
-    print(store)
-    return store
+        out_mapper = get_out_mapper(model, scenario, member, account_key)
+        ds_out.to_zarr(out_mapper, mode='a', region=region)
 
 
 def main(model: str, scenario: str, member: str, compute: bool = False) -> List:
