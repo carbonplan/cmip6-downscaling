@@ -1,16 +1,17 @@
 #!/usr/bin/env python
 
 import dask
+import fsspec
+import pandas as pd
+import xarray as xr
 import xesmf
 from carbonplan.data import cat
 
-from cmip6_downscaling.data.cmip import cmip
+from cmip6_downscaling.workflows.share import skip_unmatched
 from cmip6_downscaling.workflows.utils import get_store
 
 target = 'cmip6/regridded/conus/4000m/monthly/{key}.zarr'
 update_vars = ['area', 'crs', 'mask']
-trange = slice('1950', '2120')
-max_members = 5
 skip_existing = True
 
 
@@ -24,61 +25,40 @@ def regrid_one_model(source_ds, target_grid, method='bilinear', reuse_weights=Tr
     return out
 
 
-def slim_cmip_key(key, member_id):
-    _, _, source_id, experiment_id, _, _ = key.split('.')
-    out_key = f'{source_id}.{experiment_id}.{member_id}'
-    return out_key
-
-
 if __name__ == '__main__':
-    model_dict, data = cmip()
+
+    with fsspec.open(
+        'az://carbonplan-downscaling/cmip6/ssps_with_matching_historical_members.csv',
+        'r',
+        account_name='carbonplan',
+    ) as f:
+        df = pd.read_csv(f)
 
     # target grid
-    grid_ds = cat.grids.conus4k.to_dask().load()
+    grid_ds = cat.grids.conus4k.read()
 
-    # collect all keys to regrid
-    keys_to_regrid = []
-    for hkey, fkeys in model_dict.items():
-        keys_to_regrid.append(hkey)
-        keys_to_regrid.extend(fkeys)
-    print(f'regridding {len(keys_to_regrid)} keys')
+    for i, row in df.iterrows():
 
-    failed = {}
-    all_keys = []
-    for key in keys_to_regrid:
+        if skip_unmatched and not row.has_match:
+            continue
 
-        # get source dataset
-        source_ds = data[key].sel(time=trange)
-        print(source_ds)
-        for i, member_id in enumerate(source_ds['member_id'].data):
+        target_key = f'{row.model}.{row.scenario}.{row.member}'
+        target_path = target.format(key=target_key)
+        target_store = get_store(target_path)
 
-            # create output store
-            out_key = slim_cmip_key(key, member_id)
-            store = get_store(target.format(key=out_key))
+        # skip if existing
+        if skip_existing and '.zmetadata' in target_store:
+            print(f'{target_key} in store, skipping...')
+            continue
 
-            # skip if existing
-            if skip_existing and '.zmetadata' in store:
-                print(f'{out_key} in store, skipping...')
-                all_keys.append(out_key)
-                continue
+        source_store = get_store(row.path)
+        source_ds = xr.open_zarr(source_store, consolidated=True)
 
-            if i > (max_members - 1):
-                break
-            store.clear()
+        # perform the regridding
+        print(f'regridding {target_path}')
+        ds = regrid_one_model(source_ds, grid_ds).chunk({'time': 198, 'x': 50, 'y': 50})
 
-            # perform the regridding
-            print(f'regridding {out_key}')
-            ds = regrid_one_model(source_ds.sel(member_id=member_id), grid_ds).chunk(
-                {'time': 198, 'x': 50, 'y': 50}
-            )
+        # write output dataset to store
+        ds.update(grid_ds[update_vars])
 
-            # write output dataset to store
-            ds.update(grid_ds[update_vars])
-            try:
-                ds.to_zarr(store, mode='w', consolidated=True)
-                all_keys.append(out_key)
-            except Exception as e:
-                print(key, e)
-                failed[key] = e
-print(failed)
-print(all_keys)
+        ds.to_zarr(target_store, mode='w', consolidated=True)

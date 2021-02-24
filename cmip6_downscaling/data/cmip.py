@@ -1,10 +1,7 @@
-import os
 from collections import defaultdict
 
 import intake
 import pandas as pd
-import xarray as xr
-import zarr
 from intake_esm.merge_util import AggregationError
 
 variable_ids = ['pr', 'tasmin', 'tasmax', 'rsds', 'hurs', 'ps']
@@ -97,7 +94,7 @@ def preprocess_ssp(ds):
 
 def cmip():
 
-    col_url = 'https://raw.githubusercontent.com/NCAR/intake-esm-datastore/master/catalogs/pangeo-cmip6.json'
+    col_url = "https://storage.googleapis.com/cmip6/pangeo-cmip6.json"
     col = intake.open_esm_datastore(col_url)
 
     # get all possible simulations
@@ -130,8 +127,7 @@ def cmip():
         valid_keys.extend([k] + v)
 
     data = {}
-    # zarr_kwargs = dict(consolidated=True, use_cftime=True) # requires xarray >= 0.16.1
-    zarr_kwargs = dict(consolidated=True)
+    zarr_kwargs = dict(consolidated=True, use_cftime=True)
 
     failed = {}
     for hist_key, ssp_keys in model_dict.items():
@@ -140,7 +136,7 @@ def cmip():
             data[hist_key] = hist_subset[hist_key](
                 zarr_kwargs=zarr_kwargs, preprocess=preprocess_hist
             ).to_dask()
-        except (OSError, AggregationError) as e:
+        except (OSError, AggregationError, IndexError, RuntimeError) as e:
             print(f'key failed: {hist_key}')
             failed[hist_key] = e
             continue
@@ -151,11 +147,9 @@ def cmip():
                 data[ssp_key] = ssp_subset[ssp_key](
                     zarr_kwargs=zarr_kwargs, preprocess=preprocess_ssp
                 ).to_dask()
-            except (OSError, AggregationError) as e:
+            except (OSError, AggregationError, IndexError, RuntimeError) as e:
                 print(f'key failed: {ssp_key}')
                 failed[ssp_key] = e
-    # data.update(hist_subset.to_dataset_dict(zarr_kwargs=zarr_kwargs, preprocess=preprocess_hist))
-    # data.update(ssp_subset.to_dataset_dict(zarr_kwargs=zarr_kwargs, preprocess=preprocess_ssp))
 
     for k in list(data):
         if k not in valid_keys:
@@ -164,76 +158,3 @@ def cmip():
     print(f'done with cmip but these keys failed: {failed}')
 
     return model_dict, data
-
-
-# we can probably remove this function soon
-def sample_data():
-
-    samples = [
-        'CMIP.AWI.AWI-CM-1-1-MR.historical.Amon.gn',
-        'CMIP.BCC.BCC-CSM2-MR.historical.Amon.gn',
-        'CMIP.CSIRO.ACCESS-ESM1-5.historical.Amon.gn',
-        'CMIP.MIROC.MIROC6.historical.Amon.gn',
-        'CMIP.HAMMOZ-Consortium.MPI-ESM-1-2-HAM.historical.Amon.gn',
-        'CMIP.NUIST.NESM3.historical.Amon.gn',
-        'CMIP.CSIRO-ARCCSS.ACCESS-CM2.historical.Amon.gn',
-        'CMIP.CCCma.CanESM5.historical.Amon.gn',
-        'CMIP.CAS.FGOALS-g3.historical.Amon.gn',
-        'CMIP.MPI-M.MPI-ESM1-2-LR.historical.Amon.gn',
-        'CMIP.MRI.MRI-ESM2-0.historical.Amon.gn',
-        'CMIP.CMCC.CMCC-CM2-SR5.historical.Amon.gn',
-        'ScenarioMIP.CCCma.CanESM5.ssp370.Amon.gn',
-        'ScenarioMIP.MRI.MRI-ESM2-0.ssp245.Amon.gn',
-        'ScenarioMIP.MPI-M.MPI-ESM1-2-LR.ssp245.Amon.gn',
-        'ScenarioMIP.BCC.BCC-CSM2-MR.ssp245.Amon.gn',
-        'ScenarioMIP.CSIRO.ACCESS-ESM1-5.ssp245.Amon.gn',
-        'ScenarioMIP.CSIRO-ARCCSS.ACCESS-CM2.ssp245.Amon.gn',
-        'ScenarioMIP.CAS.FGOALS-g3.ssp370.Amon.gn',
-        'ScenarioMIP.AWI.AWI-CM-1-1-MR.ssp370.Amon.gn',
-        'ScenarioMIP.BCC.BCC-CSM2-MR.ssp370.Amon.gn',
-        'ScenarioMIP.CSIRO.ACCESS-ESM1-5.ssp370.Amon.gn',
-        'ScenarioMIP.MIROC.MIROC6.ssp370.Amon.gn',
-        'ScenarioMIP.AWI.AWI-CM-1-1-MR.ssp585.Amon.gn',
-        'ScenarioMIP.MRI.MRI-ESM2-0.ssp585.Amon.gn',
-        'ScenarioMIP.CSIRO-ARCCSS.ACCESS-CM2.ssp370.Amon.gn',
-        'ScenarioMIP.CAS.FGOALS-g3.ssp245.Amon.gn',
-        'ScenarioMIP.MIROC.MIROC6.ssp245.Amon.gn',
-        'ScenarioMIP.CMCC.CMCC-CM2-SR5.ssp585.Amon.gn',
-        'ScenarioMIP.CSIRO-ARCCSS.ACCESS-CM2.ssp585.Amon.gn',
-        'ScenarioMIP.MPI-M.MPI-ESM1-2-LR.ssp585.Amon.gn',
-        'ScenarioMIP.MIROC.MIROC6.ssp585.Amon.gn',
-        'ScenarioMIP.MPI-M.MPI-ESM1-2-LR.ssp370.Amon.gn',
-        'ScenarioMIP.NUIST.NESM3.ssp585.Amon.gn',
-        'ScenarioMIP.MRI.MRI-ESM2-0.ssp370.Amon.gn',
-        'ScenarioMIP.CAS.FGOALS-g3.ssp585.Amon.gn',
-        'ScenarioMIP.CCCma.CanESM5.ssp245.Amon.gn',
-        'ScenarioMIP.CMCC.CMCC-CM2-SR5.ssp245.Amon.gn',
-        'ScenarioMIP.HAMMOZ-Consortium.MPI-ESM-1-2-HAM.ssp370.Amon.gn',
-        'ScenarioMIP.CCCma.CanESM5.ssp585.Amon.gn',
-        'ScenarioMIP.CSIRO.ACCESS-ESM1-5.ssp585.Amon.gn',
-        'ScenarioMIP.CMCC.CMCC-CM2-SR5.ssp370.Amon.gn',
-        'ScenarioMIP.NUIST.NESM3.ssp245.Amon.gn',
-        'ScenarioMIP.AWI.AWI-CM-1-1-MR.ssp245.Amon.gn',
-        'ScenarioMIP.BCC.BCC-CSM2-MR.ssp585.Amon.gn',
-    ]
-
-    cmip_point_data = {}
-    for key in samples:
-        store = zarr.storage.ABSStore(
-            'carbonplan-data',
-            prefix=f'carbonplan-scratch/downscaling-point-data/{key}',
-            account_name='carbonplan',
-            account_key=os.environ['BLOB_ACCOUNT_KEY'],
-        )
-
-        cmip_point_data[key] = xr.open_zarr(store)
-
-    store = zarr.storage.ABSStore(
-        'carbonplan-data',
-        prefix='carbonplan-scratch/downscaling-point-data/terraclimate',
-        account_name='carbonplan',
-        account_key=os.environ['BLOB_ACCOUNT_KEY'],
-    )
-    obs_points = xr.open_zarr(store)
-
-    return cmip_point_data, obs_points

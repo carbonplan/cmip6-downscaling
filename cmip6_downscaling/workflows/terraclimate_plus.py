@@ -20,17 +20,11 @@ from cmip6_downscaling.workflows.share import (
 )
 from cmip6_downscaling.workflows.utils import get_store
 
-# from dask_gateway import Gateway
-
-
-out_vars = [
-    'aet',
-    'pdsi',
-    'pet',
-]
 force_vars = ['tmax', 'tmin', 'srad', 'ppt', 'vap', 'ws']
 aux_vars = ['mask', 'awc', 'elevation']
 in_vars = force_vars + aux_vars
+model_vars = ['aet', 'def', 'pdsi', 'pet', 'q', 'soil', 'swe', 'tmean', 'tdew', 'vap', 'vpd', 'rh']
+out_vars = in_vars + model_vars
 
 target = 'obs/conus/4000m/monthly/terraclimate_plus.zarr'
 
@@ -66,7 +60,12 @@ def block_wrapper(region: Dict, account_key: str):
     with dask.config.set(scheduler='single-threaded'):
         ds_in = get_obs(region)
         ds_in = ds_in[in_vars].load()
-        ds_out = run_terraclimate_model(ds_in)[out_vars]
+        ds_out = run_terraclimate_model(ds_in)[model_vars]
+
+        for v in out_vars:
+            if v not in ds_out:
+                ds_out[v] = ds_in[v]
+
         out_mapper = get_out_mapper(account_key)
         ds_out.to_zarr(out_mapper, mode='a', region=region)
 
@@ -108,7 +107,9 @@ def main():
     ds_in = get_obs()
     print('ds_in size: ', ds_in[in_vars].nbytes / 1e9)
 
-    full_template = create_template(ds_in['ppt'], out_vars)
+    full_template = create_template(ds_in['ppt'], in_vars + model_vars)
+    for v in aux_vars:
+        full_template[v] = ds_in[v]
     full_template = full_template.chunk(chunks)
 
     out_mapper = get_out_mapper(os.environ["BLOB_ACCOUNT_KEY"])
@@ -128,7 +129,7 @@ def main():
 if __name__ == '__main__':
     from dask.distributed import Client
 
-    with Client(threads_per_worker=1, memory_limit='6 G') as client:
+    with Client(threads_per_worker=1, memory_limit='4 G') as client:
         # gateway = Gateway()
         # with gateway.new_cluster(worker_cores=1, worker_memory=6) as cluster:
         #     client = cluster.get_client()

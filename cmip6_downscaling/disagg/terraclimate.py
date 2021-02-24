@@ -16,6 +16,8 @@ d1 = np.array([0, 1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335])
 DAYS_PER_YEAR = 365
 GSC = 0.082  # MJ m -2 min-1 (solar constant)
 SMALL_PPT = 1e-10  # fill value for months with zero precipitation
+# CLIMATE_NORMAL_PERIOD = (1960, 1990)
+# CLIMATE_NORMAL_PERIOD = (1970, 2000)
 
 
 def by_month(x):
@@ -362,7 +364,10 @@ def pdsi(
     """
 
     pad_months = pad_years * MONTHS_PER_YEAR
+    assert len(ppt) > pad_months
     y0 = ppt.index.year[0] - pad_years  # start year (with pad)
+
+    awc_in = awc / MM_PER_IN
 
     # calculate the climatology for ppt and pet (for only the climate normal period)
     df = pd.concat([pet, ppt], axis=1)
@@ -370,20 +375,18 @@ def pdsi(
 
     # repeat climatology for pad_years, then begine the time series
     ppt_extended = np.concatenate([np.tile(climatology['ppt'].values, pad_years), ppt.values])
-    ppt_extended /= MM_PER_IN
+    ppt_extended_in = ppt_extended / MM_PER_IN
     pet_extended = np.concatenate([np.tile(climatology['pet'].values, pad_years), pet.values])
-    pet_extended /= MM_PER_IN
+    pet_extended_in = pet_extended / MM_PER_IN
 
     # set all zero ppt months to SMALL_PPT: this gets around a divide by zero
     # in the pdsi function below.
-    ppt_zeros = ppt_extended <= 0
+    ppt_zeros = ppt_extended_in <= 0
     if ppt_zeros.any():
-        ppt_extended[ppt_zeros] = SMALL_PPT
+        ppt_extended_in[ppt_zeros] = SMALL_PPT
 
-    out = pd.Series(
-        palmer.pdsi(ppt_extended, pet_extended, awc / MM_PER_IN, y0, y1, y2)[0][pad_months:],
-        index=ppt.index,
-    )
+    pdsi_vals = palmer.pdsi(ppt_extended_in, pet_extended_in, awc_in, y0, y1, y2)[0]
+    out = pd.Series(pdsi_vals[pad_months:], index=ppt.index)
 
     return out
 

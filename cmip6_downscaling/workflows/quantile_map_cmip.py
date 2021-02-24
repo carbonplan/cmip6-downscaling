@@ -9,10 +9,14 @@ import pandas as pd
 import xarray as xr
 import zarr
 from dask.distributed import Client
+from skdownscale.pointwise_models import (
+    PointWiseDownscaler,
+    QuantileMappingReressor,
+    TrendAwareQuantileMappingRegressor,
+)
 
 from cmip6_downscaling import CLIMATE_NORMAL_PERIOD
 from cmip6_downscaling.constants import KELVIN, PERCENT, SEC_PER_DAY
-from cmip6_downscaling.methods.bias_correction import MontlyBiasCorrection
 from cmip6_downscaling.workflows.share import (
     chunks,
     future_time,
@@ -37,14 +41,14 @@ update_vars = ['area', 'crs', 'mask']
 # output chunks (for dask/zarr)
 rename_dict = {'pr': 'ppt', 'tasmax': 'tmax', 'tasmin': 'tmin', 'rsds': 'srad', 'hurs': 'rh'}
 
-skip_existing = False
+skip_existing = True
 dry_run = False
 
 dask.config.set(**{'array.slicing.split_large_chunks': False})
 
 # target
 source = 'cmip6/regridded/conus/4000m/monthly/{key}.zarr'
-target = 'cmip6/bias-corrected/conus/4000m/monthly/{key}.zarr'
+target = 'cmip6/quantile-mapping/conus/4000m/monthly/{key}.zarr'
 
 
 def load_coords(ds: xr.Dataset) -> xr.Dataset:
@@ -66,11 +70,9 @@ def process_cmip(ds):
     ds['rh'] /= PERCENT
     ds['ppt'] *= xr.Variable('time', ds.indexes['time'].days_in_month * SEC_PER_DAY)
 
-    keys = absolute_vars + relative_vars
-
     ds = load_coords(ds)
 
-    return ds[keys].drop(['member_id', 'height']).chunk(chunks)
+    return ds[bc_vars].drop(['member_id', 'height']).chunk(chunks)
 
 
 def open_single(model, scenario, member):
@@ -106,9 +108,6 @@ def main(model, scenario, member):
         print(f'{key} in store, skipping...')
         return
 
-    absolute_model = MontlyBiasCorrection(correction='absolute')
-    relative_model = MontlyBiasCorrection(correction='relative')
-
     y_hist = get_obs().pipe(load_coords)
 
     if xy_region:
@@ -122,35 +121,34 @@ def main(model, scenario, member):
         x_hist = x_hist.isel(**xy_region)
 
     print('x_hist:\n', x_hist)
-    print('fitting models')
-
-    # train models with historical data
-    absolute_model.fit(
-        x_hist[absolute_vars].sel(time=train_time), y_hist[absolute_vars].sel(time=train_time)
-    )
-    relative_model.fit(
-        x_hist[relative_vars].sel(time=train_time), y_hist[relative_vars].sel(time=train_time)
-    )
-    print('absolute_model:\n', absolute_model.correction_)
-
-    absolute_model = absolute_model.compute()
-    relative_model = relative_model.compute()
 
     x_scen = open_single(model, scenario, member).pipe(process_cmip)
 
     if xy_region:
         x_scen = x_scen.isel(**xy_region)
-
-    print('x_scen:\n', x_scen)
-
     if 'hist' in scenario:
         x_scen = x_scen.sel(time=hist_time)
     else:
         x_scen = x_scen.sel(time=future_time)
+    print('x_scen:\n', x_scen)
 
-    # predict this emsemble member
-    y_scen = absolute_model.predict(x_scen[absolute_vars])
-    y_scen.update(relative_model.predict(x_scen[relative_vars]))
+    print('fitting models')
+
+    models = {}
+    y_scen = xr.Dataset()
+
+    for v in bc_vars:
+        print(v)
+
+        models[v] = PointWiseDownscaler(
+            TrendAwareQuantileMappingRegressor(QuantileMappingReressor(extrapolate='1to1'))
+        )
+
+        # train models with historical data
+        models[v].fit(x_hist[v].sel(time=train_time), y_hist[v].sel(time=train_time))
+
+        # predict this ensemble member
+        y_scen[v] = models[v].predict(x_scen[v])
 
     y_scen = y_scen.chunk(chunks)
     print('y_scen:\n', y_scen)
@@ -183,4 +181,3 @@ if __name__ == '__main__':
                 continue
 
             main(row.model, row.scenario, row.member)
-            break
