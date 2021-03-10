@@ -3,9 +3,7 @@
 import os
 
 import dask
-import fsspec
 import numpy as np
-import pandas as pd
 import xarray as xr
 import zarr
 from dask.distributed import Client
@@ -16,8 +14,8 @@ from cmip6_downscaling.methods.bias_correction import MontlyBiasCorrection
 from cmip6_downscaling.workflows.share import (
     chunks,
     future_time,
+    get_cmip_runs,
     hist_time,
-    skip_unmatched,
     xy_region,
 )
 from cmip6_downscaling.workflows.utils import get_store
@@ -74,7 +72,7 @@ def process_cmip(ds):
 
 
 def open_single(model, scenario, member):
-    uri = f'cmip6/regridded/conus/monthly/4000m/{model}.{scenario}.{member}.zarr'
+    uri = f'cmip6/regridded/conus/4000m/monthly/{model}.{scenario}.{member}.zarr'
     store = get_store(uri)
     return xr.open_zarr(store, consolidated=True)
 
@@ -157,30 +155,32 @@ def main(model, scenario, member):
 
     if dry_run:
         print('skipping write of ... dry_run=True')
-        return
+        return 'skip'
     else:
         store.clear()
         write = y_scen.to_zarr(store, compute=False, mode='w')
         write.compute(retries=3)
         zarr.consolidate_metadata(store)
+        return 'done'
 
 
 if __name__ == '__main__':
+
+    # gateway = Gateway()
+    # with gateway.new_cluster(worker_cores=1, worker_memory=12) as cluster:
+    #     client = cluster.get_client()
+    #     cluster.adapt(minimum=20, maximum=375)
 
     with Client(threads_per_worker=1, memory_limit='12 G') as client:
         print(client)
         print(client.dashboard_link)
 
-        with fsspec.open(
-            'az://carbonplan-downscaling/cmip6/ssps_with_matching_historical_members.csv',
-            'r',
-            account_name='carbonplan',
-        ) as f:
-            df = pd.read_csv(f)
+        df = get_cmip_runs()
+        print(df)
 
         for i, row in df.iterrows():
-            if skip_unmatched and not row.has_match:
-                continue
-
-            main(row.model, row.scenario, row.member)
-            break
+            print(f'bias correcting {i} of {len(df)}')
+            print(row)
+            result = main(row.model, row.scenario, row.member)
+            if result == 'done':
+                client.restart()

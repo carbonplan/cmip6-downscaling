@@ -2,6 +2,8 @@ import itertools
 from typing import Dict, List
 
 import dask
+import fsspec
+import pandas as pd
 import xarray as xr
 import zarr
 
@@ -13,32 +15,27 @@ skip_unmatched = True
 # xy_region = {'x': slice(0, 100), 'y': slice(0, 100)}
 xy_region = None
 
-models = [
-    ['CanESM5', 'historical', 'r10i1p1f1'],
-    ['CanESM5', 'ssp245', 'r10i1p1f1'],
-    ['CanESM5', 'ssp370', 'r10i1p1f1'],
-    ['CanESM5', 'ssp585', 'r10i1p1f1'],
-    ['FGOALS-g3', 'historical', 'r1i1p1f1'],
-    ['FGOALS-g3', 'ssp245', 'r1i1p1f1'],
-    ['FGOALS-g3', 'ssp370', 'r1i1p1f1'],
-    ['FGOALS-g3', 'ssp585', 'r1i1p1f1'],
-    ['HadGEM3-GC31-LL', 'historical', 'r1i1p1f3'],
-    ['HadGEM3-GC31-LL', 'ssp245', 'r1i1p1f3'],
-    ['MIROC-ES2L', 'historical', 'r1i1p1f2'],
-    ['MIROC-ES2L', 'ssp245', 'r1i1p1f2'],
-    ['MIROC-ES2L', 'ssp370', 'r1i1p1f2'],
-    ['MIROC-ES2L', 'ssp585', 'r1i1p1f2'],
-    ['MIROC6', 'historical', 'r10i1p1f1'],
-    ['MIROC6', 'ssp245', 'r10i1p1f1'],
-    ['MIROC6', 'ssp585', 'r10i1p1f1'],
-    ['MRI-ESM2-0', 'historical', 'r1i1p1f1'],
-    ['MRI-ESM2-0', 'ssp245', 'r1i1p1f1'],
-    ['MRI-ESM2-0', 'ssp370', 'r1i1p1f1'],
-    ['MRI-ESM2-0', 'ssp585', 'r1i1p1f1'],
-    ['UKESM1-0-LL', 'historical', 'r10i1p1f2'],
-    ['UKESM1-0-LL', 'ssp245', 'r10i1p1f2'],
-    ['UKESM1-0-LL', 'ssp370', 'r10i1p1f2'],
-]
+
+def get_cmip_runs():
+
+    with fsspec.open(
+        'az://carbonplan-downscaling/cmip6/ssps_with_matching_historical_members.csv',
+        mode='r',
+        account_name='carbonplan',
+    ) as f:
+        df = pd.read_csv(f).drop(columns=['Unnamed: 0', 'path'])
+
+    df = df[df.has_match]
+    df['comp'] = [
+        len(set(df[(df['model'] == d[1]['model']) & (df['member'] == d[1]['member'])]['scenario']))
+        == 4
+        for d in df.iterrows()
+    ]
+    df['unique'] = [
+        d[1]['member'] == df[(df['model'] == d[1]['model'])]['member'].values[0]
+        for d in df.iterrows()
+    ]
+    return df[df.comp & df.unique][['model', 'scenario', 'member']]
 
 
 @dask.delayed(pure=True, traverse=False)

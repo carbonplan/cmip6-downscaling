@@ -73,7 +73,7 @@ def preprocess_hist(ds):
     return (
         ds.pipe(rename)
         .sel(time=slice('1950', '2015'))
-        .pipe(subset_conus)
+        # .pipe(subset_conus)
         .pipe(fix_lons)
         .pipe(fix_times)
         .pipe(maybe_drop_band_vars)
@@ -85,7 +85,7 @@ def preprocess_ssp(ds):
     return (
         ds.pipe(rename)
         .sel(time=slice('2015', '2120'))
-        .pipe(subset_conus)
+        # .pipe(subset_conus)
         .pipe(fix_lons)
         .pipe(fix_times)
         .pipe(maybe_drop_band_vars)

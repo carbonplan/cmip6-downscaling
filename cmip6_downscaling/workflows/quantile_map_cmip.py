@@ -2,7 +2,6 @@
 
 import os
 
-import dask
 import fsspec
 import numpy as np
 import pandas as pd
@@ -44,7 +43,7 @@ rename_dict = {'pr': 'ppt', 'tasmax': 'tmax', 'tasmin': 'tmin', 'rsds': 'srad', 
 skip_existing = True
 dry_run = False
 
-dask.config.set(**{'array.slicing.split_large_chunks': False})
+# dask.config.set(**{'array.slicing.split_large_chunks': False})
 
 # target
 source = 'cmip6/regridded/conus/4000m/monthly/{key}.zarr'
@@ -76,7 +75,7 @@ def process_cmip(ds):
 
 
 def open_single(model, scenario, member):
-    uri = f'cmip6/regridded/conus/monthly/4000m/{model}.{scenario}.{member}.zarr'
+    uri = f'cmip6/regridded/conus/4000m/monthly/{model}.{scenario}.{member}.zarr'
     store = get_store(uri)
     return xr.open_zarr(store, consolidated=True)
 
@@ -106,7 +105,7 @@ def main(model, scenario, member):
 
     if skip_existing and '.zmetadata' in store:
         print(f'{key} in store, skipping...')
-        return
+        return 'skipped'
 
     y_hist = get_obs().pipe(load_coords)
 
@@ -155,17 +154,18 @@ def main(model, scenario, member):
 
     if dry_run:
         print('skipping write of ... dry_run=True')
-        return
+        return 'skipped'
     else:
         store.clear()
         write = y_scen.to_zarr(store, compute=False, mode='w')
         write.compute(retries=3)
         zarr.consolidate_metadata(store)
+        return 'done'
 
 
 if __name__ == '__main__':
 
-    with Client(threads_per_worker=1, memory_limit='12 G') as client:
+    with Client(threads_per_worker=1, memory_limit='14 G') as client:
         print(client)
         print(client.dashboard_link)
 
@@ -180,4 +180,6 @@ if __name__ == '__main__':
             if skip_unmatched and not row.has_match:
                 continue
 
-            main(row.model, row.scenario, row.member)
+            result = main(row.model, row.scenario, row.member)
+            if result == 'done':
+                client.restart()

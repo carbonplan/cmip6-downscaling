@@ -10,6 +10,7 @@ from cmip6_downscaling.workflows.utils import get_store
 
 target = 'cmip6/raw/conus/monthly/{key}.zarr'
 max_members = 5
+skip_existing = False
 
 
 def slim_cmip_key(key, member_id):
@@ -62,10 +63,10 @@ def main():
                     del member_ds[v].encoding['chunks']
 
             # write store
-
-            if '.zmetadata' in store:
+            if skip_existing and '.zmetadata' in store:
                 print('++++ skipping write', prefix)
             else:
+                store.clear()
                 member_ds.to_zarr(store, consolidated=True, mode='w')
             valid_members += 1
             written_keys.append(prefix)

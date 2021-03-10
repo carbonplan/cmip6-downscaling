@@ -3,9 +3,7 @@ import os
 from typing import Dict, List
 
 import dask
-import fsspec
 import numpy as np
-import pandas as pd
 import xarray as xr
 import zarr
 
@@ -14,11 +12,11 @@ from cmip6_downscaling.workflows.share import (
     chunks,
     dummy_store,
     finish_store,
+    get_cmip_runs,
     get_regions,
     load_coords,
     maybe_slice_region,
     preprocess,
-    skip_unmatched,
 )
 from cmip6_downscaling.workflows.utils import get_store
 
@@ -38,6 +36,7 @@ out_vars = [
     'vap',
     'vpd',
 ]
+downscale_method = 'bias-corrected'
 force_vars = ['tmax', 'tmin', 'srad', 'ppt', 'rh']
 aux_vars = ['mask', 'awc', 'elevation']
 in_vars = force_vars + aux_vars + ['ws']
@@ -83,7 +82,7 @@ def get_cmip(
     """
     # open the historical simulation dataset
     hist_mapper = get_store(
-        f'cmip6/bias-corrected/conus/4000m/monthly/{model}.historical.{member}.zarr',
+        f'cmip6/{downscale_method}/conus/4000m/monthly/{model}.historical.{member}.zarr',
         account_key=account_key,
     )
     ds_hist = xr.open_zarr(hist_mapper, consolidated=True)[force_vars]
@@ -92,7 +91,7 @@ def get_cmip(
 
     # open the future simulation dataset
     scen_mapper = get_store(
-        f'cmip6/bias-corrected/conus/4000m/monthly/{model}.{scenario}.{member}.zarr'
+        f'cmip6/{downscale_method}/conus/4000m/monthly/{model}.{scenario}.{member}.zarr'
     )
     ds_scen = xr.open_zarr(scen_mapper, consolidated=True)[force_vars]
     ds_scen = maybe_slice_region(ds_scen, region)
@@ -131,7 +130,7 @@ def get_out_mapper(
     """
     out_mapper = zarr.storage.ABSStore(
         'carbonplan-scratch',
-        prefix=f'cmip6/bias-corrected/conus/4000m/monthly/{model}.{scenario}.{member}.zarr',
+        prefix=f'cmip6/{downscale_method}/conus/4000m/monthly/{model}.{scenario}.{member}.zarr',
         account_name="carbonplan",
         account_key=account_key,
     )
@@ -212,25 +211,15 @@ def main(model: str, scenario: str, member: str, compute: bool = False) -> List:
 if __name__ == '__main__':
     from dask.distributed import Client
 
-    with fsspec.open(
-        'az://carbonplan-downscaling/cmip6/ssps_with_matching_historical_members.csv',
-        'r',
-        account_name='carbonplan',
-    ) as f:
-        df = pd.read_csv(f)
+    df = get_cmip_runs()
+    df = df[df.scenario.str.contains('ssp')].reset_index()
+    print(df)
 
     with Client(threads_per_worker=1, memory_limit='4 G') as client:
-        # gateway = Gateway()
-        # with gateway.new_cluster(worker_cores=1, worker_memory=6) as cluster:
-        #     client = cluster.get_client()
-        #     cluster.adapt(minimum=20, maximum=375)
-
         print(client)
         print(client.dashboard_link)
         for i, row in df.iterrows():
-            if skip_unmatched and not row.has_match:
-                continue
-
+            print(f'running terraclimate on {i + 1} of {len(df)}')
+            print(row)
             task = main(row.model, row.scenario, row.member, compute=False)
             dask.compute(task, retries=1)
-            break
