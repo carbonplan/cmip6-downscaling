@@ -2,9 +2,7 @@
 
 import os
 
-import fsspec
 import numpy as np
-import pandas as pd
 import xarray as xr
 import zarr
 from dask.distributed import Client

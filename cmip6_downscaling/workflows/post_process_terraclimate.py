@@ -6,10 +6,8 @@ import dask
 import xarray as xr
 import zarr
 from dask.distributed import Client
-from dask_gateway import Gateway
 
 from cmip6_downscaling.workflows.share import get_cmip_runs
-
 
 account_key = os.environ.get('BLOB_ACCOUNT_KEY', None)
 chunks = {'x': 50, 'y': 50, 'time': -1}
@@ -30,7 +28,7 @@ def get_scratch_ds(model, scenario, member, method):
 
 
 def split_and_write(model, scenario, member, method, write_hist=False):
-    
+
     ds = get_scratch_ds(model, scenario, member, method)
 
     scen_mapper = zarr.storage.ABSStore(
@@ -62,10 +60,10 @@ def weighted_mean(ds, *args, **kwargs):
 
 def _annual(ds_monthly, compute=True):
     with dask.config.set(scheduler='single-threaded'):
-        
+
         if compute:
             ds_monthly = ds_monthly.load()
-        
+
         ds_annual = ds_monthly[mean_vars].resample(time='AS').map(weighted_mean, dim='time')
         ds_annual = ds_annual.update(ds_monthly[sum_vars].resample(time='AS').sum())
     return ds_annual
@@ -83,8 +81,7 @@ def make_annual(model, scenario, member, method):
         account_name="carbonplan",
         account_key=account_key,
     )
-    
-   
+
     annual_mapper = zarr.storage.ABSStore(
         'carbonplan-downscaling',
         prefix=f'cmip6/{method}/conus/4000m/annual/{model}.{scenario}.{member}.zarr',
@@ -108,13 +105,6 @@ def make_annual(model, scenario, member, method):
 if __name__ == '__main__':
 
     with Client(threads_per_worker=1, memory_limit='22 G') as client:
-    # gateway = Gateway()
-    # with gateway.new_cluster(worker_cores=1, worker_memory=12) as cluster:
-    #     client = cluster.get_client()
-    #     cluster.adapt(minimum=20, maximum=375)
-
-    # from dask.diagnostics import ProgressBar
-    # with ProgressBar():
         df = get_cmip_runs().reset_index()
         print(df)
 
@@ -122,14 +112,14 @@ if __name__ == '__main__':
 
         split_df = df[df.scenario.str.contains('ssp')].reset_index()
 
-        # for i, row in split_df.iterrows():
-        #     print(f'processing {i+1} of {len(df)}')
-        #     print(row)
-            
-        #     if row.scenario == 'historical':
-        #         continue
-        #     write_hist = ('ssp245' == row.scenario)
-        #     split_and_write(row.model, row.scenario, row.member, method, write_hist=write_hist)
+        for i, row in split_df.iterrows():
+            print(f'processing {i+1} of {len(df)}')
+            print(row)
+
+            if row.scenario == 'historical':
+                continue
+            write_hist = 'ssp245' == row.scenario
+            split_and_write(row.model, row.scenario, row.member, method, write_hist=write_hist)
 
     with Client(threads_per_worker=1, memory_limit='22 G') as client:
         print(client)
