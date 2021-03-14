@@ -19,8 +19,8 @@ from cmip6_downscaling.constants import KELVIN, PERCENT, SEC_PER_DAY
 from cmip6_downscaling.workflows.share import (
     chunks,
     future_time,
+    get_cmip_runs,
     hist_time,
-    skip_unmatched,
     xy_region,
 )
 from cmip6_downscaling.workflows.utils import get_store
@@ -169,16 +169,12 @@ if __name__ == '__main__':
         print(client)
         print(client.dashboard_link)
 
-        with fsspec.open(
-            'az://carbonplan-downscaling/cmip6/ssps_with_matching_historical_members.csv',
-            'r',
-            account_name='carbonplan',
-        ) as f:
-            df = pd.read_csv(f)
+        df = get_cmip_runs().reset_index()
+        print(df)
 
         for i, row in df.iterrows():
-            if skip_unmatched and not row.has_match:
-                continue
+            print(f'quantile mapping {i+1} of {len(df)}')
+            print(row)
 
             result = main(row.model, row.scenario, row.member)
             if result == 'done':

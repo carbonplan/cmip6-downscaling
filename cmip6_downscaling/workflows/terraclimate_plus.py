@@ -15,6 +15,7 @@ from cmip6_downscaling.workflows.share import (
     chunks,
     finish_store,
     get_regions,
+    get_cmip_runs,
     load_coords,
     maybe_slice_region,
 )
