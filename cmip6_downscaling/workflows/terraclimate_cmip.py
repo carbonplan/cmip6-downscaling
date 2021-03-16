@@ -6,7 +6,9 @@ import dask
 import numpy as np
 import xarray as xr
 import zarr
+from dask.distributed import Client
 
+from cmip6_downscaling import CLIMATE_NORMAL_PERIOD
 from cmip6_downscaling.disagg.wrapper import create_template, run_terraclimate_model
 from cmip6_downscaling.workflows.share import (
     chunks,
@@ -19,9 +21,6 @@ from cmip6_downscaling.workflows.share import (
     preprocess,
 )
 from cmip6_downscaling.workflows.utils import get_store
-
-# from dask_gateway import Gateway
-
 
 out_vars = [
     'aet',
@@ -40,7 +39,7 @@ downscale_method = 'quantile-mapping'
 force_vars = ['tmax', 'tmin', 'srad', 'ppt', 'rh']
 aux_vars = ['mask', 'awc', 'elevation']
 in_vars = force_vars + aux_vars + ['ws']
-skip_existing = True
+skip_existing = False
 
 
 def get_obs(region: dict = None, account_key: str = None) -> xr.Dataset:
@@ -60,6 +59,27 @@ def get_obs(region: dict = None, account_key: str = None) -> xr.Dataset:
     obs = xr.open_zarr(obs_mapper, consolidated=True).pipe(load_coords)
     obs = maybe_slice_region(obs, region)
     return obs
+
+
+def get_wind_climatology(ws, time_index) -> xr.Dataset:
+    """Load wind climatology
+
+    Parameters
+    ----------
+    ws : xr.DataArray
+        Wind speed timeseries
+    time_index : pd.Index
+        Time index to map repeated climatology to
+    """
+    new_shape = list(ws.shape)
+    new_shape[ws.get_axis_num('time')] = len(time_index)
+    coords = dict(ws.coords)
+    coords['time'] = time_index
+
+    new_wind = xr.DataArray(np.zeros(new_shape), dims=ws.dims, coords=coords)
+    climo = ws.sel(time=slice(*map(str, CLIMATE_NORMAL_PERIOD))).groupby('time.month').mean().load()
+    new_wind = new_wind.groupby('time.month') + climo
+    return new_wind
 
 
 def get_cmip(
@@ -158,7 +178,7 @@ def block_wrapper(model: str, scenario: str, member: str, region: Dict, account_
     with dask.config.set(scheduler='single-threaded'):
         obs = get_obs(region=region)
         ds_in = get_cmip(model, scenario, member, region=region)
-        ds_in['ws'] = xr.zeros_like(ds_in['ppt']) + 2.0
+        ds_in['ws'] = get_wind_climatology(obs['ws'], ds_in['time'])
         for v in aux_vars:
             ds_in[v] = obs[v]
         ds_in = ds_in[in_vars].load()
@@ -209,10 +229,11 @@ def main(model: str, scenario: str, member: str, compute: bool = False) -> List:
 
 
 if __name__ == '__main__':
-    from dask.distributed import Client
-
     df = get_cmip_runs()
     df = df[df.scenario.str.contains('ssp')].reset_index()
+
+    df = df[3:8]
+
     print(df)
 
     with Client(threads_per_worker=1, memory_limit='4 G') as client:
@@ -222,4 +243,4 @@ if __name__ == '__main__':
             print(f'running terraclimate on {i + 1} of {len(df)}')
             print(row)
             task = main(row.model, row.scenario, row.member, compute=False)
-            dask.compute(task, retries=1)
+            dask.compute(task, retries=2)
