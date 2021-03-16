@@ -20,7 +20,7 @@ sources:
       storage_options:
         account_name: carbonplan
 
-  regridded_cmip:
+  cmip6_regridded:
     metadata:
       title: regridded climate data
     driver: zarr
@@ -44,14 +44,14 @@ sources:
         type: str
         default: r10i1p1f1
     args:
-      urlpath: 'az://carbonplan-downscaling/cmip6/regridded/conus/{{ timestep }}/4000m/{{ model }}.{{ scenario }}.{{ member }}.zarr'
+      urlpath: 'az://carbonplan-downscaling/cmip6/regridded/conus/4000m/monthly/{{ model }}.{{ scenario }}.{{ member }}.zarr'
       consolidated: True
       storage_options:
         account_name: carbonplan
 
-  bias_corrected_cmip:
+  cmip6:
     metadata:
-      title: bias corrected climate data
+      title: Processed CMIP6 including raw and downscaled variants.
     driver: zarr
     parameters:
       timestep:
@@ -62,7 +62,6 @@ sources:
       model:
         description: climate model id
         type: str
-        default: CanESM5
       scenario:
         description: climate model scenario
         type: str
@@ -71,9 +70,13 @@ sources:
       member:
         description: climate model ensemble member
         type: str
-        default: r10i1p1f1
+      method:
+        description: processing method
+        type: str
+        default: "quantile-mapping"
+        allowed: ["regridded", "bias-corrected", "quantile-mapping"]
     args:
-      urlpath: 'az://carbonplan-downscaling/cmip6/bias-corrected/conus/4000m/{{ timestep }}/{{ model }}.{{ scenario }}.{{ member }}.zarr'
+      urlpath: 'az://carbonplan-downscaling/cmip6/{{ method }}/conus/4000m/{{ timestep }}/{{ model }}.{{ scenario }}.{{ member }}.zarr'
       consolidated: True
       storage_options:
         account_name: carbonplan
