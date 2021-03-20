@@ -167,7 +167,7 @@ if __name__ == '__main__':
         print(client)
         print(client.dashboard_link)
 
-        df = get_cmip_runs().reset_index()
+        df = get_cmip_runs(comp=False, unique=False).reset_index()
         print(df)
 
         for i, row in df.iterrows():

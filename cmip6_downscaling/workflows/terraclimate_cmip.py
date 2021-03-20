@@ -39,11 +39,11 @@ downscale_method = 'quantile-mapping'
 force_vars = ['tmax', 'tmin', 'srad', 'ppt', 'rh']
 aux_vars = ['mask', 'awc', 'elevation']
 in_vars = force_vars + aux_vars + ['ws']
-skip_existing = False
+skip_existing = True
 
 
 def get_obs(region: dict = None, account_key: str = None) -> xr.Dataset:
-    """Load downscaled observed climate data and auxillary variables
+    """Load observed climate data and auxillary variables
 
     Parameters
     ----------
@@ -229,10 +229,8 @@ def main(model: str, scenario: str, member: str, compute: bool = False) -> List:
 
 
 if __name__ == '__main__':
-    df = get_cmip_runs()
+    df = get_cmip_runs(comp=False, unique=True)
     df = df[df.scenario.str.contains('ssp')].reset_index()
-
-    df = df[3:8]
 
     print(df)
 

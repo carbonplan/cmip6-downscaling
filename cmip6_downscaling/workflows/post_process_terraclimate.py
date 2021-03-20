@@ -5,6 +5,7 @@ import os
 import dask
 import xarray as xr
 import zarr
+from dask.diagnostics import ProgressBar
 from dask.distributed import Client
 
 from cmip6_downscaling.workflows.share import get_cmip_runs
@@ -13,6 +14,7 @@ account_key = os.environ.get('BLOB_ACCOUNT_KEY', None)
 chunks = {'x': 50, 'y': 50, 'time': -1}
 mean_vars = ['tmin', 'tmax', 'srad', 'rh', 'tmean', 'tdew', 'vap', 'vpd', 'pdsi', 'soil', 'swe']
 sum_vars = ['ppt', 'aet', 'pet', 'def', 'q']
+skip_existing = True
 
 
 def get_scratch_ds(model, scenario, member, method):
@@ -27,7 +29,7 @@ def get_scratch_ds(model, scenario, member, method):
     return ds
 
 
-def split_and_write(model, scenario, member, method, write_hist=False):
+def split_and_write(model, scenario, member, method):
 
     ds = get_scratch_ds(model, scenario, member, method)
 
@@ -37,18 +39,20 @@ def split_and_write(model, scenario, member, method, write_hist=False):
         account_name="carbonplan",
         account_key=account_key,
     )
-    print('writing scen')
-    ds.sel(time=slice('2015-01', None)).to_zarr(scen_mapper, mode='a')
-    zarr.consolidate_metadata(scen_mapper)
 
-    if write_hist:
+    if not (skip_existing and 'pdsi/.zarray' in scen_mapper):
+        print('writing scen')
+        ds.sel(time=slice('2015-01', None)).to_zarr(scen_mapper, mode='a')
+        zarr.consolidate_metadata(scen_mapper)
+
+    hist_mapper = zarr.storage.ABSStore(
+        'carbonplan-downscaling',
+        prefix=f'cmip6/{method}/conus/4000m/monthly/{model}.historical.{member}.zarr',
+        account_name="carbonplan",
+        account_key=account_key,
+    )
+    if not (skip_existing and 'pdsi/.zarray' in hist_mapper):
         print('writing hist')
-        hist_mapper = zarr.storage.ABSStore(
-            'carbonplan-downscaling',
-            prefix=f'cmip6/{method}/conus/4000m/monthly/{model}.historical.{member}.zarr',
-            account_name="carbonplan",
-            account_key=account_key,
-        )
         ds.sel(time=slice(None, '2014-12')).to_zarr(hist_mapper, mode='a')
         zarr.consolidate_metadata(hist_mapper)
 
@@ -89,8 +93,8 @@ def make_annual(model, scenario, member, method):
         account_key=account_key,
     )
 
-    if '.zmetadata' in annual_mapper:
-        return
+    if skip_existing and '.zmetadata' in annual_mapper:
+        return 'skipped'
 
     ds_monthly = xr.open_zarr(monthly_mapper, consolidated=True).sel(time=tslice).chunk(chunks)
     template = _annual(ds_monthly, compute=False).chunk(chunks)
@@ -104,22 +108,20 @@ def make_annual(model, scenario, member, method):
 
 if __name__ == '__main__':
 
-    with Client(threads_per_worker=1, memory_limit='22 G') as client:
-        df = get_cmip_runs().reset_index()
-        print(df)
+    df = get_cmip_runs(comp=False, unique=True)
+    print(df)
 
-        method = 'bias-corrected'
+    method = 'quantile-mapping'
 
-        split_df = df[df.scenario.str.contains('ssp')].reset_index()
+    split_df = df[df.scenario.str.contains('ssp')].reset_index()
 
-        for i, row in split_df.iterrows():
-            print(f'processing {i+1} of {len(df)}')
-            print(row)
+    with dask.config.set(scheduler='processes'):
+        with ProgressBar():
+            for i, row in split_df.iterrows():
+                print(f'processing {i+1} of {len(df)}')
+                print(row)
 
-            if row.scenario == 'historical':
-                continue
-            write_hist = 'ssp245' == row.scenario
-            split_and_write(row.model, row.scenario, row.member, method, write_hist=write_hist)
+                split_and_write(row.model, row.scenario, row.member, method)
 
     with Client(threads_per_worker=1, memory_limit='22 G') as client:
         print(client)

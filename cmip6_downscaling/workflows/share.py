@@ -16,7 +16,7 @@ skip_unmatched = True
 xy_region = None
 
 
-def get_cmip_runs():
+def get_cmip_runs(comp=True, unique=True, has_match=True):
 
     with fsspec.open(
         'az://carbonplan-downscaling/cmip6/ssps_with_matching_historical_members.csv',
@@ -25,7 +25,9 @@ def get_cmip_runs():
     ) as f:
         df = pd.read_csv(f).drop(columns=['Unnamed: 0', 'path'])
 
-    df = df[df.has_match]
+    if has_match:
+        df = df[df.has_match]
+
     df['comp'] = [
         len(set(df[(df['model'] == d[1]['model']) & (df['member'] == d[1]['member'])]['scenario']))
         == 4
@@ -35,7 +37,15 @@ def get_cmip_runs():
         d[1]['member'] == df[(df['model'] == d[1]['model'])]['member'].values[0]
         for d in df.iterrows()
     ]
-    return df[df.comp & df.unique][['model', 'scenario', 'member']]
+
+    if comp and unique:
+        df = df[df.comp & df.unique]
+    elif comp and not unique:
+        df = df[df.comp]
+    elif unique and not comp:
+        df = df[df.unique]
+
+    return df[['model', 'scenario', 'member']]
 
 
 @dask.delayed(pure=True, traverse=False)

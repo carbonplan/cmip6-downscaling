@@ -26,7 +26,7 @@ in_vars = force_vars + aux_vars
 model_vars = ['aet', 'def', 'pdsi', 'pet', 'q', 'soil', 'swe', 'tmean', 'tdew', 'vap', 'vpd', 'rh']
 out_vars = in_vars + model_vars
 
-target = 'obs/conus/4000m/monthly/terraclimate_plus.zarr'
+target = 'obs/conus/4000m/monthly/terraclimate_plus_v2.zarr'
 
 
 def get_out_mapper(account_key: str) -> zarr.storage.ABSStore:
@@ -130,10 +130,6 @@ if __name__ == '__main__':
     from dask.distributed import Client
 
     with Client(threads_per_worker=1, memory_limit='4 G') as client:
-        # gateway = Gateway()
-        # with gateway.new_cluster(worker_cores=1, worker_memory=6) as cluster:
-        #     client = cluster.get_client()
-        #     cluster.adapt(minimum=5, maximum=375)
         print(client)
         print(client.dashboard_link)
 
