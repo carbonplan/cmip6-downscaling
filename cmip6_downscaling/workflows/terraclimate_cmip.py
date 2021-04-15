@@ -236,12 +236,10 @@ def main(model: str, scenario: str, member: str, compute: bool = False) -> List:
 
 if __name__ == '__main__':
     df = get_cmip_runs(comp=True, unique=True).reset_index()
-    df = df[df.model == 'CanESM5-CanOE']
     df = df[df.scenario.str.contains('ssp')].reset_index()
 
     print(df)
 
-    # with dask.config.set(scheduler='single-threaded'):
     with Client(threads_per_worker=1, memory_limit='6 G') as client:
         print(client)
         print(client.dashboard_link)

@@ -39,8 +39,6 @@ skip_existing = True
 dry_run = False
 version = 'v2'
 
-# dask.config.set(**{'array.slicing.split_large_chunks': False})
-
 # target
 source = 'cmip6/regridded/conus/4000m/monthly/{key}.zarr'
 target = f'cmip6/quantile-mapping-{version}/conus/4000m/monthly/{{key}}.zarr'
@@ -168,7 +166,6 @@ if __name__ == '__main__':
         print(client.dashboard_link)
 
         df = get_cmip_runs(comp=True, unique=True).reset_index()
-        df = df[df.model == 'CanESM5-CanOE']
         print(df)
 
         for i, row in df.iterrows():

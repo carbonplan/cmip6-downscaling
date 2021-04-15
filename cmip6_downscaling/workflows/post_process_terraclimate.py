@@ -109,7 +109,6 @@ def make_annual(model, scenario, member, method):
 if __name__ == '__main__':
 
     df = get_cmip_runs(comp=True, unique=True)
-    df = df[df.model == 'CanESM5-CanOE']
     print(df)
 
     method = 'quantile-mapping-v2'
