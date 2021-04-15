@@ -14,7 +14,7 @@ account_key = os.environ.get('BLOB_ACCOUNT_KEY', None)
 chunks = {'x': 50, 'y': 50, 'time': -1}
 mean_vars = ['tmin', 'tmax', 'srad', 'rh', 'tmean', 'tdew', 'vap', 'vpd', 'pdsi', 'soil', 'swe']
 sum_vars = ['ppt', 'aet', 'pet', 'def', 'q']
-skip_existing = True
+skip_existing = False
 
 
 def get_scratch_ds(model, scenario, member, method):
@@ -108,10 +108,11 @@ def make_annual(model, scenario, member, method):
 
 if __name__ == '__main__':
 
-    df = get_cmip_runs(comp=False, unique=True)
+    df = get_cmip_runs(comp=True, unique=True)
+    df = df[df.model == 'CanESM5-CanOE']
     print(df)
 
-    method = 'quantile-mapping'
+    method = 'quantile-mapping-v2'
 
     split_df = df[df.scenario.str.contains('ssp')].reset_index()
 
@@ -120,7 +121,6 @@ if __name__ == '__main__':
             for i, row in split_df.iterrows():
                 print(f'processing {i+1} of {len(df)}')
                 print(row)
-
                 split_and_write(row.model, row.scenario, row.member, method)
 
     with Client(threads_per_worker=1, memory_limit='22 G') as client:

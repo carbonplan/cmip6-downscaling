@@ -386,6 +386,7 @@ def pdsi(
         ppt_extended_in[ppt_zeros] = SMALL_PPT
 
     pdsi_vals = palmer.pdsi(ppt_extended_in, pet_extended_in, awc_in, y0, y1, y2)[0]
+    pdsi_vals = pdsi_vals.clip(-16, 16)
     out = pd.Series(pdsi_vals[pad_months:], index=ppt.index)
 
     return out

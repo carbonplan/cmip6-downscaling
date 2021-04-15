@@ -30,22 +30,20 @@ np.seterr(invalid='ignore')
 train_time = slice(str(CLIMATE_NORMAL_PERIOD[0]), str(CLIMATE_NORMAL_PERIOD[1]))
 
 # variable names
-absolute_vars = ['tmin', 'tmax']
-relative_vars = ['ppt', 'srad', 'rh']
-bc_vars = absolute_vars + relative_vars
+bc_vars = ['tmin', 'tmax', 'ppt', 'srad', 'rh']
 update_vars = ['area', 'crs', 'mask']
 
 # output chunks (for dask/zarr)
 rename_dict = {'pr': 'ppt', 'tasmax': 'tmax', 'tasmin': 'tmin', 'rsds': 'srad', 'hurs': 'rh'}
-
 skip_existing = True
 dry_run = False
+version = 'v2'
 
 # dask.config.set(**{'array.slicing.split_large_chunks': False})
 
 # target
 source = 'cmip6/regridded/conus/4000m/monthly/{key}.zarr'
-target = 'cmip6/quantile-mapping/conus/4000m/monthly/{key}.zarr'
+target = f'cmip6/quantile-mapping-{version}/conus/4000m/monthly/{{key}}.zarr'
 
 
 def load_coords(ds: xr.Dataset) -> xr.Dataset:
@@ -67,6 +65,8 @@ def process_cmip(ds):
     ds['rh'] /= PERCENT
     ds['ppt'] *= xr.Variable('time', ds.indexes['time'].days_in_month * SEC_PER_DAY)
 
+    # ds = derived_variables.process(ds)
+
     ds = load_coords(ds)
 
     return ds[bc_vars].drop(['member_id', 'height']).chunk(chunks)
@@ -82,7 +82,7 @@ def get_obs():
 
     mapper = zarr.storage.ABSStore(
         'carbonplan-downscaling',
-        prefix='obs/conus/4000m/monthly/terraclimate_plus.zarr',
+        prefix='obs/conus/4000m/monthly/terraclimate_plus_v3.zarr',
         account_name="carbonplan",
         account_key=os.environ["BLOB_ACCOUNT_KEY"],
     )
@@ -167,7 +167,8 @@ if __name__ == '__main__':
         print(client)
         print(client.dashboard_link)
 
-        df = get_cmip_runs(comp=False, unique=False).reset_index()
+        df = get_cmip_runs(comp=True, unique=True).reset_index()
+        df = df[df.model == 'CanESM5-CanOE']
         print(df)
 
         for i, row in df.iterrows():

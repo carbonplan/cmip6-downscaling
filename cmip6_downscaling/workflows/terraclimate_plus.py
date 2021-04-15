@@ -26,7 +26,9 @@ in_vars = force_vars + aux_vars
 model_vars = ['aet', 'def', 'pdsi', 'pet', 'q', 'soil', 'swe', 'tmean', 'tdew', 'vap', 'vpd', 'rh']
 out_vars = in_vars + model_vars
 
-target = 'obs/conus/4000m/monthly/terraclimate_plus_v2.zarr'
+min_vap = 0.005
+
+target = 'obs/conus/4000m/monthly/terraclimate_plus_v3.zarr'
 
 
 def get_out_mapper(account_key: str) -> zarr.storage.ABSStore:
@@ -91,6 +93,9 @@ def get_obs(region=None):
     max_soil = ds_in['soil'].max('time').load()
     ds_in['awc'] = ds_in['awc'].where(ds_in['awc'] > 0).fillna(awc_fill)
     ds_in['awc'] = np.maximum(ds_in['awc'], max_soil)
+
+    # Temporary fix for vap values == 0
+    ds_in['vap'] = ds_in['vap'].clip(min=min_vap)
 
     for v in force_vars:
         ds_in[v] = ds_in[v].astype(np.float32)

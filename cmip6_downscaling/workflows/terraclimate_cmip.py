@@ -35,8 +35,14 @@ out_vars = [
     'vap',
     'vpd',
 ]
-downscale_method = 'quantile-mapping'
-force_vars = ['tmax', 'tmin', 'srad', 'ppt', 'rh']
+downscale_method = 'quantile-mapping-v2'
+force_vars = [
+    'tmax',
+    'tmin',
+    'srad',
+    'ppt',
+    'rh',
+]
 aux_vars = ['mask', 'awc', 'elevation']
 in_vars = force_vars + aux_vars + ['ws']
 skip_existing = True
@@ -54,7 +60,7 @@ def get_obs(region: dict = None, account_key: str = None) -> xr.Dataset:
     """
 
     obs_mapper = get_store(
-        'obs/conus/4000m/monthly/terraclimate_plus.zarr', account_key=account_key
+        'obs/conus/4000m/monthly/terraclimate_plus_v3.zarr', account_key=account_key
     )
     obs = xr.open_zarr(obs_mapper, consolidated=True).pipe(load_coords)
     obs = maybe_slice_region(obs, region)
@@ -229,12 +235,14 @@ def main(model: str, scenario: str, member: str, compute: bool = False) -> List:
 
 
 if __name__ == '__main__':
-    df = get_cmip_runs(comp=False, unique=True)
+    df = get_cmip_runs(comp=True, unique=True).reset_index()
+    df = df[df.model == 'CanESM5-CanOE']
     df = df[df.scenario.str.contains('ssp')].reset_index()
 
     print(df)
 
-    with Client(threads_per_worker=1, memory_limit='4 G') as client:
+    # with dask.config.set(scheduler='single-threaded'):
+    with Client(threads_per_worker=1, memory_limit='6 G') as client:
         print(client)
         print(client.dashboard_link)
         for i, row in df.iterrows():
