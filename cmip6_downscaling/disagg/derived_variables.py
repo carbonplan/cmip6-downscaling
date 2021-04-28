@@ -71,7 +71,7 @@ def dewpoint_from_relative_humidity(temperature, rh):
     --------
     metpy.calc.dewpoint_from_relative_humidity
     """
-    return dewpoint(rh * saturation_vapor_pressure(temperature + KELVIN))
+    return dewpoint(rh * saturation_vapor_pressure(temperature))
 
 
 def relative_humidity_from_dewpoint(temperature, dewpt):
