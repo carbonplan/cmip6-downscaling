@@ -58,7 +58,7 @@ def dewpoint_from_relative_humidity(temperature, rh):
     Parameters
     ----------
     temperature : scalar or array-like
-        air temperature [C]
+        air temperature [K]
     rh : scalar or array-like
         relative humidity expressed as a ratio in the range 0 < rh <= 1
 
