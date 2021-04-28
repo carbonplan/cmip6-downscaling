@@ -58,7 +58,7 @@ def dewpoint_from_relative_humidity(temperature, rh):
     Parameters
     ----------
     temperature : scalar or array-like
-        air temperature [C]
+        air temperature [K]
     rh : scalar or array-like
         relative humidity expressed as a ratio in the range 0 < rh <= 1
 
@@ -71,7 +71,7 @@ def dewpoint_from_relative_humidity(temperature, rh):
     --------
     metpy.calc.dewpoint_from_relative_humidity
     """
-    return dewpoint(rh * saturation_vapor_pressure(temperature + KELVIN))
+    return dewpoint(rh * saturation_vapor_pressure(temperature))
 
 
 def relative_humidity_from_dewpoint(temperature, dewpt):
