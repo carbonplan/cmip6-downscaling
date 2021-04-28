@@ -9,6 +9,7 @@ import xarray as xr
 import zarr
 from carbonplan.data import cat
 
+from cmip6_downscaling.disagg.derived_variables import min_vap
 from cmip6_downscaling.disagg.wrapper import create_template, run_terraclimate_model
 from cmip6_downscaling.workflows.share import (
     awc_fill,
@@ -25,8 +26,6 @@ aux_vars = ['mask', 'awc', 'elevation']
 in_vars = force_vars + aux_vars
 model_vars = ['aet', 'def', 'pdsi', 'pet', 'q', 'soil', 'swe', 'tmean', 'tdew', 'vap', 'vpd', 'rh']
 out_vars = in_vars + model_vars
-
-min_vap = 0.005
 
 target = 'obs/conus/4000m/monthly/terraclimate_plus_v3.zarr'
 

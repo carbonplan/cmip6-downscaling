@@ -35,9 +35,19 @@ update_vars = ['area', 'crs', 'mask']
 
 # output chunks (for dask/zarr)
 rename_dict = {'pr': 'ppt', 'tasmax': 'tmax', 'tasmin': 'tmin', 'rsds': 'srad', 'hurs': 'rh'}
-skip_existing = True
+skip_existing = False
 dry_run = False
-version = 'v2'
+version = 'v3'
+
+extrapolate = {'tmin': '1to1', 'tmax': '1to1', 'ppt': '1to1', 'srad': '1to1', 'rh': '1to1'}
+
+clip = {
+    'tmin': None,
+    'tmax': None,
+    'ppt': {'min': 0.0, 'max': None},
+    'srad': {'min': 0.0, 'max': None},
+    'rh': {'min': 0.0, 'max': 1.0},
+}
 
 # target
 source = 'cmip6/regridded/conus/4000m/monthly/{key}.zarr'
@@ -134,9 +144,8 @@ def main(model, scenario, member):
 
     for v in bc_vars:
         print(v)
-
         models[v] = PointWiseDownscaler(
-            TrendAwareQuantileMappingRegressor(QuantileMappingReressor(extrapolate='1to1'))
+            TrendAwareQuantileMappingRegressor(QuantileMappingReressor(extrapolate=extrapolate[v]))
         )
 
         # train models with historical data
@@ -144,6 +153,10 @@ def main(model, scenario, member):
 
         # predict this ensemble member
         y_scen[v] = models[v].predict(x_scen[v])
+
+        # post process predicted data
+        if clip[v] is not None:
+            y_scen[v] = y_scen[v].clip(**clip[v])
 
     y_scen = y_scen.chunk(chunks)
     print('y_scen:\n', y_scen)

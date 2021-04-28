@@ -4,6 +4,7 @@ import xarray as xr
 from ..constants import KELVIN, MB_PER_KPA
 
 sat_pressure_0c = 6.112  # [milibar]
+min_vap = 0.005  # lower limit for vapor pressure
 
 
 def dewpoint(e):
@@ -106,7 +107,7 @@ def process(ds: xr.Dataset) -> xr.Dataset:
     Parameters
     ----------
     ds : xr.Dataset
-        Dataset to
+        Input dataset
 
     Returns
     -------
@@ -121,23 +122,21 @@ def process(ds: xr.Dataset) -> xr.Dataset:
 
     if 'vap' not in ds and 'rh' in ds:
         ds['vap'] = ds['rh'] * sat_vp
-
-    if 'rh' not in ds and 'vap' in ds:
+        ds['vap'] = ds['vap'].clip(min=min_vap)
         ds['rh'] = ds['vap'] / sat_vp
-
-    if 'tdew' not in ds and 'vap' in ds:
-        # calc tdew
-        ds['tdew'] = dewpoint(ds['vap'] * MB_PER_KPA)
-
-    if 'tdew' not in ds and 'rh' in ds:
         ds['tdew'] = dewpoint_from_relative_humidity(ds['tmean'] + KELVIN, ds['rh'])
-
-    if 'rh' not in ds and 'tdew' in ds:
+    elif 'rh' not in ds and 'vap' in ds:
+        ds['vap'] = ds['vap'].clip(min=min_vap)
+        ds['rh'] = ds['vap'] / sat_vp
+        ds['tdew'] = dewpoint(ds['vap'] * MB_PER_KPA)
+    elif 'rh' not in ds and 'tdew' in ds:
         ds['rh'] = relative_humidity_from_dewpoint(ds['tmean'] + KELVIN, ds['tdew'] + KELVIN)
-
-    if 'vap' not in ds and 'rh' in ds:
-        # repeated from above (now that we've calculated rh)
         ds['vap'] = ds['rh'] * sat_vp
+        ds['vap'] = ds['vap'].clip(min=min_vap)
+        ds['rh'] = ds['vap'] / sat_vp
+        ds['tdew'] = dewpoint_from_relative_humidity(ds['tmean'] + KELVIN, ds['rh'])
+    else:
+        raise ValueError('not able to calculate vap/rh/tdew with given input variables')
 
     if 'vpd' not in ds:
         ds['vpd'] = sat_vp - ds['vap']
