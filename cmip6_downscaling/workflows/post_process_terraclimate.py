@@ -14,7 +14,7 @@ account_key = os.environ.get('BLOB_ACCOUNT_KEY', None)
 chunks = {'x': 50, 'y': 50, 'time': -1}
 mean_vars = ['tmin', 'tmax', 'srad', 'rh', 'tmean', 'tdew', 'vap', 'vpd', 'pdsi', 'soil', 'swe']
 sum_vars = ['ppt', 'aet', 'pet', 'def', 'q']
-skip_existing = False
+skip_existing = True
 
 
 def get_scratch_ds(model, scenario, member, method):
@@ -101,7 +101,7 @@ def make_annual(model, scenario, member, method):
     ds_annual = ds_monthly.map_blocks(_annual, template=template)
     annual_mapper.clear()
     task = ds_annual.to_zarr(annual_mapper, mode='w', compute=False)
-    dask.compute(task, retries=4)
+    dask.compute(task, retries=12)
     zarr.consolidate_metadata(annual_mapper)
     return 'done'
 
@@ -114,11 +114,19 @@ if __name__ == '__main__':
     method = 'quantile-mapping-v2'
 
     split_df = df[df.scenario.str.contains('ssp')].reset_index()
+    df = df.reset_index()
+
+    #     print(split_df)
+
+    #     print(split_df.iloc[17])
+
+    #     row = split_df.iloc[17]
+    #     split_and_write(row.model, row.scenario, row.member, method)
 
     with dask.config.set(scheduler='processes'):
         with ProgressBar():
             for i, row in split_df.iterrows():
-                print(f'processing {i+1} of {len(df)}')
+                print(f'processing {i+1} of {len(split_df)}')
                 print(row)
                 split_and_write(row.model, row.scenario, row.member, method)
 
@@ -128,7 +136,6 @@ if __name__ == '__main__':
         for i, row in df.iterrows():
             print(f'processing {i+1} of {len(df)}')
             print(row)
-
             result = make_annual(row.model, row.scenario, row.member, method)
             if result == 'done':
                 client.restart()
