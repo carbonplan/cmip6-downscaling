@@ -35,7 +35,7 @@ out_vars = [
     'vap',
     'vpd',
 ]
-downscale_method = 'quantile-mapping-v2'
+downscale_method = 'quantile-mapping-v3'
 force_vars = [
     'tmax',
     'tmin',
@@ -45,7 +45,7 @@ force_vars = [
 ]
 aux_vars = ['mask', 'awc', 'elevation']
 in_vars = force_vars + aux_vars + ['ws']
-skip_existing = True
+skip_existing = False
 
 
 def get_obs(region: dict = None, account_key: str = None) -> xr.Dataset:

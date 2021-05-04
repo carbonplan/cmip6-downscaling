@@ -8,5 +8,6 @@ intake-esm
 intake-xarray
 scikit-downscale
 scikit-learn
+tenacity
 xarray
 zarr
