@@ -1,8 +1,8 @@
 {
   "esmcat_version": "0.1.0",
-  "id": "carbonplan-az-cmip6",
-  "description": "This is an intake-esm catalog for the carbonplan azure-storage CMIP6 zarr data.",
-  "catalog_file": "az://cmip6/az_cmip6.csv",
+  "id": "pangeo-az-cmip6",
+  "description": "This is an intake-esm catalog for the Azure storage CMIP6 zarr data.",
+  "catalog_file": "https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.csv",
   "attributes": [
     {
       "column_name": "activity_id",

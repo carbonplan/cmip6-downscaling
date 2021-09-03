@@ -1,42 +1,48 @@
+# Imports -----------------------------------------------------------
+
 import pandas as pd
 import json
-import os
-import adlfs
 import fsspec
 import intake
 import xarray as xr
 from prefect import Flow, Parameter, task
 from prefect.run_configs import KubernetesRun
-from prefect.storage import GCS
-import datetime
-from datetime import timedelta
+from prefect.storage import Azure
+from prefect.executors import LocalExecutor
+import prefect
+from prefect.client import Secret
+
+prefect.config.cloud.use_local_secrets = False
+prefect.config.logging.level = "DEBUG"
+
+
+# vars/pathing -----------------------------------------------------------
 
 
 variable_ids = ["pr", "tasmin", "tasmax"]
 col_url = "https://storage.googleapis.com/cmip6/pangeo-cmip6.json"
-connection_string = "BlobEndpoint=https://cmip6downscaling.blob.core.windows.net/;QueueEndpoint=https://cmip6downscaling.queue.core.windows.net/;FileEndpoint=https://cmip6downscaling.file.core.windows.net/;TableEndpoint=https://cmip6downscaling.table.core.windows.net/;SharedAccessSignature=sv=2020-08-04&ss=bfqt&srt=co&sp=rwdlacuptfx&se=2022-01-02T04:42:34Z&st=2021-08-31T19:42:34Z&spr=https&sig=lx2ZwVnXnTZGdykX9kjMrE%2F6c%2FyKL0HnEwxrGHyxbyo%3D"
-csv_catalog_path = "az://cmip6/az_cmip6.csv"
-json_catalog_path = "az://cmip6/az_cmip6.json"
+connection_string = Secret("cmip6downscaling-connection-string").get()
+csv_catalog_path = "az://cmip6/pangeo-cmip6.csv"
+json_catalog_path = "az://cmip6/pangeo-cmip6.json"
 
-##### Helper Functions ####
+# Helper Functions -----------------------------------------------------------
 
 
 def open_json_catalog():
+    """Loads local CMIP6 JSON intake catalog"""
     data = json.load(open("cmip_catalog.json"))
     return data
 
 
 def write_json_catalog_to_azure():
+    """Writes json catalog to Azure store"""
     data = open_json_catalog()
     with fsspec.open(json_catalog_path, "w", connection_string=connection_string) as f:
         json.dump(data, f)
 
 
-# def read_json_catalog_on_azure():
-#     with fsspec.open(json_catalog_path, "r", connection_string=connection_string) as f:
-
-
 def create_catalog_df():
+    """Creates an empty DataFrame for a catalog"""
     df = pd.DataFrame(
         columns=[
             "activity_id",
@@ -56,6 +62,7 @@ def create_catalog_df():
 
 
 def save_empty_catalog():
+    """Saves initial catalog"""
     df = create_catalog_df()
     df.to_csv(
         csv_catalog_path,
@@ -66,6 +73,7 @@ def save_empty_catalog():
 
 
 def load_csv_catalog():
+    """Loads existing csv catalog, if catalog is missing creates an empty one"""
     try:
         df = pd.read_csv(
             csv_catalog_path, storage_options={"connection_string": connection_string}
@@ -76,6 +84,7 @@ def load_csv_catalog():
 
 
 def rename_gs_to_az(src):
+    """String formatting to update the prefix of the CMIP6 gs store location to Azure"""
     tgt = "az://cmip6/" + src.split("CMIP6/")[1]
     return tgt
 
@@ -85,11 +94,8 @@ def zarr_is_complete(store, check=".zmetadata"):
     return check in store
 
 
-#### Tasks #####
-
-
-@task
 def write_csv_catalog(df):
+    """Writes modified csv catalog to Azure storage"""
     df.to_csv(
         csv_catalog_path,
         storage_options={"connection_string": connection_string},
@@ -97,45 +103,30 @@ def write_csv_catalog(df):
     )
 
 
-@task
-def append_to_catalog_df(src_chunk, df):
-    df = df.append(src)
-    return df
-
-
-@task(nout=2)
 def map_src_tgt(src, tgt, connection_string):
+    """Uses fsspec to creating mapped object from source and target connection strings"""
     src_map = fsspec.get_mapper(src)
     tgt_map = fsspec.get_mapper(tgt, connection_string=connection_string)
     return src_map, tgt_map
 
 
-@task
-def check_target_store(tgt_map):
-    check_status = zarr_is_complete(tgt_map)
-    return check_status
-
-
-@task()
 def load_zarr_store(src_map):
+    """Given a mapped source, loads Zarr store and returns xarray dataset"""
     xdf = xr.open_zarr(src_map, decode_cf=False, consolidated=True)
     return xdf
 
 
-@task()
-def process_data(xdf):
-    # do any data processing steps...
-    cleaned_xdf = xdf
-    return cleaned_xdf
+def copy_cleaned_data(xdf, tgt_map, overwrite=True):
+    """Copies xarray dataset to zarr store for given target"""
+    if overwrite == True:
+        mode = "w"
+    else:
+        mode = "r"
+    xdf.to_zarr(tgt_map, mode=mode, consolidated=True)
 
 
-@task()
-def copy_cleaned_data(cleaned_xdf, tgt_map, overwrite=False):
-    cleaned_xdf.to_zarr(tgt_map, consolidated=True)
-
-
-# @task(nout=2)
 def retrive_cmip6_catalog():
+    """Returns historical and scenario results as intake catalogs"""
     col = intake.open_esm_datastore(col_url)
 
     # get all possible simulations
@@ -163,63 +154,50 @@ def retrive_cmip6_catalog():
     return hist_subset, ssp_subset
 
 
-"""testing transfer"""
-hist_subset, ssp_subset = retrive_cmip6_catalog()
+# Prefect Task(s) -----------------------------------------------------------
 
 
-src = ssp_subset.df.zstore.iloc[0]
-tgt = "az://cmip6/" + src.split("CMIP6/")[1]
-src_map = fsspec.get_mapper(src)
+@task
+def copy_to_azure(src_tgt_uris):
+    src_uri, tgt_uri = src_tgt_uris
+    src_map, tgt_map = map_src_tgt(src_uri, tgt_uri, connection_string)
+    if not zarr_is_complete(tgt_map):
+        xdf = load_zarr_store(src_map)
+        copy_cleaned_data(xdf, tgt_map)
 
-tgt_map = fsspec.get_mapper(tgt, connection_string=connection_string)
-# xdf = xr.open_zarr(src_map, decode_cf=False, consolidated=True)
 
+# Prefect cloud config settings -----------------------------------------------------------
 
 run_config = KubernetesRun(
     cpu_request=2,
-    memory_request="2Gi",
+    memory_request="7Gi",
     image="gcr.io/carbonplan/hub-notebook:b2419ff",
-    labels=["gcp-us-central1-b"],
     env={"TZ": "UTC"},
+    labels=["az-eu-west"],
 )
-storage = GCS("carbonplan-prefect")
+storage = Azure("prefect", connection_string=connection_string)
+
+# Prefect Flow -----------------------------------------------------------
 
 
-# with Flow(
-#     name="Transfer CMIP6 from gs to az", storage=storage, run_config=run_config,
-# ) as flow:
-with Flow(name="Transfer CMIP6 from gs to az") as flow:
-    # 0.5
+with Flow(name="Transfer_CMIP6", storage=storage, run_config=run_config) as flow:
     hist_subset, ssp_subset = retrive_cmip6_catalog()
-    src_test_list = [
-        "gs://cmip6/CMIP6/ScenarioMIP/MRI/MRI-ESM2-0/ssp245/r1i1p1f1/Amon/pr/gn/v20190222/"
-    ]
-    # loop though ssp_subset/hist_subset.df
-    for row in ssp_subset.df.iterrows():
-        src = row["zstore"]
-        tgt = rename_gs_to_az(src)
-        # 1. attempt to map src and target (what to do if fails.. retry?). if fails, append to dict of failed map, pass other flows
-        src_map, tgt_map = map_src_tgt(src, tgt, connection_string)
-        # 2. check that store does not exist, if exists already, pass
-        check_status = check_target_store(tgt_map)
-        if check_status == False:
-            missed = []
-            try:
-                # 3. load store
-                xdf = load_zarr_store(src_map)
-                # 4. clean store
-                cleaned_xdf = process_data(xdf)
-                # 5. export store
-                copy_cleaned_data(cleaned_xdf, tgt_map)
-                # 6. update catalog
-                df = append_to_catalog_df(row, df)
-            except:
-                missed.append(src)
+    df = load_csv_catalog()
+    hist_df = hist_subset.df.iloc[0:3]
+    uris = [(src_uri, rename_gs_to_az(src_uri)) for src_uri in hist_df.zstore.to_list()]
+    df_new = hist_df.copy()
+    copy_to_azure.map(uris)
+    df_new["zstore"] = [tgt_uri[1] for tgt_uri in uris]
+    updated_df = pd.concat([df, df_new], axis=0).drop_duplicates(
+        keep="last", ignore_index=True
+    )
+    updated_df.to_csv(
+        csv_catalog_path, storage_options={"connection_string": connection_string}
+    )
 
-    write_csv_catalog(df)
-
+# state = flow.run(executor=LocalExecutor())
 
 # if __name__ == "__main__":
-#     # flow = prefect_flow()
-#     # flow.register(project_name="offset-fires")
-#     flow.run()
+#     flow = prefect_flow()
+# flow.register(project_name="offset-fires")
+# flow.run()
