@@ -9,8 +9,8 @@
       "vocabulary": "https://raw.githubusercontent.com/WCRP-CMIP/CMIP6_CVs/master/CMIP6_activity_id.json"
     },
     {
-        "column_name": "institution_id",
-        "vocabulary": "https://raw.githubusercontent.com/WCRP-CMIP/CMIP6_CVs/master/CMIP6_institution_id.json"
+      "column_name": "institution_id",
+      "vocabulary": "https://raw.githubusercontent.com/WCRP-CMIP/CMIP6_CVs/master/CMIP6_institution_id.json"
     },
     {
       "column_name": "source_id",
@@ -20,12 +20,18 @@
       "column_name": "experiment_id",
       "vocabulary": "https://raw.githubusercontent.com/WCRP-CMIP/CMIP6_CVs/master/CMIP6_experiment_id.json"
     },
-    { "column_name": "member_id", "vocabulary": "" },
+    {
+      "column_name": "member_id",
+      "vocabulary": ""
+    },
     {
       "column_name": "table_id",
       "vocabulary": "https://raw.githubusercontent.com/WCRP-CMIP/CMIP6_CVs/master/CMIP6_table_id.json"
     },
-    { "column_name": "variable_id", "vocabulary": "" },
+    {
+      "column_name": "variable_id",
+      "vocabulary": ""
+    },
     {
       "column_name": "grid_label",
       "vocabulary": "https://raw.githubusercontent.com/WCRP-CMIP/CMIP6_CVs/master/CMIP6_grid_label.json"
@@ -58,16 +64,21 @@
         "type": "union",
         "attribute_name": "variable_id"
       },
-
       {
         "type": "join_new",
         "attribute_name": "member_id",
-        "options": { "coords": "minimal", "compat": "override" }
+        "options": {
+          "coords": "minimal",
+          "compat": "override"
+        }
       },
       {
         "type": "join_new",
         "attribute_name": "dcpp_init_year",
-        "options": { "coords": "minimal", "compat": "override" }
+        "options": {
+          "coords": "minimal",
+          "compat": "override"
+        }
       }
     ]
   }

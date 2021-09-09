@@ -1,27 +1,20 @@
 # Imports -----------------------------------------------------------
-
-import pandas as pd
 import json
+import os
+
 import fsspec
 import intake
+import pandas as pd
 import xarray as xr
-from prefect import Flow, Parameter, task
+from prefect import Flow, task
 from prefect.run_configs import KubernetesRun
 from prefect.storage import Azure
-from prefect.executors import LocalExecutor
-import prefect
-from prefect.client import Secret
-
-prefect.config.cloud.use_local_secrets = False
-prefect.config.logging.level = "DEBUG"
-
 
 # vars/pathing -----------------------------------------------------------
 
-
 variable_ids = ["pr", "tasmin", "tasmax"]
 col_url = "https://storage.googleapis.com/cmip6/pangeo-cmip6.json"
-connection_string = Secret("cmip6downscaling-connection-string").get()
+connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 csv_catalog_path = "az://cmip6/pangeo-cmip6.csv"
 json_catalog_path = "az://cmip6/pangeo-cmip6.json"
 
@@ -75,9 +68,7 @@ def save_empty_catalog():
 def load_csv_catalog():
     """Loads existing csv catalog, if catalog is missing creates an empty one"""
     try:
-        df = pd.read_csv(
-            csv_catalog_path, storage_options={"connection_string": connection_string}
-        )
+        df = pd.read_csv(csv_catalog_path, storage_options={"connection_string": connection_string})
     except:
         df = save_empty_catalog()
     return df
@@ -118,7 +109,7 @@ def load_zarr_store(src_map):
 
 def copy_cleaned_data(xdf, tgt_map, overwrite=True):
     """Copies xarray dataset to zarr store for given target"""
-    if overwrite == True:
+    if overwrite is True:
         mode = "w"
     else:
         mode = "r"
@@ -133,25 +124,26 @@ def retrive_cmip6_catalog():
     full_subset = col.search(
         activity_id=["CMIP", "ScenarioMIP"],
         experiment_id=["historical", "ssp245", "ssp370", "ssp585"],
-        table_id="Amon",
+        member_id="r1i1p1f1",
+        table_id="day",
         grid_label="gn",
         variable_id=variable_ids,
     )
 
-    # get historical simulations
-    hist_subset = full_subset.search(
-        activity_id=["CMIP"],
-        experiment_id=["historical"],
-        require_all_on=["variable_id"],
-    )
+    # # get historical simulations
+    # hist_subset = full_subset.search(
+    #     activity_id=["CMIP"],
+    #     experiment_id=["historical"],
+    #     require_all_on=["variable_id"],
+    # )
 
-    # get future simulations
-    ssp_subset = full_subset.search(
-        activity_id=["ScenarioMIP"],
-        experiment_id=["ssp245", "ssp370", "ssp585"],
-        require_all_on=["variable_id"],
-    )
-    return hist_subset, ssp_subset
+    # # get future simulations
+    # ssp_subset = full_subset.search(
+    #     activity_id=["ScenarioMIP"],
+    #     experiment_id=["ssp245", "ssp370", "ssp585"],
+    #     require_all_on=["variable_id"],
+    # )
+    return full_subset  # hist_subset, ssp_subset
 
 
 # Prefect Task(s) -----------------------------------------------------------
@@ -170,34 +162,25 @@ def copy_to_azure(src_tgt_uris):
 
 run_config = KubernetesRun(
     cpu_request=2,
-    memory_request="7Gi",
-    image="gcr.io/carbonplan/hub-notebook:b2419ff",
-    env={"TZ": "UTC"},
+    memory_request="2Gi",
+    # image="gcr.io/carbonplan/hub-notebook:b2419ff",
+    image="gcr.io/carbonplan/hub-notebook:7252fc3",
     labels=["az-eu-west"],
 )
-storage = Azure("prefect", connection_string=connection_string)
+storage = Azure("prefect")
 
 # Prefect Flow -----------------------------------------------------------
 
 
 with Flow(name="Transfer_CMIP6", storage=storage, run_config=run_config) as flow:
-    hist_subset, ssp_subset = retrive_cmip6_catalog()
+    # hist_subset, ssp_subset = retrive_cmip6_catalog()
+    full_subset = retrive_cmip6_catalog()
+
     df = load_csv_catalog()
-    hist_df = hist_subset.df.iloc[0:3]
-    uris = [(src_uri, rename_gs_to_az(src_uri)) for src_uri in hist_df.zstore.to_list()]
-    df_new = hist_df.copy()
+    subset_df = full_subset.df  # .iloc[0:3]
+    uris = [(src_uri, rename_gs_to_az(src_uri)) for src_uri in subset_df.zstore.to_list()]
+    df_new = subset_df.copy()
     copy_to_azure.map(uris)
     df_new["zstore"] = [tgt_uri[1] for tgt_uri in uris]
-    updated_df = pd.concat([df, df_new], axis=0).drop_duplicates(
-        keep="last", ignore_index=True
-    )
-    updated_df.to_csv(
-        csv_catalog_path, storage_options={"connection_string": connection_string}
-    )
-
-# state = flow.run(executor=LocalExecutor())
-
-# if __name__ == "__main__":
-#     flow = prefect_flow()
-# flow.register(project_name="offset-fires")
-# flow.run()
+    updated_df = pd.concat([df, df_new], axis=0).drop_duplicates(keep="last", ignore_index=True)
+    updated_df.to_csv(csv_catalog_path, storage_options={"connection_string": connection_string})
