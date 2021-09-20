@@ -122,7 +122,7 @@ def run_terraclimate_model(ds_in: xr.Dataset) -> xr.Dataset:
 
 
 def calc_valid_mask(ds: xr.Dataset) -> xr.Dataset:
-    """ helper function to calculate a valid mask for given input variables """
+    """helper function to calculate a valid mask for given input variables"""
     # Temporary fix to correct for mismatched masks (along coasts)
     ds['mask'] = (
         ds['mask'].astype(bool)

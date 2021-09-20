@@ -61,14 +61,14 @@ def dummy_store(store):
 
 
 def preprocess(ds: xr.Dataset) -> xr.Dataset:
-    ''' preprocess datasets after loading them '''
+    '''preprocess datasets after loading them'''
     if 'month' in ds:
         ds = ds.drop('month')
     return ds
 
 
 def load_coords(ds: xr.Dataset) -> xr.Dataset:
-    ''' helper function to pre-load coordinates '''
+    '''helper function to pre-load coordinates'''
     return ds.update(ds[list(ds.coords)].load())
 
 
@@ -88,7 +88,7 @@ def get_slices(length: int, chunk_size: int) -> List:
 
 
 def get_regions(ds: xr.Dataset) -> xr.Dataset:
-    ''' create a list of regions (dict of slices) '''
+    '''create a list of regions (dict of slices)'''
     x_slices = get_slices(ds.dims['x'], chunks['x'])
     y_slices = get_slices(ds.dims['y'], chunks['y'])
     t_slices = [slice(None)]
