@@ -4,7 +4,7 @@ import zarr
 
 
 def get_store(prefix, account_key=None):
-    ''' helper function to create a zarr store'''
+    '''helper function to create a zarr store'''
 
     if account_key is None:
         account_key = os.environ.get('BLOB_ACCOUNT_KEY', None)

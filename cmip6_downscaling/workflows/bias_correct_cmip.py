@@ -46,7 +46,7 @@ target = 'cmip6/bias-corrected/conus/4000m/monthly/{key}.zarr'
 
 
 def load_coords(ds: xr.Dataset) -> xr.Dataset:
-    ''' helper function to pre-load coordinates '''
+    '''helper function to pre-load coordinates'''
     ds = ds.update(ds[list(ds.coords)].load())
     for v in ds.variables:
         if 'chunks' in ds[v].encoding:
