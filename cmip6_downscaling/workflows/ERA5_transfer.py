@@ -34,11 +34,7 @@ def copy_cleaned_data(xdf, tgt_map, overwrite=True):
 
 def extract_name_path(file_path):
     """String formatting to update the prefix of the ERA5 store location to Azure"""
-    # tgt = "az://cmip6/ERA5/" + file_path_tuple[0].split('/zarr/')[1].split('data/')[0].replace('/','_') + 'consolidated_vars/'
-    tgt = "az://cmip6/ERA5/" + file_path.split('/zarr/')[1].replace(
-        '/data', ''
-    )  # .replace('/','_')[:-1]
-
+    tgt = "az://cmip6/ERA5/" + file_path.split("/zarr/")[1].replace("/data", "")
     return tgt
 
 
@@ -51,19 +47,19 @@ def map_and_open_zarr_link(file_loc_str):
 def create_formatted_links():
     """Create list of tuples representing all year/month/variable combinations"""
     vars_list = [
-        'eastward_wind_at_10_metres',
-        'northward_wind_at_10_metres',
-        'eastward_wind_at_100_metres',
-        'northward_wind_at_100_metres',
-        'dew_point_temperature_at_2_metres',
-        'air_temperature_at_2_metres',
-        'air_temperature_at_2_metres_1hour_Maximum',
-        'air_temperature_at_2_metres_1hour_Minimum',
-        'air_pressure_at_mean_sea_level',
-        'sea_surface_temperature',
-        'surface_air_pressure',
-        'integral_wrt_time_of_surface_direct_downwelling_shortwave_flux_in_air_1hour_Accumulation',
-        'precipitation_amount_1hour_Accumulation',
+        "eastward_wind_at_10_metres",
+        "northward_wind_at_10_metres",
+        "eastward_wind_at_100_metres",
+        "northward_wind_at_100_metres",
+        "dew_point_temperature_at_2_metres",
+        "air_temperature_at_2_metres",
+        "air_temperature_at_2_metres_1hour_Maximum",
+        "air_temperature_at_2_metres_1hour_Minimum",
+        "air_pressure_at_mean_sea_level",
+        "sea_surface_temperature",
+        "surface_air_pressure",
+        "integral_wrt_time_of_surface_direct_downwelling_shortwave_flux_in_air_1hour_Accumulation",
+        "precipitation_amount_1hour_Accumulation",
     ]
 
     month_list = [str(x).zfill(2) for x in range(1, 13, 1)]
@@ -72,16 +68,16 @@ def create_formatted_links():
     for year in year_list:
         for month in month_list:
             for var in vars_list:
-                file_pattern = f's3://era5-pds/zarr/{year}/{month}/data/{var}.zarr/'
+                file_pattern = f"s3://era5-pds/zarr/{year}/{month}/data/{var}.zarr/"
                 file_pattern_list.append(file_pattern)
     return file_pattern_list
 
 
 def clean_ds(ds):
-    if 'time0' in list(ds.coords):
-        cleaned_ds = ds.rename({'time0': 'time'})
-    elif 'time1' in list(ds.coords):
-        cleaned_ds = ds.rename({'time1': 'time'})
+    if "time0" in list(ds.coords):
+        cleaned_ds = ds.rename({"time0": "time"})
+    elif "time1" in list(ds.coords):
+        cleaned_ds = ds.rename({"time1": "time"})
 
     return cleaned_ds
 

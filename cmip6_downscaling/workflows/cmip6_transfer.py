@@ -130,19 +130,6 @@ def retrive_cmip6_catalog():
         variable_id=variable_ids,
     )
 
-    # # get historical simulations
-    # hist_subset = full_subset.search(
-    #     activity_id=["CMIP"],
-    #     experiment_id=["historical"],
-    #     require_all_on=["variable_id"],
-    # )
-
-    # # get future simulations
-    # ssp_subset = full_subset.search(
-    #     activity_id=["ScenarioMIP"],
-    #     experiment_id=["ssp245", "ssp370", "ssp585"],
-    #     require_all_on=["variable_id"],
-    # )
     return full_subset  # hist_subset, ssp_subset
 
 
@@ -163,7 +150,6 @@ def copy_to_azure(src_tgt_uris):
 run_config = KubernetesRun(
     cpu_request=2,
     memory_request="2Gi",
-    # image="gcr.io/carbonplan/hub-notebook:b2419ff",
     image="gcr.io/carbonplan/hub-notebook:7252fc3",
     labels=["az-eu-west"],
 )
@@ -173,9 +159,7 @@ storage = Azure("prefect")
 
 
 with Flow(name="Transfer_CMIP6", storage=storage, run_config=run_config) as flow:
-    # hist_subset, ssp_subset = retrive_cmip6_catalog()
     full_subset = retrive_cmip6_catalog()
-
     df = load_csv_catalog()
     subset_df = full_subset.df  # .iloc[0:3]
     uris = [(src_uri, rename_gs_to_az(src_uri)) for src_uri in subset_df.zstore.to_list()]
