@@ -1,7 +1,7 @@
 repos:
 
 -   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v3.4.0
+    rev: v4.0.1
     hooks:
     - id: trailing-whitespace
     - id: end-of-file-fixer
@@ -11,14 +11,14 @@ repos:
     - id: pretty-format-json
       args: ["--autofix", "--indent=2", "--no-sort-keys"]
 
--   repo: https://github.com/ambv/black
-    rev: 20.8b1
+-   repo: https://github.com/psf/black
+    rev: 21.9b0
     hooks:
     - id: black
       args: ["--line-length", "100", "--skip-string-normalization"]
 
--   repo: https://gitlab.com/pycqa/flake8
-    rev: 3.8.4
+-   repo: https://github.com/PyCQA/flake8
+    rev: 3.9.2
     hooks:
     - id: flake8
 
@@ -26,8 +26,8 @@ repos:
     rev: v2.2.0
     hooks:
     - id: seed-isort-config
--   repo: https://github.com/pre-commit/mirrors-isort
-    rev: v5.7.0
+-   repo: https://github.com/PyCQA/isort
+    rev: 5.9.3
     hooks:
     - id: isort
 

@@ -70,11 +70,11 @@ class MontlyBiasCorrection:
         return corrected.drop('month')
 
     def persist(self, **kwargs):
-        """ Persist correction to dask arrays"""
+        """Persist correction to dask arrays"""
         self.correction_ = self.correction_.persist(**kwargs)
         return self
 
     def compute(self, **kwargs):
-        """ Load correction as numpy arrays"""
+        """Load correction as numpy arrays"""
         self.correction_ = self.correction_.compute(**kwargs)
         return self

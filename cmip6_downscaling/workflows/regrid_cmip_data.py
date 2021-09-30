@@ -16,7 +16,7 @@ skip_existing = True
 
 
 def regrid_one_model(source_ds, target_grid, method='bilinear', reuse_weights=False):
-    ''' simple wrapper around xesmf '''
+    '''simple wrapper around xesmf'''
     with dask.config.set(scheduler='threads'):
         regridder = xesmf.Regridder(
             source_ds, target_grid, method=method, reuse_weights=reuse_weights
