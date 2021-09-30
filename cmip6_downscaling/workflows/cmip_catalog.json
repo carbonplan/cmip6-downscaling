@@ -1,0 +1,85 @@
+{
+  "esmcat_version": "0.1.0",
+  "id": "pangeo-az-cmip6",
+  "description": "This is an intake-esm catalog for the Azure storage CMIP6 zarr data.",
+  "catalog_file": "https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.csv",
+  "attributes": [
+    {
+      "column_name": "activity_id",
+      "vocabulary": "https://raw.githubusercontent.com/WCRP-CMIP/CMIP6_CVs/master/CMIP6_activity_id.json"
+    },
+    {
+      "column_name": "institution_id",
+      "vocabulary": "https://raw.githubusercontent.com/WCRP-CMIP/CMIP6_CVs/master/CMIP6_institution_id.json"
+    },
+    {
+      "column_name": "source_id",
+      "vocabulary": "https://raw.githubusercontent.com/WCRP-CMIP/CMIP6_CVs/master/CMIP6_source_id.json"
+    },
+    {
+      "column_name": "experiment_id",
+      "vocabulary": "https://raw.githubusercontent.com/WCRP-CMIP/CMIP6_CVs/master/CMIP6_experiment_id.json"
+    },
+    {
+      "column_name": "member_id",
+      "vocabulary": ""
+    },
+    {
+      "column_name": "table_id",
+      "vocabulary": "https://raw.githubusercontent.com/WCRP-CMIP/CMIP6_CVs/master/CMIP6_table_id.json"
+    },
+    {
+      "column_name": "variable_id",
+      "vocabulary": ""
+    },
+    {
+      "column_name": "grid_label",
+      "vocabulary": "https://raw.githubusercontent.com/WCRP-CMIP/CMIP6_CVs/master/CMIP6_grid_label.json"
+    },
+    {
+      "column_name": "dcpp_start_year",
+      "vocabulary": ""
+    },
+    {
+      "column_name": "version",
+      "vocabulary": ""
+    }
+  ],
+  "assets": {
+    "column_name": "zstore",
+    "format": "zarr"
+  },
+  "aggregation_control": {
+    "variable_column_name": "variable_id",
+    "groupby_attrs": [
+      "activity_id",
+      "institution_id",
+      "source_id",
+      "experiment_id",
+      "table_id",
+      "grid_label"
+    ],
+    "aggregations": [
+      {
+        "type": "union",
+        "attribute_name": "variable_id"
+      },
+      {
+        "type": "join_new",
+        "attribute_name": "member_id",
+        "options": {
+          "coords": "minimal",
+          "compat": "override"
+        }
+      },
+      {
+        "type": "join_new",
+        "attribute_name": "dcpp_init_year",
+        "options": {
+          "coords": "minimal",
+          "compat": "override"
+        }
+      }
+    ]
+  }
+}
