@@ -1,13 +1,17 @@
 # Imports -----------------------------------------------------------
+import json
 import os
 
 import fsspec
+import pandas as pd
 import xarray as xr
 from prefect import Flow, task
 from prefect.run_configs import KubernetesRun
 from prefect.storage import Azure
 
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
+csv_catalog_path = "az://cmip6/ERA5_catalog.csv"
+json_catalog_path = "az://cmip6/ERA5_catalog.json"
 
 # Helper Functions -----------------------------------------------------------
 
@@ -71,6 +75,38 @@ def create_formatted_links():
                 file_pattern = f"s3://era5-pds/zarr/{year}/{month}/data/{var}.zarr/"
                 file_pattern_list.append(file_pattern)
     return file_pattern_list
+
+
+def open_json_catalog():
+    """Loads local CMIP6 JSON intake catalog"""
+    data = json.load(open("ERA5_catalog.json"))
+    return data
+
+
+def write_json_catalog_to_azure():
+    """Writes json catalog to Azure store"""
+    data = open_json_catalog()
+    with fsspec.open(json_catalog_path, "w", connection_string=connection_string) as f:
+        json.dump(data, f)
+
+
+def create_csv_catalog():
+    file_pattern_list = create_formatted_links()
+    az_list = []
+    for fil in file_pattern_list:
+        az_fil = extract_name_path(fil)
+        az_list.append(az_fil)
+
+    df = pd.DataFrame({'zstore': az_list})
+    zstore_split_str = df['zstore'].str.split('.zarr', expand=True)[0].str.split('/')
+    df['variable'] = zstore_split_str.str[-1]
+    df['month'] = zstore_split_str.str[-2]
+    df['year'] = zstore_split_str.str[-3]
+    df.to_csv(
+        csv_catalog_path,
+        storage_options={"connection_string": connection_string},
+        index=False,
+    )
 
 
 def clean_ds(ds):
