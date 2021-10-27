@@ -3,35 +3,24 @@ import os
 import fsspec
 import intake
 import xarray as xr
-import zarr
 from prefect import Flow, task
 from prefect.run_configs import KubernetesRun
 from prefect.storage import Azure
+
+from cmip6_downscaling.workflows.share import get_store
 
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 account_key = os.environ.get("account_key")
 
 
-def get_store(bucket, prefix, account_key=None):
-    """helper function to create a zarr store"""
-    if account_key is None:
-        account_key = os.environ.get("AccountKey", None)
-
-    store = zarr.storage.ABSStore(
-        bucket, prefix=prefix, account_name="cmip6downscaling", account_key=account_key
-    )
-    return store
-
-
-def get_zstore_list():
+def get_ERA5_zstore_list():
     account_key = os.environ.get("AccountKey", None)
     col = intake.open_esm_datastore(
         "https://cmip6downscaling.blob.core.windows.net/cmip6/ERA5_catalog.json"
     )
     zstores = [zstore.split("az://cmip6/")[1] for zstore in col.df.zstore.to_list()]
     store_list = [
-        get_store(bucket="cmip6", prefix=prefix, account_key=account_key)
-        for prefix in zstores
+        get_store(bucket="cmip6", prefix=prefix, account_key=account_key) for prefix in zstores
     ]
     return store_list
 
@@ -73,9 +62,7 @@ def get_storage_chunks(chunk_direction):
 
 
 def write_zarr_store(ds):
-    mapped_tgt = map_tgt(
-        "az://cmip6/ERA5/ERA5_resample_chunked_time/", connection_string
-    )
+    mapped_tgt = map_tgt("az://cmip6/ERA5/ERA5_resample_chunked_time/", connection_string)
     ds.to_zarr(mapped_tgt, mode="w", consolidated=True)
 
 
@@ -83,7 +70,7 @@ def write_zarr_store(ds):
 def downsample_and_combine():
     # grab zstore list and variable rename dictionary
     var_name_dict = get_var_name_dict()
-    store_list = get_zstore_list()
+    store_list = get_ERA5_zstore_list()
 
     # Open all zarr stores for ERA5
     ds = xr.open_mfdataset(store_list, engine="zarr", concat_dim="time")
@@ -130,7 +117,5 @@ run_config = KubernetesRun(
 storage = Azure("prefect")
 
 
-with Flow(
-    name="Resample_ERA5_chunked_space", storage=storage, run_config=run_config
-) as flow:
+with Flow(name="Resample_ERA5_chunked_space", storage=storage, run_config=run_config) as flow:
     downsample_and_combine()
