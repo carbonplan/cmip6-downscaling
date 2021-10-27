@@ -61,11 +61,13 @@ def map_tgt(tgt, connection_string):
 
 
 def get_storage_chunks(chunk_direction):
+
     if chunk_direction.lower() == 'time':
         # mdf.isel(time=slice(0,2)).nbytes/1e6 = ~102 MB. So every two days of full slices is 100MB
         target_chunks = {"lat": 721, "lon": 1440, "time": 2}
     elif chunk_direction.lower() == 'space':
-        target_chunks = {"lat": 10, "lon": 10}
+        # time_mult = 368184 # num of time slices in dataset -- (ds.isel(time=0,lat=slice(0,2),lon=slice(0,2)).nbytes * time_mult)/1e6 = ~88MB
+        target_chunks = {"lat": 2, "lon": 2}
     return target_chunks
 
 
@@ -76,7 +78,6 @@ def write_zarr_store(ds):
 
 @task()
 def downsample_and_combine():
-
     # grab zstore list and variable rename dictionary
     var_name_dict = get_var_name_dict()
     store_list = get_zstore_list()
@@ -90,32 +91,31 @@ def downsample_and_combine():
     # rename vars to match CMIP6 conventions
     ds = ds.rename(var_name_dict)
 
-    # temp vals for subsetting in resample
-    tasmaxmin = [
-        var_name_dict.pop(k, None)
-        for k in [
-            'air_temperature_at_2_metres_1hour_Maximum',
-            'air_temperature_at_2_metres_1hour_Minimum',
-        ]
-    ]
+    # mean vars
+    ds['uas'] = ds['uas'].resample(time='D').mean(keep_attrs=True)
+    ds['vas'] = ds['vas'].resample(time='D').mean(keep_attrs=True)
+    ds['ua100m'] = ds['ua100m'].resample(time='D').mean(keep_attrs=True)
+    ds['va100m'] = ds['va100m'].resample(time='D').mean(keep_attrs=True)
+    ds['tdps'] = ds['tdps'].resample(time='D').mean(keep_attrs=True)
+    ds['tas'] = ds['tas'].resample(time='D').mean(keep_attrs=True)
+    ds['psl'] = ds['psl'].resample(time='D').mean(keep_attrs=True)
+    ds['tos'] = ds['tos'].resample(time='D').mean(keep_attrs=True)
+    ds['ps'] = ds['ps'].resample(time='D').mean(keep_attrs=True)
 
-    # split dataset for differant resample strategies
-    ds_max = ds[[tasmaxmin[0]]].resample(time='D').max(keep_attrs=True)
-    ds_min = ds[[tasmaxmin[1]]].resample(time='D').min(keep_attrs=True)
-    ds_mean = ds[list(var_name_dict.values())].resample(time='D').mean(keep_attrs=True)
+    # summed vars
+    ds['rsds'] = ds['rsds'].resample(time='D').sum(keep_attrs=True) / 86400.0
+    ds['pr'] = ds['pr'].resample(time='D').sum(keep_attrs=True)
 
-    # merge resampled datasets
-    mdf = xr.merge([ds_max, ds_min, ds_mean])
-
-    # convert integral_wrt_time_of_surface_direct_downwelling_shortwave_flux_in_air_1hour_Accumulation to match flux units in cmip6
-    mdf['rsds'] = mdf['rsds'] / 86400.0
+    # min/max vars
+    ds['tasmax'] = ds['tasmax'].resample(time='D').max(keep_attrs=True)
+    ds['tasmin'] = ds['tasmin'].resample(time='D').min(keep_attrs=True)
 
     # write CRS
-    mdf = mdf.rio.write_crs('EPSG:4326')
+    ds = ds.rio.write_crs('EPSG:4326')
 
     # write data as consolidated zarr store
     storage_chunks = get_storage_chunks('time')
-    write_zarr_store(mdf, storage_chunks=storage_chunks)
+    write_zarr_store(ds, storage_chunks=storage_chunks)
 
 
 run_config = KubernetesRun(
