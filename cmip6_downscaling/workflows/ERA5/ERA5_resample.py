@@ -30,8 +30,7 @@ def get_zstore_list():
     )
     zstores = [zstore.split("az://cmip6/")[1] for zstore in col.df.zstore.to_list()]
     store_list = [
-        get_store(bucket="cmip6", prefix=prefix, account_key=account_key)
-        for prefix in zstores
+        get_store(bucket="cmip6", prefix=prefix, account_key=account_key) for prefix in zstores
     ]
     return store_list
 
@@ -73,9 +72,7 @@ def get_storage_chunks(chunk_direction):
 
 
 def write_zarr_store(ds):
-    mapped_tgt = map_tgt(
-        "az://cmip6/ERA5/ERA5_resample_chunked_time/", connection_string
-    )
+    mapped_tgt = map_tgt("az://cmip6/ERA5/ERA5_resample_chunked_time/", connection_string)
     ds.to_zarr(mapped_tgt, mode="w", consolidated=True)
 
 
@@ -130,7 +127,5 @@ run_config = KubernetesRun(
 storage = Azure("prefect")
 
 
-with Flow(
-    name="Resample_ERA5_chunked_space", storage=storage, run_config=run_config
-) as flow:
+with Flow(name="Resample_ERA5_chunked_space", storage=storage, run_config=run_config) as flow:
     downsample_and_combine()
