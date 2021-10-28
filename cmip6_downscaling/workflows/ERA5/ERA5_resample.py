@@ -1,3 +1,5 @@
+"""Script for resampling and reformatting existing ERA5 zarr stores into a single, daily zarr store with matching variable names to CMIP6 GCM data."""
+
 import os
 
 import fsspec
@@ -56,8 +58,8 @@ def get_storage_chunks(chunk_direction):
         # mdf.isel(time=slice(0,2)).nbytes/1e6 = ~102 MB. So every two days of full slices is 100MB
         target_chunks = {"lat": 721, "lon": 1440, "time": 2}
     elif chunk_direction.lower() == "space":
-        # time_mult = 368184 # num of time slices in dataset -- (ds.isel(time=0,lat=slice(0,2),lon=slice(0,2)).nbytes * time_mult)/1e6 = ~88MB
-        target_chunks = {"lat": 2, "lon": 2}
+        # time_mult = 368184 (time_mult is # of time entries) -- (ds.isel(time=0,lat=slice(0,2),lon=slice(0,2)).nbytes * time_mult)/1e6 = ~88MB
+        target_chunks = {"lat": 2, "lon": 2, "time": -1}
     return target_chunks
 
 
@@ -67,7 +69,7 @@ def write_zarr_store(ds):
 
 
 @task()
-def downsample_and_combine():
+def downsample_and_combine(chunking_method):
     # grab zstore list and variable rename dictionary
     var_name_dict = get_var_name_dict()
     store_list = get_ERA5_zstore_list()
@@ -94,7 +96,7 @@ def downsample_and_combine():
 
     # summed vars
     ds["rsds"] = ds["rsds"].resample(time="D").sum(keep_attrs=True) / 86400.0
-    ds["pr"] = ds["pr"].resample(time="D").sum(keep_attrs=True)
+    ds["pr"] = ds["pr"].resample(time="D").sum(keep_attrs=True) / 86400.0 * 1000.0
 
     # min/max vars
     ds["tasmax"] = ds["tasmax"].resample(time="D").max(keep_attrs=True)
@@ -104,7 +106,7 @@ def downsample_and_combine():
     ds = ds.rio.write_crs("EPSG:4326")
 
     # write data as consolidated zarr store
-    storage_chunks = get_storage_chunks("space")
+    storage_chunks = get_storage_chunks(chunking_method)
     write_zarr_store(ds, storage_chunks=storage_chunks)
 
 
@@ -113,9 +115,14 @@ run_config = KubernetesRun(
     memory_request="3Gi",
     image="gcr.io/carbonplan/hub-notebook:7252fc3",
     labels=["az-eu-west"],
+    env={"EXTRA_PIP_PACKAGES": "git+git://github.com/carbonplan/cmip6-downscaling"},
 )
 storage = Azure("prefect")
 
-
-with Flow(name="Resample_ERA5_chunked_space", storage=storage, run_config=run_config) as flow:
-    downsample_and_combine()
+chunking_method = "space"
+with Flow(
+    name=f"Resample_ERA5_chunked_{chunking_method}",
+    storage=storage,
+    run_config=run_config,
+) as flow:
+    downsample_and_combine(chunking_method)
