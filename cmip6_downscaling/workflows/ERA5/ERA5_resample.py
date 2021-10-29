@@ -5,14 +5,26 @@ import os
 import fsspec
 import intake
 import xarray as xr
+import zarr
 from prefect import Flow, task
 from prefect.run_configs import KubernetesRun
 from prefect.storage import Azure
 
-from cmip6_downscaling.workflows.share import get_store
+# from cmip6_downscaling.workflows.share import get_store
 
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 account_key = os.environ.get("account_key")
+
+
+def get_store(bucket, prefix, account_key=None):
+    """helper function to create a zarr store"""
+    if account_key is None:
+        account_key = os.environ.get("AccountKey", None)
+
+    store = zarr.storage.ABSStore(
+        bucket, prefix=prefix, account_name="cmip6downscaling", account_key=account_key
+    )
+    return store
 
 
 def get_ERA5_zstore_list():
@@ -69,10 +81,16 @@ def write_zarr_store(ds):
 
 
 @task()
-def downsample_and_combine(chunking_method):
-    # grab zstore list and variable rename dictionary
-    var_name_dict = get_var_name_dict()
+def get_zarr_store_list():
+    # grab zstore list
     store_list = get_ERA5_zstore_list()
+    return store_list
+
+
+@task()
+def downsample_and_combine(chunking_method, store_list):
+    # grab variable rename dictionary
+    var_name_dict = get_var_name_dict()
 
     # Open all zarr stores for ERA5
     ds = xr.open_mfdataset(store_list, engine="zarr", concat_dim="time")
@@ -111,9 +129,9 @@ def downsample_and_combine(chunking_method):
 
 
 run_config = KubernetesRun(
-    cpu_request=3,
+    cpu_request=2,
     memory_request="3Gi",
-    image="gcr.io/carbonplan/hub-notebook:7252fc3",
+    image="gcr.io/carbonplan/hub-notebook:b2ea31c",
     labels=["az-eu-west"],
     env={"EXTRA_PIP_PACKAGES": "git+git://github.com/carbonplan/cmip6-downscaling"},
 )
@@ -125,4 +143,5 @@ with Flow(
     storage=storage,
     run_config=run_config,
 ) as flow:
-    downsample_and_combine(chunking_method)
+    store_list = get_zarr_store_list()
+    downsample_and_combine(chunking_method, store_list)
