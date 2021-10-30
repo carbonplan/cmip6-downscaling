@@ -1,0 +1,296 @@
+import json
+import os
+os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "True"
+
+import fsspec
+import intake
+import pandas as pd
+import xarray as xr
+from prefect import Flow, task, Parameter
+from prefect.storage import Azure
+import zarr
+import xesmf as xe
+from prefect.engine.results import LocalResult
+# specify your run parameters by reading in a text config file?
+# potential test: ensure that the run_id in the config file is 
+# the same as the name of the config file? to make sure that 
+# you've created a new config file for a new run?
+run_hyperparameters = {
+    "FLOW_NAME": "BCSD_testing", # want to populate with unique string name?
+    # "MODEL": "BCSD",
+    # "VARIABLES": ["tasmax"],
+    # "INTERPOLATION": "bilinear",
+    "GCMS": ["MIROC6"],
+    # "EXPERIMENT_ID": 'CMIP.MIROC.MIROC6.historical.day.gn',
+    # "SCENARIOS": ["ssp370"],
+    "TRAIN_PERIOD_START": '1990',
+    "TRAIN_PERIOD_END": '1992',
+    # "PREDICT_PERIOD": (2000,2002),
+    # "DOMAIN": {'lat': slice(50, 45),
+    #             'lon': slice(235.2, 240.0)},
+    "VARIABLE": 'tasmax',
+    # "GRID_NAME": None,
+    # "INTERMEDIATE_STORE": "scratch/cmip6",
+    # "FINAL_STORE": "cmip6/downscaled",
+    # "SAVE_MODEL": False,
+    "OBS": 'ERA5'
+}
+flow_name = run_hyperparameters.pop('FLOW_NAME') # pop it out because if you leave it in the dict
+# but don't call it as a parameter it'll complain
+
+# converts cmip standard names to ERA5 names
+# can be deleted once new ERA5 dataset complete
+variable_name_dict = {'tasmax': 'air_temperature_at_2_metres_1hour_Maximum',
+                      'tasmin': 'air_temperature_at_2_metres_1hour_Minimum',
+                      'pr': 'precipitation_amount_1hour_Accumulation'
+                     }
+chunks = {'lat': 10, 'lon': 10, 'time': -1}
+def load_cmip_dictionary(activity_ids=["CMIP", "ScenarioMIP"],
+        experiment_ids=["historical", "ssp370"], #, "ssp126", "ssp245",  "ssp585"
+        member_ids=["r1i1p1f1"],
+        source_ids=["MIROC6"],#BCC-CSM2-MR"]
+        table_ids=["day"],
+        grid_labels=["gn"],
+        variable_ids=['tasmax']):
+
+    '''
+    Load dictionary of datasets via intake catalog
+    '''
+    col_url = "https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.json"
+    col = intake.open_esm_datastore(col_url)
+    print(col)
+    full_subset = col.search(
+        activity_id=activity_ids,
+        experiment_id=experiment_ids, 
+        member_id=member_ids,
+        source_id=source_ids,
+        table_id=table_ids,
+        grid_label=grid_labels,
+        variable_id=variable_ids)
+    ds_dict = full_subset.to_dataset_dict(zarr_kwargs={"consolidated": True, 
+                                                        "decode_times": True, 
+                                                        "use_cftime": True}, 
+                                            storage_options={'account_name':'cmip6downscaling',
+                                                        'account_key':os.environ.get('AccountKey', None)})
+    return ds_dict
+# # tests
+
+def get_store(bucket, prefix, account_key=None):
+    ''' helper function to create a zarr store'''
+
+    if account_key is None:
+        account_key = os.environ.get('AccountKey', None)
+
+    store = zarr.storage.ABSStore(
+        bucket,
+        prefix=prefix,
+        account_name="cmip6downscaling",
+        account_key=account_key
+    )
+    return store
+
+def open_era5(var):
+    all_era5_stores = pd.read_csv('/home/jovyan/cmip6-downscaling/ERA5_catalog.csv')['ERA5'].values
+    era5_stores = [store.split('az://cmip6/')[1] for store in all_era5_stores if variable_name_dict[var] in store]
+    store_list = [get_store(bucket='cmip6',
+        prefix=prefix) for prefix in era5_stores]
+    ds = xr.open_mfdataset(store_list, engine='zarr', concat_dim='time').drop('time1_bounds')
+    return ds
+
+def load_obs(obs_id, variable, time_period, domain):
+    ## most of this can be deleted once new ERA5 dataset complete 
+    if obs_id=='ERA5':
+        full_obs = open_era5(variable)
+        obs = full_obs[variable_name_dict[variable]].sel(time=time_period, lon=domain['lon'], 
+                                                                lat=domain['lat']).resample(time='1d'
+                                                                ).mean(
+                                                                ).rename(variable
+                                                                ).load(scheduler='threads'
+                                                                ).chunk(chunks)
+        obs = obs.resample(time='1D').max()
+    return obs
+
+###### ALL OF THIS IS ICING ON THE CAKE- NOT NECESSARY NOW
+# @task
+# def setuprun()
+#     '''
+#     based upon input gcms/scenarios determine which tasks you need to complete
+#     then the remaining tasks will loop through (anticipates a not-dense set of gcms/scenarios/dsms)
+#     - shared across downscaling methods
+#     '''
+    
+#     return experiment_ids
+
+# def get_grid(dataset):
+#     if dataset=='ERA5':
+#         return '25km'
+#     elif dataset=='CMIP.MIROC.MIROC6.historical.day.gn':
+#         return 'not25km'
+
+# def check_preparation(experiment):
+#     # what grid are you on
+#     # does the weights file for that grid exist
+#     # does the coarse obs for that grid exist
+#     # do the spatial anomolies for those coarse obs (time period matters) exist
+
+@task(checkpoint=True)
+def get_weight_file(grid_name_gcm, grid_name_obs):
+    happy = 'yeah'
+    return happy
+    
+# @task(checkpoint=True) 
+def get_coarse_obs(obs, gcm):
+    # QUESTION: how do we make sure that the timeslice used to make 
+    # the coarsened obs matches the one that was used to create the cached coarse obs? 
+
+    # if existing (check cache), just read it in
+    # if not existing, create it
+    print(obs)
+    print(gcm.isel(time=0))
+    regridder = xe.Regridder(obs, gcm.isel(time=0), 'bilinear')
+    obs_coarse = regridder(obs)
+    # then write it out
+    # # obs_coarse.to_zarr()
+    return obs_coarse
+
+def get_spatial_anomolies(coarse_obs, fine_obs):
+    # check if this has been done, if do the math
+    # if it has been done, just read them in
+    regridder = xe.Regridder(coarse_obs, fine_obs, 'bilinear')
+    obs_interpolated = regridder(coarse_obs)
+    spatial_anomolies = obs_interpolated - fine_obs
+    seasonal_cycle_spatial_anomolies = spatial_anomolies.groupby('time.month').mean()
+    seasonal_cycle_spatial_anomolies.to_zarr()
+
+    return seasonal_cycle_spatial_anomolies
+@task(log_stdout=True)  
+def print_x(x):
+    print(x)
+@task(target="{flow_name}.txt", checkpoint=True, 
+        result=LocalResult(dir="~/.prefect"),
+        # cache_for=datetime.timedelta(hours=1),
+        log_stdout=True)
+
+def preprocess_bcsd(gcm, obs_id, train_period, variable): #domain, 
+    '''
+    take experiment id and return the gcm, obs at the coarse scale to match that
+    gcm's grid, and the spatial anomolies, all chunked in a performant way
+    create checkpoint when this has run
+    TODO: do we want to assign this to a class? write out? probably
+    '''
+    # check which components you'll need to create in order to 
+    # run the flow for this experiment
+    # inputs_complete = check_preparation(experiment)
+    # TODO: this part (working with grid and getting weight file) will just help us not repeat 
+    # the regridding step by grabbing the grid and checking for an existing weights file, but
+    # for now we'll just not try to do that checking and we'll just regrid regardless (optimize later)
+    # grid_name_gcm = get_grid(gcm)
+    # grid_name_obs = get_grid(obs)
+    # get_weight_file_task = task(get_weight_file, 
+    #             checkpoint=True, 
+    #             result=AzureResult('cmip6'),
+    #             target='grid.zarr')
+    # weight_file = get_weight_file_task(grid_name_gcm, grid_name_obs)
+    # obs = load_obs(obs_id, variable, train_period, domain)
+    gcm_ds = load_cmip_dictionary(source_ids=gcm,
+                                    variable_ids=[variable])['CMIP.MIROC.MIROC6.historical.day.gn']
+    out_ds = gcm_ds.isel(time=3)
+    return out_ds
+    # coarse_obs = get_coarse_obs(obs.sel(time=train_period), gcm_ds)
+    # spatial_anomolies = get_spatial_anomolies(coarse_obs, obs)
+    # return (coarse_obs, spatial_anomolies)
+    # save the coarse obs because it might be used by another gcm
+    # coarse_obs.to_zarr(coarse_obs_store)
+    # spatial_anomolies = obs_coarse.interp_like(obs, 
+    #                                 kwargs={"fill_value": "extrapolate"}) - fine_obs
+    # spatial_anomolies.to_zarr(anomolies_store)
+
+
+
+# @task
+# def biascorrect(X, y, train_period, predict_period, model):
+#     '''
+#     fit the model at coarse gcm scale and then predict!
+        # fit
+        # predict
+        # return y_hat
+#     '''
+
+# @task
+# def postprocess(y_hat, spatial_anomolies):
+#     '''
+#     Interpolate, add back in the spatial anomolies from the coarsening, and write to store
+#     '''
+#     y_hat.
+    # write out downscaled bias-corrected 
+
+
+
+# # Prefect cloud config settings -----------------------------------------------------------
+
+# run_config = KubernetesRun(
+#     cpu_request=2,
+#     memory_request="2Gi",
+#     image="gcr.io/carbonplan/hub-notebook:7252fc3", #CHANGE
+#     labels=["az-eu-west"],
+#     env=run_hyperparameters
+# )
+# storage = Azure("prefect") # does this define the output bucket? CMIP_downscaling?
+
+# Prefect Flow -----------------------------------------------------------
+# put the experiment_ids outside of this loop?
+with Flow(name=flow_name) as flow:
+    # check which experiment ids we need to run the hyperparameters
+    # if no valid ones, then just exit
+    # experiment_ids, preprocess_incomplete = setuprun() #this probably could be deleted
+    # run preprocess and create dependency/checkpoint to show it's done
+    # PARALLELIZATION NOTE: this part will not be parallelized
+    # if experiment_ids and preprocess_incomplete:
+        # do we want to have a preprocess_incomplete flag (so do the manual "does the coarsend obs store exist" check inside setuprun OR
+        # do we want to use prefect's checking functionality to see that it has run on this experiment id before)
+        # for experiment in experiment_ids:
+    # experiment_id = Parameter("EXPERIMENT_ID")
+    # flow_name = Parameter("FLOW_NAME")
+    obs = Parameter('OBS')
+    gcm = Parameter('GCMS')
+    train_period_start = Parameter('TRAIN_PERIOD_START')
+    train_period_end = Parameter('TRAIN_PERIOD_END')
+    # domain = Parameter('DOMAIN')
+    variable = Parameter('VARIABLE')
+    # `preprocess` will create the necessary coarsened input files and write them out 
+    # then we'll read them below
+    nout = preprocess_bcsd(gcm, obs_id=obs, train_period=slice(train_period_start,
+    train_period_end),variable=variable) #domain=domain
+    print_x(nout)
+    # once preprocess is complete run model fit 
+    # PARALLELIZATION NOTE: this part is fully parallelizable
+    # for experiment in experiment_ids:
+    #     print('experiment')
+        # (save anything from fit? if so create checkpoint)
+        # y = load_coarsened_obs(experiment) # load the obs that fits the grid of the experiment
+
+    #     X = load_gcm(experiment, 'historical', time_slice=(1985,2015))
+    #     ## HMMMMM IM CONFUZZLED - CLASS OR NOT?
+    #     ## examples: do we want to be carrying around spatial anomolies, the model, 
+    #     # just link to the anomolies?
+    #     model = PointWiseDownscaler(model=self._model, dim=self._dim)
+
+    #     model.fit(X, y)
+    #     # if fit is complete run predict
+    #     X = load_gcm(experiment, 'future')
+
+    #     future_bias_corrected = model.predict(X)
+
+    # # postprocessing (adding back in the spatial anomolies)
+    # # QUESTION: 
+    # # PARALLELIZATION NOTE: this part is not parallelizable
+    #     postprocess(future_bias_corrected, spatial_anomolies)
+
+flow.run(parameters=run_hyperparameters)
+
+
+# for run_hyperparameters in list_of_hyperparameter_dicts:
+#     flow.run(parameters=run_hyperparameters)
+# make all permutations of list_of_hyperparameter_dicts:
+
+# task.map(list_of_hyperparameter_dicts)
