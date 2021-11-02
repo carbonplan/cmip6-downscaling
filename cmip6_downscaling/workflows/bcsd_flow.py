@@ -12,11 +12,18 @@ import zarr
 import xesmf as xe
 from prefect.engine.results import LocalResult
 from rechunker import rechunk
+from skdownscale.pointwise_models import (
+    PointWiseDownscaler,
+    # QuantileMappingReressor,
+    # TrendAwareQuantileMappingRegressor,
+    BcAbsolute
+)
+from skdownscale.pipelines.bcsd_wrapper import BcsdWrapper
 # specify your run parameters by reading in a text config file?
 # potential test: ensure that the run_id in the config file is 
 # the same as the name of the config file? to make sure that 
 # you've created a new config file for a new run?
-
+chunks = {'lat': 10, 'lon': 10, 'time': -1}
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 def convert_to_360(lon):
     if lon > 0:
@@ -79,6 +86,7 @@ def load_cmip_dictionary(activity_ids=["CMIP", "ScenarioMIP"],
         table_id=table_ids,
         grid_label=grid_labels,
         variable_id=variable_ids)
+    # return full_subset
 
     ds_dict = full_subset.to_dataset_dict(zarr_kwargs={"consolidated": True, 
                                                         "decode_times": True, 
@@ -118,7 +126,7 @@ def load_obs(obs_id, variable, time_period, domain):
                                                                 lat=domain['lat']).resample(time='1d'
                                                                 ).mean(
                                                                 ).rename(variable
-                                                                ).load(scheduler='threads'
+                                                                ).load(scheduler='threads' #GOAL! REMOVE THE `LOAD`!
                                                                 ).chunk(chunks)
         obs = obs.resample(time='1D').max()
     return obs
@@ -231,6 +239,7 @@ def preprocess_bcsd(gcm, obs_id, train_period_start, train_period_end, variable,
         coarse_obs.to_dataset(name=variable).to_zarr(coarse_obs_store, mode='w', consolidated=True)
         
         spatial_anomolies.to_dataset(name=variable).to_zarr(spatial_anomolies_store, mode='w', consolidated=True)
+    
 
 
 # @task
@@ -250,8 +259,33 @@ def preprocess_bcsd(gcm, obs_id, train_period_start, train_period_end, variable,
 #     y_hat.
     # write out downscaled bias-corrected 
 
+@task(log_stdout=True, nout=2)
+def prep_inputs(gcm, obs_id, train_period_start, train_period_end, variable, out_bucket, domain):
+    X = load_cmip_dictionary()['CMIP.MIROC.MIROC6.historical.day.gn']
+    if X.lat[0] < X.lat[-1]:
+        X = X.reindex({'lat': X.lat[::-1]})
+    X = X.sel(**domain, time=slice(train_period_start,train_period_end))
+    X = X.drop(['lat_bnds', 'lon_bnds', 'time_bnds', 'height', 'member_id']).squeeze(drop=True)#source_ids=Parameter('GCMS'), # Question: why doesn't this work?
+                                    #variable_ids=Parameter('VARIABLE'))
 
+    coarse_obs_store = fsspec.get_mapper(f'az://cmip6/intermediates/{obs_id}_{gcm[0]}_{train_period_start}_{train_period_end}_{variable}.zarr', 
+                        connection_string=connection_string)
+    y = xr.open_zarr(coarse_obs_store, consolidated=True).sel(**domain, time=slice(train_period_start, train_period_end))
+    # finally set the gcm time index to be the same as the obs one (and the era5 index is datetime64 which sklearn prefers)
+    X['time'] = y.time.values
+    X = X.chunk(chunks)
+    y = y.chunk(chunks)
+    return X, y
 
+@task(log_stdout=True)
+def fit_and_predict(X_train, y, dim='time', feature_list=['tasmax']): 
+    bcsd_model = BcAbsolute(return_anoms=False)
+    pointwise_model = PointWiseDownscaler(model=bcsd_model, dim=dim)
+
+    pointwise_model.fit(X_train, y)
+    # ALTERNATIVE: could use the bcsdwrapper like below:
+    # bcsd_wrapper = BcsdWrapper(model=bcsd_model, feature_list=['tasmax'], dim='time')
+    # bcsd_wrapper.fit(X=X_train, y=y)
 # # Prefect cloud config settings -----------------------------------------------------------
 
 # run_config = KubernetesRun(
@@ -283,23 +317,33 @@ with Flow(name=flow_name) as flow:
     variable = Parameter('VARIABLE')
     # `preprocess` will create the necessary coarsened input files and write them out 
     # then we'll read them below
-    preprocess_bcsd(gcm, obs_id=obs, train_period_start=train_period_start,
-    train_period_end=train_period_end,variable=variable, out_bucket='cmip6', domain=domain, rerun=False)
-    # once preprocess is complete run model fit 
-    # PARALLELIZATION NOTE: this part is fully parallelizable
-    coarse_obs_store = fsspec.get_mapper(f'az://cmip6/intermediates/{obs}_{gcm[0]}_{train_period_start}_{train_period_end}_{variable}.zarr', 
-                        connection_string=connection_string)
-    spatial_anomolies_store = fsspec.get_mapper(f'az://cmip6/intermediates/anomalies_{obs}_{gcm[0]}_{train_period_start}_{train_period_end}_{variable}.zarr', 
-                        connection_string=connection_string)
-    y = xr.open_zarr(coarse_obs_store, consolidated=True) # load the obs that fits the grid of the experiment
-
-    X = load_cmip_dictionary(source_ids=gcm,
-                                    variable_ids=[variable])['CMIP.MIROC.MIROC6.historical.day.gn'].sel(domain, time=slice(train_period_start, train_period_end))
-    print(X)
-    #     ## HMMMMM IM CONFUZZLED - CLASS OR NOT?
-    #     ## examples: do we want to be carrying around spatial anomolies, the model, 
-    #     # just link to the anomolies?
-    #     model = PointWiseDownscaler(model=self._model, dim=self._dim)
+    preprocess_bcsd(gcm, 
+                    obs_id=obs, 
+                    train_period_start=train_period_start,
+                    train_period_end=train_period_end,
+                    variable=variable, 
+                    out_bucket='cmip6', 
+                    domain=domain, 
+                    rerun=False) # set this 
+    # # once preprocess is complete run model fit 
+    # # PARALLELIZATION NOTE: this part is fully parallelizable
+    # print(run_hyperparameters['OBS'])
+    # print('az://cmip6/intermediates/{}'.format(run_hyperparameters['OBS']))#_{run_hyperparameters['GCM'][0]}_{run_hyperparameters['TRAIN_PERIOD_START']}_{run_hyperparameters['TRAIN_PERIOD_END']}_{run_hyperparameters['VARIABLE']}.zarr')
+    # coarse_obs_store = fsspec.get_mapper('az://cmip6/intermediates/{}_{}_{}_{}_{}.zarr'.format(run_hyperparameters['OBS'],run_hyperparameters['GCMS'][0],
+    #                 run_hyperparameters['TRAIN_PERIOD_START'],
+    #                 run_hyperparameters['TRAIN_PERIOD_END'],
+    #                 run_hyperparameters['VARIABLE']), connection_string=connection_string)
+    # spatial_anomolies_store = fsspec.get_mapper(f'az://cmip6/intermediates/anomalies_{obs}_{gcm[0]}_{train_period_start}_{train_period_end}_{variable}.zarr', 
+    #                     connection_string=connection_string)
+    X, y = prep_inputs(gcm, 
+                    obs_id=obs, 
+                    train_period_start=train_period_start,
+                    train_period_end=train_period_end,
+                    variable=variable, 
+                    out_bucket='cmip6', 
+                    domain=domain)
+    fit_and_predict(X, y)
+    # model =  bcsd_wrapper.fit(X=X, y=y)
 
     #     model.fit(X, y)
     #     # if fit is complete run predict
