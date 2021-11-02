@@ -11,10 +11,23 @@ from prefect.storage import Azure
 import zarr
 import xesmf as xe
 from prefect.engine.results import LocalResult
+from rechunker import rechunk
 # specify your run parameters by reading in a text config file?
 # potential test: ensure that the run_id in the config file is 
 # the same as the name of the config file? to make sure that 
 # you've created a new config file for a new run?
+
+connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
+def convert_to_360(lon):
+    if lon > 0:
+        return lon
+    elif lon < 0:
+        return 360+lon
+test_specs = {'domain': {'lat': slice(50, 45),
+                            'lon': slice(convert_to_360(-124.8), convert_to_360(-120.))}} # bounding box of downscaling region
+
+connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
+account_key = os.environ.get('account_key')
 run_hyperparameters = {
     "FLOW_NAME": "BCSD_testing", # want to populate with unique string name?
     # "MODEL": "BCSD",
@@ -45,6 +58,7 @@ variable_name_dict = {'tasmax': 'air_temperature_at_2_metres_1hour_Maximum',
                       'pr': 'precipitation_amount_1hour_Accumulation'
                      }
 chunks = {'lat': 10, 'lon': 10, 'time': -1}
+
 def load_cmip_dictionary(activity_ids=["CMIP", "ScenarioMIP"],
         experiment_ids=["historical", "ssp370"], #, "ssp126", "ssp245",  "ssp585"
         member_ids=["r1i1p1f1"],
@@ -57,9 +71,7 @@ def load_cmip_dictionary(activity_ids=["CMIP", "ScenarioMIP"],
     Load dictionary of datasets via intake catalog
     '''
     col_url = "https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.json"
-    col = intake.open_esm_datastore(col_url)
-    print(col)
-    full_subset = col.search(
+    full_subset = intake.open_esm_datastore(col_url).search(
         activity_id=activity_ids,
         experiment_id=experiment_ids, 
         member_id=member_ids,
@@ -67,11 +79,12 @@ def load_cmip_dictionary(activity_ids=["CMIP", "ScenarioMIP"],
         table_id=table_ids,
         grid_label=grid_labels,
         variable_id=variable_ids)
+
     ds_dict = full_subset.to_dataset_dict(zarr_kwargs={"consolidated": True, 
                                                         "decode_times": True, 
                                                         "use_cftime": True}, 
                                             storage_options={'account_name':'cmip6downscaling',
-                                                        'account_key':os.environ.get('AccountKey', None)})
+                                                        'account_key':os.environ.get('AccountKey', None)}, progressbar=False)
     return ds_dict
 # # tests
 
@@ -139,15 +152,17 @@ def get_weight_file(grid_name_gcm, grid_name_obs):
     return happy
     
 # @task(checkpoint=True) 
-def get_coarse_obs(obs, gcm):
+def get_coarse_obs(obs, gcm_ds_single_time_slice):
     # QUESTION: how do we make sure that the timeslice used to make 
     # the coarsened obs matches the one that was used to create the cached coarse obs? 
 
     # if existing (check cache), just read it in
     # if not existing, create it
-    print(obs)
-    print(gcm.isel(time=0))
-    regridder = xe.Regridder(obs, gcm.isel(time=0), 'bilinear')
+    # TODO: this will not work when scaling
+    obs = obs#.load()
+    print('this is my single gcm time slice')
+    print(gcm_ds_single_time_slice)
+    regridder = xe.Regridder(obs, gcm_ds_single_time_slice, 'bilinear')
     obs_coarse = regridder(obs)
     # then write it out
     # # obs_coarse.to_zarr()
@@ -156,22 +171,22 @@ def get_coarse_obs(obs, gcm):
 def get_spatial_anomolies(coarse_obs, fine_obs):
     # check if this has been done, if do the math
     # if it has been done, just read them in
-    regridder = xe.Regridder(coarse_obs, fine_obs, 'bilinear')
+    regridder = xe.Regridder(coarse_obs, fine_obs.isel(time=0), 'bilinear')
     obs_interpolated = regridder(coarse_obs)
     spatial_anomolies = obs_interpolated - fine_obs
     seasonal_cycle_spatial_anomolies = spatial_anomolies.groupby('time.month').mean()
-    seasonal_cycle_spatial_anomolies.to_zarr()
 
     return seasonal_cycle_spatial_anomolies
+
 @task(log_stdout=True)  
 def print_x(x):
     print(x)
-@task(target="{flow_name}.txt", checkpoint=True, 
-        result=LocalResult(dir="~/.prefect"),
+
+@task(#target="{flow_name}.txt", checkpoint=True, 
+        # result=LocalResult(dir="~/.prefect"),
         # cache_for=datetime.timedelta(hours=1),
         log_stdout=True)
-
-def preprocess_bcsd(gcm, obs_id, train_period, variable): #domain, 
+def preprocess_bcsd(gcm, obs_id, train_period_start, train_period_end, variable, out_bucket, domain, rerun=True):
     '''
     take experiment id and return the gcm, obs at the coarse scale to match that
     gcm's grid, and the spatial anomolies, all chunked in a performant way
@@ -184,27 +199,38 @@ def preprocess_bcsd(gcm, obs_id, train_period, variable): #domain,
     # TODO: this part (working with grid and getting weight file) will just help us not repeat 
     # the regridding step by grabbing the grid and checking for an existing weights file, but
     # for now we'll just not try to do that checking and we'll just regrid regardless (optimize later)
-    # grid_name_gcm = get_grid(gcm)
-    # grid_name_obs = get_grid(obs)
-    # get_weight_file_task = task(get_weight_file, 
-    #             checkpoint=True, 
-    #             result=AzureResult('cmip6'),
-    #             target='grid.zarr')
-    # weight_file = get_weight_file_task(grid_name_gcm, grid_name_obs)
-    # obs = load_obs(obs_id, variable, train_period, domain)
-    gcm_ds = load_cmip_dictionary(source_ids=gcm,
-                                    variable_ids=[variable])['CMIP.MIROC.MIROC6.historical.day.gn']
-    out_ds = gcm_ds.isel(time=3)
-    return out_ds
-    # coarse_obs = get_coarse_obs(obs.sel(time=train_period), gcm_ds)
-    # spatial_anomolies = get_spatial_anomolies(coarse_obs, obs)
-    # return (coarse_obs, spatial_anomolies)
-    # save the coarse obs because it might be used by another gcm
-    # coarse_obs.to_zarr(coarse_obs_store)
-    # spatial_anomolies = obs_coarse.interp_like(obs, 
-    #                                 kwargs={"fill_value": "extrapolate"}) - fine_obs
-    # spatial_anomolies.to_zarr(anomolies_store)
-
+    ## grid_name_gcm = get_grid(gcm)
+    ## grid_name_obs = get_grid(obs)
+    ## get_weight_file_task = task(get_weight_file, 
+    ##             checkpoint=True, 
+    ##             result=AzureResult('cmip6'),
+    ##             target='grid.zarr')
+    ## weight_file = get_weight_file_task(grid_name_gcm, grid_name_obs)
+    coarse_obs_store = fsspec.get_mapper(f'az://cmip6/intermediates/{obs_id}_{gcm[0]}_{train_period_start}_{train_period_end}_{variable}.zarr', 
+                        connection_string=connection_string)
+    spatial_anomolies_store = fsspec.get_mapper(f'az://cmip6/intermediates/anomalies_{obs_id}_{gcm[0]}_{train_period_start}_{train_period_end}_{variable}.zarr', 
+                        connection_string=connection_string)
+    if rerun:
+        obs = load_obs(obs_id, variable, time_period=slice(train_period_start, train_period_end), 
+                                domain=domain)
+        gcm_ds = load_cmip_dictionary(source_ids=gcm,
+                                        variable_ids=[variable])['CMIP.MIROC.MIROC6.historical.day.gn']
+        # Check whether gcm latitudes go from low to high, if so, swap them to match ERA5 which goes from high to low
+        # after we create era5 daily processed product we should still leave this in but should switch < to > in if statement
+        if gcm_ds.lat[0] < gcm_ds.lat[-1]:
+            gcm_ds = gcm_ds.reindex({'lat': gcm_ds.lat[::-1]})
+        gcm_ds_single_time_slice = gcm_ds.sel(domain).isel(time=0).load()
+        ## rechunked_obs = rechunk(obs, target_chunks=(365, 20, 20),
+        ##                  max_mem='1GB',
+        ##                  temp_store=intermediate)
+        coarse_obs = get_coarse_obs(obs.sel(time=slice(train_period_start, train_period_end)).load(), gcm_ds_single_time_slice) #.load() this was on the obs
+        spatial_anomolies = get_spatial_anomolies(coarse_obs, obs)
+    
+        # save the coarse obs because it might be used by another gcm
+        
+        coarse_obs.to_dataset(name=variable).to_zarr(coarse_obs_store, mode='w', consolidated=True)
+        
+        spatial_anomolies.to_dataset(name=variable).to_zarr(spatial_anomolies_store, mode='w', consolidated=True)
 
 
 # @task
@@ -235,8 +261,6 @@ def preprocess_bcsd(gcm, obs_id, train_period, variable): #domain,
 #     labels=["az-eu-west"],
 #     env=run_hyperparameters
 # )
-# storage = Azure("prefect") # does this define the output bucket? CMIP_downscaling?
-
 # Prefect Flow -----------------------------------------------------------
 # put the experiment_ids outside of this loop?
 with Flow(name=flow_name) as flow:
@@ -255,21 +279,23 @@ with Flow(name=flow_name) as flow:
     gcm = Parameter('GCMS')
     train_period_start = Parameter('TRAIN_PERIOD_START')
     train_period_end = Parameter('TRAIN_PERIOD_END')
-    # domain = Parameter('DOMAIN')
+    domain = test_specs['domain']
     variable = Parameter('VARIABLE')
     # `preprocess` will create the necessary coarsened input files and write them out 
     # then we'll read them below
-    nout = preprocess_bcsd(gcm, obs_id=obs, train_period=slice(train_period_start,
-    train_period_end),variable=variable) #domain=domain
-    print_x(nout)
+    preprocess_bcsd(gcm, obs_id=obs, train_period_start=train_period_start,
+    train_period_end=train_period_end,variable=variable, out_bucket='cmip6', domain=domain, rerun=False)
     # once preprocess is complete run model fit 
     # PARALLELIZATION NOTE: this part is fully parallelizable
-    # for experiment in experiment_ids:
-    #     print('experiment')
-        # (save anything from fit? if so create checkpoint)
-        # y = load_coarsened_obs(experiment) # load the obs that fits the grid of the experiment
+    coarse_obs_store = fsspec.get_mapper(f'az://cmip6/intermediates/{obs}_{gcm[0]}_{train_period_start}_{train_period_end}_{variable}.zarr', 
+                        connection_string=connection_string)
+    spatial_anomolies_store = fsspec.get_mapper(f'az://cmip6/intermediates/anomalies_{obs}_{gcm[0]}_{train_period_start}_{train_period_end}_{variable}.zarr', 
+                        connection_string=connection_string)
+    y = xr.open_zarr(coarse_obs_store, consolidated=True) # load the obs that fits the grid of the experiment
 
-    #     X = load_gcm(experiment, 'historical', time_slice=(1985,2015))
+    X = load_cmip_dictionary(source_ids=gcm,
+                                    variable_ids=[variable])['CMIP.MIROC.MIROC6.historical.day.gn'].sel(domain, time=slice(train_period_start, train_period_end))
+    print(X)
     #     ## HMMMMM IM CONFUZZLED - CLASS OR NOT?
     #     ## examples: do we want to be carrying around spatial anomolies, the model, 
     #     # just link to the anomolies?
@@ -289,8 +315,19 @@ with Flow(name=flow_name) as flow:
 flow.run(parameters=run_hyperparameters)
 
 
+
+
+# with Flow(name=flow_name) as flow:
+#     ds_dict = test_intake()
+#     print(ds_dict)
+
+
 # for run_hyperparameters in list_of_hyperparameter_dicts:
 #     flow.run(parameters=run_hyperparameters)
 # make all permutations of list_of_hyperparameter_dicts:
 
 # task.map(list_of_hyperparameter_dicts)
+
+# ds = load_cmip_dictionary.run(source_ids=gcm,
+#                                     variable_ids=[variable])
+# print(ds)
