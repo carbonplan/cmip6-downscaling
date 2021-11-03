@@ -13,7 +13,6 @@ from prefect import Flow, Parameter, task
 from prefect.engine.results import LocalResult
 from prefect.storage import Azure
 from rechunker import rechunk
-
 # from skdownscale.pipelines.bcsd_wrapper import BcsdWrapper
 from skdownscale.pointwise_models import (  # QuantileMappingReressor,; TrendAwareQuantileMappingRegressor,
     BcAbsolute,
@@ -65,9 +64,7 @@ run_hyperparameters = {
     # "SAVE_MODEL": False,
     "OBS": "ERA5",
 }
-flow_name = run_hyperparameters.pop(
-    "FLOW_NAME"
-)  # pop it out because if you leave it in the dict
+flow_name = run_hyperparameters.pop("FLOW_NAME")  # pop it out because if you leave it in the dict
 # but don't call it as a parameter it'll complain
 
 # converts cmip standard names to ERA5 names
@@ -151,18 +148,14 @@ def get_store(bucket, prefix, account_key=None):
 
 
 def open_era5(var):
-    all_era5_stores = pd.read_csv("/home/jovyan/cmip6-downscaling/ERA5_catalog.csv")[
-        "ERA5"
-    ].values
+    all_era5_stores = pd.read_csv("/home/jovyan/cmip6-downscaling/ERA5_catalog.csv")["ERA5"].values
     era5_stores = [
         store.split("az://cmip6/")[1]
         for store in all_era5_stores
         if variable_name_dict[var] in store
     ]
     store_list = [get_store(bucket="cmip6", prefix=prefix) for prefix in era5_stores]
-    ds = xr.open_mfdataset(store_list, engine="zarr", concat_dim="time").drop(
-        "time1_bounds"
-    )
+    ds = xr.open_mfdataset(store_list, engine="zarr", concat_dim="time").drop("time1_bounds")
     return ds
 
 
@@ -317,9 +310,7 @@ def preprocess_bcsd(
 
         # save the coarse obs because it might be used by another gcm
 
-        coarse_obs.to_dataset(name=variable).to_zarr(
-            coarse_obs_store, mode="w", consolidated=True
-        )
+        coarse_obs.to_dataset(name=variable).to_zarr(coarse_obs_store, mode="w", consolidated=True)
 
         spatial_anomolies.to_dataset(name=variable).to_zarr(
             spatial_anomolies_store, mode="w", consolidated=True
@@ -345,9 +336,7 @@ def preprocess_bcsd(
 def gcm_munge(ds):
     if ds.lat[0] < ds.lat[-1]:
         ds = ds.reindex({"lat": ds.lat[::-1]})
-    ds = ds.drop(["lat_bnds", "lon_bnds", "time_bnds", "height", "member_id"]).squeeze(
-        drop=True
-    )
+    ds = ds.drop(["lat_bnds", "lon_bnds", "time_bnds", "height", "member_id"]).squeeze(drop=True)
     return ds
 
 
@@ -379,9 +368,7 @@ def prep_bcsd_inputs(
     y = y.chunk(chunks)
     X_predict = load_cmip_dictionary()["ScenarioMIP.MIROC.MIROC6.ssp370.day.gn"]
     X_predict = gcm_munge(X_predict)
-    X_predict = X_predict.sel(
-        **domain, time=slice(predict_period_start, predict_period_end)
-    )
+    X_predict = X_predict.sel(**domain, time=slice(predict_period_start, predict_period_end))
     X_predict = X_predict.chunk(chunks)
     return X, y, X_predict
 
@@ -413,9 +400,7 @@ def postprocess_bcsd(
         connection_string=connection_string,
     )
     spatial_anomalies = xr.open_zarr(spatial_anomalies_store, consolidated=True)
-    regridder = xe.Regridder(
-        X_predict, spatial_anomalies, "bilinear", extrap_method="nearest_s2d"
-    )
+    regridder = xe.Regridder(X_predict, spatial_anomalies, "bilinear", extrap_method="nearest_s2d")
     X_predict_fine = regridder(X_predict)
     bcsd_results = X_predict_fine.groupby("time.month") + spatial_anomalies
     bcsd_store = fsspec.get_mapper(
