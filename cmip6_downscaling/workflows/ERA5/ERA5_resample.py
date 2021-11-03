@@ -75,9 +75,9 @@ def get_storage_chunks(chunk_direction):
     return target_chunks
 
 
-def write_zarr_store(ds):
+def write_zarr_store(ds, storage_chunks):
     mapped_tgt = map_tgt("az://cmip6/ERA5/ERA5_resample_chunked_time/", connection_string)
-    ds.to_zarr(mapped_tgt, mode="w", consolidated=True)
+    ds.to_zarr(mapped_tgt, mode="w", consolidated=True, chunk_store=storage_chunks)
 
 
 @task()
@@ -93,44 +93,50 @@ def downsample_and_combine(chunking_method, store_list):
     var_name_dict = get_var_name_dict()
 
     # Open all zarr stores for ERA5
-    ds = xr.open_mfdataset(store_list, engine="zarr", concat_dim="time")
+    ds_orig = xr.open_mfdataset(store_list, engine="zarr", concat_dim="time")
+    print(ds_orig)
+    ds = xr.Dataset()
 
     # drop time1 bounds
-    ds = ds.drop("time1_bounds")
+    ds_orig = ds_orig.drop("time1_bounds")
+
+    # change lat convention to go from +90 to -90  to -90 to +90. This will match GCM conventions
+    ds_orig = ds_orig.reindex({"lat": ds_orig.lat[::-1]})
 
     # rename vars to match CMIP6 conventions
-    ds = ds.rename(var_name_dict)
+    ds_orig = ds_orig.rename(var_name_dict)
 
     # mean vars
-    ds["uas"] = ds["uas"].resample(time="D").mean(keep_attrs=True)
-    ds["vas"] = ds["vas"].resample(time="D").mean(keep_attrs=True)
-    ds["ua100m"] = ds["ua100m"].resample(time="D").mean(keep_attrs=True)
-    ds["va100m"] = ds["va100m"].resample(time="D").mean(keep_attrs=True)
-    ds["tdps"] = ds["tdps"].resample(time="D").mean(keep_attrs=True)
-    ds["tas"] = ds["tas"].resample(time="D").mean(keep_attrs=True)
-    ds["psl"] = ds["psl"].resample(time="D").mean(keep_attrs=True)
-    ds["tos"] = ds["tos"].resample(time="D").mean(keep_attrs=True)
-    ds["ps"] = ds["ps"].resample(time="D").mean(keep_attrs=True)
+    ds["uas"] = ds_orig["uas"].resample(time="D").mean(keep_attrs=True)
+    ds["vas"] = ds_orig["vas"].resample(time="D").mean(keep_attrs=True)
+    ds["ua100m"] = ds_orig["ua100m"].resample(time="D").mean(keep_attrs=True)
+    ds["va100m"] = ds_orig["va100m"].resample(time="D").mean(keep_attrs=True)
+    ds["tdps"] = ds_orig["tdps"].resample(time="D").mean(keep_attrs=True)
+    ds["tas"] = ds_orig["tas"].resample(time="D").mean(keep_attrs=True)
+    ds["psl"] = ds_orig["psl"].resample(time="D").mean(keep_attrs=True)
+    ds["tos"] = ds_orig["tos"].resample(time="D").mean(keep_attrs=True)
+    ds["ps"] = ds_orig["ps"].resample(time="D").mean(keep_attrs=True)
 
     # summed vars
-    ds["rsds"] = ds["rsds"].resample(time="D").sum(keep_attrs=True) / 86400.0
-    ds["pr"] = ds["pr"].resample(time="D").sum(keep_attrs=True) / 86400.0 * 1000.0
+    ds["rsds"] = ds_orig["rsds"].resample(time="D").sum(keep_attrs=True) / 86400.0
+    ds["pr"] = ds_orig["pr"].resample(time="D").sum(keep_attrs=True) / 86400.0 * 1000.0
 
     # min/max vars
-    ds["tasmax"] = ds["tasmax"].resample(time="D").max(keep_attrs=True)
-    ds["tasmin"] = ds["tasmin"].resample(time="D").min(keep_attrs=True)
+    ds["tasmax"] = ds_orig["tasmax"].resample(time="D").max(keep_attrs=True)
+    ds["tasmin"] = ds_orig["tasmin"].resample(time="D").min(keep_attrs=True)
 
     # write CRS
     ds = ds.rio.write_crs("EPSG:4326")
-
+    print(ds)
     # write data as consolidated zarr store
     storage_chunks = get_storage_chunks(chunking_method)
-    write_zarr_store(ds, storage_chunks=storage_chunks)
+    ds = ds.chunk(storage_chunks)
+    write_zarr_store(ds)
 
 
 run_config = KubernetesRun(
     cpu_request=2,
-    memory_request="3Gi",
+    memory_request="6Gi",
     image="gcr.io/carbonplan/hub-notebook:b2ea31c",
     labels=["az-eu-west"],
     env={"EXTRA_PIP_PACKAGES": "git+git://github.com/carbonplan/cmip6-downscaling"},
