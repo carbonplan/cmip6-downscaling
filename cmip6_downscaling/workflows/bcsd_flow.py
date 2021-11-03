@@ -45,7 +45,8 @@ run_hyperparameters = {
     # "SCENARIOS": ["ssp370"],
     "TRAIN_PERIOD_START": '1990',
     "TRAIN_PERIOD_END": '1992',
-    # "PREDICT_PERIOD": (2000,2002),
+    "PREDICT_PERIOD_START": '2080',
+    "PREDICT_PERIOD_END": '2082', 
     # "DOMAIN": {'lat': slice(50, 45),
     #             'lon': slice(235.2, 240.0)},
     "VARIABLE": 'tasmax',
@@ -179,7 +180,7 @@ def get_coarse_obs(obs, gcm_ds_single_time_slice):
 def get_spatial_anomolies(coarse_obs, fine_obs):
     # check if this has been done, if do the math
     # if it has been done, just read them in
-    regridder = xe.Regridder(coarse_obs, fine_obs.isel(time=0), 'bilinear')
+    regridder = xe.Regridder(coarse_obs, fine_obs.isel(time=0), 'bilinear', extrap_method="nearest_s2d")
     obs_interpolated = regridder(coarse_obs)
     spatial_anomolies = obs_interpolated - fine_obs
     seasonal_cycle_spatial_anomolies = spatial_anomolies.groupby('time.month').mean()
@@ -239,7 +240,6 @@ def preprocess_bcsd(gcm, obs_id, train_period_start, train_period_end, variable,
         coarse_obs.to_dataset(name=variable).to_zarr(coarse_obs_store, mode='w', consolidated=True)
         
         spatial_anomolies.to_dataset(name=variable).to_zarr(spatial_anomolies_store, mode='w', consolidated=True)
-    
 
 
 # @task
@@ -258,16 +258,17 @@ def preprocess_bcsd(gcm, obs_id, train_period_start, train_period_end, variable,
 #     '''
 #     y_hat.
     # write out downscaled bias-corrected 
-
-@task(log_stdout=True, nout=2)
-def prep_inputs(gcm, obs_id, train_period_start, train_period_end, variable, out_bucket, domain):
+def gcm_munge(ds):
+    if ds.lat[0] < ds.lat[-1]:
+        ds = ds.reindex({'lat': ds.lat[::-1]})
+    ds = ds.drop(['lat_bnds', 'lon_bnds', 'time_bnds', 'height', 'member_id']).squeeze(drop=True)
+    return ds
+    
+@task(log_stdout=True, nout=3)
+def prep_bcsd_inputs(gcm, obs_id, train_period_start, train_period_end, predict_period_start, predict_period_end, variable, out_bucket, domain):
     X = load_cmip_dictionary()['CMIP.MIROC.MIROC6.historical.day.gn']
-    if X.lat[0] < X.lat[-1]:
-        X = X.reindex({'lat': X.lat[::-1]})
+    X = gcm_munge(X)
     X = X.sel(**domain, time=slice(train_period_start,train_period_end))
-    X = X.drop(['lat_bnds', 'lon_bnds', 'time_bnds', 'height', 'member_id']).squeeze(drop=True)#source_ids=Parameter('GCMS'), # Question: why doesn't this work?
-                                    #variable_ids=Parameter('VARIABLE'))
-
     coarse_obs_store = fsspec.get_mapper(f'az://cmip6/intermediates/{obs_id}_{gcm[0]}_{train_period_start}_{train_period_end}_{variable}.zarr', 
                         connection_string=connection_string)
     y = xr.open_zarr(coarse_obs_store, consolidated=True).sel(**domain, time=slice(train_period_start, train_period_end))
@@ -275,17 +276,34 @@ def prep_inputs(gcm, obs_id, train_period_start, train_period_end, variable, out
     X['time'] = y.time.values
     X = X.chunk(chunks)
     y = y.chunk(chunks)
-    return X, y
+    X_predict = load_cmip_dictionary()['ScenarioMIP.MIROC.MIROC6.ssp370.day.gn']
+    X_predict = gcm_munge(X_predict)
+    X_predict = X_predict.sel(**domain, time=slice(predict_period_start,predict_period_end))
+    X_predict = X_predict.chunk(chunks)
+    return X, y, X_predict
 
 @task(log_stdout=True)
-def fit_and_predict(X_train, y, dim='time', feature_list=['tasmax']): 
+def fit_and_predict(X_train, y, X_predict, dim='time', feature_list=['tasmax']): 
     bcsd_model = BcAbsolute(return_anoms=False)
     pointwise_model = PointWiseDownscaler(model=bcsd_model, dim=dim)
-
     pointwise_model.fit(X_train, y)
+    bias_corrected = pointwise_model.predict(X_predict)
     # ALTERNATIVE: could use the bcsdwrapper like below:
     # bcsd_wrapper = BcsdWrapper(model=bcsd_model, feature_list=['tasmax'], dim='time')
     # bcsd_wrapper.fit(X=X_train, y=y)
+
+@task(log_stdout=True)
+def postprocess_bcsd(X_predict, gcm, obs_id, train_period_start, train_period_end, variable, predict_period_start, predict_period_end):
+    spatial_anomalies_store = fsspec.get_mapper(f'az://cmip6/intermediates/anomalies_{obs_id}_{gcm[0]}_{train_period_start}_{train_period_end}_{variable}.zarr', 
+                           connection_string=connection_string)
+    spatial_anomalies=xr.open_zarr(spatial_anomalies_store, consolidated=True)
+    regridder = xe.Regridder(X_predict, spatial_anomalies, 'bilinear', extrap_method="nearest_s2d")
+    X_predict_fine = regridder(X_predict)
+    bcsd_results = (X_predict_fine.groupby('time.month') + spatial_anomalies)
+    bcsd_store = fsspec.get_mapper(f'az://cmip6/intermediates/bcsd_{obs_id}_{gcm[0]}_{predict_period_start}_{predict_period_end}_{variable}.zarr', 
+                        connection_string=connection_string)
+    bcsd_results.chunk(chunks).to_zarr(bcsd_store, mode='w', consolidated=True)
+
 # # Prefect cloud config settings -----------------------------------------------------------
 
 # run_config = KubernetesRun(
@@ -313,6 +331,8 @@ with Flow(name=flow_name) as flow:
     gcm = Parameter('GCMS')
     train_period_start = Parameter('TRAIN_PERIOD_START')
     train_period_end = Parameter('TRAIN_PERIOD_END')
+    predict_period_start = Parameter('PREDICT_PERIOD_START')
+    predict_period_end = Parameter('PREDICT_PERIOD_END')
     domain = test_specs['domain']
     variable = Parameter('VARIABLE')
     # `preprocess` will create the necessary coarsened input files and write them out 
@@ -324,7 +344,7 @@ with Flow(name=flow_name) as flow:
                     variable=variable, 
                     out_bucket='cmip6', 
                     domain=domain, 
-                    rerun=False) # set this 
+                    rerun=False)# can remove this once we have caching working
     # # once preprocess is complete run model fit 
     # # PARALLELIZATION NOTE: this part is fully parallelizable
     # print(run_hyperparameters['OBS'])
@@ -335,14 +355,20 @@ with Flow(name=flow_name) as flow:
     #                 run_hyperparameters['VARIABLE']), connection_string=connection_string)
     # spatial_anomolies_store = fsspec.get_mapper(f'az://cmip6/intermediates/anomalies_{obs}_{gcm[0]}_{train_period_start}_{train_period_end}_{variable}.zarr', 
     #                     connection_string=connection_string)
-    X, y = prep_inputs(gcm, 
+    X, y, X_predict = prep_bcsd_inputs(gcm, 
                     obs_id=obs, 
                     train_period_start=train_period_start,
                     train_period_end=train_period_end,
+                    predict_period_start=predict_period_start,
+                    predict_period_end=predict_period_end,
                     variable=variable, 
                     out_bucket='cmip6', 
                     domain=domain)
-    fit_and_predict(X, y)
+    fit_and_predict(X, y, X_predict)
+    postprocess_bcsd(X_predict, gcm, obs, train_period_start, train_period_end, 
+                    variable, predict_period_start, predict_period_end)
+
+
     # model =  bcsd_wrapper.fit(X=X, y=y)
 
     #     model.fit(X, y)
