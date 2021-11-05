@@ -4,14 +4,13 @@ os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "True"
 
 import fsspec
 import intake
-import pandas as pd
 import xarray as xr
 import xesmf as xe
 import zarr
 from prefect import Flow, Parameter, task
 from skdownscale.pointwise_models import BcAbsolute, PointWiseDownscaler
-from cmip6_downscaling.workflows.utils import rechunk_dataset
 
+from cmip6_downscaling.workflows.utils import rechunk_dataset
 
 # https://rechunker.readthedocs.io/en/latest/
 
@@ -80,8 +79,8 @@ run_hyperparameters = {
     # "SCENARIOS": ["ssp370"],
     "TRAIN_PERIOD_START": "1990",
     "TRAIN_PERIOD_END": "1992",
-    "PREDICT_PERIOD_START": "2080",
-    "PREDICT_PERIOD_END": "2082",
+    # "PREDICT_PERIOD_START": "2080",
+    # "PREDICT_PERIOD_END": "2082",
     # "DOMAIN": {'lat': slice(50, 45),
     #             'lon': slice(235.2, 240.0)},
     "VARIABLE": "tasmax",
@@ -138,7 +137,7 @@ def load_cmip_dictionary(
         [dictionary containing available xarray datasets]
     """
     col_url = "https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.json"
-    print('intake')
+    print("intake")
     full_subset = intake.open_esm_datastore(col_url).search(
         activity_id=activity_ids,
         experiment_id=experiment_ids,
@@ -148,7 +147,7 @@ def load_cmip_dictionary(
         grid_label=grid_labels,
         variable_id=variable_ids,
     )
-    print('to dictionary')
+    print("to dictionary")
     ds_dict = full_subset.to_dataset_dict(
         zarr_kwargs={"consolidated": True, "decode_times": True, "use_cftime": True},
         storage_options={
@@ -157,7 +156,7 @@ def load_cmip_dictionary(
         },
         progressbar=False,
     )
-    print('return dict')
+    print("return dict")
     return ds_dict
 
 
@@ -177,17 +176,23 @@ def get_store(bucket, prefix, account_key=None):
 
 
 def open_era5(var):
-    all_era5_stores = pd.read_csv("/Users/orianachegwidden/Desktop/ERA5_catalog.csv")["ERA5"].values
-    era5_stores = [
-        store.split("az://cmip6/")[1]
-        for store in all_era5_stores
-        if variable_name_dict[var] in store
-    ]
-    print('getting stores')
-    store_list = [get_store(bucket="cmip6", prefix=prefix) for prefix in era5_stores]
-    print('open mfdataset')
-    ds = xr.open_mfdataset(store_list, engine="zarr", concat_dim="time").drop("time1_bounds")
-    print('return mfdataset')
+    print("getting stores")
+    col = intake.open_esm_datastore(
+        "https://cmip6downscaling.blob.core.windows.net/cmip6/ERA5_catalog.json"
+    )
+    stores = col.df.zstore
+    era5_var = variable_name_dict[var]
+    store_list = stores[stores.str.contains(era5_var)].to_list()
+    # store_list[:10]
+    ds = xr.open_mfdataset(
+        store_list,
+        engine="zarr",  # these options set the inputs and how to read them
+        consolidated=True,
+        parallel=True,  # these options speed up the reading of individual datasets (before they are combined)
+        combine="by_coords",  # these options tell xarray how to combine the data
+        # data_vars=['air_temperature_at_2_metres_1hour_Maximum']  # these options limit the amount of data that is read to only variables of interest
+    ).drop("time1_bounds")
+    print("return mfdataset")
     return ds
 
 
@@ -212,9 +217,9 @@ def load_obs(obs_id, variable, time_period, domain):
     """
     ## most of this can be deleted once new ERA5 dataset complete
     if obs_id == "ERA5":
-        print('open era5')
+        print("open era5")
         full_obs = open_era5(variable)
-        print('resample era5')
+        print("resample era5")
         obs = (
             full_obs[variable_name_dict[variable]]
             .sel(time=time_period, lon=domain["lon"], lat=domain["lat"])
@@ -224,6 +229,7 @@ def load_obs(obs_id, variable, time_period, domain):
             # .load(scheduler="threads")  # GOAL! REMOVE THE `LOAD`!
         )
         obs = obs.resample(time="1D").max()
+    print(obs)
     return obs
 
 
@@ -258,7 +264,10 @@ def get_weight_file(grid_name_gcm, grid_name_obs):
 
 
 # @task(checkpoint=True)
-def get_coarse_obs(obs, gcm_ds_single_time_slice):
+def get_coarse_obs(
+    obs,
+    gcm_ds_single_time_slice,
+):
     """[summary]
 
     Parameters
@@ -271,7 +280,7 @@ def get_coarse_obs(obs, gcm_ds_single_time_slice):
     Returns
     -------
     [type]
-        [Chunked in time]
+        [Chunked in space (lat=-1, lon=-1, time=1)]
     """
     # TEST TODO: Check that obs is chunked appropriately and throw error if not
     # Like: assert obs.chunks == (lat=-1, lon=-1, time=1) - then eventually we can move the rechunker in as an `else`
@@ -280,6 +289,7 @@ def get_coarse_obs(obs, gcm_ds_single_time_slice):
     obs_coarse = regridder(obs)
     # then write it out
     # # obs_coarse.to_zarr()
+    print(obs_coarse.chunks)
     return obs_coarse
 
 
@@ -308,7 +318,7 @@ def get_spatial_anomolies(coarse_obs, fine_obs):
     obs_interpolated = regridder(coarse_obs)
     spatial_anomolies = obs_interpolated - fine_obs
     seasonal_cycle_spatial_anomolies = spatial_anomolies.groupby("time.month").mean()
-
+    print(seasonal_cycle_spatial_anomolies.chunks)
     return seasonal_cycle_spatial_anomolies
 
 
@@ -361,14 +371,15 @@ def preprocess_bcsd(
         connection_string=connection_string,
     )
     if rerun:
-        print('load obs')
-        obs = load_obs(
+        print("load obs")
+        obs_ds = load_obs(
             obs_id,
             variable,
             time_period=slice(train_period_start, train_period_end),
             domain=domain,
         )  # We want it chunked in space. (time=1,lat=-1, lon=-1)
-        print('load cmip')
+
+        print("load cmip")
         gcm_ds = load_cmip_dictionary(source_ids=gcm, variable_ids=[variable])[
             "CMIP.MIROC.MIROC6.historical.day.gn"
         ]  # This comes chunked in space (time~600,lat-1,lon-1), which is good.
@@ -376,12 +387,17 @@ def preprocess_bcsd(
         # Check whether gcm latitudes go from low to high, if so, swap them to match ERA5 which goes from high to low
         # after we create era5 daily processed product we should still leave this in but should switch < to > in if statement
         if gcm_ds.lat[0] < gcm_ds.lat[-1]:
+            print("switched")
             gcm_ds = gcm_ds.reindex({"lat": gcm_ds.lat[::-1]})
-        gcm_ds_single_time_slice = gcm_ds.sel(domain).isel(time=0).load() #TODO: check whether we need the load here
-        rechunked_obs, rechunked_obs_path = rechunk_dataset(obs, 
-                                                            chunks_dict={'tasmax': (1, -1, -1)}, 
-                                                            connection_string=connection_string,
-                                                            max_mem='1GB')
+        gcm_ds_single_time_slice = gcm_ds.sel(domain).isel(
+            time=0
+        )  # .load() #TODO: check whether we need the load here
+        rechunked_obs, rechunked_obs_path = rechunk_dataset(
+            obs_ds.to_dataset(name=variable),
+            chunks_dict={"tasmax": (1, -1, -1)},
+            connection_string=connection_string,
+            max_mem="1GB",
+        )
 
         # we want to pass rechunked obs to both get_coarse_obs and get_spatial_anomalies
         # since they both work in map space instead of time space
@@ -395,7 +411,8 @@ def preprocess_bcsd(
         coarse_obs.to_dataset(name=variable).to_zarr(coarse_obs_store, mode="w", consolidated=True)
 
         spatial_anomolies.to_dataset(name=variable).to_zarr(
-            spatial_anomolies_store, mode="w", consolidated=True)
+            spatial_anomolies_store, mode="w", consolidated=True
+        )
         return coarse_obs
 
 
@@ -473,21 +490,37 @@ def prep_bcsd_inputs(
     # y = coarse_obs.sel(**domain)
     # # finally set the gcm time index to be the same as the obs one (and the era5 index is datetime64 which sklearn prefers)
     # X["time"] = y.time.values
-    print('loading xpredict')
+    chunks_dict = {"tasmax": {"time": -1, "lat": 10, "lon": 10}}
+    X_rechunked, X_rechunked_path = rechunk_dataset(
+        X, chunks_dict=chunks_dict, connection_string=connection_string, max_mem="1GB"
+    )
+    y_rechunked, y_rechunked_path = rechunk_dataset(
+        y, chunks_dict=chunks_dict, connection_string=connection_string, max_mem="1GB"
+    )
+    print("loading xpredict")
     X_predict = load_cmip_dictionary()["ScenarioMIP.MIROC.MIROC6.ssp370.day.gn"]
-    print('x_predict loaded')
+    print("x_predict loaded")
     X_predict = gcm_munge(X_predict)
-    X_predict = X_predict.sel(time=slice(predict_period_start, predict_period_end), **domain)
+    ## Commenting this out helped remove weird rechunker dask chunk issue. (    raise ValueError(f"Invalid chunk_limits {chunk_limits}.")ValueError: Invalid chunk_limits (4,).)
+    # X_predict = X_predict.sel(time=slice(predict_period_start, predict_period_end), **domain)
 
     # RECHUNKER: X, Y and X_predict rechunked in (lat=10,lon=10,time=-1)
     print(X_predict)
     print(X_predict.tasmax.dims)
-    X_predict_rechunked, X_predict_rechunked_path = rechunk_dataset(X_predict, 
-                                                            chunks_dict={'tasmax': {'time':-1, 
-                                                                                    'lat': 2, 
-                                                                                    'lon': 2}}, 
-                                                            connection_string=connection_string,
-                                                            max_mem='1GB') 
+    X_predict_rechunked, X_predict_rechunked_path = rechunk_dataset(
+        X_predict,
+        chunks_dict=chunks_dict,
+        connection_string=connection_string,
+        max_mem="1GB",
+    )
+    # THIS IS TEMP!
+
+    X = None
+    y = None
+    print("X_predict_rechunked:")
+    print(X_predict_rechunked)
+    print(X_predict_rechunked.chunks)
+
     return X, y, X_predict
 
 
@@ -563,6 +596,12 @@ def postprocess_bcsd(
     spatial_anomalies = xr.open_zarr(spatial_anomalies_store, consolidated=True)
     regridder = xe.Regridder(y_predict, spatial_anomalies, "bilinear", extrap_method="nearest_s2d")
     # Rechunk y_predict to (lat=-1,lon=-1,time=1)
+    rechunked_y_predict, rechunked_y_predict_path = rechunk_dataset(
+        y_predict,
+        chunks_dict={"tasmax": (-1, -1, 1)},
+        connection_string=connection_string,
+        max_mem="1GB",
+    )
     y_predict_fine = regridder(y_predict)
     # This lat=-1,lon=-1,time=1) chunking might be best? Check to make sure that is what is returned from regridder.
     bcsd_results = y_predict_fine.groupby("time.month") + spatial_anomalies
@@ -578,7 +617,7 @@ def postprocess_bcsd(
 # run_config = KubernetesRun(
 #     cpu_request=2,
 #     memory_request="2Gi",
-#     image="gcr.io/carbonplan/hub-notebook:7252fc3", #CHANGE
+#     image="gcr.io/carbonplan/hub-notebook:7252fc3", #CHANGE ASK JOE FOR NEW IMAGE
 #     labels=["az-eu-west"],
 #     env=run_hyperparameters
 # )
@@ -597,46 +636,41 @@ with Flow(name=flow_name) as flow:
     # `preprocess` will create the necessary coarsened input files and write them out
     # then we'll read them below
 
-    # task 1.1 read data (era params) - data passed to regridding task
-    # task 1.2 read grid (grid params) - data
-
-    # task 2. regridding of data etc ( data, grid, method, tstart, tend)
-    # task 3. write task (params)
-
-    # coarse_obs = preprocess_bcsd(
-    #     gcm,
-    #     obs_id=obs,
-    #     train_period_start=train_period_start,
-    #     train_period_end=train_period_end,
-    #     variable=variable,
-    #     out_bucket="cmip6",
-    #     domain=domain,
-    #     rerun=True,
-    # )  # can remove this once we have caching working
-
-    X, y, X_predict = prep_bcsd_inputs(
-        # coarse_obs,
+    coarse_obs = preprocess_bcsd(
         gcm,
         obs_id=obs,
         train_period_start=train_period_start,
         train_period_end=train_period_end,
-        predict_period_start=predict_period_start,
-        predict_period_end=predict_period_end,
         variable=variable,
         out_bucket="cmip6",
         domain=domain,
-    )
-    y_predict = fit_and_predict(X, y, X_predict)
-    postprocess_bcsd(
-        y_predict,
-        gcm,
-        obs,
-        train_period_start,
-        train_period_end,
-        variable,
-        predict_period_start,
-        predict_period_end,
-    )
+        rerun=True,
+    )  # can remove this once we have caching working
+
+    # X, y, X_predict = prep_bcsd_inputs(
+    #     # coarse_obs,
+    #     gcm,
+    #     obs_id=obs,
+    #     train_period_start=train_period_start,
+    #     train_period_end=train_period_end,
+    #     predict_period_start=predict_period_start,
+    #     predict_period_end=predict_period_end,
+    #     variable=variable,
+    #     out_bucket="cmip6",
+    #     domain=domain,
+    # )
+
+    # y_predict = fit_and_predict(X, y, X_predict)
+    # postprocess_bcsd(
+    #     y_predict,
+    #     gcm,
+    #     obs,
+    #     train_period_start,
+    #     train_period_end,
+    #     variable,
+    #     predict_period_start,
+    #     predict_period_end,
+    # )
 # flow.visualize()
 flow.run(parameters=run_hyperparameters)
 
