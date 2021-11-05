@@ -78,7 +78,7 @@ run_hyperparameters = {
     # "EXPERIMENT_ID": 'CMIP.MIROC.MIROC6.historical.day.gn',
     # "SCENARIOS": ["ssp370"],
     "TRAIN_PERIOD_START": "1990",
-    "TRAIN_PERIOD_END": "1992",
+    "TRAIN_PERIOD_END": "1990",
     # "PREDICT_PERIOD_START": "2080",
     # "PREDICT_PERIOD_END": "2082",
     # "DOMAIN": {'lat': slice(50, 45),
@@ -90,7 +90,9 @@ run_hyperparameters = {
     # "SAVE_MODEL": False,
     "OBS": "ERA5",
 }
-flow_name = run_hyperparameters.pop("FLOW_NAME")  # pop it out because if you leave it in the dict
+flow_name = run_hyperparameters.pop(
+    "FLOW_NAME"
+)  # pop it out because if you leave it in the dict
 # but don't call it as a parameter it'll complain
 
 # converts cmip standard names to ERA5 names
@@ -222,13 +224,17 @@ def load_obs(obs_id, variable, time_period, domain):
         print("resample era5")
         obs = (
             full_obs[variable_name_dict[variable]]
-            .sel(time=time_period, lon=domain["lon"], lat=domain["lat"])
-            .resample(time="1d")
-            .mean()
+            # .sel(time=time_period, lon=domain["lon"], lat=domain["lat"])
+            .sel(time=time_period)
+            # .resample(time="1d")
+            # .mean()
             .rename(variable)
             # .load(scheduler="threads")  # GOAL! REMOVE THE `LOAD`!
         )
-        obs = obs.resample(time="1D").max()
+        obs = obs.sel(time=obs.time.dt.hour==12)
+        obs = obs.sel(time=obs.time.dt.day==1)
+
+        # obs = obs.resample(time="1D").max()
     print(obs)
     return obs
 
@@ -389,11 +395,12 @@ def preprocess_bcsd(
         if gcm_ds.lat[0] < gcm_ds.lat[-1]:
             print("switched")
             gcm_ds = gcm_ds.reindex({"lat": gcm_ds.lat[::-1]})
-        gcm_ds_single_time_slice = gcm_ds.sel(domain).isel(
+        gcm_ds_single_time_slice = gcm_ds.isel(
             time=0
         )  # .load() #TODO: check whether we need the load here
         rechunked_obs, rechunked_obs_path = rechunk_dataset(
-            obs_ds.to_dataset(name=variable),
+            obs_ds,
+            # obs_ds.to_dataset(name=variable), # Might have to revert this..
             chunks_dict={"tasmax": (1, -1, -1)},
             connection_string=connection_string,
             max_mem="1GB",
@@ -408,7 +415,9 @@ def preprocess_bcsd(
         spatial_anomolies = get_spatial_anomolies(coarse_obs, rechunked_obs)
 
         # save the coarse obs because it might be used by another gcm
-        coarse_obs.to_dataset(name=variable).to_zarr(coarse_obs_store, mode="w", consolidated=True)
+        coarse_obs.to_dataset(name=variable).to_zarr(
+            coarse_obs_store, mode="w", consolidated=True
+        )
 
         spatial_anomolies.to_dataset(name=variable).to_zarr(
             spatial_anomolies_store, mode="w", consolidated=True
@@ -435,7 +444,9 @@ def preprocess_bcsd(
 def gcm_munge(ds):
     if ds.lat[0] < ds.lat[-1]:
         ds = ds.reindex({"lat": ds.lat[::-1]})
-    ds = ds.drop(["lat_bnds", "lon_bnds", "time_bnds", "height", "member_id"]).squeeze(drop=True)
+    ds = ds.drop(["lat_bnds", "lon_bnds", "time_bnds", "height", "member_id"]).squeeze(
+        drop=True
+    )
     return ds
 
 
@@ -594,7 +605,9 @@ def postprocess_bcsd(
     )
     # spatial anomalies is chunked in (lat=-1,lon=-1,time=1)
     spatial_anomalies = xr.open_zarr(spatial_anomalies_store, consolidated=True)
-    regridder = xe.Regridder(y_predict, spatial_anomalies, "bilinear", extrap_method="nearest_s2d")
+    regridder = xe.Regridder(
+        y_predict, spatial_anomalies, "bilinear", extrap_method="nearest_s2d"
+    )
     # Rechunk y_predict to (lat=-1,lon=-1,time=1)
     rechunked_y_predict, rechunked_y_predict_path = rechunk_dataset(
         y_predict,
