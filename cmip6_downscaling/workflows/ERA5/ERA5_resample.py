@@ -1,29 +1,26 @@
-"""Script for resampling and reformatting existing ERA5 zarr stores into a single, daily zarr store with matching variable names to CMIP6 GCM data."""
+"""
+What are initial chunks?
 
+"""
 import os
-
 import fsspec
 import intake
 import xarray as xr
 from prefect import Flow, task
 from prefect.run_configs import KubernetesRun
 from prefect.storage import Azure
-
-from cmip6_downscaling.workflows.share import get_store
+from prefect.executors import DaskExecutor
+from dask_kubernetes import KubeCluster, make_pod_spec
 
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
-account_key = os.environ.get("account_key")
+image = "carbonplan/cmip6-downscaling-prefect:latest"
 
 
 def get_ERA5_zstore_list():
-    account_key = os.environ.get("AccountKey", None)
     col = intake.open_esm_datastore(
         "https://cmip6downscaling.blob.core.windows.net/cmip6/ERA5_catalog.json"
     )
-    zstores = [zstore.split("az://cmip6/")[1] for zstore in col.df.zstore.to_list()]
-    store_list = [
-        get_store(bucket="cmip6", prefix=prefix, account_key=account_key) for prefix in zstores
-    ]
+    store_list = list(col.df.zstore)
     return store_list
 
 
@@ -53,10 +50,11 @@ def map_tgt(tgt, connection_string):
 
 
 def get_storage_chunks(chunk_direction):
-
+    #ALONG TIME
     if chunk_direction.lower() == "time":
         # mdf.isel(time=slice(0,2)).nbytes/1e6 = ~102 MB. So every two days of full slices is 100MB
-        target_chunks = {"lat": 721, "lon": 1440, "time": 2}
+        target_chunks = {"lat": 721, "lon": 1440, "time": 1}
+        #keep spatial chunks as (150,150,*n time chunks)
     elif chunk_direction.lower() == "space":
         # time_mult = 368184 (time_mult is # of time entries) -- (ds.isel(time=0,lat=slice(0,2),lon=slice(0,2)).nbytes * time_mult)/1e6 = ~88MB
         target_chunks = {"lat": 2, "lon": 2, "time": -1}
@@ -67,16 +65,25 @@ def write_zarr_store(ds):
     mapped_tgt = map_tgt("az://cmip6/ERA5/ERA5_resample_chunked_time/", connection_string)
     ds.to_zarr(mapped_tgt, mode="w", consolidated=True)
 
+def chunk_dataset(ds,storage_chunks):
+    return ds.chunk(chunks=storage_chunks)
+
 
 @task()
 def downsample_and_combine(chunking_method):
     # grab zstore list and variable rename dictionary
     var_name_dict = get_var_name_dict()
     store_list = get_ERA5_zstore_list()
-
+    # store_list = store_list[0:13]
     # Open all zarr stores for ERA5
-    ds = xr.open_mfdataset(store_list, engine="zarr", concat_dim="time")
-
+    ds = xr.open_mfdataset(
+        store_list,
+        engine="zarr",  # these options set the inputs and how to read them
+        consolidated=True,
+        parallel=True,  # these options speed up the reading of individual datasets (before they are combined)
+        combine="by_coords",  # these options tell xarray how to combine the data
+        # data_vars=['air_temperature_at_2_metres_1hour_Maximum']  # these options limit the amount of data that is read to only variables of interest
+    )
     # drop time1 bounds
     ds = ds.drop("time1_bounds")
 
@@ -107,18 +114,33 @@ def downsample_and_combine(chunking_method):
 
     # write data as consolidated zarr store
     storage_chunks = get_storage_chunks(chunking_method)
-    write_zarr_store(ds, storage_chunks=storage_chunks)
+    #chunk dataset 
+    ds = chunk_dataset(ds,storage_chunks)
+
+    write_zarr_store(ds)
 
 
-run_config = KubernetesRun(
-    cpu_request=3,
-    memory_request="3Gi",
-    image="gcr.io/carbonplan/hub-notebook:7252fc3",
-    labels=["az-eu-west"],
-    env={"EXTRA_PIP_PACKAGES": "git+git://github.com/carbonplan/cmip6-downscaling"},
-)
 storage = Azure("prefect")
 
+run_config = KubernetesRun(
+    cpu_request=2,
+    memory_request="2Gi",
+    image=image,
+    labels=["az-eu-west"])
+
+executor = DaskExecutor(
+    cluster_class=lambda: KubeCluster(
+        make_pod_spec(
+            image=image,
+            env={
+                "AZURE_STORAGE_CONNECTION_STRING": os.environ[
+                    "AZURE_STORAGE_CONNECTION_STRING"
+                ],
+            },
+        )
+    ),
+    adapt_kwargs={"minimum": 2, "maximum": 3},
+)
 chunking_method = "space"
 with Flow(
     name=f"Resample_ERA5_chunked_{chunking_method}",
