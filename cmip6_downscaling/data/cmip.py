@@ -158,3 +158,74 @@ def cmip():
     print(f'done with cmip but these keys failed: {failed}')
 
     return model_dict, data
+
+
+def load_cmip_dictionary(
+    activity_ids=["CMIP", "ScenarioMIP"],
+    experiment_ids=["historical", "ssp370"],  # , "ssp126", "ssp245",  "ssp585"
+    member_ids=["r1i1p1f1"],
+    source_ids=["MIROC6"],  # BCC-CSM2-MR"]
+    table_ids=["day"],
+    grid_labels=["gn"],
+    variable_ids=["tasmax"],
+):
+    """Loads CMIP6 GCM dataset dictionary based on input criteria.
+
+    Parameters
+    ----------
+    activity_ids : list, optional
+        [activity_ids in CMIP6 catalog], by default ["CMIP", "ScenarioMIP"],
+    experiment_ids : list, optional
+        [experiment_ids in CMIP6 catalog], by default ["historical", "ssp370"],  ex:#  "ssp126", "ssp245",  "ssp585"
+    member_ids : list, optional
+        [member_ids in CMIP6 catalog], by default ["r1i1p1f1"]
+    source_ids : list, optional
+        [source_ids in CMIP6 catalog], by default ["MIROC6"]
+    table_ids : list, optional
+        [table_ids in CMIP6 catalog], by default ["day"]
+    grid_labels : list, optional
+        [grid_labels in CMIP6 catalog], by default ["gn"]
+    variable_ids : list, optional
+        [variable_ids in CMIP6 catalog], by default ['tasmax']
+
+    Returns
+    -------
+    [dictionary]
+        [dictionary containing available xarray datasets]
+    """
+    col_url = "https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.json"
+    print("intake")
+    full_subset = intake.open_esm_datastore(col_url).search(
+        activity_id=activity_ids,
+        experiment_id=experiment_ids,
+        member_id=member_ids,
+        source_id=source_ids,
+        table_id=table_ids,
+        grid_label=grid_labels,
+        variable_id=variable_ids,
+    )
+    print("to dictionary")
+    ds_dict = full_subset.to_dataset_dict(
+        zarr_kwargs={"consolidated": True, "decode_times": True, "use_cftime": True},
+        storage_options={
+            "account_name": "cmip6downscaling",
+            "account_key": os.environ.get("AccountKey", None),
+        },
+        progressbar=False,
+    )
+    print("return dict")
+    return ds_dict
+
+def convert_to_360(lon):
+    if lon > 0:
+        return lon
+    elif lon < 0:
+        return 360 + lon
+
+def gcm_munge(ds):
+    if ds.lat[0] < ds.lat[-1]:
+        ds = ds.reindex({"lat": ds.lat[::-1]})
+    ds = ds.drop(["lat_bnds", "lon_bnds", "time_bnds", "height", "member_id"]).squeeze(
+        drop=True
+    )
+    return ds
