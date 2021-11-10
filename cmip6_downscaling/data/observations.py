@@ -5,10 +5,10 @@ os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "True"
 import fsspec
 import intake
 import xarray as xr
-
 import zarr
 
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
+
 
 def get_store(bucket, prefix, account_key=None):
     """helper function to create a zarr store"""
@@ -54,6 +54,7 @@ def open_era5(var):
     print("return mfdataset")
     return ds
 
+
 def load_obs(obs_id, variable, time_period, domain):
     """
 
@@ -90,6 +91,7 @@ def load_obs(obs_id, variable, time_period, domain):
         )
     return obs
 
+
 def get_coarse_obs(
     obs,
     gcm_ds_single_time_slice,
@@ -114,6 +116,7 @@ def get_coarse_obs(
 
     obs_coarse = regridder(obs)
     return obs_coarse
+
 
 def get_spatial_anomolies(coarse_obs, fine_obs):
     # check if this has been done, if do the math

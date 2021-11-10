@@ -27,6 +27,7 @@ def temp_file_name():
     letters = string.ascii_lowercase
     return "".join(random.choice(letters) for i in range(10))
 
+
 def delete_chunks_encoding(ds):
     for data_var in ds.data_vars:
         if 'chunks' in ds[data_var].encoding:
@@ -34,7 +35,8 @@ def delete_chunks_encoding(ds):
     for coord in ds.coords:
         if 'chunks' in ds[coords].encoding:
             del ds[coords].encoding['chunks']
-            
+
+
 def rechunk_dataset(ds, chunks_dict, connection_string, max_mem="500MB"):
     """[summary]
 
@@ -76,16 +78,18 @@ def rechunk_dataset(ds, chunks_dict, connection_string, max_mem="500MB"):
         target_store=store_tgt,
         temp_store=store_tmp,
     ).execute()
-    rechunked_ds = xr.open_zarr(store_tgt)  # ideally we want consolidated=True but it seems that functionality isn't offered in rechunker right now
+    rechunked_ds = xr.open_zarr(
+        store_tgt
+    )  # ideally we want consolidated=True but it seems that functionality isn't offered in rechunker right now
     return rechunked_ds, path_tgt
 
 
-def calc_auspicious_chunks_dict(ds,
-                    target_size='100mb', 
-                     chunk_dims=('lat', 'lon')):
-    assert target_size=='100mb',"Apologies, but not implemented for anything but 100m right now!"
-    assert type(chunk_dims)==tuple,"Your chunk_dims likely includes one string but needs a comma after it! to be a tuple!"
-    target_size_bytes=100e6
+def calc_auspicious_chunks_dict(ds, target_size='100mb', chunk_dims=('lat', 'lon')):
+    assert target_size == '100mb', "Apologies, but not implemented for anything but 100m right now!"
+    assert (
+        type(chunk_dims) == tuple
+    ), "Your chunk_dims likely includes one string but needs a comma after it! to be a tuple!"
+    target_size_bytes = 100e6
     array_dims = dict(zip(ds.dims, ds.shape))
     chunks_dict = {}
     # dims not in chunk_dims should be one chunk (length -1)
@@ -95,12 +99,14 @@ def calc_auspicious_chunks_dict(ds,
     # calculate the bytesize given the dtype
     data_bytesize = int(re.findall(r'\d+', str(ds.dtype))[0])
     # calculate single non_chunked_size based upon dtype
-    smallest_size_one_chunk = data_bytesize * np.prod([array_dims[dim] for dim in chunks_dict.keys()])
+    smallest_size_one_chunk = data_bytesize * np.prod(
+        [array_dims[dim] for dim in chunks_dict.keys()]
+    )
     # the dims in chunk_dims should be of a square size that creates ~100 mb
-    perfect_chunk = target_size_bytes/smallest_size_one_chunk
+    perfect_chunk = target_size_bytes / smallest_size_one_chunk
     # then make reasonable chunk size by rounding up (avoids corner case of it rounding down to 0...)
-    perfect_chunk_length = int(np.ceil(perfect_chunk ** (1/len(chunk_dims))))
+    perfect_chunk_length = int(np.ceil(perfect_chunk ** (1 / len(chunk_dims))))
     for dim in chunk_dims:
         chunks_dict[dim] = perfect_chunk_length
-    
+
     return chunks_dict

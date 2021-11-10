@@ -216,16 +216,16 @@ def load_cmip_dictionary(
     print("return dict")
     return ds_dict
 
+
 def convert_to_360(lon):
     if lon > 0:
         return lon
     elif lon < 0:
         return 360 + lon
 
+
 def gcm_munge(ds):
     if ds.lat[0] < ds.lat[-1]:
         ds = ds.reindex({"lat": ds.lat[::-1]})
-    ds = ds.drop(["lat_bnds", "lon_bnds", "time_bnds", "height", "member_id"]).squeeze(
-        drop=True
-    )
+    ds = ds.drop(["lat_bnds", "lon_bnds", "time_bnds", "height", "member_id"]).squeeze(drop=True)
     return ds
