@@ -3,6 +3,7 @@ dask[complete]
 fsspec
 google-cloud-storage
 gcsfs
+gstools
 intake
 intake-esm
 intake-xarray
