@@ -7,6 +7,7 @@ import intake
 import xarray as xr
 import zarr
 
+import xesmf as xe
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 
 
