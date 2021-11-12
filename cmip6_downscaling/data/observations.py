@@ -5,9 +5,9 @@ os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "True"
 import fsspec
 import intake
 import xarray as xr
+import xesmf as xe
 import zarr
 
-import xesmf as xe
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 
 

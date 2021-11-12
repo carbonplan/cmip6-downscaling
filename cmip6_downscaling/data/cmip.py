@@ -1,10 +1,12 @@
-from collections import defaultdict
 import os
+from collections import defaultdict
+
 import intake
 import pandas as pd
-from intake_esm.merge_util import AggregationError
-import zarr
 import xarray as xr
+import zarr
+from intake_esm.merge_util import AggregationError
+
 variable_ids = ['pr', 'tasmin', 'tasmax', 'rsds', 'hurs', 'ps']
 
 
@@ -169,7 +171,7 @@ def load_cmip_dictionary(
     table_ids=["day"],
     grid_labels=["gn"],
     variable_ids=["tasmax"],
-    return_type='zarr'
+    return_type='zarr',
 ):
     """Loads CMIP6 GCM dataset dictionary based on input criteria.
 
@@ -197,18 +199,22 @@ def load_cmip_dictionary(
     """
     col_url = "https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.json"
     print("intake")
-    store = intake.open_esm_datastore(col_url).search(
-        activity_id=activity_ids,
-        experiment_id=experiment_ids,
-        member_id=member_ids,
-        source_id=source_ids,
-        table_id=table_ids,
-        grid_label=grid_labels,
-        variable_id=variable_ids,
-    ).df['zstore'][0]
-    if return_type=='zarr':
+    store = (
+        intake.open_esm_datastore(col_url)
+        .search(
+            activity_id=activity_ids,
+            experiment_id=experiment_ids,
+            member_id=member_ids,
+            source_id=source_ids,
+            table_id=table_ids,
+            grid_label=grid_labels,
+            variable_id=variable_ids,
+        )
+        .df['zstore'][0]
+    )
+    if return_type == 'zarr':
         return zarr.open_consolidated(store, mode='r')
-    elif return_type=='xr':
+    elif return_type == 'xr':
         return xr.open_zarr(store, consolidated=True)
 
 
@@ -223,6 +229,6 @@ def gcm_munge(ds):
     if ds.lat[0] < ds.lat[-1]:
         ds = ds.reindex({"lat": ds.lat[::-1]})
     ds = maybe_drop_band_vars(ds)
-    if 'height'in ds:
+    if 'height' in ds:
         ds = ds.drop('height').squeeze(drop=True)
     return ds
