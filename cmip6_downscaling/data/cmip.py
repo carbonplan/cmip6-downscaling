@@ -210,7 +210,8 @@ def load_cmip_dictionary(
             grid_label=grid_labels,
             variable_id=variable_ids,
         )
-        .df['zstore'].to_list()
+        .df['zstore']
+        .to_list()
     )
     if len(stores) > 1:
         raise ValueError('can only get 1 store at a time')
@@ -218,9 +219,9 @@ def load_cmip_dictionary(
         ds = zarr.open_consolidated(stores[0], mode='r')
     elif return_type == 'xr':
         ds = xr.open_zarr(stores[0], consolidated=True)
-        
+
     ds = gcm_munge(ds)
-    
+
     return ds
 
 
