@@ -43,7 +43,6 @@ def open_era5(var):
     stores = col.df.zstore
     era5_var = variable_name_dict[var]
     store_list = stores[stores.str.contains(era5_var)].to_list()
-    # store_list[:10]
     ds = xr.open_mfdataset(
         store_list,
         engine="zarr",  # these options set the inputs and how to read them
@@ -58,7 +57,6 @@ def open_era5(var):
 
 def load_obs(obs_id, variable, time_period, domain):
     """
-
     Parameters
     ----------
     obs_id : [type]

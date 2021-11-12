@@ -198,8 +198,8 @@ def load_cmip_dictionary(
         [dictionary containing available xarray datasets]
     """
     col_url = "https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.json"
-    print("intake")
-    store = (
+
+    stores = (
         intake.open_esm_datastore(col_url)
         .search(
             activity_id=activity_ids,
@@ -210,12 +210,18 @@ def load_cmip_dictionary(
             grid_label=grid_labels,
             variable_id=variable_ids,
         )
-        .df['zstore'][0]
+        .df['zstore'].to_list()
     )
+    if len(stores) > 1:
+        raise ValueError('can only get 1 store at a time')
     if return_type == 'zarr':
-        return zarr.open_consolidated(store, mode='r')
+        ds = zarr.open_consolidated(stores[0], mode='r')
     elif return_type == 'xr':
-        return xr.open_zarr(store, consolidated=True)
+        ds = xr.open_zarr(stores[0], consolidated=True)
+        
+    ds = gcm_munge(ds)
+    
+    return ds
 
 
 def convert_to_360(lon):
@@ -230,5 +236,6 @@ def gcm_munge(ds):
         ds = ds.reindex({"lat": ds.lat[::-1]})
     ds = maybe_drop_band_vars(ds)
     if 'height' in ds:
-        ds = ds.drop('height').squeeze(drop=True)
+        ds = ds.drop('height')
+    ds = ds.squeeze(drop=True)
     return ds
