@@ -1,28 +1,21 @@
-from prefect import Flow, task
-from prefect.run_configs import KubernetesRun
-from prefect.storage import Azure
-from prefect.executors import DaskExecutor
-from dask_kubernetes import KubeCluster, make_pod_spec
-from dask.distributed import Client, LocalCluster
-
-
-import fsspec
-import intake
-import xarray as xr
-import xesmf as xe
-import zarr
-from prefect import Flow, Parameter, task
-from skdownscale.pointwise_models import BcAbsolute, PointWiseDownscaler
-
 # from cmip6_downscaling.workflows.utils import rechunk_dataset
 import os
 import random
 import string
 
 import fsspec
+import intake
 import xarray as xr
+import xesmf as xe
 import zarr
+from dask.distributed import Client, LocalCluster
+from dask_kubernetes import KubeCluster, make_pod_spec
+from prefect import Flow, Parameter, task
+from prefect.executors import DaskExecutor
+from prefect.run_configs import KubernetesRun
+from prefect.storage import Azure
 from rechunker import api
+from skdownscale.pointwise_models import BcAbsolute, PointWiseDownscaler
 
 image = "carbonplan/cmip6-downscaling-prefect:latest"
 
@@ -45,9 +38,7 @@ executor = DaskExecutor(
             image=image,
             env={
                 "EXTRA_PIP_PACKAGES": extra_pip_packages,
-                "AZURE_STORAGE_CONNECTION_STRING": os.environ[
-                    "AZURE_STORAGE_CONNECTION_STRING"
-                ],
+                "AZURE_STORAGE_CONNECTION_STRING": os.environ["AZURE_STORAGE_CONNECTION_STRING"],
             },
         )
     ),
@@ -55,6 +46,7 @@ executor = DaskExecutor(
 )
 
 os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "True"
+
 
 def get_store(prefix, account_key=None):
     """helper function to create a zarr store"""
@@ -205,9 +197,7 @@ run_hyperparameters = {
     # "SAVE_MODEL": False,
     "OBS": "ERA5",
 }
-flow_name = run_hyperparameters.pop(
-    "FLOW_NAME"
-)  # pop it out because if you leave it in the dict
+flow_name = run_hyperparameters.pop("FLOW_NAME")  # pop it out because if you leave it in the dict
 # but don't call it as a parameter it'll complain
 
 # converts cmip standard names to ERA5 names
@@ -555,9 +545,7 @@ def preprocess_bcsd(
 def gcm_munge(ds):
     if ds.lat[0] < ds.lat[-1]:
         ds = ds.reindex({"lat": ds.lat[::-1]})
-    ds = ds.drop(["lat_bnds", "lon_bnds", "time_bnds", "height", "member_id"]).squeeze(
-        drop=True
-    )
+    ds = ds.drop(["lat_bnds", "lon_bnds", "time_bnds", "height", "member_id"]).squeeze(drop=True)
     return ds
 
 
@@ -716,9 +704,7 @@ def postprocess_bcsd(
     )
     # spatial anomalies is chunked in (lat=-1,lon=-1,time=1)
     spatial_anomalies = xr.open_zarr(spatial_anomalies_store, consolidated=True)
-    regridder = xe.Regridder(
-        y_predict, spatial_anomalies, "bilinear", extrap_method="nearest_s2d"
-    )
+    regridder = xe.Regridder(y_predict, spatial_anomalies, "bilinear", extrap_method="nearest_s2d")
     # Rechunk y_predict to (lat=-1,lon=-1,time=1)
     rechunked_y_predict, rechunked_y_predict_path = rechunk_dataset(
         y_predict,
@@ -747,9 +733,7 @@ def postprocess_bcsd(
 # )
 # Prefect Flow -----------------------------------------------------------
 # put the experiment_ids outside of this loop?
-with Flow(
-    name="bcsd_flow", storage=storage, run_config=run_config, executor=executor
-) as flow:
+with Flow(name="bcsd_flow", storage=storage, run_config=run_config, executor=executor) as flow:
 
     # run preprocess and create dependency/checkpoint to show it's done
     obs = run_hyperparameters["OBS"]  # Parameter("OBS")
@@ -757,9 +741,7 @@ with Flow(
     train_period_start = run_hyperparameters[
         "TRAIN_PERIOD_START"
     ]  # Parameter("TRAIN_PERIOD_START")
-    train_period_end = run_hyperparameters[
-        "TRAIN_PERIOD_END"
-    ]  # Parameter("TRAIN_PERIOD_END")
+    train_period_end = run_hyperparameters["TRAIN_PERIOD_END"]  # Parameter("TRAIN_PERIOD_END")
     predict_period_start = run_hyperparameters[
         "PREDICT_PERIOD_START"
     ]  # Parameter("PREDICT_PERIOD_START")

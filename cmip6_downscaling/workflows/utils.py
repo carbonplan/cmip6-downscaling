@@ -1,12 +1,13 @@
 import os
 import random
+import re
 import string
-import numpy as np
+
 import fsspec
+import numpy as np
 import xarray as xr
 import zarr
 from rechunker import rechunk
-import re
 
 
 def get_store(prefix, account_key=None):
@@ -80,6 +81,7 @@ def rechunk_zarr_array(zarr_array, chunks_dict, connection_string, max_mem="10MB
     # we can just add a consolidate_metadata step here to do it after the fact (once rechunker is done) but only
     # necessary if we'll reopen this rechukned_ds multiple times
     return rechunked_ds, path_tgt
+
 
 def calc_auspicious_chunks_dict(ds, target_size='100mb', chunk_dims=('lat', 'lon')):
     assert target_size == '100mb', "Apologies, but not implemented for anything but 100m right now!"
