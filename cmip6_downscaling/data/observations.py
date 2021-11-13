@@ -55,7 +55,7 @@ def open_era5(var):
     return ds
 
 
-def load_obs(obs_id, variable, time_period, domain, agg_func='max'):
+def load_obs(obs_id, variable, time_period, domain, agg_func=np.max):
     """
     Parameters
     ----------
@@ -84,7 +84,7 @@ def load_obs(obs_id, variable, time_period, domain, agg_func='max'):
             full_obs[variable_name_dict[variable]]
             .sel(time=time_period)
             .resample(time="1D")
-            .agg(agg_func)
+            .reduce(agg_func)
             .rename(variable)
             # .load(scheduler="threads")  # GOAL! REMOVE THE `LOAD`!
         )
