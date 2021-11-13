@@ -6,6 +6,7 @@ gcsfs
 intake
 intake-esm
 intake-xarray
+prefect
 scikit-downscale
 scikit-learn
 tenacity
