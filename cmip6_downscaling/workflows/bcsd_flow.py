@@ -142,7 +142,7 @@ def preprocess_bcsd(
         # since they both work in map space instead of time space
         coarse_obs = get_coarse_obs(
             rechunked_obs,
-            gcm_ds_single_time_slice,
+            gcm_ds_single_time_slice, # write_cache=True, read_cache=True
         )
         spatial_anomolies = get_spatial_anomolies(coarse_obs, rechunked_obs)
 
