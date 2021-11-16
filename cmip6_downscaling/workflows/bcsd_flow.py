@@ -17,16 +17,15 @@ from prefect.storage import Azure
 from rechunker import api
 from skdownscale.pointwise_models import BcAbsolute, PointWiseDownscaler
 
-from ..data.cmip import convert_to_360, gcm_munge, load_cmip_dictionary
-from ..data.observations import get_coarse_obs, get_spatial_anomolies, load_obs
-from ..utils import calc_auspicious_chunks_dict
-
-from cmip6_downscaling.workflows.utils import convert_to_360, rechunk_dataset
+from cmip6_downscaling.workflows.utils import rechunk_zarr_array, calc_auspicious_chunks_dict, delete_chunks_encoding
+import numpy as np
+from xarray_schema import DataArraySchema, DatasetSchema
+from cmip6_downscaling.data.observations import load_obs, get_coarse_obs, get_spatial_anomolies
+from cmip6_downscaling.data.cmip import load_cmip_dictionary, gcm_munge, convert_to_360
 
 
 chunks = {"lat": 10, "lon": 10, "time": -1}
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
-
 test_specs = {
     "domain": {
         "lat": slice(50, 45),
@@ -34,7 +33,6 @@ test_specs = {
     }
 }  # bounding box of downscaling region
 
-connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 account_key = os.environ.get("account_key")
 run_hyperparameters = {
     "FLOW_NAME": "BCSD_testing",  # want to populate with unique string name?
@@ -46,8 +44,8 @@ run_hyperparameters = {
     # "SCENARIOS": ["ssp370"],
     "TRAIN_PERIOD_START": "1990",
     "TRAIN_PERIOD_END": "1990",
-    "PREDICT_PERIOD_START": "2080",
-    "PREDICT_PERIOD_END": "2080",
+    "PREDICT_PERIOD_START": "2090",
+    "PREDICT_PERIOD_END": "2090",
     # "DOMAIN": {'lat': slice(50, 45),
     #             'lon': slice(235.2, 240.0)},
     "VARIABLE": "tasmax",
@@ -67,8 +65,6 @@ variable_name_dict = {
     "tasmin": "air_temperature_at_2_metres_1hour_Minimum",
     "pr": "precipitation_amount_1hour_Accumulation",
 }
-chunks = {"lat": 10, "lon": 10, "time": -1}
-
 
 @task(  # target="{flow_name}.txt", checkpoint=True,
     # result=LocalResult(dir="~/.prefect"),
@@ -114,37 +110,39 @@ def preprocess_bcsd(
         connection_string=connection_string,
     )
     if rerun:
-        print("load obs")
-        obs_da = load_obs(
-            obs_id,
-            variable,
-            time_period=slice(train_period_start, train_period_end),
-            domain=domain,
-        )  # We want it chunked in space. (time=1,lat=-1, lon=-1)
-
-        print("load cmip")
+        # obs_ds = load_obs(
+        #     obs_id,
+        #     variable,
+        #     time_period=slice(train_period_start, train_period_end),
+        #     domain=domain
+        # )  # We want it chunked in space. (time=1,lat=-1, lon=-1)
+        # for testing we'll use the lines below but eventually comment out above lines
+        local_obs_path_maps = 'era5_tasmax_1990_maps.zarr'
+        obs_ds = xr.open_zarr(local_obs_path_maps)
+        # find a good chunking scheme then chunk the obs appropriately, might be able to 
+        # delete this once era5 is chunked well
+        target_chunks={variable: calc_auspicious_chunks_dict(obs_ds[variable], chunk_dims=('time',)), 
+               'time': None, # don't rechunk this array
+                'lon': None,
+                'lat': None}
+        obs_ds = zarr.open_consolidated(local_obs_path_maps, mode='r')
+        rechunked_obs, path_tgt = rechunk_zarr_array(obs_ds, 
+                                                    target_chunks, 
+                                                    connection_string, 
+                                                    max_mem="100MB")
         gcm_ds = load_cmip_dictionary(source_ids=gcm, variable_ids=[variable])[
             "CMIP.MIROC.MIROC6.historical.day.gn"
         ]  # This comes chunked in space (time~600,lat-1,lon-1), which is good.
 
         # Check whether gcm latitudes go from low to high, if so, swap them to match ERA5 which goes from high to low
         # after we create era5 daily processed product we should still leave this in but should switch < to > in if statement
-        if gcm_ds.lat[0] < gcm_ds.lat[-1]:
-            print("switched")
-            gcm_ds = gcm_ds.reindex({"lat": gcm_ds.lat[::-1]})
+        gcm_ds = gcm_munge(gcm_ds)
+        delete_chunks_encoding(gcm_ds)
+
         gcm_ds_single_time_slice = gcm_ds.isel(
             time=0
         )  # .load() #TODO: check whether we need the load here
         chunks_dict_obs_maps = calc_auspicious_chunks_dict(obs_ds, chunk_dims=('time',)) # you'll need to put comma after the one element tuple
-
-        rechunked_obs, rechunked_obs_path = rechunk_dataset(
-            # obs_ds,
-            obs_ds.to_dataset(name=variable),  # Might have to revert this..
-            chunks_dict={"tasmax": (1, -1, -1)},
-            connection_string=connection_string,
-            max_mem="1GB",
-        )
-
         # we want to pass rechunked obs to both get_coarse_obs and get_spatial_anomalies
         # since they both work in map space instead of time space
         coarse_obs = get_coarse_obs(
@@ -157,35 +155,12 @@ def preprocess_bcsd(
         coarse_obs.to_zarr(coarse_obs_store, mode="w", consolidated=True)
 
         spatial_anomolies.to_zarr(spatial_anomolies_store, mode="w", consolidated=True)
-        return coarse_obs
-
-
-# @task
-# def biascorrect(X, y, train_period, predict_period, model):
-#     '''
-#     fit the model at coarse gcm scale and then predict!
-# fit
-# predict
-# return y_hat
-#     '''
-
-# @task
-# def postprocess(y_hat, spatial_anomolies):
-#     '''
-#     Interpolate, add back in the spatial anomolies from the coarsening, and write to store
-#     '''
-#     y_hat.
-# write out downscaled bias-corrected
-def gcm_munge(ds):
-    if ds.lat[0] < ds.lat[-1]:
-        ds = ds.reindex({"lat": ds.lat[::-1]})
-    ds = ds.drop(["lat_bnds", "lon_bnds", "time_bnds", "height", "member_id"]).squeeze(drop=True)
-    return ds
+        return coarse_obs_store, spatial_anomolies_store
 
 
 @task(log_stdout=True, nout=3)
 def prep_bcsd_inputs(
-    coarse_obs,
+    coarse_obs_store,
     gcm,
     obs_id,
     train_period_start,
@@ -224,62 +199,50 @@ def prep_bcsd_inputs(
     xarray datasets
         Chunked in lat=10,lon=10,time=-1
     """
-    X = load_cmip_dictionary()["CMIP.MIROC.MIROC6.historical.day.gn"]
-    X = gcm_munge(X)
-    X = X.sel(time=slice(train_period_start, train_period_end))
-    # coarse_obs_store = fsspec.get_mapper(
-    #     f"az://cmip6/intermediates/{obs_id}_{gcm[0]}_{train_period_start}_{train_period_end}_{variable}.zarr",
-    #     connection_string=connection_string,
-    # )
-    y = coarse_obs
-    # finally set the gcm time index to be the same as the obs one (and the era5 index is datetime64 which sklearn prefers)
-    X["time"] = y.time.values
-    chunks_dict = {"tasmax": {"time": -1, "lat": 10, "lon": 10}}
-    X_rechunked, X_rechunked_path = rechunk_dataset(
-        X, chunks_dict=chunks_dict, connection_string=connection_string, max_mem="1GB"
-    )
-    y_rechunked, y_rechunked_path = rechunk_dataset(
-        y, chunks_dict=chunks_dict, connection_string=connection_string, max_mem="1GB"
-    )
-    print("loading xpredict")
-    X_predict = load_cmip_dictionary()["ScenarioMIP.MIROC.MIROC6.ssp370.day.gn"]
-    print("x_predict loaded")
+    # load in coarse obs as xarray ds to get chunk sizes
+    y = xr.open_zarr(coarse_obs_store, consolidated=True)
+    coarse_time_chunks = {"tasmax": calc_auspicious_chunks_dict(coarse_obs.tasmax,chunk_dims=('lat','lon')), 
+                      'time': None, # don't rechunk this array
+                        'lon': None,
+                        'lat': None}
+    y_rechunked, path_tgt_y = rechunk_zarr_array(coarse_obs, 
+                                                chunks_dict=coarse_time_chunks, 
+                                                connection_string=connection_string, 
+                                                max_mem='1G')
+
+    X_train = load_cmip_dictionary(return_type='xr').sel(time=slice(train_period_start, 
+                                                                    train_period_end))
+    X_train = gcm_munge(X_train)
+
+    X_train['time'] = y.time.values
+    delete_chunks_encoding(X_train)
+
+    X_train_rechunked, path_tgt_X_train = rechunk_zarr_array(X_train.chunk(coarse_time_chunks['tasmax']), 
+                                                         chunks_dict=coarse_time_chunks, connection_string=connection_string, max_mem='1G')
+
+    X_predict = load_cmip_dictionary(activity_ids=['ScenarioMIP'],
+                                experiment_ids=['ssp370'],
+                             return_type='xr').sel(time=slice(predict_period_start, predict_period_end))
     X_predict = gcm_munge(X_predict)
-    ## Commenting this out helped remove weird rechunker dask chunk issue. (    raise ValueError(f"Invalid chunk_limits {chunk_limits}.")ValueError: Invalid chunk_limits (4,).)
-    # X_predict = X_predict.sel(time=slice(predict_period_start, predict_period_end), **domain)
-
-    # RECHUNKER: X, Y and X_predict rechunked in (lat=10,lon=10,time=-1)
-    print(X_predict)
-    print(X_predict.tasmax.dims)
-    X_predict_rechunked, X_predict_rechunked_path = rechunk_dataset(
-        X_predict,
-        chunks_dict=chunks_dict,
-        connection_string=connection_string,
-        max_mem="1GB",
-    )
-    # THIS IS TEMP!
-
-    # X = None
-    # y = None
-    print("X_predict_rechunked:")
-    print(X_predict_rechunked)
-    print(X_predict_rechunked.chunks)
-
-    return X, y, X_predict
-
+    delete_chunks_encoding(X_predict)
+    X_predict_rechunked, path_tgt_X_predict = rechunk_zarr_array(X_predict.chunk(coarse_time_chunks['tasmax']), 
+                                             coarse_time_chunks, connection_string, max_mem="1GB")
+    delete_chunks_encoding(X_predict_rechunked)
+    # maybe change to stores
+    return y_rechunked, X_train_rechunked, X_predict_rechunked
 
 @task(log_stdout=True)
-def fit_and_predict(X_train, y, X_predict, dim="time", feature_list=["tasmax"]):
+def fit_and_predict(X_train, y, X_predict, dim="time", feature_list=["tasmax"], write=False):
     """expects X,y, X_predict to be chunked in (lat=10,lon=10,time=-1)
 
     Parameters
     ----------
     X_train : [type]
-        [description]
+        Chunked to preserve full timeseries
     y : [type]
-        [description]
+        Chunked to preserve full timeseries
     X_predict : [type]
-        [description]
+        Chunked to preserve full timeseries
     dim : str, optional
         [description], by default "time"
     feature_list : list, optional
@@ -294,9 +257,13 @@ def fit_and_predict(X_train, y, X_predict, dim="time", feature_list=["tasmax"]):
     pointwise_model = PointWiseDownscaler(model=bcsd_model, dim=dim)
     pointwise_model.fit(X_train, y)
     bias_corrected = pointwise_model.predict(X_predict)
-    # ALTERNATIVE: could use the bcsdwrapper like below:
-    # bcsd_wrapper = BcsdWrapper(model=bcsd_model, feature_list=['tasmax'], dim='time')
-    # bcsd_wrapper.fit(X=X_train, y=y)
+    if write:
+        bias_corrected_store = fsspec.get_mapper(
+        f"az://cmip6/intermediates/bc_{obs_id}_{gcm[0]}_{train_period_start}_{train_period_end}_{variable}.zarr",
+        connection_string=connection_string,
+        )
+        bias_corrected.to_zarr(bias_corrected_store)
+
     return bias_corrected
 
 
@@ -422,5 +389,4 @@ with Flow(name="bcsd_flow", storage=storage, run_config=run_config, executor=exe
         predict_period_start,
         predict_period_end,
     )
-# flow.visualize()
 flow.run(parameters=run_hyperparameters)
