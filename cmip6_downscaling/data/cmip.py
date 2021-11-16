@@ -1,7 +1,10 @@
+import os
 from collections import defaultdict
 
 import intake
 import pandas as pd
+import xarray as xr
+import zarr
 from intake_esm.merge_util import AggregationError
 
 variable_ids = ['pr', 'tasmin', 'tasmax', 'rsds', 'hurs', 'ps']
@@ -161,13 +164,22 @@ def cmip():
 
 
 def load_cmip_dictionary(
+<<<<<<< HEAD
     activity_ids=["CMIP", "ScenarioMIP"],
     experiment_ids=["historical", "ssp370"],  # , "ssp126", "ssp245",  "ssp585"
+=======
+    activity_ids=["CMIP"],
+    experiment_ids=["historical"],  # , "ssp126", "ssp245",  "ssp585"
+>>>>>>> origin
     member_ids=["r1i1p1f1"],
     source_ids=["MIROC6"],  # BCC-CSM2-MR"]
     table_ids=["day"],
     grid_labels=["gn"],
     variable_ids=["tasmax"],
+<<<<<<< HEAD
+=======
+    return_type='zarr',
+>>>>>>> origin
 ):
     """Loads CMIP6 GCM dataset dictionary based on input criteria.
 
@@ -194,6 +206,7 @@ def load_cmip_dictionary(
         [dictionary containing available xarray datasets]
     """
     col_url = "https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.json"
+<<<<<<< HEAD
     print("intake")
     full_subset = intake.open_esm_datastore(col_url).search(
         activity_id=activity_ids,
@@ -215,6 +228,34 @@ def load_cmip_dictionary(
     )
     print("return dict")
     return ds_dict
+=======
+
+    stores = (
+        intake.open_esm_datastore(col_url)
+        .search(
+            activity_id=activity_ids,
+            experiment_id=experiment_ids,
+            member_id=member_ids,
+            source_id=source_ids,
+            table_id=table_ids,
+            grid_label=grid_labels,
+            variable_id=variable_ids,
+        )
+        .df['zstore']
+        .to_list()
+    )
+    if len(stores) > 1:
+        raise ValueError('can only get 1 store at a time')
+    if return_type == 'zarr':
+        ds = zarr.open_consolidated(stores[0], mode='r')
+    elif return_type == 'xr':
+        ds = xr.open_zarr(stores[0], consolidated=True)
+
+    ds = gcm_munge(ds)
+
+    return ds
+
+>>>>>>> origin
 
 def convert_to_360(lon):
     if lon > 0:
@@ -222,6 +263,7 @@ def convert_to_360(lon):
     elif lon < 0:
         return 360 + lon
 
+<<<<<<< HEAD
 def gcm_munge(ds):
     if ds.lat[0] < ds.lat[-1]:
         ds = ds.reindex({"lat": ds.lat[::-1]})
@@ -229,3 +271,14 @@ def gcm_munge(ds):
         drop=True
     )
     return ds
+=======
+
+def gcm_munge(ds):
+    if ds.lat[0] < ds.lat[-1]:
+        ds = ds.reindex({"lat": ds.lat[::-1]})
+    ds = maybe_drop_band_vars(ds)
+    if 'height' in ds:
+        ds = ds.drop('height')
+    ds = ds.squeeze(drop=True)
+    return ds
+>>>>>>> origin

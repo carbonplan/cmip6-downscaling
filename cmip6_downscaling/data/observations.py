@@ -5,11 +5,19 @@ os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "True"
 import fsspec
 import intake
 import xarray as xr
+<<<<<<< HEAD
 
+=======
+import xesmf as xe
+>>>>>>> origin
 import zarr
 
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin
 def get_store(bucket, prefix, account_key=None):
     """helper function to create a zarr store"""
 
@@ -42,7 +50,10 @@ def open_era5(var):
     stores = col.df.zstore
     era5_var = variable_name_dict[var]
     store_list = stores[stores.str.contains(era5_var)].to_list()
+<<<<<<< HEAD
     # store_list[:10]
+=======
+>>>>>>> origin
     ds = xr.open_mfdataset(
         store_list,
         engine="zarr",  # these options set the inputs and how to read them
@@ -54,9 +65,15 @@ def open_era5(var):
     print("return mfdataset")
     return ds
 
+<<<<<<< HEAD
 def load_obs(obs_id, variable, time_period, domain):
     """
 
+=======
+
+def load_obs(obs_id, variable, time_period, domain, agg_func=np.max):
+    """
+>>>>>>> origin
     Parameters
     ----------
     obs_id : [type]
@@ -84,12 +101,20 @@ def load_obs(obs_id, variable, time_period, domain):
             full_obs[variable_name_dict[variable]]
             .sel(time=time_period)
             .resample(time="1D")
+<<<<<<< HEAD
             .max()
+=======
+            .reduce(agg_func)
+>>>>>>> origin
             .rename(variable)
             # .load(scheduler="threads")  # GOAL! REMOVE THE `LOAD`!
         )
     return obs
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin
 def get_coarse_obs(
     obs,
     gcm_ds_single_time_slice,
@@ -115,6 +140,10 @@ def get_coarse_obs(
     obs_coarse = regridder(obs)
     return obs_coarse
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin
 def get_spatial_anomolies(coarse_obs, fine_obs):
     # check if this has been done, if do the math
     # if it has been done, just read them in
@@ -140,4 +169,8 @@ def get_spatial_anomolies(coarse_obs, fine_obs):
     obs_interpolated = regridder(coarse_obs)
     spatial_anomolies = obs_interpolated - fine_obs
     seasonal_cycle_spatial_anomolies = spatial_anomolies.groupby("time.month").mean()
+<<<<<<< HEAD
     return seasonal_cycle_spatial_anomolies
+=======
+    return seasonal_cycle_spatial_anomolies
+>>>>>>> origin
