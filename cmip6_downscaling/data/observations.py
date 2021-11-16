@@ -111,6 +111,7 @@ def get_coarse_obs(
     """
     # TEST TODO: Check that obs is chunked appropriately and throw error if not
     # Like: assert obs.chunks == (lat=-1, lon=-1, time=1) - then eventually we can move the rechunker in as an `else`
+    obs = obs.chunk({'lat': -1, 'lon': -1, 'time': 1})
     regridder = xe.Regridder(obs, gcm_ds_single_time_slice, "bilinear")
 
     obs_coarse = regridder(obs)
