@@ -27,11 +27,11 @@ def get_store(prefix, account_key=None):
 
 def generate_batches(n, batch_size, buffer_size, one_indexed=False):
     """
-    ds must have a dimension called time that is a valid datetime index 
+    ds must have a dimension called time that is a valid datetime index
     """
-    # TODO: add tests. if buffer_size == 0, batches == cores 
-    # construct 2 test cases 
-    
+    # TODO: add tests. if buffer_size == 0, batches == cores
+    # construct 2 test cases
+
     cores = []
     batches = []
     if one_indexed:
@@ -43,15 +43,15 @@ def generate_batches(n, batch_size, buffer_size, one_indexed=False):
     for start in range(xmin, xmax, batch_size):
         end = min(start + batch_size, xmax)
         cores.append(np.arange(start, end))
-        
-        # add buffer 
+
+        # add buffer
         end = end + buffer_size
         start = start - buffer_size
         batch = np.arange(start, end)
         batch[batch < xmin] += n
         batch[batch > xmax - 1] -= n
         batches.append(batch)
-        
+
     return batches, cores
 
 
