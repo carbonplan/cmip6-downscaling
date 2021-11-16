@@ -17,12 +17,11 @@ from prefect.storage import Azure
 from rechunker import api
 from skdownscale.pointwise_models import BcAbsolute, PointWiseDownscaler
 
+from cmip6_downscaling.workflows.utils import convert_to_360, rechunk_dataset
+
 from ..data.cmip import convert_to_360, gcm_munge, load_cmip_dictionary
 from ..data.observations import get_coarse_obs, get_spatial_anomolies, load_obs
 from ..utils import calc_auspicious_chunks_dict
-
-from cmip6_downscaling.workflows.utils import convert_to_360, rechunk_dataset
-
 
 chunks = {"lat": 10, "lon": 10, "time": -1}
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
@@ -135,7 +134,9 @@ def preprocess_bcsd(
         gcm_ds_single_time_slice = gcm_ds.isel(
             time=0
         )  # .load() #TODO: check whether we need the load here
-        chunks_dict_obs_maps = calc_auspicious_chunks_dict(obs_ds, chunk_dims=('time',)) # you'll need to put comma after the one element tuple
+        chunks_dict_obs_maps = calc_auspicious_chunks_dict(
+            obs_ds, chunk_dims=('time',)
+        )  # you'll need to put comma after the one element tuple
 
         rechunked_obs, rechunked_obs_path = rechunk_dataset(
             # obs_ds,
@@ -149,7 +150,7 @@ def preprocess_bcsd(
         # since they both work in map space instead of time space
         coarse_obs = get_coarse_obs(
             rechunked_obs,
-            gcm_ds_single_time_slice, # write_cache=True, read_cache=True
+            gcm_ds_single_time_slice,  # write_cache=True, read_cache=True
         )
         spatial_anomolies = get_spatial_anomolies(coarse_obs, rechunked_obs)
 
