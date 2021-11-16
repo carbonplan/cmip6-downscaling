@@ -16,12 +16,14 @@ from prefect.run_configs import KubernetesRun
 from prefect.storage import Azure
 from rechunker import api
 from skdownscale.pointwise_models import BcAbsolute, PointWiseDownscaler
-from ..data.observations import load_obs, get_coarse_obs, get_spatial_anomolies
-from ..data.cmip import load_cmip_dictionary, gcm_munge, convert_to_360
+
+from ..data.cmip import convert_to_360, gcm_munge, load_cmip_dictionary
+from ..data.observations import get_coarse_obs, get_spatial_anomolies, load_obs
 from ..utils import calc_auspicious_chunks_dict
 
 <<<<<<< HEAD
-from cmip6_downscaling.workflows.utils import rechunk_dataset, convert_to_360
+from cmip6_downscaling.workflows.utils import convert_to_360, rechunk_dataset
+
 =======
 image = "carbonplan/cmip6-downscaling-prefect:latest"
 
