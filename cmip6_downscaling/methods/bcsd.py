@@ -6,11 +6,15 @@ import xarray as xr
 import xesmf as xe
 import zarr
 from skdownscale.pointwise_models import BcAbsolute, PointWiseDownscaler
-
 from xarray_schema import DataArraySchema, DatasetSchema
-from cmip6_downscaling.data.observations import load_obs, get_coarse_obs, get_spatial_anomolies
-from cmip6_downscaling.data.cmip import load_cmip_dictionary, gcm_munge, convert_to_360
-from cmip6_downscaling.workflows.utils import rechunk_zarr_array, calc_auspicious_chunks_dict, delete_chunks_encoding
+
+from cmip6_downscaling.data.cmip import convert_to_360, gcm_munge, load_cmip_dictionary
+from cmip6_downscaling.data.observations import get_coarse_obs, get_spatial_anomolies, load_obs
+from cmip6_downscaling.workflows.utils import (
+    calc_auspicious_chunks_dict,
+    delete_chunks_encoding,
+    rechunk_zarr_array,
+)
 
 chunks = {"lat": 10, "lon": 10, "time": -1}
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
@@ -33,6 +37,7 @@ variable_name_dict = {
     "pr": "precipitation_amount_1hour_Accumulation",
 }
 chunks = {"lat": 10, "lon": 10, "time": -1}
+
 
 def preprocess_bcsd(
     gcm,
@@ -82,17 +87,18 @@ def preprocess_bcsd(
         # for testing we'll use the lines below but eventually comment out above lines
         local_obs_path_maps = 'era5_tasmax_1990_maps.zarr'
         obs_ds = xr.open_zarr(local_obs_path_maps)
-        # find a good chunking scheme then chunk the obs appropriately, might be able to 
+        # find a good chunking scheme then chunk the obs appropriately, might be able to
         # delete this once era5 is chunked well
-        target_chunks={variable: calc_auspicious_chunks_dict(obs_ds[variable], chunk_dims=('time',)), 
-               'time': None, # don't rechunk this array
-                'lon': None,
-                'lat': None}
+        target_chunks = {
+            variable: calc_auspicious_chunks_dict(obs_ds[variable], chunk_dims=('time',)),
+            'time': None,  # don't rechunk this array
+            'lon': None,
+            'lat': None,
+        }
         obs_ds = zarr.open_consolidated(local_obs_path_maps, mode='r')
-        rechunked_obs, path_tgt = rechunk_zarr_array(obs_ds, 
-                                                    target_chunks, 
-                                                    connection_string, 
-                                                    max_mem="100MB")
+        rechunked_obs, path_tgt = rechunk_zarr_array(
+            obs_ds, target_chunks, connection_string, max_mem="100MB"
+        )
         gcm_ds = load_cmip_dictionary(source_ids=gcm, variable_ids=[variable])[
             "CMIP.MIROC.MIROC6.historical.day.gn"
         ]  # This comes chunked in space (time~600,lat-1,lon-1), which is good.
@@ -105,12 +111,14 @@ def preprocess_bcsd(
         gcm_ds_single_time_slice = gcm_ds.isel(
             time=0
         )  # .load() #TODO: check whether we need the load here
-        chunks_dict_obs_maps = calc_auspicious_chunks_dict(obs_ds, chunk_dims=('time',)) # you'll need to put comma after the one element tuple
+        chunks_dict_obs_maps = calc_auspicious_chunks_dict(
+            obs_ds, chunk_dims=('time',)
+        )  # you'll need to put comma after the one element tuple
         # we want to pass rechunked obs to both get_coarse_obs and get_spatial_anomalies
         # since they both work in map space instead of time space
         coarse_obs = get_coarse_obs(
             rechunked_obs,
-            gcm_ds_single_time_slice, # write_cache=True, read_cache=True
+            gcm_ds_single_time_slice,  # write_cache=True, read_cache=True
         )
         spatial_anomolies = get_spatial_anomolies(coarse_obs, rechunked_obs)
 
@@ -163,32 +171,45 @@ def prep_bcsd_inputs(
     """
     # load in coarse obs as xarray ds to get chunk sizes
     y = xr.open_zarr(coarse_obs_store, consolidated=True)
-    coarse_time_chunks = {"tasmax": calc_auspicious_chunks_dict(coarse_obs.tasmax,chunk_dims=('lat','lon')), 
-                      'time': None, # don't rechunk this array
-                        'lon': None,
-                        'lat': None}
-    y_rechunked, path_tgt_y = rechunk_zarr_array(coarse_obs, 
-                                                chunks_dict=coarse_time_chunks, 
-                                                connection_string=connection_string, 
-                                                max_mem='1G')
+    coarse_time_chunks = {
+        "tasmax": calc_auspicious_chunks_dict(coarse_obs.tasmax, chunk_dims=('lat', 'lon')),
+        'time': None,  # don't rechunk this array
+        'lon': None,
+        'lat': None,
+    }
+    y_rechunked, path_tgt_y = rechunk_zarr_array(
+        coarse_obs,
+        chunks_dict=coarse_time_chunks,
+        connection_string=connection_string,
+        max_mem='1G',
+    )
 
-    X_train = load_cmip_dictionary(return_type='xr').sel(time=slice(train_period_start, 
-                                                                    train_period_end))
+    X_train = load_cmip_dictionary(return_type='xr').sel(
+        time=slice(train_period_start, train_period_end)
+    )
     X_train = gcm_munge(X_train)
 
     X_train['time'] = y.time.values
     delete_chunks_encoding(X_train)
 
-    X_train_rechunked, path_tgt_X_train = rechunk_zarr_array(X_train.chunk(coarse_time_chunks['tasmax']), 
-                                                         chunks_dict=coarse_time_chunks, connection_string=connection_string, max_mem='1G')
+    X_train_rechunked, path_tgt_X_train = rechunk_zarr_array(
+        X_train.chunk(coarse_time_chunks['tasmax']),
+        chunks_dict=coarse_time_chunks,
+        connection_string=connection_string,
+        max_mem='1G',
+    )
 
-    X_predict = load_cmip_dictionary(activity_ids=['ScenarioMIP'],
-                                experiment_ids=['ssp370'],
-                             return_type='xr').sel(time=slice(predict_period_start, predict_period_end))
+    X_predict = load_cmip_dictionary(
+        activity_ids=['ScenarioMIP'], experiment_ids=['ssp370'], return_type='xr'
+    ).sel(time=slice(predict_period_start, predict_period_end))
     X_predict = gcm_munge(X_predict)
     delete_chunks_encoding(X_predict)
-    X_predict_rechunked, path_tgt_X_predict = rechunk_zarr_array(X_predict.chunk(coarse_time_chunks['tasmax']), 
-                                             coarse_time_chunks, connection_string, max_mem="1GB")
+    X_predict_rechunked, path_tgt_X_predict = rechunk_zarr_array(
+        X_predict.chunk(coarse_time_chunks['tasmax']),
+        coarse_time_chunks,
+        connection_string,
+        max_mem="1GB",
+    )
     delete_chunks_encoding(X_predict_rechunked)
     # maybe change to stores
     return y_rechunked, X_train_rechunked, X_predict_rechunked
@@ -221,8 +242,8 @@ def fit_and_predict(X_train, y, X_predict, dim="time", feature_list=["tasmax"], 
     bias_corrected = pointwise_model.predict(X_predict)
     if write:
         bias_corrected_store = fsspec.get_mapper(
-        f"az://cmip6/intermediates/bc_{obs_id}_{gcm[0]}_{train_period_start}_{train_period_end}_{variable}.zarr",
-        connection_string=connection_string,
+            f"az://cmip6/intermediates/bc_{obs_id}_{gcm[0]}_{train_period_start}_{train_period_end}_{variable}.zarr",
+            connection_string=connection_string,
         )
         bias_corrected.to_zarr(bias_corrected_store)
 
@@ -267,9 +288,7 @@ def postprocess_bcsd(
     )
     # spatial anomalies is chunked in (lat=-1,lon=-1,time=1)
     spatial_anomalies = xr.open_zarr(spatial_anomalies_store, consolidated=True)
-    regridder = xe.Regridder(
-        y_predict, spatial_anomalies, "bilinear", extrap_method="nearest_s2d"
-    )
+    regridder = xe.Regridder(y_predict, spatial_anomalies, "bilinear", extrap_method="nearest_s2d")
     # Rechunk y_predict to (lat=-1,lon=-1,time=1)
     rechunked_y_predict, rechunked_y_predict_path = rechunk_dataset(
         y_predict,
@@ -285,6 +304,7 @@ def postprocess_bcsd(
         connection_string=connection_string,
     )
     bcsd_results.to_zarr(bcsd_store, mode="w", consolidated=True)
+
 
 def postprocess_bcsd(
     y_predict,

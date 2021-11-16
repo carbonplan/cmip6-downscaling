@@ -5,6 +5,7 @@ import string
 
 import fsspec
 import intake
+import numpy as np
 import xarray as xr
 import xesmf as xe
 import zarr
@@ -16,13 +17,21 @@ from prefect.run_configs import KubernetesRun
 from prefect.storage import Azure
 from rechunker import api
 from skdownscale.pointwise_models import BcAbsolute, PointWiseDownscaler
-
-from cmip6_downscaling.workflows.utils import rechunk_zarr_array, calc_auspicious_chunks_dict, delete_chunks_encoding
-import numpy as np
 from xarray_schema import DataArraySchema, DatasetSchema
-from cmip6_downscaling.data.observations import load_obs, get_coarse_obs, get_spatial_anomolies
-from cmip6_downscaling.data.cmip import load_cmip_dictionary, gcm_munge, convert_to_360
-from cmip6_downscaling.methods.bcsd import preprocess_bcsd, prep_bcsd_inputs, fit_and_predict, postprocess_bcsd
+
+from cmip6_downscaling.data.cmip import convert_to_360, gcm_munge, load_cmip_dictionary
+from cmip6_downscaling.data.observations import get_coarse_obs, get_spatial_anomolies, load_obs
+from cmip6_downscaling.methods.bcsd import (
+    fit_and_predict,
+    postprocess_bcsd,
+    prep_bcsd_inputs,
+    preprocess_bcsd,
+)
+from cmip6_downscaling.workflows.utils import (
+    calc_auspicious_chunks_dict,
+    delete_chunks_encoding,
+    rechunk_zarr_array,
+)
 
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 
@@ -70,8 +79,8 @@ with Flow(name="bcsd_flow", storage=storage, run_config=run_config, executor=exe
         variable=variable,
         out_bucket="cmip6",
         domain=domain,
-        rerun=True,# can remove this once we have caching working
-    )  
+        rerun=True,  # can remove this once we have caching working
+    )
 
     X, y, X_predict = prep_bcsd_inputs_task(
         coarse_obs,
