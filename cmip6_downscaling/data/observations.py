@@ -10,6 +10,7 @@ import zarr
 
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 
+
 def get_store(bucket, prefix, account_key=None):
     """helper function to create a zarr store"""
 
@@ -89,6 +90,7 @@ def load_obs(obs_id, variable, time_period, domain, agg_func=np.max):
         )
     return obs
 
+
 def get_coarse_obs(
     obs,
     gcm_ds_single_time_slice,
@@ -113,6 +115,7 @@ def get_coarse_obs(
 
     obs_coarse = regridder(obs)
     return obs_coarse
+
 
 def get_spatial_anomolies(coarse_obs, fine_obs):
     # check if this has been done, if do the math
