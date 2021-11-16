@@ -164,22 +164,14 @@ def cmip():
 
 
 def load_cmip_dictionary(
-<<<<<<< HEAD
-    activity_ids=["CMIP", "ScenarioMIP"],
-    experiment_ids=["historical", "ssp370"],  # , "ssp126", "ssp245",  "ssp585"
-=======
     activity_ids=["CMIP"],
     experiment_ids=["historical"],  # , "ssp126", "ssp245",  "ssp585"
->>>>>>> origin
     member_ids=["r1i1p1f1"],
     source_ids=["MIROC6"],  # BCC-CSM2-MR"]
     table_ids=["day"],
     grid_labels=["gn"],
     variable_ids=["tasmax"],
-<<<<<<< HEAD
-=======
     return_type='zarr',
->>>>>>> origin
 ):
     """Loads CMIP6 GCM dataset dictionary based on input criteria.
 
@@ -206,29 +198,6 @@ def load_cmip_dictionary(
         [dictionary containing available xarray datasets]
     """
     col_url = "https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.json"
-<<<<<<< HEAD
-    print("intake")
-    full_subset = intake.open_esm_datastore(col_url).search(
-        activity_id=activity_ids,
-        experiment_id=experiment_ids,
-        member_id=member_ids,
-        source_id=source_ids,
-        table_id=table_ids,
-        grid_label=grid_labels,
-        variable_id=variable_ids,
-    )
-    print("to dictionary")
-    ds_dict = full_subset.to_dataset_dict(
-        zarr_kwargs={"consolidated": True, "decode_times": True, "use_cftime": True},
-        storage_options={
-            "account_name": "cmip6downscaling",
-            "account_key": os.environ.get("AccountKey", None),
-        },
-        progressbar=False,
-    )
-    print("return dict")
-    return ds_dict
-=======
 
     stores = (
         intake.open_esm_datastore(col_url)
@@ -255,7 +224,6 @@ def load_cmip_dictionary(
 
     return ds
 
->>>>>>> origin
 
 def convert_to_360(lon):
     if lon > 0:
@@ -263,15 +231,6 @@ def convert_to_360(lon):
     elif lon < 0:
         return 360 + lon
 
-<<<<<<< HEAD
-def gcm_munge(ds):
-    if ds.lat[0] < ds.lat[-1]:
-        ds = ds.reindex({"lat": ds.lat[::-1]})
-    ds = ds.drop(["lat_bnds", "lon_bnds", "time_bnds", "height", "member_id"]).squeeze(
-        drop=True
-    )
-    return ds
-=======
 
 def gcm_munge(ds):
     if ds.lat[0] < ds.lat[-1]:
@@ -281,4 +240,3 @@ def gcm_munge(ds):
         ds = ds.drop('height')
     ds = ds.squeeze(drop=True)
     return ds
->>>>>>> origin
