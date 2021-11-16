@@ -29,6 +29,10 @@ def temp_file_name():
     letters = string.ascii_lowercase
     return "".join(random.choice(letters) for i in range(10))
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin/workflow
 def delete_chunks_encoding(ds):
     for data_var in ds.data_vars:
         if 'chunks' in ds[data_var].encoding:

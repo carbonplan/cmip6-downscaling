@@ -198,8 +198,13 @@ def load_cmip_dictionary(
         [dictionary containing available xarray datasets]
     """
     col_url = "https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.json"
+<<<<<<< HEAD
 
     stores = (
+=======
+    print("intake")
+    store = (
+>>>>>>> origin/workflow
         intake.open_esm_datastore(col_url)
         .search(
             activity_id=activity_ids,
@@ -210,6 +215,7 @@ def load_cmip_dictionary(
             grid_label=grid_labels,
             variable_id=variable_ids,
         )
+<<<<<<< HEAD
         .df['zstore']
         .to_list()
     )
@@ -223,6 +229,14 @@ def load_cmip_dictionary(
     ds = gcm_munge(ds)
 
     return ds
+=======
+        .df['zstore'][0]
+    )
+    if return_type == 'zarr':
+        return zarr.open_consolidated(store, mode='r')
+    elif return_type == 'xr':
+        return xr.open_zarr(store, consolidated=True)
+>>>>>>> origin/workflow
 
 
 def convert_to_360(lon):
@@ -237,6 +251,10 @@ def gcm_munge(ds):
         ds = ds.reindex({"lat": ds.lat[::-1]})
     ds = maybe_drop_band_vars(ds)
     if 'height' in ds:
+<<<<<<< HEAD
         ds = ds.drop('height')
     ds = ds.squeeze(drop=True)
+=======
+        ds = ds.drop('height').squeeze(drop=True)
+>>>>>>> origin/workflow
     return ds
