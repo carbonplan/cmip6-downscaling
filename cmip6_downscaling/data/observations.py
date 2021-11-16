@@ -4,6 +4,7 @@ os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "True"
 
 import fsspec
 import intake
+import numpy as np
 import xarray as xr
 import xesmf as xe
 import zarr
