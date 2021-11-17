@@ -2,13 +2,13 @@
 import json
 import os
 from typing import Dict, List
+
 import fsspec  # type: ignore
 import pandas as pd  # type: ignore
 import xarray as xr
 from prefect import Flow, task
 from prefect.run_configs import KubernetesRun
 from prefect.storage import Azure
-
 
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 csv_catalog_path = "az://cmip6/ERA5_catalog.csv"
@@ -154,16 +154,14 @@ def open_json_catalog() -> Dict:
 
 
 def write_json_catalog_to_azure():
-    """Writes json catalog to Azure store
-    """
+    """Writes json catalog to Azure store"""
     data = open_json_catalog()
     with fsspec.open(json_catalog_path, "w", connection_string=connection_string) as f:
         json.dump(data, f)
 
 
 def create_csv_catalog():
-    """Creates csv catalog of zarr stores
-    """
+    """Creates csv catalog of zarr stores"""
     file_pattern_list = create_formatted_links()
     az_list = []
     for fil in file_pattern_list:
