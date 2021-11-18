@@ -93,10 +93,11 @@ with Flow(name="bcsd_flow", storage=storage, run_config=run_config, executor=exe
         variable=variable,
     )
 
-    bias_corrected_path = fit_and_predict(X_train_rechunked_path, 
-                                      y_rechunked_path, 
-                                      X_predict_rechunked_path, 
-                                      bias_corrected_path)
-                                      
-    out_path = postprocess_bcsd(bias_corrected_path, spatial_anomalies_path, final_out_path, variable, connection_string)
+    bias_corrected_path = fit_and_predict(
+        X_train_rechunked_path, y_rechunked_path, X_predict_rechunked_path, bias_corrected_path
+    )
+
+    out_path = postprocess_bcsd(
+        bias_corrected_path, spatial_anomalies_path, final_out_path, variable, connection_string
+    )
 flow.run(parameters=run_hyperparameters)

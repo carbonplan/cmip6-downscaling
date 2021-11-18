@@ -37,7 +37,10 @@ def open_era5(var):
     xarray.Dataset
         An hourly dataset for one variable.
     """
-    stores = [f'https://cmip6downscaling.blob.core.windows.net/cmip6/ERA5_daily/{y}' for y in range(1979, 2021)]
+    stores = [
+        f'https://cmip6downscaling.blob.core.windows.net/cmip6/ERA5_daily/{y}'
+        for y in range(1979, 2021)
+    ]
     ds = xr.open_mfdataset(stores, engine='zarr', consolidated=True)
     return ds[var]
 
@@ -66,6 +69,7 @@ def load_obs(obs_id, variable, time_period):
     if obs_id == "ERA5":
         return open_era5(variable).sel(time=time_period)
 
+
 def get_spatial_anomolies(coarse_obs, fine_obs, variable, connection_string):
     # check if this has been done, if do the math
     # if it has been done, just read them in
@@ -84,10 +88,9 @@ def get_spatial_anomolies(coarse_obs, fine_obs, variable, connection_string):
         [description]
     """
     print(coarse_obs.chunks)
-    obs_interpolated = regrid_dataset(coarse_obs, 
-                                        fine_obs.isel(time=0), 
-                                        variable=variable,
-                                        connection_string=connection_string)
+    obs_interpolated = regrid_dataset(
+        coarse_obs, fine_obs.isel(time=0), variable=variable, connection_string=connection_string
+    )
     spatial_anomolies = obs_interpolated - fine_obs
     seasonal_cycle_spatial_anomolies = spatial_anomolies.groupby("time.month").mean()
     return seasonal_cycle_spatial_anomolies

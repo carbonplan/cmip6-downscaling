@@ -63,25 +63,28 @@ def preprocess_bcsd(
     ##             target='grid.zarr')
     ## weight_file = get_weight_file_task(grid_name_gcm, grid_name_obs)
     if rerun:
-        obs_ds = load_obs(
-            obs_id,
-            variable,
-            time_period=slice(train_period_start, train_period_end))
+        obs_ds = load_obs(obs_id, variable, time_period=slice(train_period_start, train_period_end))
         # )  # We want it chunked in space. (time=1,lat=-1, lon=-1)
-        
+
         # find a good chunking scheme then chunk the obs appropriately, might be able to
         # delete this once era5 is chunked well
-        gcm_one_slice = load_cmip(return_type='xr', variable_ids=[variable]).isel(time=0) # This comes chunked in space (time~600,lat-1,lon-1), which is good.
-        coarse_obs = regrid_dataset(obs_ds.to_dataset(name=variable), 
-                                        gcm_one_slice, 
-                                        variable='tasmax', 
-                                        connection_string=connection_string)
+        gcm_one_slice = load_cmip(return_type='xr', variable_ids=[variable]).isel(
+            time=0
+        )  # This comes chunked in space (time~600,lat-1,lon-1), which is good.
+        coarse_obs = regrid_dataset(
+            obs_ds.to_dataset(name=variable),
+            gcm_one_slice,
+            variable='tasmax',
+            connection_string=connection_string,
+        )
         # TODO : make function call with parameters as opposed to dataset for caching
         # save the coarse obs because it might be used by another gcm
 
         write_dataset(coarse_obs, coarse_obs_path)
 
-        spatial_anomolies = get_spatial_anomolies(coarse_obs, rechunked_obs, variable, connection_string)
+        spatial_anomolies = get_spatial_anomolies(
+            coarse_obs, rechunked_obs, variable, connection_string
+        )
         write_dataset(spatial_anomolies, spatial_anomolies_path)
 
         return coarse_obs_path, spatial_anomolies_path
