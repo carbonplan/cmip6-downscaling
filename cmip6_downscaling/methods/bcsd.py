@@ -12,11 +12,8 @@ from cmip6_downscaling.data.observations import load_obs, get_coarse_obs, get_sp
 from cmip6_downscaling.data.cmip import load_cmip, convert_to_360
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array, calc_auspicious_chunks_dict, delete_chunks_encoding, load_paths, write_dataset, regrid_dataset
 
-chunks = {"lat": 10, "lon": 10, "time": -1}
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 
-
-connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 account_key = os.environ.get("account_key")
 
 # converts cmip standard names to ERA5 names
@@ -26,7 +23,6 @@ variable_name_dict = {
     "tasmin": "air_temperature_at_2_metres_1hour_Minimum",
     "pr": "precipitation_amount_1hour_Accumulation",
 }
-chunks = {"lat": 10, "lon": 10, "time": -1}
 
 # TODO: add templates for paths, maybe using prefect context
 
@@ -121,7 +117,7 @@ def preprocess_bcsd(
 
 
 def prep_bcsd_inputs(
-    coarse_obs_store,
+    coarse_obs_path,
     gcm,
     obs_id,
     train_period_start,
@@ -159,34 +155,34 @@ def prep_bcsd_inputs(
         Chunked in lat=10,lon=10,time=-1
     """
     # load in coarse obs as xarray ds to get chunk sizes
-    y = xr.open_zarr(coarse_obs_store, consolidated=True)
-    coarse_time_chunks = {variable: calc_auspicious_chunks_dict(y[variable], chunk_dims=('lat','lon')), 
-                      'time': None, # don't rechunk this array
-                        'lon': None,
-                        'lat': None}
+    [y] = load_paths([coarse_obs_path])
     # TODO: add xarray_schema test here for chunking - if the chunking fails then try rechunking
     # if passes skip
-    y_rechunked, y_rechunked_path = rechunk_zarr_array(y, 
-                                                chunks_dict=coarse_time_chunks, 
-                                                connection_string=connection_string, 
-                                                max_mem='1GB')
+    y_rechunked, y_rechunked_path = rechunk_zarr_array(y, chunk_dims=('lat', 'lon'), 
+                                        variable=variable, 
+                                        connection_string=connection_string,
+                                        max_mem='1GB')
+
     X_train = load_cmip(return_type='xr').sel(time=slice(train_period_start, 
                                                                     train_period_end))
     X_train['time'] = y.time.values
-    # TODO: pull delete_chunks into rechunk_zarr_array
 
-    X_train_rechunked, X_train_rechunked_path = rechunk_zarr_array(X_train.chunk(coarse_time_chunks['tasmax']), 
-                                                         chunks_dict=coarse_time_chunks, connection_string=connection_string, max_mem='1G')
+    X_train_rechunked, X_train_rechunked_path = rechunk_zarr_array(X_train, 
+                                                        variable=variable,
+                                                         chunk_dims=('lat', 'lon'), 
+                                                         connection_string=connection_string, 
+                                                         max_mem='1GB')
 
     X_predict = load_cmip(activity_ids=['ScenarioMIP'],
                                 experiment_ids=['ssp370'],
                              return_type='xr').sel(time=slice(predict_period_start, predict_period_end))
                               
-    X_predict_rechunked, X_predict_rechunked_path = rechunk_zarr_array(X_predict.chunk(coarse_time_chunks['tasmax']), 
-                                             coarse_time_chunks, connection_string, max_mem="1GB")
-    delete_chunks_encoding(X_predict_rechunked)
+    X_predict_rechunked, X_predict_rechunked_path = rechunk_zarr_array(X_predict, 
+                                                        variable=variable,
+                                                         chunk_dims=('lat', 'lon'), 
+                                                         connection_string=connection_string, 
+                                                         max_mem='1GB')
 
-    # TODO: change to stores
     return y_rechunked_path, X_train_rechunked_path, X_predict_rechunked_path
 
 
@@ -257,22 +253,14 @@ def postprocess_bcsd(
     # TODO: make spatial_anomalies_store as input from preprocess
     y_predict, spatial_anomalies = load_paths([y_predict_path, spatial_anomalies_path])
 
-    # TODO: regrid_prediction(y_predict) # collapse four lines below
     # TODO: test - create sample input, run it through rechunk/regridder and then 
     # assert that it looks like i want it to
-    print(y_predict['tasmax'].chunks)
     y_predict_fine = regrid_dataset(y_predict, spatial_anomalies, variable, connection_string)
     # This lat=-1,lon=-1,time=1) chunking might be best? Check to make sure that is what is returned from regridder.
     # comment
-    print('here')
-    print(y_predict_fine[variable].chunks)
-    print(spatial_anomalies)
     bcsd_results = y_predict_fine.groupby("time.month") + spatial_anomalies
-    print('here')
-    print(bcsd_results)
-    print(bcsd_results.chunks)
     # TODO: write_bcsd()
-    write_dataset(bcsd_results, final_out_path, variable)
+    write_dataset(bcsd_results, final_out_path)
 
     # TODO: string version
     return final_out_path
