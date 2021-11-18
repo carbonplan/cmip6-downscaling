@@ -6,3 +6,5 @@ MGM2D_PER_WM2 = SEC_PER_DAY / 1e6  # 1 W m-2 = 0.0864 MJ m-2 day-1
 MM_PER_IN = 25.4
 MB_PER_KPA = 10
 PERCENT = 100
+RELATIVE_VARS = ['pr']
+ABSOLUTE_VARS = ['tasmax', 'tasmin']

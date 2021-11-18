@@ -11,7 +11,6 @@ import xesmf as xe
 import zarr
 from rechunker import rechunk
 
-
 def get_store(prefix, account_key=None):
     """helper function to create a zarr store"""
 
@@ -45,31 +44,48 @@ def delete_chunks_encoding(ds: Union[xr.Dataset, xr.DataArray]):
         if 'chunks' in ds[coord].encoding:
             del ds[coord].encoding['chunks']
 
+def make_rechunker_stores(connection_string : str) :# -> tuple[fsspec.mapping.FSmap, fsspec.mapping.FSmap]:
+    """Initialize two stores for rechunker to use as temporary and final rechunked locations 
+
+    Parameters
+    ----------
+    connection_string : str
+        Connection string to give you write access to the stores
+
+    Returns
+    -------
+    temp_store, target_store, path_tgt : tuple[fsspec.mapping.FSmap, fsspec.mapping.FSmap, string]
+        Stores where rechunker will write and the path to the target store
+    """    
+    path_tmp = "az://cmip6/temp/{}.zarr".format(temp_file_name())
+    path_tgt = "az://cmip6/temp/{}.zarr".format(temp_file_name())
+    temp_store = fsspec.get_mapper(path_tmp, connection_string=connection_string)
+    target_store = fsspec.get_mapper(path_tgt, connection_string=connection_string)
+    return temp_store, target_store, path_tgt
 
 def rechunk_zarr_array(
-    zarr_array, connection_string, variable, chunk_dims: tuple = ('time',), max_mem="10MB"
+    zarr_array: xr.Dataset, connection_string: str, variable: str, chunk_dims: tuple = ('time',), max_mem: str = "200MB"
 ):
     """Use `rechunker` package to adjust chunks of dataset to a form
     conducive for your processing.
 
     Parameters
     ----------
-    ds : zarr or xarray dataset
-        [description]
-    chunks_dict : dict
-        Desired chunks sizes for each variable. They can either be specified in tuple or dict form.
-        But dict is probably safer! When working in space you proabably want somehting like
-        (1, -1, -1) where dims are of form (time, lat, lon). In time you probably want
-        (-1, 10, 10). You likely want the same chunk sizes for each variable.
+    zarr_array : zarr or xarray dataset
+        Dataset you want to rechunk.
+    chunk_dims : tuple
+        Dimension along which you want to chunk ds. The optimal chunk sizes will get 
+        calculated internally.
     connection_string : str
-        [description]
+        Connection string to give you write access
     max_mem : str
-        Likely can go higher than 500MB!
+        The max memory you want to allow for a chunk. Probably want it to be around 100 MB, but that
+        is also controlled by the `calc_auspicious_chunk_sizes` calls.
 
     Returns
     -------
-    [type]
-        [description]
+    rechunked_ds, path_tgt : tuple[xr.Dataset, str]
+        Rechunked dataset as well as string of location where it's stored.
     """
     chunks_dict = {
         variable: calc_auspicious_chunks_dict(zarr_array, chunk_dims=chunk_dims),
@@ -79,10 +95,7 @@ def rechunk_zarr_array(
     }
 
     delete_chunks_encoding(zarr_array)
-    path_tmp = "az://cmip6/temp/{}.zarr".format(temp_file_name())
-    path_tgt = "az://cmip6/temp/{}.zarr".format(temp_file_name())
-    temp_store = fsspec.get_mapper(path_tmp, connection_string=connection_string)
-    target_store = fsspec.get_mapper(path_tgt, connection_string=connection_string)
+    temp_store, target_store, path_tgt = make_rechunker_stores(connection_string)
     # delete_chunks_encoding(ds) # need to do this before since it wont work on zarr array
     # for some reason doing this on zarr arrays is faster than on xr.open_zarr - it calls `copy_chunk` less.
     # TODO: could switch this to a validation with xarray schema - confirm that the chunks are all uniform and
@@ -98,7 +111,10 @@ def rechunk_zarr_array(
         )
         print(zarr_array.chunks)
         print(calc_auspicious_chunks_dict(zarr_array, chunk_dims=chunk_dims))
-
+        # make new stores in case it failed mid-write. alternatively could clean up that store but
+        # we don't have delete permission currently
+        temp_store, target_store, path_tgt = make_rechunker_stores(connection_string)
+        delete_chunks_encoding(zarr_array)
         rechunk_plan = rechunk(
             zarr_array.chunk(calc_auspicious_chunks_dict(zarr_array, chunk_dims=chunk_dims)),
             chunks_dict,
@@ -119,7 +135,25 @@ def calc_auspicious_chunks_dict(
     da: Union[xr.DataArray, xr.Dataset],
     target_size: str = '100mb',
     chunk_dims: tuple = ('lat', 'lon'),
-):
+) -> dict:
+    """Figure out a chunk size that, given the size of the dataset, the dimension(s) you want to chunk on
+    and the data type, will fit under the target_size. Currently only works for 100mb which
+    is the recommended chunk size for dask processing.
+
+    Parameters
+    ----------
+    da : Union[xr.DataArray, xr.Dataset]
+        Dataset or data array you're wanting to chunk
+    target_size : str, optional
+        Target size for chunk- dask recommends 100mb, by default '100mb'
+    chunk_dims : tuple, optional
+        Dimension(s) you want to chunk along, by default ('lat', 'lon')
+
+    Returns
+    -------
+    chunks_dict : dict
+        Dictionary of chunk sizes
+    """
     assert target_size == '100mb', "Apologies, but not implemented for anything but 100m right now!"
     assert (
         type(chunk_dims) == tuple
@@ -150,7 +184,25 @@ def calc_auspicious_chunks_dict(
 
     return chunks_dict
 
-def regrid_dataset(ds : xr.Dataset, target_grid_ds : xr.Dataset, variable : str, connection_string : str):
+def regrid_dataset(ds: xr.Dataset, target_grid_ds: xr.Dataset, variable: str, connection_string: str) -> xr.Dataset:
+    """Regrid a dataset to a target grid. For use in both coarsening or interpolating to finer resolution.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Dataset you want to regrid
+    target_grid_ds : xr.Dataset
+        Template dataset whose grid you'll match
+    variable : str
+        variable you're working with
+    connection_string : str
+        Connection string to give you write access to the stores
+
+    Returns
+    -------
+    ds_regridded : xr.Dataset
+        Final regridded dataset
+    """    
     # TODO: use xarray_schema to check that the dataset is chunked into map space already
     # and if not rechunk it into map space (only do the line below if it's necessary)
     ds_rechunked, ds_rechunked_path = rechunk_zarr_array(ds, connection_string, variable, chunk_dims=('time',), max_mem="1GB")
@@ -162,7 +214,18 @@ def regrid_dataset(ds : xr.Dataset, target_grid_ds : xr.Dataset, variable : str,
     return ds_regridded
 
 
-def write_dataset(ds, path, chunks_dims=('time',)):
+def write_dataset(ds: xr.Dataset, path: str, chunks_dims: tuple = ('time',)) -> None:
+    """Write out a dataset.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Dataset you want to write
+    path : str
+        Location where to write it
+    chunks_dims : tuple, optional
+        Dimension to chunk along if chunks are iffy, by default ('time',)
+    """    
     store = fsspec.get_mapper(path)
     try:
         ds.to_zarr(store, mode='w', consolidated=True)
@@ -173,6 +236,5 @@ def write_dataset(ds, path, chunks_dims=('time',)):
             'WARNING: Failed to write zarr store, perhaps because of variable chunk sizes, trying to rechunk it'
         )
         chunks_dict = calc_auspicious_chunks_dict(ds, chunk_dims=chunks_dims)
-        print(chunks_dict)
         delete_chunks_encoding(ds)
         ds.chunk(chunks_dict).to_zarr(store, mode='w', consolidated=True)
