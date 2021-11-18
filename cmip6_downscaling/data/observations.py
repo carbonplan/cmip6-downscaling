@@ -1,15 +1,20 @@
 import os
 
-os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "True"
-
-import fsspec
 import intake
 import numpy as np
 import xarray as xr
 import xesmf as xe
 import zarr
 
+os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "True"
+
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
+
+variable_name_dict = {
+    "tasmax": "air_temperature_at_2_metres_1hour_Maximum",
+    "tasmin": "air_temperature_at_2_metres_1hour_Minimum",
+    "pr": "precipitation_amount_1hour_Accumulation",
+}
 
 
 def get_store(bucket, prefix, account_key=None):
