@@ -6,7 +6,7 @@ import zarr
 from skdownscale.pointwise_models import BcAbsolute, PointWiseDownscaler
 
 from cmip6_downscaling.data.cmip import load_cmip
-from cmip6_downscaling.data.observations import get_coarse_obs, get_spatial_anomolies, load_obs
+from cmip6_downscaling.data.observations import get_spatial_anomolies, load_obs
 from cmip6_downscaling.workflows.utils import (
     calc_auspicious_chunks_dict,
     delete_chunks_encoding,
@@ -37,8 +37,9 @@ def preprocess_bcsd(
     train_period_start,
     train_period_end,
     variable,
-    out_bucket,
-    domain,
+    coarse_obs_path,
+    spatial_anomolies_path,
+    connection_string,
     rerun=True,
 ):
 
@@ -61,65 +62,29 @@ def preprocess_bcsd(
     ##             result=AzureResult('cmip6'),
     ##             target='grid.zarr')
     ## weight_file = get_weight_file_task(grid_name_gcm, grid_name_obs)
-    coarse_obs_store = fsspec.get_mapper(
-        f"az://cmip6/intermediates/{obs_id}_{gcm[0]}_{train_period_start}_{train_period_end}_{variable}.zarr",
-        connection_string=connection_string,
-    )
-    spatial_anomolies_store = fsspec.get_mapper(
-        f"az://cmip6/intermediates/anomalies_{obs_id}_{gcm[0]}_{train_period_start}_{train_period_end}_{variable}.zarr",
-        connection_string=connection_string,
-    )
     if rerun:
-        # obs_ds = load_obs(
-        #     obs_id,
-        #     variable,
-        #     time_period=slice(train_period_start, train_period_end),
-        #     domain=domain
+        obs_ds = load_obs(
+            obs_id,
+            variable,
+            time_period=slice(train_period_start, train_period_end))
         # )  # We want it chunked in space. (time=1,lat=-1, lon=-1)
-        # for testing we'll use the lines below but eventually comment out above lines
-        local_obs_path_maps = 'era5_tasmax_1990_maps.zarr'
-        obs_ds = xr.open_zarr(local_obs_path_maps)
+        
         # find a good chunking scheme then chunk the obs appropriately, might be able to
         # delete this once era5 is chunked well
-        target_chunks = {
-            variable: calc_auspicious_chunks_dict(obs_ds[variable], chunk_dims=('time',)),
-            'time': None,  # don't rechunk this array
-            'lon': None,
-            'lat': None,
-        }
-        obs_ds = zarr.open_consolidated(local_obs_path_maps, mode='r')
-        rechunked_obs, path_tgt = rechunk_zarr_array(
-            obs_ds, target_chunks, connection_string, max_mem="100MB"
-        )
-        gcm_ds = load_cmip(source_ids=gcm, variable_ids=[variable])[
-            "CMIP.MIROC.MIROC6.historical.day.gn"
-        ]  # This comes chunked in space (time~600,lat-1,lon-1), which is good.
-
-        delete_chunks_encoding(gcm_ds)
-
-        gcm_ds_single_time_slice = gcm_ds.isel(
-            time=0
-        )  # .load() #TODO: check whether we need the load here
-        chunks_dict_obs_maps = calc_auspicious_chunks_dict(
-            obs_ds, chunk_dims=('time',)
-        )  # you'll need to put comma after the one element tuple
-        # we want to pass rechunked obs to both get_coarse_obs and get_spatial_anomalies
-        # since they both work in map space instead of time space
-        # TODO: currently the caching would be on gcm name as opposed to grid name
+        gcm_one_slice = load_cmip(return_type='xr', variable_ids=[variable]).isel(time=0) # This comes chunked in space (time~600,lat-1,lon-1), which is good.
+        coarse_obs = regrid_dataset(obs_ds.to_dataset(name=variable), 
+                                        gcm_one_slice, 
+                                        variable='tasmax', 
+                                        connection_string=connection_string)
         # TODO : make function call with parameters as opposed to dataset for caching
-        coarse_obs = get_coarse_obs(
-            rechunked_obs,
-            gcm_ds_single_time_slice,  # write_cache=True, read_cache=True
-        )
-        # TODO : make function call with parameters as opposed to dataset for caching
-
-        spatial_anomolies = get_spatial_anomolies(coarse_obs, rechunked_obs)
-
         # save the coarse obs because it might be used by another gcm
-        coarse_obs.to_zarr(coarse_obs_store, mode="w", consolidated=True)
 
-        spatial_anomolies.to_zarr(spatial_anomolies_store, mode="w", consolidated=True)
-        return coarse_obs_store, spatial_anomolies_store
+        write_dataset(coarse_obs, coarse_obs_path)
+
+        spatial_anomolies = get_spatial_anomolies(coarse_obs, rechunked_obs, variable, connection_string)
+        write_dataset(spatial_anomolies, spatial_anomolies_path)
+
+        return coarse_obs_path, spatial_anomolies_path
 
 
 def prep_bcsd_inputs(

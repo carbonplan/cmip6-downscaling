@@ -133,6 +133,8 @@ def calc_auspicious_chunks_dict(da : Union[xr.DataArray, xr.Dataset], target_siz
     return chunks_dict
 
 def regrid_dataset(ds : xr.Dataset, target_grid_ds : xr.Dataset, variable : str, connection_string : str):
+    # TODO: use xarray_schema to check that the dataset is chunked into map space already
+    # and if not rechunk it into map space (only do the line below if it's necessary)
     ds_rechunked, ds_rechunked_path = rechunk_zarr_array(ds, connection_string, variable, chunk_dims=('time',), max_mem="1GB")
     regridder = xe.Regridder(
         ds_rechunked, target_grid_ds, "bilinear", extrap_method="nearest_s2d"
