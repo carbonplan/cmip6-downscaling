@@ -1,12 +1,12 @@
 import os
 from collections import defaultdict
+from typing import Union
 
 import intake
 import pandas as pd
 import xarray as xr
 import zarr
 from intake_esm.merge_util import AggregationError
-from typing import Union
 
 variable_ids = ['pr', 'tasmin', 'tasmax', 'rsds', 'hurs', 'ps']
 
@@ -234,7 +234,7 @@ def convert_to_360(lon: Union[float, int]) -> Union[float, int]:
     Parameters
     ----------
     lon : float or int
-        Longitude on -180 to 180 basis 
+        Longitude on -180 to 180 basis
 
     Returns
     -------

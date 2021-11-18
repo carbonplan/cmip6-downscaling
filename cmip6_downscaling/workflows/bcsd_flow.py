@@ -70,15 +70,17 @@ with Flow(name="bcsd_flow", storage=storage, run_config=run_config, executor=exe
     domain = test_specs["domain"]
     variable = run_hyperparameters["VARIABLE"]
 
-    coarse_obs_path, spatial_anomolies_path = preprocess_bcsd(gcm=gcm,
-                    obs_id=obs_id,
-                    train_period_start=train_period_start,
-                    train_period_end=train_period_end,
-                    variable=variable,
-                coarse_obs_path=coarse_obs_path,
-                spatial_anomolies_path=spatial_anomolies_path,
-                connection_string=connection_string,
-                rerun=True)
+    coarse_obs_path, spatial_anomolies_path = preprocess_bcsd(
+        gcm=gcm,
+        obs_id=obs_id,
+        train_period_start=train_period_start,
+        train_period_end=train_period_end,
+        variable=variable,
+        coarse_obs_path=coarse_obs_path,
+        spatial_anomolies_path=spatial_anomolies_path,
+        connection_string=connection_string,
+        rerun=True,
+    )
 
     y_rechunked_path, X_train_rechunked_path, X_predict_rechunked_path = prep_bcsd_inputs(
         coarse_obs_path,
@@ -91,10 +93,11 @@ with Flow(name="bcsd_flow", storage=storage, run_config=run_config, executor=exe
         variable=variable,
     )
 
-    bias_corrected_path = fit_and_predict(X_train_rechunked_path, 
-                                      y_rechunked_path, 
-                                      X_predict_rechunked_path, 
-                                      bias_corrected_path)
+    bias_corrected_path = fit_and_predict(
+        X_train_rechunked_path, y_rechunked_path, X_predict_rechunked_path, bias_corrected_path
+    )
 
-    out_path = postprocess_bcsd(bias_corrected_path, spatial_anomalies_path, final_out_path, variable, connection_string)
+    out_path = postprocess_bcsd(
+        bias_corrected_path, spatial_anomalies_path, final_out_path, variable, connection_string
+    )
 flow.run(parameters=run_hyperparameters)
