@@ -82,8 +82,8 @@ with Flow(name="bcsd_flow", storage=storage, run_config=run_config, executor=exe
         rerun=True,  # can remove this once we have caching working
     )
 
-    X, y, X_predict = prep_bcsd_inputs_task(
-        coarse_obs,
+    y_rechunked_path, X_train_rechunked_path, X_predict_rechunked_path = prep_bcsd_inputs(
+        coarse_obs_path,
         gcm,
         obs_id=obs,
         train_period_start=train_period_start,
@@ -91,19 +91,12 @@ with Flow(name="bcsd_flow", storage=storage, run_config=run_config, executor=exe
         predict_period_start=predict_period_start,
         predict_period_end=predict_period_end,
         variable=variable,
-        out_bucket="cmip6",
-        domain=domain,
     )
 
-    y_predict = fit_and_predict_task(X, y, X_predict)
-    postprocess_bcsd_task(
-        y_predict,
-        gcm,
-        obs,
-        train_period_start,
-        train_period_end,
-        variable,
-        predict_period_start,
-        predict_period_end,
-    )
+    bias_corrected_path = fit_and_predict(X_train_rechunked_path, 
+                                      y_rechunked_path, 
+                                      X_predict_rechunked_path, 
+                                      bias_corrected_path)
+                                      
+    out_path = postprocess_bcsd(bias_corrected_path, spatial_anomalies_path, final_out_path, variable, connection_string)
 flow.run(parameters=run_hyperparameters)
