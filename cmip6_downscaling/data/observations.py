@@ -38,7 +38,10 @@ def open_era5(var : str):
     xarray.Dataset
         A daily dataset for one variable.
     """
-    stores = [f'https://cmip6downscaling.blob.core.windows.net/cmip6/ERA5_daily/{y}' for y in range(1979, 2021)]
+    stores = [
+        f'https://cmip6downscaling.blob.core.windows.net/cmip6/ERA5_daily/{y}'
+        for y in range(1979, 2021)
+    ]
     ds = xr.open_mfdataset(stores, engine='zarr', consolidated=True)
     return ds[[var]]
 
