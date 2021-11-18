@@ -21,7 +21,7 @@ from cmip6_downscaling.workflows.utils import rechunk_zarr_array, calc_auspiciou
 import numpy as np
 from xarray_schema import DataArraySchema, DatasetSchema
 from cmip6_downscaling.data.observations import load_obs, get_coarse_obs, get_spatial_anomolies
-from cmip6_downscaling.data.cmip import load_cmip_dictionary, gcm_munge, convert_to_360
+from cmip6_downscaling.data.cmip import load_cmip, gcm_munge, convert_to_360
 from cmip6_downscaling.methods.bcsd import preprocess_bcsd, prep_bcsd_inputs, fit_and_predict, postprocess_bcsd
 
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
@@ -43,7 +43,7 @@ flow_name = run_hyperparameters.pop("FLOW_NAME")  # pop it out because if you le
 # but don't call it as a parameter it'll complain
 
 preprocess_bcsd_task = task(preprocess_bcsd, log_stdout=True)
-
+# TODO: make path/store templates
 # TODO: think about caching with nout>1
 prep_bcsd_inputs_task = task(prep_bcsd_inputs, log_stdout=True, nout=3)
 
