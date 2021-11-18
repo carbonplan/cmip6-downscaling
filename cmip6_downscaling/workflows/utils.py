@@ -49,11 +49,12 @@ def delete_chunks_encoding(ds: Union[xr.Dataset, xr.DataArray]):
 def rechunk_zarr_array(
     zarr_array, connection_string, variable, chunk_dims: tuple = ('time',), max_mem="10MB"
 ):
-    """[summary]
+    """Use `rechunker` package to adjust chunks of dataset to a form
+    conducive for your processing.
 
     Parameters
     ----------
-    ds : [zarr array]
+    ds : zarr or xarray dataset
         [description]
     chunks_dict : dict
         Desired chunks sizes for each variable. They can either be specified in tuple or dict form.
@@ -90,7 +91,7 @@ def rechunk_zarr_array(
         rechunk_plan = rechunk(
             zarr_array, chunks_dict, max_mem, target_store, temp_store=temp_store
         )
-        rechunk_plan.execute()
+        rechunk_plan.execute(retries=5)
     except ValueError:
         print(
             'WARNING: Failed to write zarr store, perhaps because of variable chunk sizes, trying to rechunk it'
@@ -105,7 +106,7 @@ def rechunk_zarr_array(
             target_store,
             temp_store=temp_store,
         )
-        rechunk_plan.execute()
+        rechunk_plan.execute(retries=5)
     rechunked_ds = xr.open_zarr(
         target_store
     )  # ideally we want consolidated=True but it seems that functionality isn't offered in rechunker right now
