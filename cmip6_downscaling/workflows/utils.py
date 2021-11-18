@@ -8,6 +8,8 @@ import numpy as np
 import xarray as xr
 import zarr
 from rechunker import rechunk
+import xesmf as xe
+
 
 
 def get_store(prefix, account_key=None):
@@ -24,6 +26,10 @@ def get_store(prefix, account_key=None):
     )
     return store
 
+def load_paths(paths): # What type do i use here since paths is of unknown length? : list[str]):
+    print(paths)
+    ds_list = [xr.open_zarr(path) for path in paths]
+    return ds_list
 
 def temp_file_name():
     letters = string.ascii_lowercase
@@ -61,16 +67,12 @@ def rechunk_zarr_array(zarr_array, chunks_dict, connection_string, max_mem="10MB
     [type]
         [description]
     """
-    path_tmp, path_tgt = temp_file_name(), temp_file_name()
-
-    temp_store = fsspec.get_mapper(
-        "az://cmip6/temp/{}.zarr".format(path_tmp), connection_string=connection_string
-    )
-    target_store = fsspec.get_mapper(
-        "az://cmip6/temp/{}.zarr".format(path_tgt), connection_string=connection_string
-    )
-    print(path_tmp)
-    print(path_tgt)
+    delete_chunks_encoding(zarr_array)
+    str_tmp, str_tgt = temp_file_name(), temp_file_name()
+    path_tmp = "az://cmip6/temp/{}.zarr".format(str_tmp)
+    path_tgt =  "az://cmip6/temp/{}.zarr".format(str_tgt)
+    temp_store = fsspec.get_mapper(path_tmp, connection_string=connection_string)
+    target_store = fsspec.get_mapper(path_tgt, connection_string=connection_string)
     # delete_chunks_encoding(ds) # need to do this before since it wont work on zarr array
     # for some reason doing this on zarr arrays is faster than on xr.open_zarr - it calls `copy_chunk` less.
     rechunk_plan = rechunk(zarr_array, chunks_dict, max_mem, target_store, temp_store=temp_store)
@@ -83,13 +85,13 @@ def rechunk_zarr_array(zarr_array, chunks_dict, connection_string, max_mem="10MB
     return rechunked_ds, path_tgt
 
 
-def calc_auspicious_chunks_dict(ds, target_size='100mb', chunk_dims=('lat', 'lon')):
+def calc_auspicious_chunks_dict(da : xr.DataArray, target_size : str = '100mb', chunk_dims : tuple = ('lat', 'lon')):
     assert target_size == '100mb', "Apologies, but not implemented for anything but 100m right now!"
     assert (
         type(chunk_dims) == tuple
     ), "Your chunk_dims likely includes one string but needs a comma after it! to be a tuple!"
     target_size_bytes = 100e6
-    array_dims = dict(zip(ds.dims, ds.shape))
+    array_dims = dict(zip(da.dims, da.shape))
     chunks_dict = {}
     # dims not in chunk_dims should be one chunk (length -1)
     for dim in array_dims.keys():
@@ -98,7 +100,7 @@ def calc_auspicious_chunks_dict(ds, target_size='100mb', chunk_dims=('lat', 'lon
             #  so we'll always just give it the full length of the dimension
             chunks_dict[dim] = array_dims[dim]
     # calculate the bytesize given the dtype
-    data_bytesize = int(re.findall(r'\d+', str(ds.dtype))[0])
+    data_bytesize = int(re.findall(r'\d+', str(da.dtype))[0])
     # calculate single non_chunked_size based upon dtype
     smallest_size_one_chunk = data_bytesize * np.prod(
         [array_dims[dim] for dim in chunks_dict.keys()]
@@ -111,3 +113,35 @@ def calc_auspicious_chunks_dict(ds, target_size='100mb', chunk_dims=('lat', 'lon
         chunks_dict[dim] = perfect_chunk_length
 
     return chunks_dict
+
+def regrid_dataset(ds : xr.Dataset, target_grid_ds : xr.Dataset, variable : str, connection_string : str):
+    chunks_dict = {"tasmax": calc_auspicious_chunks_dict(ds[variable], chunk_dims=('time',)), 
+                      'time': None, # don't rechunk this array
+                        'lon': None,
+                        'lat': None}
+    print(target_grid_ds.chunks)
+    print(target_grid_ds['tasmax'].chunks)
+    delete_chunks_encoding(ds)
+    ds_rechunked, ds_rechunked_path = rechunk_zarr_array(ds, 
+                                             chunks_dict, connection_string, max_mem="1GB")
+
+    print(ds_rechunked_path)
+    regridder = xe.Regridder(
+        ds_rechunked, target_grid_ds, "bilinear", extrap_method="nearest_s2d"
+    )
+    ds_regridded = regridder(ds_rechunked)
+    print(ds_regridded.chunks)
+    return ds_regridded
+    
+def write_dataset(ds, path, variable):
+    store = fsspec.get_mapper(path)
+    try:
+        ds.to_zarr(store, mode='w', consolidated=True)
+    except ValueError:
+        # if your chunk size isn't uniform you'll probably get a value error so
+        # you can try doing this you can rechunk it
+        print('WARNING: Failed to write zarr store, perhaps because of variable chunk sizes, trying to rechunk it')
+        chunks_dict = calc_auspicious_chunks_dict(ds[variable], chunk_dims=('time',))
+        print(chunks_dict)
+        delete_chunks_encoding(ds)
+        ds.chunk(chunks_dict).to_zarr(store, mode='w', consolidated=True)

@@ -163,7 +163,7 @@ def cmip():
     return model_dict, data
 
 
-def load_cmip_dictionary(
+def load_cmip(
     activity_ids=["CMIP"],
     experiment_ids=["historical"],  # , "ssp126", "ssp245",  "ssp585"
     member_ids=["r1i1p1f1"],
