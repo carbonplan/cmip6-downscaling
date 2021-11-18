@@ -1,4 +1,3 @@
-# from cmip6_downscaling.workflows.utils import rechunk_dataset
 import os
 import random
 import string
@@ -71,16 +70,15 @@ with Flow(name="bcsd_flow", storage=storage, run_config=run_config, executor=exe
     domain = test_specs["domain"]
     variable = run_hyperparameters["VARIABLE"]
 
-    coarse_obs = preprocess_bcsd_task(
-        gcm,
-        obs_id=obs,
-        train_period_start=train_period_start,
-        train_period_end=train_period_end,
-        variable=variable,
-        out_bucket="cmip6",
-        domain=domain,
-        rerun=True,  # can remove this once we have caching working
-    )
+    coarse_obs_path, spatial_anomolies_path = preprocess_bcsd(gcm=gcm,
+                    obs_id=obs_id,
+                    train_period_start=train_period_start,
+                    train_period_end=train_period_end,
+                    variable=variable,
+                coarse_obs_path=coarse_obs_path,
+                spatial_anomolies_path=spatial_anomolies_path,
+                connection_string=connection_string,
+                rerun=True)
 
     y_rechunked_path, X_train_rechunked_path, X_predict_rechunked_path = prep_bcsd_inputs(
         coarse_obs_path,
@@ -97,6 +95,6 @@ with Flow(name="bcsd_flow", storage=storage, run_config=run_config, executor=exe
                                       y_rechunked_path, 
                                       X_predict_rechunked_path, 
                                       bias_corrected_path)
-                                      
+
     out_path = postprocess_bcsd(bias_corrected_path, spatial_anomalies_path, final_out_path, variable, connection_string)
 flow.run(parameters=run_hyperparameters)

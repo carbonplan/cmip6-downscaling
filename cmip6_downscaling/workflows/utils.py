@@ -95,13 +95,17 @@ def rechunk_zarr_array(
         print(
             'WARNING: Failed to write zarr store, perhaps because of variable chunk sizes, trying to rechunk it'
         )
+        print(zarr_array.chunks)
+        print(calc_auspicious_chunks_dict(zarr_array, chunk_dims=chunk_dims))
+
         rechunk_plan = rechunk(
             zarr_array.chunk(calc_auspicious_chunks_dict(zarr_array, chunk_dims=chunk_dims)),
-            hunks_dict,
+            chunks_dict,
             max_mem,
             target_store,
             temp_store=temp_store,
         )
+        rechunk_plan.execute()
     rechunked_ds = xr.open_zarr(
         target_store
     )  # ideally we want consolidated=True but it seems that functionality isn't offered in rechunker right now
@@ -157,7 +161,7 @@ def regrid_dataset(ds : xr.Dataset, target_grid_ds : xr.Dataset, variable : str,
     return ds_regridded
 
 
-def write_dataset(ds, path):
+def write_dataset(ds, path, chunks_dims=('time',)):
     store = fsspec.get_mapper(path)
     try:
         ds.to_zarr(store, mode='w', consolidated=True)
@@ -167,7 +171,7 @@ def write_dataset(ds, path):
         print(
             'WARNING: Failed to write zarr store, perhaps because of variable chunk sizes, trying to rechunk it'
         )
-        chunks_dict = calc_auspicious_chunks_dict(ds, chunk_dims=('time',))
+        chunks_dict = calc_auspicious_chunks_dict(ds, chunk_dims=chunks_dims)
         print(chunks_dict)
         delete_chunks_encoding(ds)
         ds.chunk(chunks_dict).to_zarr(store, mode='w', consolidated=True)

@@ -8,6 +8,7 @@ import numpy as np
 import xarray as xr
 import xesmf as xe
 import zarr
+from cmip6_downscaling.workflows.utils import regrid_dataset, rechunk_zarr_array
 
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 
@@ -39,7 +40,7 @@ def open_era5(var):
     """
     stores = [f'https://cmip6downscaling.blob.core.windows.net/cmip6/ERA5_daily/{y}' for y in range(1979, 2021)]
     ds = xr.open_mfdataset(stores, engine='zarr', consolidated=True)
-    return ds[var]
+    return ds[[var]]
 
 
 def load_obs(obs_id, variable, time_period):
@@ -88,6 +89,11 @@ def get_spatial_anomolies(coarse_obs, fine_obs, variable, connection_string):
                                         fine_obs.isel(time=0), 
                                         variable=variable,
                                         connection_string=connection_string)
-    spatial_anomolies = obs_interpolated - fine_obs
+    # get fine_obs into map chunks so it plays nice with the interpolated obs
+    fine_obs_rechunked, fine_obs_rechunked_path = rechunk_zarr_array(fine_obs, connection_string, variable, chunk_dims=('time',), max_mem='1GB')
+    print(fine_obs.chunks)
+    print(fine_obs_rechunked.chunks)
+    print(obs_interpolated.chunks)
+    spatial_anomolies = obs_interpolated - fine_obs_rechunked
     seasonal_cycle_spatial_anomolies = spatial_anomolies.groupby("time.month").mean()
     return seasonal_cycle_spatial_anomolies
