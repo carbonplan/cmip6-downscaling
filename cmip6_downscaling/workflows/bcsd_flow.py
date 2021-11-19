@@ -87,7 +87,7 @@ with Flow(name="bcsd-testing", storage=storage, run_config=run_config, executor=
         coarse_obs_path=coarse_obs_path,
         spatial_anomalies_path=spatial_anomalies_path,
         connection_string=connection_string,
-        rerun=False,
+        rerun=True,
     )
 
     y_rechunked_path, X_train_rechunked_path, X_predict_rechunked_path = prep_bcsd_inputs(
