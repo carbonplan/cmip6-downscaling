@@ -25,6 +25,45 @@ def get_store(prefix, account_key=None):
     )
     return store
 
+def make_flow_paths(OBS: str, GCM: str, SCENARIO: str, TRAIN_PERIOD_START: str, TRAIN_PERIOD_END: str, PREDICT_PERIOD_START: str, PREDICT_PERIOD_END: str, 
+                    VARIABLE: str, workdir: str = "az://cmip6", outdir: str = "az://cmip6/results") -> tuple[str, str, str, str]:
+    """Build the paths where your outputs (both intermediate and final) will go
+
+    Parameters
+    ----------
+    OBS : str
+        From run hyperparameters
+    GCM : str
+        From run hyperparameters
+    SCENARIO : str
+        From run hyperparameters
+    TRAIN_PERIOD_START : str
+        From run hyperparameters
+    TRAIN_PERIOD_END : str
+        From run hyperparameters
+    PREDICT_PERIOD_START : str
+        From run hyperparameters
+    PREDICT_PERIOD_END : str
+        From run hyperparameters
+    VARIABLE : str
+        From run hyperparameters
+    workdir : str, optional
+        Intermediate files for caching (and might be used by other gcms), by default "az://cmip6"
+    outdir : str, optional
+        Final result space, by default "az://cmip6/results"
+
+    Returns
+    -------
+    tuple[str, str, str, str]
+        From run hyperparameters
+    """    
+
+    coarse_obs_path = f"{workdir}/intermediates/{OBS}_{GCM}_{TRAIN_PERIOD_START}_{TRAIN_PERIOD_END}_{VARIABLE}.zarr"
+    spatial_anomolies_path =  f"{workdir}/intermediates/anomalies_{OBS}_{GCM}_{TRAIN_PERIOD_START}_{TRAIN_PERIOD_END}_{VARIABLE}.zarr"
+    bias_corrected_path = f"{workdir}/intermediates/bc_{OBS}_{SCENARIO}_{GCM}_{TRAIN_PERIOD_START}_{TRAIN_PERIOD_END}_{VARIABLE}.zarr"
+    final_out_path = f"{outdir}/bcsd_{OBS}_{SCENARIO}_{GCM}_{PREDICT_PERIOD_START}_{PREDICT_PERIOD_END}_{VARIABLE}.zarr"
+    return coarse_obs_path, spatial_anomolies_path, bias_corrected_path, final_out_path
+
 
 def load_paths(paths):  # What type do i use here since paths is of unknown length? : list[str]):
     ds_list = [xr.open_zarr(path) for path in paths]
