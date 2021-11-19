@@ -1,22 +1,10 @@
 import os
-import random
-import string
 
-import fsspec
-import intake
-import numpy as np
-import xarray as xr
-import xesmf as xe
-import zarr
-from dask.distributed import Client, LocalCluster
 from dask_kubernetes import KubeCluster, make_pod_spec
-from prefect import Flow, Parameter, task
+from prefect import Flow, task
 from prefect.executors import DaskExecutor
 from prefect.run_configs import KubernetesRun
 from prefect.storage import Azure
-from rechunker import api
-from skdownscale.pointwise_models import BcAbsolute, PointWiseDownscaler
-from xarray_schema import DataArraySchema, DatasetSchema
 
 from cmip6_downscaling.methods.bcsd import (
     fit_and_predict,
@@ -75,12 +63,7 @@ fit_and_predict_task = task(fit_and_predict, log_stdout=True)
 
 postprocess_bcsd_task = task(postprocess_bcsd, log_stdout=True)
 
-with Flow(
-    name="bcsd-testing",
-    storage=storage,
-    run_config=run_config,
-    executor=executor
-) as flow:
+with Flow(name="bcsd-testing", storage=storage, run_config=run_config, executor=executor) as flow:
 
     obs = run_hyperparameters["OBS"]
     gcm = run_hyperparameters["GCM"]
@@ -91,17 +74,21 @@ with Flow(
     predict_period_end = run_hyperparameters["PREDICT_PERIOD_END"]
     variable = run_hyperparameters["VARIABLE"]
 
-    coarse_obs_path, spatial_anomolies_path, bias_corrected_path, final_out_path = make_flow_paths(**run_hyperparameters)
+    coarse_obs_path, spatial_anomalies_path, bias_corrected_path, final_out_path = make_flow_paths(
+        **run_hyperparameters
+    )
 
-    coarse_obs_path, spatial_anomolies_path = preprocess_bcsd(gcm=gcm,
-                    obs_id=obs,
-                    train_period_start=train_period_start,
-                    train_period_end=train_period_end,
-                    variable=variable,
-                coarse_obs_path=coarse_obs_path,
-                spatial_anomolies_path=spatial_anomolies_path,
-                connection_string=connection_string,
-                rerun=False)
+    coarse_obs_path, spatial_anomalies_path = preprocess_bcsd(
+        gcm=gcm,
+        obs_id=obs,
+        train_period_start=train_period_start,
+        train_period_end=train_period_end,
+        variable=variable,
+        coarse_obs_path=coarse_obs_path,
+        spatial_anomalies_path=spatial_anomalies_path,
+        connection_string=connection_string,
+        rerun=False,
+    )
 
     y_rechunked_path, X_train_rechunked_path, X_predict_rechunked_path = prep_bcsd_inputs(
         coarse_obs_path,
@@ -115,10 +102,11 @@ with Flow(
         variable=variable,
     )
 
-    bias_corrected_path = fit_and_predict(X_train_rechunked_path, 
-                                      y_rechunked_path, 
-                                      X_predict_rechunked_path, 
-                                      bias_corrected_path)
+    bias_corrected_path = fit_and_predict(
+        X_train_rechunked_path, y_rechunked_path, X_predict_rechunked_path, bias_corrected_path
+    )
 
-    out_path = postprocess_bcsd(bias_corrected_path, spatial_anomalies_path, final_out_path, variable, connection_string)
+    out_path = postprocess_bcsd(
+        bias_corrected_path, spatial_anomalies_path, final_out_path, variable, connection_string
+    )
 flow.run(parameters=run_hyperparameters)
