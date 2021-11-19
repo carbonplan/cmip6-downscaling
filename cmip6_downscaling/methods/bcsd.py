@@ -89,12 +89,13 @@ def preprocess_bcsd(
         spatial_anomolies = get_spatial_anomolies(coarse_obs, obs_ds, variable, connection_string)
         write_dataset(spatial_anomolies, spatial_anomolies_path, chunks_dims=('month',))
 
-        return coarse_obs_path, spatial_anomolies_path
+    return coarse_obs_path, spatial_anomolies_path
 
 
 def prep_bcsd_inputs(
     coarse_obs_path: str,
     gcm: str,
+    scenario: str,
     obs_id: str,
     train_period_start: str,
     train_period_end: str,
@@ -142,7 +143,7 @@ def prep_bcsd_inputs(
         max_mem='1GB',
     )
 
-    X_train = load_cmip(return_type='xr').sel(time=slice(train_period_start, train_period_end))
+    X_train = load_cmip(source_ids=[gcm], return_type='xr').sel(time=slice(train_period_start, train_period_end))
     X_train['time'] = y.time.values
 
     X_train_rechunked, X_train_rechunked_path = rechunk_zarr_array(
@@ -154,7 +155,8 @@ def prep_bcsd_inputs(
     )
 
     X_predict = load_cmip(
-        activity_ids=['ScenarioMIP'], experiment_ids=['ssp370'], return_type='xr'
+        source_ids=[gcm],
+        activity_ids=['ScenarioMIP'], experiment_ids=[scenario], return_type='xr'
     ).sel(time=slice(predict_period_start, predict_period_end))
     assert len(X_predict.lat) == len(X_train.lat), "Uh oh! Your prediction length is different from your training and so the chunk sizes wont match and xarray will complain!" 
     # TODO: test for the corner case of predicting on a different time length than training- if so, need to
