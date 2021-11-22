@@ -52,7 +52,7 @@ def map_tgt(tgt: str) -> fsspec.FSMap:
     return tgt_map
 
 
-def copy_cleaned_data(xdf: xr.Dataset, tgt_map: str, overwrite: bool = True):
+def copy_cleaned_data(xdf: xr.Dataset, tgt_map: str, overwrite: bool = True) -> None:
     """Copies xarray dataset to zarr store for given target
 
     Parameters
