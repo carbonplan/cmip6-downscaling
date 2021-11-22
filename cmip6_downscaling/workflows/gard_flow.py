@@ -11,9 +11,6 @@ from scipy.stats import norm as norm
 import gstools as gs
 
 
-def preprocess 
-
-
 def bias_correction_by_var(
     da_gcm: xr.DataArray,
     da_obs: xr.DataArray,
