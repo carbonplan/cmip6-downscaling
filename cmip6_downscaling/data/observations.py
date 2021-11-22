@@ -1,6 +1,8 @@
 import os
 
 os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "True"
+import intake
+import numpy as np
 import xarray as xr
 import zarr
 from xarray_schema import DataArraySchema
@@ -11,6 +13,11 @@ connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 
 schema_map_chunks = DataArraySchema(chunks={'lat': -1, 'lon': -1})
 schema_timeseries_chunks = DataArraySchema(chunks={'time': -1})
+variable_name_dict = {
+    "tasmax": "air_temperature_at_2_metres_1hour_Maximum",
+    "tasmin": "air_temperature_at_2_metres_1hour_Minimum",
+    "pr": "precipitation_amount_1hour_Accumulation",
+}
 
 
 def get_store(bucket, prefix, account_key=None):
