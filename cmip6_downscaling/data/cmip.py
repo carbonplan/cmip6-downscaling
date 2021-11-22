@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Union
+from typing import List, Union
 
 import intake
 import pandas as pd
@@ -164,13 +164,13 @@ def cmip():
 
 
 def load_cmip(
-    activity_ids: list = ["CMIP"],
-    experiment_ids: list = ["historical"],
-    member_ids: list = ["r1i1p1f1"],
-    source_ids: list = ["MIROC6"],
-    table_ids: list = ["day"],
-    grid_labels: list = ["gn"],
-    variable_ids: list = ["tasmax"],
+    activity_ids: str = "CMIP",
+    experiment_ids: str = "historical",
+    member_ids: str = "r1i1p1f1",
+    source_ids: str = "MIROC6",
+    table_ids: str = "day",
+    grid_labels: str = "gn",
+    variable_ids: List[str] = ["tasmax"],
     return_type: list = 'zarr',
 ) -> xr.Dataset:
     """Loads CMIP6 GCM dataset based on input criteria.

@@ -1,10 +1,12 @@
 import os
+from typing import Tuple
 
+import fsspec
 from skdownscale.pointwise_models import BcAbsolute, BcRelative, PointWiseDownscaler
 
 from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
 from cmip6_downscaling.data.cmip import load_cmip
-from cmip6_downscaling.data.observations import get_spatial_anomolies, load_obs
+from cmip6_downscaling.data.observations import get_spatial_anomolies, open_era5
 from cmip6_downscaling.workflows.utils import (
     load_paths,
     rechunk_zarr_array,
@@ -13,12 +15,59 @@ from cmip6_downscaling.workflows.utils import (
 )
 
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
+fs = fsspec.filesystem('az')
 # TODO: add templates for paths, maybe using prefect context. Do this once functions ported to prefect world in bcsd_flow.py
+
+
+def make_flow_paths(
+    GCM: str,
+    SCENARIO: str,
+    TRAIN_PERIOD_START: str,
+    TRAIN_PERIOD_END: str,
+    PREDICT_PERIOD_START: str,
+    PREDICT_PERIOD_END: str,
+    VARIABLE: str,
+    workdir: str = "az://cmip6",
+    outdir: str = "az://cmip6/results",
+) -> Tuple[str, str, str, str]:
+    """Build the paths where your outputs (both intermediate and final) will go
+
+    Parameters
+    ----------
+    GCM : str
+        From run hyperparameters
+    SCENARIO : str
+        From run hyperparameters
+    TRAIN_PERIOD_START : str
+        From run hyperparameters
+    TRAIN_PERIOD_END : str
+        From run hyperparameters
+    PREDICT_PERIOD_START : str
+        From run hyperparameters
+    PREDICT_PERIOD_END : str
+        From run hyperparameters
+    VARIABLE : str
+        From run hyperparameters
+    workdir : str, optional
+        Intermediate files for caching (and might be used by other gcms), by default "az://cmip6"
+    outdir : str, optional
+        Final result space, by default "az://cmip6/results"
+
+    Returns
+    -------
+    tuple[str, str, str, str]
+        From run hyperparameters
+    """
+
+    coarse_obs_path = f"{workdir}/intermediates/ERA5_{GCM}_{TRAIN_PERIOD_START}_{TRAIN_PERIOD_END}_{VARIABLE}.zarr"
+    spatial_anomolies_path = f"{workdir}/intermediates/anomalies_{GCM}_{TRAIN_PERIOD_START}_{TRAIN_PERIOD_END}_{VARIABLE}.zarr"
+    bias_corrected_path = f"{workdir}/intermediates/bc_{SCENARIO}_{GCM}_{TRAIN_PERIOD_START}_{TRAIN_PERIOD_END}_{VARIABLE}.zarr"
+    final_out_path = f"{outdir}/bcsd_{SCENARIO}_{GCM}_{PREDICT_PERIOD_START}_{PREDICT_PERIOD_END}_{VARIABLE}.zarr"
+    return coarse_obs_path, spatial_anomolies_path, bias_corrected_path, final_out_path
 
 
 def preprocess_bcsd(
     gcm: str,
-    obs_id: str,
     train_period_start: str,
     train_period_end: str,
     variable: str,
@@ -36,8 +85,6 @@ def preprocess_bcsd(
     ----------
     gcm : str
         Name of GCM
-    obs_id : str
-        Name of obs dataset (currently only supports 'ERA5')
     train_period_start : str
         Date for training period start (e.g. '1985')
     train_period_end : str
@@ -65,8 +112,8 @@ def preprocess_bcsd(
     """
     # TODO: add in functionality to label the obs/spatial anomalies by grid name as opposed to GCM
     #  since it will just help us not repeat the coarsening/spatial anomalies step
-    if rerun:
-        obs_ds = load_obs(obs_id, variable, time_period=slice(train_period_start, train_period_end))
+    if (not (fs.exists(coarse_obs_path) and fs.exists(spatial_anomolies_path))) or rerun:
+        obs_ds = open_era5(variable, start_year=train_period_start, end_year=train_period_end)
 
         gcm_one_slice = load_cmip(return_type='xr', variable_ids=[variable]).isel(time=0)
         # calculate and write out the coarsened version of obs dataset to match the gcm
@@ -87,7 +134,6 @@ def prep_bcsd_inputs(
     coarse_obs_path: str,
     gcm: str,
     scenario: str,
-    obs_id: str,
     train_period_start: str,
     train_period_end: str,
     predict_period_start: str,
@@ -104,8 +150,6 @@ def prep_bcsd_inputs(
         Path to read coarsened obs zarr dataset (e.g. 'az://bucket/out.zarr')
     gcm : str
         Name of GCM
-    obs_id : str
-        Name of obs dataset (currently only supports 'ERA5')
     train_period_start : str
         Date for training period start (e.g. '1985')
     train_period_end : str
@@ -124,17 +168,18 @@ def prep_bcsd_inputs(
     """
     # load in coarse obs as xarray ds
     [y] = load_paths([coarse_obs_path])
-    # TODO: add xarray_schema test here for chunking - if the chunking fails then try rechunking
-    # if passes skip
+    # The rechunking will only run if y isn't chunked in the way specified, if it already looks
+    # like that, then it will pass
     y_rechunked, y_rechunked_path = rechunk_zarr_array(
         y,
+        coarse_obs_path,
         chunk_dims=('lat', 'lon'),
         variable=variable,
         connection_string=connection_string,
         max_mem='1GB',
     )
 
-    X_train = load_cmip(source_ids=[gcm], return_type='xr').sel(
+    X_train = load_cmip(source_ids=gcm, variable_ids=[variable], return_type='xr').sel(
         time=slice(train_period_start, train_period_end)
     )
     X_train['time'] = y.time.values
@@ -148,18 +193,22 @@ def prep_bcsd_inputs(
     )
 
     X_predict = load_cmip(
-        source_ids=[gcm], activity_ids=['ScenarioMIP'], experiment_ids=[scenario], return_type='xr'
+        source_ids=gcm,
+        activity_ids='ScenarioMIP',
+        experiment_ids=scenario,
+        variable_ids=[variable],
+        return_type='xr',
     ).sel(time=slice(predict_period_start, predict_period_end))
-    assert len(X_predict.lat) == len(
-        X_train.lat
-    ), "Uh oh! Your prediction length is different from your training and so the chunk sizes wont match and xarray will complain!"
-    # TODO: test for the corner case of predicting on a different time length than training- if so, need to
-    # pass the lat and lon dims since the spatial chunks of predict data need to match when they get passed to
-    # the fit_and_predict utility
+    # validate that X_predict spatial chunks match those of X_train since the spatial chunks of predict data need
+    # to match when they get passed to the fit_and_predict utility
+    # if they are not, rechunk X_predict to match those spatial chunks specifically (don't just pass lat/lon as the chunking dims)
+    matching_chunks_dict = {
+        variable: {'time': -1, 'lat': X_predict.chunks['lat'][0], 'lon': X_predict.chunks['lon'][0]}
+    }
     X_predict_rechunked, X_predict_rechunked_path = rechunk_zarr_array(
         X_predict,
         variable=variable,
-        chunk_dims=('lat', 'lon'),
+        chunk_dims=matching_chunks_dict,
         connection_string=connection_string,
         max_mem='1GB',
     )
@@ -199,6 +248,7 @@ def fit_and_predict(
         Path to where coarse bias-corrected data is
     """
     y, X_train, X_predict = load_paths([y_path, X_train_path, X_predict_path])
+
     if variable in ABSOLUTE_VARS:
         bcsd_model = BcAbsolute(return_anoms=False)
     elif variable in RELATIVE_VARS:

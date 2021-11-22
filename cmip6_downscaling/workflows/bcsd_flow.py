@@ -8,11 +8,11 @@ from prefect.storage import Azure
 
 from cmip6_downscaling.methods.bcsd import (
     fit_and_predict,
+    make_flow_paths,
     postprocess_bcsd,
     prep_bcsd_inputs,
     preprocess_bcsd,
 )
-from cmip6_downscaling.workflows.utils import make_flow_paths
 
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 
@@ -25,7 +25,6 @@ run_hyperparameters = {
     "PREDICT_PERIOD_START": "2090",
     "PREDICT_PERIOD_END": "2090",
     "VARIABLE": "tasmax",
-    "OBS": "ERA5",
 }
 
 storage = Azure("prefect")
@@ -64,8 +63,6 @@ fit_and_predict_task = task(fit_and_predict, log_stdout=True)
 postprocess_bcsd_task = task(postprocess_bcsd, log_stdout=True)
 
 with Flow(name="bcsd-testing", storage=storage, run_config=run_config, executor=executor) as flow:
-
-    obs = run_hyperparameters["OBS"]
     gcm = run_hyperparameters["GCM"]
     scenario = run_hyperparameters["SCENARIO"]
     train_period_start = run_hyperparameters["TRAIN_PERIOD_START"]
@@ -80,7 +77,6 @@ with Flow(name="bcsd-testing", storage=storage, run_config=run_config, executor=
 
     coarse_obs_path, spatial_anomalies_path = preprocess_bcsd(
         gcm=gcm,
-        obs_id=obs,
         train_period_start=train_period_start,
         train_period_end=train_period_end,
         variable=variable,
@@ -94,7 +90,6 @@ with Flow(name="bcsd-testing", storage=storage, run_config=run_config, executor=
         coarse_obs_path,
         gcm,
         scenario,
-        obs_id=obs,
         train_period_start=train_period_start,
         train_period_end=train_period_end,
         predict_period_start=predict_period_start,

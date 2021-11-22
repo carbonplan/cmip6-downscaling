@@ -3,10 +3,14 @@ import os
 os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "True"
 import xarray as xr
 import zarr
+from xarray_schema import DataArraySchema
 
-from cmip6_downscaling.workflows.utils import rechunk_zarr_array, regrid_dataset
+from cmip6_downscaling.workflows.utils import load_paths, regrid_dataset
 
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
+
+schema_map_chunks = DataArraySchema(chunks={'lat': -1, 'lon': -1})
+schema_timeseries_chunks = DataArraySchema(chunks={'time': -1})
 
 
 def get_store(bucket, prefix, account_key=None):
@@ -21,13 +25,19 @@ def get_store(bucket, prefix, account_key=None):
     return store
 
 
-def open_era5(var: str):
+def open_era5(var: str, start_year: str, end_year: str) -> xr.Dataset:
     """Open ERA5 daily data for a single variable for period 1979-2021
 
     Parameters
     ----------
     var : str
         The variable you want to grab from the ERA5 dataset.
+
+    start_year : str
+        The first year of the time period you want to grab from ERA5 dataset.
+
+    end_year : str
+        The last year of the time period you want to grab from ERA5 dataset.
 
     Returns
     -------
@@ -36,38 +46,15 @@ def open_era5(var: str):
     """
     stores = [
         f'https://cmip6downscaling.blob.core.windows.net/cmip6/ERA5_daily/{y}'
-        for y in range(1979, 2021)
+        for y in range(int(start_year), int(end_year) + 1)
     ]
     ds = xr.open_mfdataset(stores, engine='zarr', consolidated=True)
     return ds[[var]]
 
 
-def load_obs(obs_id: str, variable: str, time_period: slice) -> xr.Dataset:
-    """Load a temporal subset of an observational dataset for one variable
-    Parameters
-    ----------
-    obs_id : str
-        name of observation dataset. currently only "ERA5" is supported
-    variable : str
-        name of variable following CMIP conventions (e.g. tasmax, tasmin, pr)
-    time_period : slice
-        time period you want to subset. e.g. slice('1985', '2015'). using
-        full years is recommended if you are going to be doing the spatial
-        anomaly calculations.
-
-    Returns
-    -------
-    open_era5(variable).sel(time=time_period) : xr.Dataset
-        Temporal subset of observational dataset
-    """
-    ## most of this can be deleted once new ERA5 dataset complete
-    ## we'll instead just want to have something like
-    ## open_era5(chunking_method='space', variables=['tasmax', 'pr'], time_period=slice(start, end), domain=slice())
-    if obs_id == "ERA5":
-        return open_era5(variable).sel(time=time_period)
-
-
-def get_spatial_anomolies(coarse_obs, fine_obs, variable, connection_string) -> xr.Dataset:
+def get_spatial_anomolies(
+    coarse_obs, fine_obs_rechunked_path, variable, connection_string
+) -> xr.Dataset:
     """Calculate the seasonal cycle (12 timesteps) spatial anomaly associated
     with aggregating the fine_obs to a given coarsened scale and then reinterpolating
     it back to the original spatial resolution. The outputs of this function are
@@ -80,7 +67,7 @@ def get_spatial_anomolies(coarse_obs, fine_obs, variable, connection_string) -> 
     ----------
     coarse_obs : xr.Dataset
         Coarsened to a GCM resolution. Chunked along time.
-    fine_obs : xr.Dataset
+    fine_obs_rechunked_path : xr.Dataset
         Original observationa spatial resolution. Chunked along time.
     variable: str
         The variable included in the dataset.
@@ -91,13 +78,18 @@ def get_spatial_anomolies(coarse_obs, fine_obs, variable, connection_string) -> 
         Spatial anomaly for each month (i.e. of shape (nlat, nlon, 12))
     """
     # interpolate coarse_obs back to the original scale
+    [fine_obs_rechunked] = load_paths([fine_obs_rechunked_path])
+
     obs_interpolated = regrid_dataset(
-        coarse_obs, fine_obs.isel(time=0), variable=variable, connection_string=connection_string
+        coarse_obs,
+        fine_obs_rechunked.isel(time=0),
+        variable=variable,
+        connection_string=connection_string,
     )
-    # get fine_obs into map chunks so it plays nice with the interpolated obs
-    fine_obs_rechunked, fine_obs_rechunked_path = rechunk_zarr_array(
-        fine_obs, connection_string, variable, chunk_dims=('time',), max_mem='1GB'
-    )
+    # use rechunked fine_obs from coarsening step above because that is in map chunks so it
+    # will play nice with the interpolated obs
+
+    fine_obs_rechunked = schema_map_chunks.validate(fine_obs_rechunked)
 
     # calculate difference between interpolated obs and the original obs
     spatial_anomolies = obs_interpolated - fine_obs_rechunked
