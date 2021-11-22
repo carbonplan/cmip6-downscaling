@@ -58,7 +58,9 @@ def bias_correction_by_var(
         obs_out = da_obs
 
     elif self.bias_correction_method == 'detrended_quantile_map':
-        qm = PointWiseDownscaler(TrendAwareQuantileMappingRegressor(QuantileMappingReressor(**bc_kwargs)))
+        qm = PointWiseDownscaler(
+            TrendAwareQuantileMappingRegressor(QuantileMappingReressor(**bc_kwargs))
+        )
         qm.fit(da_gcm.sel(time=historical_period), da_obs)
         gcm_out = qm.predict(da_gcm)
         obs_out = da_obs
@@ -68,7 +70,13 @@ def bias_correction_by_var(
         obs_out = da_obs
 
     else:
-        availalbe_methods = ['quantile_transform', 'z_score', 'quantile_map', 'detrended_quantile_map', 'none']
+        availalbe_methods = [
+            'quantile_transform',
+            'z_score',
+            'quantile_map',
+            'detrended_quantile_map',
+            'none',
+        ]
         raise NotImplementedError(f'bias correction method must be one of {availalbe_methods}')
 
     return gcm_out, obs_out
@@ -113,7 +121,9 @@ def get_gard_model(
     elif model_type == 'PureRegression':
         return PureRegression(**model_params)
     else:
-        raise NotImplementedError('model_type must be AnalogRegression, PureAnalog, or PureRegression')
+        raise NotImplementedError(
+            'model_type must be AnalogRegression, PureAnalog, or PureRegression'
+        )
 
 
 def gard_fit_and_predict(
@@ -127,9 +137,7 @@ def gard_fit_and_predict(
 ) -> xr.Dataset:
 
     # point wise downscaling
-    model = PointWiseDownscaler(
-        model=get_gard_model(model_type, model_params),
-        dim=dim)
+    model = PointWiseDownscaler(model=get_gard_model(model_type, model_params), dim=dim)
     model.fit(ds_obs_interpolated, ds_obs[variable])
 
     out = xr.Dataset()
@@ -143,7 +151,7 @@ def gard_fit_and_predict(
 def calc_correlation_length_scale(
     da: xr.DataArray,
     seasonality_period: int = 31,
-    temporal_scaler: float = 1000.,
+    temporal_scaler: float = 1000.0,
 ) -> Dict[str, float]:
     """
     find the correlation length for a dataarray with dimensions lat, lon and time
@@ -153,20 +161,35 @@ def calc_correlation_length_scale(
         assert dim in da
 
     # remove seasonality before finding correlation length, otherwise the seasonality correlation dominates
-    seasonality = data.rolling({'time': seasonality_period}, center=True, min_periods=1).mean().groupby('time.dayofyear').mean()
+    seasonality = (
+        data.rolling({'time': seasonality_period}, center=True, min_periods=1)
+        .mean()
+        .groupby('time.dayofyear')
+        .mean()
+    )
     detrended = data.groupby("time.dayofyear") - seasonality
 
     # find spatial length scale
-    bin_center, gamma = gs.vario_estimate(pos=(detrended.lon.values, detrended.lat.values), field=detrended.values, latlon=True, mesh_type='structured')
+    bin_center, gamma = gs.vario_estimate(
+        pos=(detrended.lon.values, detrended.lat.values),
+        field=detrended.values,
+        latlon=True,
+        mesh_type='structured',
+    )
     spatial = gs.Gaussian(dim=2, latlon=True, rescale=gs.EARTH_RADIUS)
-    spatial.fit_variogram(bin_center, gamma, sill=np.mean(np.var(fields, axis=(1,2))))
+    spatial.fit_variogram(bin_center, gamma, sill=np.mean(np.var(fields, axis=(1, 2))))
 
     # find temporal length scale
     # break the time series into fields of 1 year length, since otherwise the algorithm struggles to find the correct length scale
     fields = []
     day_in_year = 365
     for yr, group in detrended.groupby('time.year'):
-        v = group.isel(time=slice(0, day_in_year)).stack(point=['lat', 'lon']).transpose('point', 'time').values
+        v = (
+            group.isel(time=slice(0, day_in_year))
+            .stack(point=['lat', 'lon'])
+            .transpose('point', 'time')
+            .values
+        )
         fields.extend(list(v))
     t = np.arange(day_in_year) / temporal_scaler
     bin_center, gamma = gs.vario_estimate(pos=t, field=fields, mesh_type='structured')
@@ -181,8 +204,8 @@ def generate_scrf(
     output_template: xr.DataArray,
     seasonality_period: int = 31,
     seed: int = 0,
-    temporal_scaler: float = 1000.,
-    crs: str = 'ESRI:54008'
+    temporal_scaler: float = 1000.0,
+    crs: str = 'ESRI:54008',
 ) -> xr.DataArray:
     # find correlation length from source data
     length_scale = calc_correlation_length_scale(
@@ -207,9 +230,7 @@ def generate_scrf(
     model = gs.Gaussian(dim=3, var=1.0, len_scale=[ss, ss, ts])
     srf = gs.SRF(model, seed=seed)
     field = xr.DataArray(
-        srf.structured((x, y, t)),
-        dims=['lon', 'lat', 'time'],
-        coords=[x, y, output_template.time]
+        srf.structured((x, y, t)), dims=['lon', 'lat', 'time'], coords=[x, y, output_template.time]
     ).rio.write_crs(crs)
 
     field = field.rio.reproject('EPSG:4326')
@@ -223,28 +244,30 @@ def gard_postprocess(
     thresh: Union[float, None],
     seasonality_period: int = 31,
     seed: int = 0,
-    temporal_scaler: float = 1000.,
-    crs: str = 'ESRI:54008'
+    temporal_scaler: float = 1000.0,
+    crs: str = 'ESRI:54008',
 ) -> xr.DataArray:
     # generate spatio-tempprally correlated random fields based on observation data
-    scrf = generate_scrf(
-        data=ds_obs[variable],
-        template=model_output['pred'],
-        seed=seed
-    )
+    scrf = generate_scrf(data=ds_obs[variable], template=model_output['pred'], seed=seed)
 
     if thresh is not None:
         # convert scrf from a normal distribution to a uniform distribution
-        scrf_uniform = xr.apply_ufunc(norm.cdf, scrf, dask='parallelized', output_dtypes=[scrf.dtype])
+        scrf_uniform = xr.apply_ufunc(
+            norm.cdf, scrf, dask='parallelized', output_dtypes=[scrf.dtype]
+        )
 
         # find where exceedance prob is exceeded
         mask = scrf_uniform > (1 - model_output['exceedance_prob'])
 
         # Rescale the uniform distribution
-        new_uniform = (scrf_uniform - (1 - model_output['exceedance_prob'])) / model_output['exceedance_prob']
+        new_uniform = (scrf_uniform - (1 - model_output['exceedance_prob'])) / model_output[
+            'exceedance_prob'
+        ]
 
         # Get the normal distribution equivalent of new_uniform
-        r_normal = xr.apply_ufunc(norm.ppf, new_uniform, dask='parallelized', output_dtypes=[new_uniform.dtype])
+        r_normal = xr.apply_ufunc(
+            norm.ppf, new_uniform, dask='parallelized', output_dtypes=[new_uniform.dtype]
+        )
 
         downscaled = model_output['pred'] + r_normal * model_output['error']
 
@@ -289,6 +312,6 @@ def gard_flow(
     self.thresh = model.thresh
 
     # shared between multiple method types but point wise
-    #TODO: spatial features
-    #TODO: extend this to include transforming the feature space into PCA, etc
+    # TODO: spatial features
+    # TODO: extend this to include transforming the feature space into PCA, etc
     # map + 1d component (pca) of ocean surface temperature for precip prediction
