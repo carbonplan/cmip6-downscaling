@@ -1,3 +1,5 @@
+"""Script for resampling and reformatting existing ERA5 zarr stores into a single, daily zarr store with matching variable names to CMIP6 GCM data."""
+
 import os
 
 import dask
@@ -7,6 +9,8 @@ import xarray as xr
 from prefect import Flow, task
 from prefect.run_configs import KubernetesRun
 from prefect.storage import Azure
+
+# from cmip6_downscaling.workflows.share import get_store
 
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 image = "carbonplan/cmip6-downscaling-prefect:latest"
