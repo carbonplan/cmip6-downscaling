@@ -94,8 +94,8 @@ with Flow(name="bcsd-testing") as flow:
         train_period_end=train_period_end,
         predict_period_start=predict_period_start,
         predict_period_end=predict_period_end,
-        variable=variable
-        )
+        variable=variable,
+    )
 
     bias_corrected_path = fit_and_predict(
         X_train_rechunked_path, y_rechunked_path, X_predict_rechunked_path, bias_corrected_path

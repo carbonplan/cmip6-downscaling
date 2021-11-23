@@ -134,7 +134,7 @@ def rechunk_zarr_array(
         rechunked_ds = target_schema.validate(zarr_array[variable])
         # return back the dataset you introduced, and the path is None since you haven't created a new dataset
         return zarr_array, zarr_array_location
-    except (SchemaError, AssertionError) as e:
+    except (SchemaError, AssertionError):
         delete_chunks_encoding(zarr_array)
         temp_store, target_store, path_tgt = make_rechunker_stores(connection_string)
         # delete_chunks_encoding(ds) # need to do this before since it wont work on zarr array
@@ -227,7 +227,11 @@ def calc_auspicious_chunks_dict(
 
 
 def regrid_dataset(
-    ds: xr.Dataset, ds_path: xr.Dataset, target_grid_ds: xr.Dataset, variable: str, connection_string: str
+    ds: xr.Dataset,
+    ds_path: xr.Dataset,
+    target_grid_ds: xr.Dataset,
+    variable: str,
+    connection_string: str,
 ) -> Tuple[xr.Dataset, str]:
     """Regrid a dataset to a target grid. For use in both coarsening or interpolating to finer resolution.
 

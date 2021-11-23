@@ -115,12 +115,18 @@ def preprocess_bcsd(
         # # calculate and write out the coarsened version of obs dataset to match the gcm
         # # (will be used in training)
         coarse_obs, fine_obs_rechunked_path = regrid_dataset(
-            ds=obs_ds, ds_path=None, target_grid_ds=gcm_one_slice, variable=variable, connection_string=connection_string
+            ds=obs_ds,
+            ds_path=None,
+            target_grid_ds=gcm_one_slice,
+            variable=variable,
+            connection_string=connection_string,
         )
         write_dataset(coarse_obs, coarse_obs_path)
         # calculate the seasonal cycle (ntime = 12) of spatial anomalies due to interpolating
         # the coarsened obs back to its original resolution and write it out (will be used in postprocess)
-        spatial_anomalies = get_spatial_anomalies(coarse_obs_path, fine_obs_rechunked_path, variable, connection_string)
+        spatial_anomalies = get_spatial_anomalies(
+            coarse_obs_path, fine_obs_rechunked_path, variable, connection_string
+        )
         write_dataset(spatial_anomalies, spatial_anomalies_path, chunks_dims=('month',))
 
     return coarse_obs_path, spatial_anomalies_path
@@ -204,7 +210,11 @@ def prep_bcsd_inputs(
     # to match when they get passed to the fit_and_predict utility
     # if they are not, rechunk X_predict to match those spatial chunks specifically (don't just pass lat/lon as the chunking dims)
     matching_chunks_dict = {
-        variable: {'time': X_train_rechunked.chunks['time'][0], 'lat': X_train_rechunked.chunks['lat'][0], 'lon': X_train_rechunked.chunks['lon'][0]}
+        variable: {
+            'time': X_train_rechunked.chunks['time'][0],
+            'lat': X_train_rechunked.chunks['lat'][0],
+            'lon': X_train_rechunked.chunks['lon'][0],
+        }
     }
     _, X_predict_rechunked_path = rechunk_zarr_array(
         X_predict,
@@ -294,8 +304,13 @@ def postprocess_bcsd(
 
     # TODO: test - create sample input, run it through rechunk/regridder and then
     # assert that it looks like i want it to
-    y_predict_fine, _ = regrid_dataset(ds=y_predict, ds_path=y_predict_path, 
-                        target_grid_ds=spatial_anomalies, variable=variable, connection_string=connection_string)
+    y_predict_fine, _ = regrid_dataset(
+        ds=y_predict,
+        ds_path=y_predict_path,
+        target_grid_ds=spatial_anomalies,
+        variable=variable,
+        connection_string=connection_string,
+    )
     bcsd_results = y_predict_fine.groupby("time.month") + spatial_anomalies
     write_dataset(bcsd_results, final_out_path)
 
