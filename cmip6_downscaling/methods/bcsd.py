@@ -8,8 +8,8 @@ from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
 from cmip6_downscaling.data.cmip import load_cmip
 from cmip6_downscaling.data.observations import open_era5
 from cmip6_downscaling.workflows.utils import (
-    load_paths,
     get_spatial_anomalies,
+    load_paths,
     rechunk_zarr_array,
     regrid_dataset,
     write_dataset,
@@ -160,8 +160,8 @@ def prep_bcsd_inputs(
     Returns
     -------
     y_rechunked_path: str,
-    X_train_rechunked_path: str, 
-    X_predict_rechunked_path: str 
+    X_train_rechunked_path: str,
+    X_predict_rechunked_path: str
         Paths to to write y, X_train, and X_predict ready for eventual use by model
     """
     # load in coarse obs as xarray ds
