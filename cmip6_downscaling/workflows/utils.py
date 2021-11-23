@@ -260,6 +260,7 @@ def regrid_dataset(
     ds_regridded = regridder(ds_rechunked)
     return ds_regridded
 
+
 def get_spatial_anomolies(
     coarse_obs, fine_obs_rechunked_path, variable, connection_string
 ) -> xr.Dataset:
@@ -297,7 +298,7 @@ def get_spatial_anomolies(
     # use rechunked fine_obs from coarsening step above because that is in map chunks so it
     # will play nice with the interpolated obs
 
-    fine_obs_rechunked = schema_map_chunks.validate(fine_obs_rechunked)
+    fine_obs_rechunked = schema_maps_chunks.validate(fine_obs_rechunked)
 
     # calculate difference between interpolated obs and the original obs
     spatial_anomolies = obs_interpolated - fine_obs_rechunked
@@ -305,6 +306,7 @@ def get_spatial_anomolies(
     # calculate seasonal cycle (12 time points)
     seasonal_cycle_spatial_anomolies = spatial_anomolies.groupby("time.month").mean()
     return seasonal_cycle_spatial_anomolies
+
 
 def write_dataset(ds: xr.Dataset, path: str, chunks_dims: Tuple = ('time',)) -> None:
     """Write out a dataset.

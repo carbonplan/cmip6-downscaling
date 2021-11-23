@@ -1,18 +1,11 @@
 import os
 
 os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "True"
-import intake
-import numpy as np
 import xarray as xr
 import zarr
-from xarray_schema import DataArraySchema
-
-from cmip6_downscaling.workflows.utils import load_paths, regrid_dataset
 
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 
-schema_map_chunks = DataArraySchema(chunks={'lat': -1, 'lon': -1})
-schema_timeseries_chunks = DataArraySchema(chunks={'time': -1})
 variable_name_dict = {
     "tasmax": "air_temperature_at_2_metres_1hour_Maximum",
     "tasmin": "air_temperature_at_2_metres_1hour_Minimum",
