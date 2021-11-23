@@ -20,16 +20,19 @@ run_hyperparameters = {
     "FLOW_NAME": "BCSD_testing",
     "GCM": "MIROC6",
     "SCENARIO": "ssp370",
-    "TRAIN_PERIOD_START": "1990",
-    "TRAIN_PERIOD_END": "1990",
-    "PREDICT_PERIOD_START": "2090",
-    "PREDICT_PERIOD_END": "2090",
+    "TRAIN_PERIOD_START": "1991",
+    "TRAIN_PERIOD_END": "1991",
+    "PREDICT_PERIOD_START": "2079",
+    "PREDICT_PERIOD_END": "2079",
     "VARIABLE": "tasmax",
 }
 
 storage = Azure("prefect")
 image = "carbonplan/cmip6-downscaling-prefect:latest"
-run_config = KubernetesRun(cpu_request=7, memory_request="16Gi", image=image, labels=["az-eu-west"])
+# install three specific branches (cmip6, skdownscale, xarray-schema)
+run_config = KubernetesRun(cpu_request=7, memory_request="16Gi", image=image, labels=["az-eu-west"],
+                            env={"EXTRA_PIP_PACKAGES": "git+git://github.com/carbonplan/cmip6-downscaling:bugfix_bcsd_workflow git+git://github.com/carbonplan/xarray-schema:chunks git+git://github.com/orianac/scikit-downscale:bcsd-workflow"}
+                            )
 
 executor = DaskExecutor(
     cluster_class=lambda: KubeCluster(
@@ -62,7 +65,7 @@ fit_and_predict_task = task(fit_and_predict, log_stdout=True)
 
 postprocess_bcsd_task = task(postprocess_bcsd, log_stdout=True)
 
-with Flow(name="bcsd-testing") as flow:
+with Flow(name=flow_name) as flow:
     gcm = run_hyperparameters["GCM"]
     scenario = run_hyperparameters["SCENARIO"]
     train_period_start = run_hyperparameters["TRAIN_PERIOD_START"]
