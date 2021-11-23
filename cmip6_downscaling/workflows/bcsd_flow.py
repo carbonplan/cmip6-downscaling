@@ -30,9 +30,15 @@ run_hyperparameters = {
 storage = Azure("prefect")
 image = "carbonplan/cmip6-downscaling-prefect:latest"
 # install three specific branches (cmip6, skdownscale, xarray-schema)
-run_config = KubernetesRun(cpu_request=7, memory_request="16Gi", image=image, labels=["az-eu-west"],
-                            env={"EXTRA_PIP_PACKAGES": "git+git://github.com/carbonplan/cmip6-downscaling:bugfix_bcsd_workflow git+git://github.com/carbonplan/xarray-schema:chunks git+git://github.com/orianac/scikit-downscale:bcsd-workflow"}
-                            )
+run_config = KubernetesRun(
+    cpu_request=7,
+    memory_request="16Gi",
+    image=image,
+    labels=["az-eu-west"],
+    env={
+        "EXTRA_PIP_PACKAGES": "git+git://github.com/carbonplan/cmip6-downscaling:bugfix_bcsd_workflow git+git://github.com/carbonplan/xarray-schema:chunks git+git://github.com/orianac/scikit-downscale:bcsd-workflow"
+    },
+)
 
 executor = DaskExecutor(
     cluster_class=lambda: KubeCluster(
