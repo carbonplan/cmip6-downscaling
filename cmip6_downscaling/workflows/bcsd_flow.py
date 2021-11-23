@@ -62,7 +62,7 @@ fit_and_predict_task = task(fit_and_predict, log_stdout=True)
 
 postprocess_bcsd_task = task(postprocess_bcsd, log_stdout=True)
 
-with Flow(name="bcsd-testing", storage=storage, run_config=run_config, executor=executor) as flow:
+with Flow(name="bcsd-testing") as flow:
     gcm = run_hyperparameters["GCM"]
     scenario = run_hyperparameters["SCENARIO"]
     train_period_start = run_hyperparameters["TRAIN_PERIOD_START"]
@@ -75,7 +75,7 @@ with Flow(name="bcsd-testing", storage=storage, run_config=run_config, executor=
         **run_hyperparameters
     )
 
-    coarse_obs_path, spatial_anomalies_path = preprocess_bcsd(
+    coarse_obs_path, spatial_anomolies_path = preprocess_bcsd(
         gcm=gcm,
         train_period_start=train_period_start,
         train_period_end=train_period_end,
@@ -87,15 +87,15 @@ with Flow(name="bcsd-testing", storage=storage, run_config=run_config, executor=
     )
 
     y_rechunked_path, X_train_rechunked_path, X_predict_rechunked_path = prep_bcsd_inputs(
-        coarse_obs_path,
-        gcm,
-        scenario,
+        coarse_obs_path=coarse_obs_path,
+        gcm=gcm,
+        scenario=scenario,
         train_period_start=train_period_start,
         train_period_end=train_period_end,
         predict_period_start=predict_period_start,
         predict_period_end=predict_period_end,
-        variable=variable,
-    )
+        variable=variable
+        )
 
     bias_corrected_path = fit_and_predict(
         X_train_rechunked_path, y_rechunked_path, X_predict_rechunked_path, bias_corrected_path
