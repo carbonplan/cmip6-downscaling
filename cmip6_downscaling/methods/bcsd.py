@@ -6,9 +6,10 @@ from skdownscale.pointwise_models import BcAbsolute, BcRelative, PointWiseDownsc
 
 from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
 from cmip6_downscaling.data.cmip import load_cmip
-from cmip6_downscaling.data.observations import get_spatial_anomolies, open_era5
+from cmip6_downscaling.data.observations import open_era5
 from cmip6_downscaling.workflows.utils import (
     load_paths,
+    get_spatial_anomalies,
     rechunk_zarr_array,
     regrid_dataset,
     write_dataset,
@@ -60,10 +61,10 @@ def make_flow_paths(
     """
 
     coarse_obs_path = f"{workdir}/intermediates/ERA5_{GCM}_{TRAIN_PERIOD_START}_{TRAIN_PERIOD_END}_{VARIABLE}.zarr"
-    spatial_anomolies_path = f"{workdir}/intermediates/anomalies_{GCM}_{TRAIN_PERIOD_START}_{TRAIN_PERIOD_END}_{VARIABLE}.zarr"
+    spatial_anomalies_path = f"{workdir}/intermediates/anomalies_{GCM}_{TRAIN_PERIOD_START}_{TRAIN_PERIOD_END}_{VARIABLE}.zarr"
     bias_corrected_path = f"{workdir}/intermediates/bc_{SCENARIO}_{GCM}_{TRAIN_PERIOD_START}_{TRAIN_PERIOD_END}_{VARIABLE}.zarr"
     final_out_path = f"{outdir}/bcsd_{SCENARIO}_{GCM}_{PREDICT_PERIOD_START}_{PREDICT_PERIOD_END}_{VARIABLE}.zarr"
-    return coarse_obs_path, spatial_anomolies_path, bias_corrected_path, final_out_path
+    return coarse_obs_path, spatial_anomalies_path, bias_corrected_path, final_out_path
 
 
 def preprocess_bcsd(
@@ -72,7 +73,7 @@ def preprocess_bcsd(
     train_period_end: str,
     variable: str,
     coarse_obs_path: str,
-    spatial_anomolies_path: str,
+    spatial_anomalies_path: str,
     connection_string: str,
     rerun: bool = True,
 ) -> tuple[str, str]:
@@ -93,7 +94,7 @@ def preprocess_bcsd(
         Variable of interest in CMIP conventions (e.g. 'tasmax')
     coarse_obs_path : str
         Path to write coarsened obs zarr dataset (e.g. 'az://bucket/out.zarr')
-    spatial_anomolies_path : str
+    spatial_anomalies_path : str
         Path to write coarsened obs zarr dataset (e.g. 'az://bucket/out.zarr')
     connection_string : str
         Connection string to give you read/write access to the out buckets specified above
@@ -102,17 +103,12 @@ def preprocess_bcsd(
 
     Returns
     -------
-    coarse_obs_path, spatial_anomolies_path : str, str
+    coarse_obs_path, spatial_anomalies_path : str, str
         Paths to where the outputs were written. These will be cached by prefect.
-    """
-
-    """
-
-    TODO: do we want to assign this to a class? write out? probably
     """
     # TODO: add in functionality to label the obs/spatial anomalies by grid name as opposed to GCM
     #  since it will just help us not repeat the coarsening/spatial anomalies step
-    if (not (fs.exists(coarse_obs_path) and fs.exists(spatial_anomolies_path))) or rerun:
+    if (not (fs.exists(coarse_obs_path) and fs.exists(spatial_anomalies_path))) or rerun:
         obs_ds = open_era5(variable, start_year=train_period_start, end_year=train_period_end)
 
         gcm_one_slice = load_cmip(return_type='xr', variable_ids=[variable]).isel(time=0)
@@ -124,10 +120,10 @@ def preprocess_bcsd(
         write_dataset(coarse_obs, coarse_obs_path)
         # calculate the seasonal cycle (ntime = 12) of spatial anomalies due to interpolating
         # the coarsened obs back to its original resolution and write it out (will be used in postprocess)
-        spatial_anomolies = get_spatial_anomolies(coarse_obs, obs_ds, variable, connection_string)
-        write_dataset(spatial_anomolies, spatial_anomolies_path, chunks_dims=('month',))
+        spatial_anomalies = get_spatial_anomalies(coarse_obs, obs_ds, variable, connection_string)
+        write_dataset(spatial_anomalies, spatial_anomalies_path, chunks_dims=('month',))
 
-    return coarse_obs_path, spatial_anomolies_path
+    return coarse_obs_path, spatial_anomalies_path
 
 
 def prep_bcsd_inputs(
@@ -163,14 +159,16 @@ def prep_bcsd_inputs(
 
     Returns
     -------
-    y_rechunked_path, X_train_rechunked_path, X_predict_rechunked_path : str, str, str
+    y_rechunked_path: str,
+    X_train_rechunked_path: str, 
+    X_predict_rechunked_path: str 
         Paths to to write y, X_train, and X_predict ready for eventual use by model
     """
     # load in coarse obs as xarray ds
     [y] = load_paths([coarse_obs_path])
     # The rechunking will only run if y isn't chunked in the way specified, if it already looks
     # like that, then it will pass
-    y_rechunked, y_rechunked_path = rechunk_zarr_array(
+    _, y_rechunked_path = rechunk_zarr_array(
         y,
         coarse_obs_path,
         chunk_dims=('lat', 'lon'),
@@ -184,7 +182,7 @@ def prep_bcsd_inputs(
     )
     X_train['time'] = y.time.values
 
-    X_train_rechunked, X_train_rechunked_path = rechunk_zarr_array(
+    _, X_train_rechunked_path = rechunk_zarr_array(
         X_train,
         variable=variable,
         chunk_dims=('lat', 'lon'),
@@ -205,7 +203,7 @@ def prep_bcsd_inputs(
     matching_chunks_dict = {
         variable: {'time': -1, 'lat': X_predict.chunks['lat'][0], 'lon': X_predict.chunks['lon'][0]}
     }
-    X_predict_rechunked, X_predict_rechunked_path = rechunk_zarr_array(
+    _, X_predict_rechunked_path = rechunk_zarr_array(
         X_predict,
         variable=variable,
         chunk_dims=matching_chunks_dict,
@@ -223,7 +221,7 @@ def fit_and_predict(
     bias_corrected_path: str,
     dim: str = "time",
     variable: str = "tasmax",
-):
+) -> str:
     """Fit bcsd model on prepared CMIP data with obs at corresponding spatial scale.
     Then predict for a set of CMIP data (likely future).
 
@@ -266,7 +264,7 @@ def postprocess_bcsd(
     final_out_path: str,
     variable: str,
     connection_string: str,
-):
+) -> str:
     """Downscale the bias-corrected data by interpolating and then
     adding the spatial anomalies back in.
 

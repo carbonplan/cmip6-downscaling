@@ -171,7 +171,7 @@ def load_cmip(
     table_ids: str = "day",
     grid_labels: str = "gn",
     variable_ids: List[str] = ["tasmax"],
-    return_type: list = 'zarr',
+    return_type: str = 'zarr',
 ) -> xr.Dataset:
     """Loads CMIP6 GCM dataset based on input criteria.
 
@@ -194,8 +194,8 @@ def load_cmip(
 
     Returns
     -------
-    ds : xr.Dataset
-        [dictionary containing available xarray datasets]
+    ds : xr.Dataset or zarr group
+        Dataset or zarr group with CMIP data
     """
     col_url = "https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.json"
 
