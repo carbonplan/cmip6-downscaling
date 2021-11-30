@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2.4.0
-      - uses: actions/setup-python@v2.3.0
+      - uses: actions/setup-python@v2.3.1
       - uses: pre-commit/action@v2.0.3
 
   test:
@@ -24,7 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2.4.0
       - name: Setup Python
-        uses: actions/setup-python@v2.3.0
+        uses: actions/setup-python@v2.3.1
         with:
           python-version: ${{ matrix.python-version }}
           architecture: x64
