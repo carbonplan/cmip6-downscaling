@@ -234,7 +234,7 @@ def regrid_dataset(
     connection_string: str,
 ) -> Tuple[xr.Dataset, str]:
     """Regrid a dataset to a target grid. For use in both coarsening or interpolating to finer resolution.
-    The function will check whether the dataset is chunked along time (into spatially-contiguous maps) 
+    The function will check whether the dataset is chunked along time (into spatially-contiguous maps)
     and if not it will rechunk it.
 
     Parameters
