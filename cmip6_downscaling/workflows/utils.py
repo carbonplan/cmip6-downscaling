@@ -228,7 +228,7 @@ def calc_auspicious_chunks_dict(
 
 def regrid_dataset(
     ds: xr.Dataset,
-    ds_path: Union[str, None] = None,
+    ds_path: Union[str, None],
     target_grid_ds: xr.Dataset,
     variable: str,
     connection_string: str,
