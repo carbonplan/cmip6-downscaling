@@ -84,7 +84,7 @@ with Flow(name=flow_name) as flow:
         **run_hyperparameters
     )
 
-    coarse_obs_path, spatial_anomolies_path = preprocess_bcsd(
+    coarse_obs_path, spatial_anomalies_path = preprocess_bcsd(
         gcm=gcm,
         train_period_start=train_period_start,
         train_period_end=train_period_end,

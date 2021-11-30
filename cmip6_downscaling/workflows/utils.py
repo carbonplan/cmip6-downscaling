@@ -228,19 +228,21 @@ def calc_auspicious_chunks_dict(
 
 def regrid_dataset(
     ds: xr.Dataset,
-    ds_path: xr.Dataset,
+    ds_path: Union[str, None] = None,
     target_grid_ds: xr.Dataset,
     variable: str,
     connection_string: str,
 ) -> Tuple[xr.Dataset, str]:
     """Regrid a dataset to a target grid. For use in both coarsening or interpolating to finer resolution.
+    The function will check whether the dataset is chunked along time (into spatially-contiguous maps) 
+    and if not it will rechunk it.
 
     Parameters
     ----------
     ds : xr.Dataset
         Dataset you want to regrid
     ds_path: str
-        Path to where the dataset is stored
+        Path to where the dataset is stored. If None
     target_grid_ds : xr.Dataset
         Template dataset whose grid you'll match
     variable : str
@@ -263,6 +265,7 @@ def regrid_dataset(
         ds_rechunked = ds
         ds_rechunked_path = ds_path
     except SchemaError:
+        assert ds_path is not None, 'Must pass path to dataset so that you can rechunk it'
         ds_rechunked, ds_rechunked_path = rechunk_zarr_array(
             ds, ds_path, connection_string, variable, chunk_dims=('time',), max_mem="1GB"
         )
