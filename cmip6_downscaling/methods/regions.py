@@ -3,7 +3,6 @@ from typing import Any, Dict, Tuple, Union
 import numpy as np
 import regionmask
 import xarray as xr
-from shapely.geometry import Polygon
 
 
 def generate_subdomains(
