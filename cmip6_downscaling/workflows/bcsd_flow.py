@@ -29,7 +29,6 @@ run_config = KubernetesRun(
     labels=["az-eu-west"],
     env={
         "EXTRA_PIP_PACKAGES": "git+git://github.com/carbonplan/cmip6-downscaling@main git+git://github.com/carbonplan/xarray-schema:chunks git+git@github.com:orianac/scikit-downscale/tree/bcsd-workflow.git"
-
     },
 )
 
@@ -114,7 +113,6 @@ with Flow(name="bcsd-testing", storage=storage, run_config=run_config, executor=
         PREDICT_PERIOD_START=predict_period_start,
         PREDICT_PERIOD_END=predict_period_end,
         VARIABLE=variable,
-
     )
 
     coarse_obs_path, spatial_anomalies_path = preprocess_bcsd_task(
@@ -132,7 +130,6 @@ with Flow(name="bcsd-testing", storage=storage, run_config=run_config, executor=
         coarse_obs_path=coarse_obs_path,
         gcm=gcm,
         scenario=scenario,
-
         train_period_start=train_period_start,
         train_period_end=train_period_end,
         predict_period_start=predict_period_start,
