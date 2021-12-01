@@ -194,7 +194,7 @@ def calc_auspicious_chunks_dict(
     """
     assert target_size == '100mb', "Apologies, but not implemented for anything but 100m right now!"
     assert (
-        type(chunk_dims) == Tuple
+        type(chunk_dims) == tuple
     ), "Your chunk_dims likely includes one string but needs a comma after it! to be a tuple!"
     if type(da) == xr.Dataset:
         da = da.to_array().squeeze()
@@ -254,14 +254,15 @@ def regrid_dataset(
         ds_rechunked = ds
     except:
         ds_rechunked, ds_rechunked_path = rechunk_zarr_array(
-            ds, connection_string, variable, chunk_dims=('time',), max_mem="1GB"
+            ds, target_grid_ds, connection_string, variable, chunk_dims=('time',), max_mem="1GB"
         )
+
     regridder = xe.Regridder(ds_rechunked, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
     ds_regridded = regridder(ds_rechunked)
     return ds_regridded
 
 
-def get_spatial_anomolies(
+def get_spatial_anomalies(
     coarse_obs, fine_obs_rechunked_path, variable, connection_string
 ) -> xr.Dataset:
     """Calculate the seasonal cycle (12 timesteps) spatial anomaly associated

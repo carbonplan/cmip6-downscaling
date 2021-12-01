@@ -1,7 +1,8 @@
+# Imports -----------------------------------------------------------
 import os
 
 from dask_kubernetes import KubeCluster, make_pod_spec
-from prefect import Flow, task
+from prefect import Flow, Parameter, task
 from prefect.executors import DaskExecutor
 from prefect.run_configs import KubernetesRun
 from prefect.storage import Azure
@@ -14,22 +15,21 @@ from cmip6_downscaling.methods.bcsd import (
     preprocess_bcsd,
 )
 
-connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
+# Config -----------------------------------------------------------
 
-run_hyperparameters = {
-    "FLOW_NAME": "BCSD_testing",
-    "GCM": "MIROC6",
-    "SCENARIO": "ssp370",
-    "TRAIN_PERIOD_START": "1990",
-    "TRAIN_PERIOD_END": "1990",
-    "PREDICT_PERIOD_START": "2090",
-    "PREDICT_PERIOD_END": "2090",
-    "VARIABLE": "tasmax",
-}
+connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 
 storage = Azure("prefect")
 image = "carbonplan/cmip6-downscaling-prefect:latest"
-run_config = KubernetesRun(cpu_request=7, memory_request="16Gi", image=image, labels=["az-eu-west"])
+run_config = KubernetesRun(
+    cpu_request=7,
+    memory_request="16Gi",
+    image=image,
+    labels=["az-eu-west"],
+    env={
+        "EXTRA_PIP_PACKAGES": "git+git://github.com/carbonplan/cmip6-downscaling@main git+git@github.com:orianac/scikit-downscale/tree/bcsd-workflow.git"
+    },
+)
 
 executor = DaskExecutor(
     cluster_class=lambda: KubeCluster(
@@ -48,9 +48,7 @@ executor = DaskExecutor(
     adapt_kwargs={"minimum": 4, "maximum": 20},
 )
 
-
-flow_name = run_hyperparameters.pop("FLOW_NAME")  # pop it out because if you leave it in the dict
-# but don't call it as a parameter it'll complain
+# Transform Functions into Tasks -----------------------------------------------------------
 
 make_flow_paths_task = task(make_flow_paths, log_stdout=True, nout=4)
 
@@ -62,20 +60,61 @@ fit_and_predict_task = task(fit_and_predict, log_stdout=True)
 
 postprocess_bcsd_task = task(postprocess_bcsd, log_stdout=True)
 
-with Flow(name="bcsd-testing", storage=storage, run_config=run_config, executor=executor) as flow:
-    gcm = run_hyperparameters["GCM"]
-    scenario = run_hyperparameters["SCENARIO"]
-    train_period_start = run_hyperparameters["TRAIN_PERIOD_START"]
-    train_period_end = run_hyperparameters["TRAIN_PERIOD_END"]
-    predict_period_start = run_hyperparameters["PREDICT_PERIOD_START"]
-    predict_period_end = run_hyperparameters["PREDICT_PERIOD_END"]
-    variable = run_hyperparameters["VARIABLE"]
 
-    coarse_obs_path, spatial_anomalies_path, bias_corrected_path, final_out_path = make_flow_paths(
-        **run_hyperparameters
+@task(log_stdout=True)
+def show_params(
+    flow_name,
+    GCM,
+    SCENARIO,
+    TRAIN_PERIOD_START,
+    TRAIN_PERIOD_END,
+    PREDICT_PERIOD_START,
+    PREDICT_PERIOD_END,
+    VARIABLE,
+):
+    print(type(VARIABLE), type(TRAIN_PERIOD_START), type(TRAIN_PERIOD_END))
+
+
+# Main Flow -----------------------------------------------------------
+
+# with Flow(name="bcsd-testing") as flow:
+with Flow(name="bcsd-testing", storage=storage, run_config=run_config, executor=executor) as flow:
+    flow_name = Parameter("FLOW_NAME")
+    gcm = Parameter("GCM")
+    scenario = Parameter("SCENARIO")
+    train_period_start = Parameter("TRAIN_PERIOD_START")
+    train_period_end = Parameter("TRAIN_PERIOD_END")
+    predict_period_start = Parameter("PREDICT_PERIOD_START")
+    predict_period_end = Parameter("PREDICT_PERIOD_END")
+    variable = Parameter("VARIABLE")
+
+    show_params(
+        flow_name,
+        gcm,
+        scenario,
+        train_period_start,
+        train_period_end,
+        predict_period_start,
+        predict_period_end,
+        variable,
     )
 
-    coarse_obs_path, spatial_anomalies_path = preprocess_bcsd(
+    (
+        coarse_obs_path,
+        spatial_anomalies_path,
+        bias_corrected_path,
+        final_out_path,
+    ) = make_flow_paths_task(
+        GCM=gcm,
+        SCENARIO=scenario,
+        TRAIN_PERIOD_START=train_period_start,
+        TRAIN_PERIOD_END=train_period_end,
+        PREDICT_PERIOD_START=predict_period_start,
+        PREDICT_PERIOD_END=predict_period_end,
+        VARIABLE=variable,
+    )
+
+    coarse_obs_path, spatial_anomalies_path = preprocess_bcsd_task(
         gcm=gcm,
         train_period_start=train_period_start,
         train_period_end=train_period_end,
@@ -86,7 +125,7 @@ with Flow(name="bcsd-testing", storage=storage, run_config=run_config, executor=
         rerun=True,
     )
 
-    y_rechunked_path, X_train_rechunked_path, X_predict_rechunked_path = prep_bcsd_inputs(
+    (y_rechunked_path, X_train_rechunked_path, X_predict_rechunked_path,) = prep_bcsd_inputs_task(
         coarse_obs_path,
         gcm,
         scenario,
@@ -97,11 +136,17 @@ with Flow(name="bcsd-testing", storage=storage, run_config=run_config, executor=
         variable=variable,
     )
 
-    bias_corrected_path = fit_and_predict(
-        X_train_rechunked_path, y_rechunked_path, X_predict_rechunked_path, bias_corrected_path
+    bias_corrected_path = fit_and_predict_task(
+        X_train_rechunked_path,
+        y_rechunked_path,
+        X_predict_rechunked_path,
+        bias_corrected_path,
     )
 
-    out_path = postprocess_bcsd(
-        bias_corrected_path, spatial_anomalies_path, final_out_path, variable, connection_string
+    out_path = postprocess_bcsd_task(
+        bias_corrected_path,
+        spatial_anomalies_path,
+        final_out_path,
+        variable,
+        connection_string,
     )
-flow.run(parameters=run_hyperparameters)
