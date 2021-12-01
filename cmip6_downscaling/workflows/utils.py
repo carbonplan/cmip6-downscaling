@@ -128,12 +128,13 @@ def rechunk_zarr_array(
     # so that you can check whether what you passed in (zarr_array) already looks like that
     # if it does, you'll skip the rechunking!
     target_schema = DataArraySchema(chunks=chunks_dict[variable])
-
     try:
+        # first confirm that you have a zarr_array_location
+        assert zarr_array_location is not None
         rechunked_ds = target_schema.validate(zarr_array[variable])
         # return back the dataset you introduced, and the path is None since you haven't created a new dataset
         return zarr_array, zarr_array_location
-    except SchemaError:
+    except (SchemaError, AssertionError):
         delete_chunks_encoding(zarr_array)
         temp_store, target_store, path_tgt = make_rechunker_stores(connection_string)
         # delete_chunks_encoding(ds) # need to do this before since it wont work on zarr array
@@ -152,9 +153,11 @@ def rechunk_zarr_array(
             # make new stores in case it failed mid-write. alternatively could clean up that store but
             # we don't have delete permission currently
             temp_store, target_store, path_tgt = make_rechunker_stores(connection_string)
+            print(chunks_dict[variable])
             delete_chunks_encoding(zarr_array)
+            print(zarr_array.chunk(chunks_dict[variable]))
             rechunk_plan = rechunk(
-                zarr_array.chunk(calc_auspicious_chunks_dict(zarr_array, chunk_dims=chunk_dims)),
+                zarr_array.chunk(chunks_dict[variable]),
                 chunks_dict,
                 max_mem,
                 target_store,
@@ -224,14 +227,22 @@ def calc_auspicious_chunks_dict(
 
 
 def regrid_dataset(
-    ds: xr.Dataset, target_grid_ds: xr.Dataset, variable: str, connection_string: str
+    ds: xr.Dataset,
+    ds_path: Union[str, None],
+    target_grid_ds: xr.Dataset,
+    variable: str,
+    connection_string: str,
 ) -> Tuple[xr.Dataset, str]:
     """Regrid a dataset to a target grid. For use in both coarsening or interpolating to finer resolution.
+    The function will check whether the dataset is chunked along time (into spatially-contiguous maps)
+    and if not it will rechunk it.
 
     Parameters
     ----------
     ds : xr.Dataset
         Dataset you want to regrid
+    ds_path: str
+        Path to where the dataset is stored. If None
     target_grid_ds : xr.Dataset
         Template dataset whose grid you'll match
     variable : str
@@ -252,18 +263,21 @@ def regrid_dataset(
     try:
         _ = schema_maps_chunks.validate(ds[variable])
         ds_rechunked = ds
-    except:
+        ds_rechunked_path = ds_path
+    except SchemaError:
+        assert ds_path is not None, 'Must pass path to dataset so that you can rechunk it'
         ds_rechunked, ds_rechunked_path = rechunk_zarr_array(
-            ds, target_grid_ds, connection_string, variable, chunk_dims=('time',), max_mem="1GB"
+          ]
+            ds, ds_path, connection_string, variable, chunk_dims=('time',), max_mem="1GB"
         )
 
     regridder = xe.Regridder(ds_rechunked, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
     ds_regridded = regridder(ds_rechunked)
-    return ds_regridded
+    return ds_regridded, ds_rechunked_path
 
 
 def get_spatial_anomalies(
-    coarse_obs, fine_obs_rechunked_path, variable, connection_string
+    coarse_obs_path, fine_obs_rechunked_path, variable, connection_string
 ) -> xr.Dataset:
     """Calculate the seasonal cycle (12 timesteps) spatial anomaly associated
     with aggregating the fine_obs to a given coarsened scale and then reinterpolating
@@ -284,29 +298,30 @@ def get_spatial_anomalies(
 
     Returns
     -------
-    seasonal_cycle_spatial_anomolies : xr.Dataset
+    seasonal_cycle_spatial_anomalies : xr.Dataset
         Spatial anomaly for each month (i.e. of shape (nlat, nlon, 12))
     """
     # interpolate coarse_obs back to the original scale
-    [fine_obs_rechunked] = load_paths([fine_obs_rechunked_path])
+    [coarse_obs, fine_obs_rechunked] = load_paths([coarse_obs_path, fine_obs_rechunked_path])
 
-    obs_interpolated = regrid_dataset(
-        coarse_obs,
-        fine_obs_rechunked.isel(time=0),
+    obs_interpolated, _ = regrid_dataset(
+        ds=coarse_obs,
+        ds_path=coarse_obs_path,
+        target_grid_ds=fine_obs_rechunked.isel(time=0),
         variable=variable,
         connection_string=connection_string,
     )
     # use rechunked fine_obs from coarsening step above because that is in map chunks so it
     # will play nice with the interpolated obs
 
-    fine_obs_rechunked = schema_maps_chunks.validate(fine_obs_rechunked)
+    fine_obs_rechunked = schema_maps_chunks.validate(fine_obs_rechunked[variable])
 
     # calculate difference between interpolated obs and the original obs
-    spatial_anomolies = obs_interpolated - fine_obs_rechunked
+    spatial_anomalies = obs_interpolated - fine_obs_rechunked
 
     # calculate seasonal cycle (12 time points)
-    seasonal_cycle_spatial_anomolies = spatial_anomolies.groupby("time.month").mean()
-    return seasonal_cycle_spatial_anomolies
+    seasonal_cycle_spatial_anomalies = spatial_anomalies.groupby("time.month").mean()
+    return seasonal_cycle_spatial_anomalies
 
 
 def write_dataset(ds: xr.Dataset, path: str, chunks_dims: Tuple = ('time',)) -> None:

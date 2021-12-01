@@ -21,13 +21,15 @@ connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 
 storage = Azure("prefect")
 image = "carbonplan/cmip6-downscaling-prefect:latest"
+
 run_config = KubernetesRun(
     cpu_request=7,
     memory_request="16Gi",
     image=image,
     labels=["az-eu-west"],
     env={
-        "EXTRA_PIP_PACKAGES": "git+git://github.com/carbonplan/cmip6-downscaling@main git+git@github.com:orianac/scikit-downscale/tree/bcsd-workflow.git"
+        "EXTRA_PIP_PACKAGES": "git+git://github.com/carbonplan/cmip6-downscaling@main git+git://github.com/carbonplan/xarray-schema:chunks git+git@github.com:orianac/scikit-downscale/tree/bcsd-workflow.git"
+
     },
 )
 
@@ -112,6 +114,7 @@ with Flow(name="bcsd-testing", storage=storage, run_config=run_config, executor=
         PREDICT_PERIOD_START=predict_period_start,
         PREDICT_PERIOD_END=predict_period_end,
         VARIABLE=variable,
+
     )
 
     coarse_obs_path, spatial_anomalies_path = preprocess_bcsd_task(
@@ -125,10 +128,11 @@ with Flow(name="bcsd-testing", storage=storage, run_config=run_config, executor=
         rerun=True,
     )
 
-    (y_rechunked_path, X_train_rechunked_path, X_predict_rechunked_path,) = prep_bcsd_inputs_task(
-        coarse_obs_path,
-        gcm,
-        scenario,
+    y_rechunked_path, X_train_rechunked_path, X_predict_rechunked_path = prep_bcsd_inputs_task(
+        coarse_obs_path=coarse_obs_path,
+        gcm=gcm,
+        scenario=scenario,
+
         train_period_start=train_period_start,
         train_period_end=train_period_end,
         predict_period_start=predict_period_start,
