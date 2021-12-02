@@ -28,7 +28,7 @@ run_config = KubernetesRun(
     image=image,
     labels=["az-eu-west"],
     env={
-        "EXTRA_PIP_PACKAGES": "git+git://github.com/carbonplan/cmip6-downscaling@param_json git+git://github.com/carbonplan/xarray-schema git+git@github.com:orianac/scikit-downscale/tree/bcsd-workflow.git"
+        "EXTRA_PIP_PACKAGES": "git+https://github.com/carbonplan/cmip6-downscaling.git@param_json git+https://github.com/carbonplan/xarray-schema.git git+https://github.com/orianac/scikit-downscale.git@bcsd-workflow"
     },
 )
 
@@ -43,6 +43,7 @@ executor = DaskExecutor(
             cpu_request=2,
             env={
                 "AZURE_STORAGE_CONNECTION_STRING": os.environ["AZURE_STORAGE_CONNECTION_STRING"],
+                "EXTRA_PIP_PACKAGES": "git+https://github.com/carbonplan/cmip6-downscaling.git@param_json git+https://github.com/carbonplan/xarray-schema.git git+https://github.com/orianac/scikit-downscale.git@bcsd-workflow",
             },
         )
     ),

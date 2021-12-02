@@ -10,7 +10,8 @@ import xarray as xr
 import xesmf as xe
 import zarr
 from rechunker import rechunk
-from xarray_schema.core import DataArraySchema, SchemaError
+from xarray_schema import DataArraySchema
+from xarray_schema.base import SchemaError
 
 schema_maps_chunks = DataArraySchema(chunks={'lat': -1, 'lon': -1})
 
