@@ -28,7 +28,7 @@ run_config = KubernetesRun(
     image=image,
     labels=["az-eu-west"],
     env={
-        "EXTRA_PIP_PACKAGES": "git+git://github.com/carbonplan/cmip6-downscaling@main git+git://github.com/carbonplan/xarray-schema:chunks git+git@github.com:orianac/scikit-downscale/tree/bcsd-workflow.git"
+        "EXTRA_PIP_PACKAGES": "git+git://github.com/carbonplan/cmip6-downscaling@param_json git+git://github.com/carbonplan/xarray-schema git+git@github.com:orianac/scikit-downscale/tree/bcsd-workflow.git"
     },
 )
 

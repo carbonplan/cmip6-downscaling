@@ -265,9 +265,8 @@ def regrid_dataset(
         ds_rechunked = ds
         ds_rechunked_path = ds_path
     except SchemaError:
-        assert ds_path is not None, 'Must pass path to dataset so that you can rechunk it'
+        # assert ds_path is not None, 'Must pass path to dataset so that you can rechunk it'
         ds_rechunked, ds_rechunked_path = rechunk_zarr_array(
-          ]
             ds, ds_path, connection_string, variable, chunk_dims=('time',), max_mem="1GB"
         )
 
