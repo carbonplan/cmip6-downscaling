@@ -1,3 +1,9 @@
+"""
+in preprocess_bcsd:
+
+Error during execution of task: TypeError("unsupported operand type(s) for -: 'Array' and 'NoneType'") """
+
+
 # Imports -----------------------------------------------------------
 import os
 
@@ -79,8 +85,8 @@ def show_params(
 
 # Main Flow -----------------------------------------------------------
 
-# with Flow(name="bcsd-testing") as flow:
-with Flow(name="bcsd-testing", storage=storage, run_config=run_config, executor=executor) as flow:
+with Flow(name="bcsd-testing") as flow:
+    # with Flow(name="bcsd-testing", storage=storage, run_config=run_config, executor=executor) as flow:
     flow_name = Parameter("FLOW_NAME")
     gcm = Parameter("GCM")
     scenario = Parameter("SCENARIO")
@@ -127,7 +133,7 @@ with Flow(name="bcsd-testing", storage=storage, run_config=run_config, executor=
         rerun=True,
     )
 
-    y_rechunked_path, X_train_rechunked_path, X_predict_rechunked_path = prep_bcsd_inputs_task(
+    (y_rechunked_path, X_train_rechunked_path, X_predict_rechunked_path,) = prep_bcsd_inputs_task(
         coarse_obs_path=coarse_obs_path,
         gcm=gcm,
         scenario=scenario,

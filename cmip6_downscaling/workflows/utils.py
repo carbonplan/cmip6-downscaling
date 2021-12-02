@@ -132,7 +132,7 @@ def rechunk_zarr_array(
     try:
         # first confirm that you have a zarr_array_location
         assert zarr_array_location is not None
-        rechunked_ds = target_schema.validate(zarr_array[variable])
+        target_schema.validate(zarr_array[variable])
         # return back the dataset you introduced, and the path is None since you haven't created a new dataset
         return zarr_array, zarr_array_location
     except (SchemaError, AssertionError):
@@ -262,7 +262,7 @@ def regrid_dataset(
     # and if not rechunk it into map space (only do the rechunking if it's necessary)
     # we only have dataarray schema implemented now- can switch to datasets once that's done
     try:
-        _ = schema_maps_chunks.validate(ds[variable])
+        schema_maps_chunks.validate(ds[variable])
         ds_rechunked = ds
         ds_rechunked_path = ds_path
     except SchemaError:
@@ -292,7 +292,7 @@ def get_spatial_anomalies(
     coarse_obs : xr.Dataset
         Coarsened to a GCM resolution. Chunked along time.
     fine_obs_rechunked_path : xr.Dataset
-        Original observationa spatial resolution. Chunked along time.
+        Original observation spatial resolution. Chunked along time.
     variable: str
         The variable included in the dataset.
 
@@ -314,7 +314,7 @@ def get_spatial_anomalies(
     # use rechunked fine_obs from coarsening step above because that is in map chunks so it
     # will play nice with the interpolated obs
 
-    fine_obs_rechunked = schema_maps_chunks.validate(fine_obs_rechunked[variable])
+    schema_maps_chunks.validate(fine_obs_rechunked[variable])
 
     # calculate difference between interpolated obs and the original obs
     spatial_anomalies = obs_interpolated - fine_obs_rechunked
