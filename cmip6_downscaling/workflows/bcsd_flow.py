@@ -86,8 +86,8 @@ def show_params(
 # Main Flow -----------------------------------------------------------
 
 # with Flow(name="bcsd-testing") as flow:
-# with Flow(name="bcsd-testing", storage=storage, run_config=run_config, executor=executor) as flow:
-with Flow(name="bcsd-testing", storage=storage, run_config=run_config) as flow:
+# with Flow(name="bcsd-testing", storage=storage, run_config=run_config) as flow:
+with Flow(name="bcsd-testing", storage=storage, run_config=run_config, executor=executor) as flow:
 
     flow_name = Parameter("FLOW_NAME")
     gcm = Parameter("GCM")
