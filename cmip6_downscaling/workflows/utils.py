@@ -278,13 +278,7 @@ def regrid_dataset(
             max_mem="1GB",
         )
 
-    regridder = xe.Regridder(
-        ds_rechunked,
-        target_grid_ds,
-        "bilinear",
-        extrap_method="nearest_s2d",
-        reuse_weights=True,
-    )
+    regridder = xe.Regridder(ds_rechunked, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
     ds_regridded = regridder(ds_rechunked)
     return ds_regridded, ds_rechunked_path
 
