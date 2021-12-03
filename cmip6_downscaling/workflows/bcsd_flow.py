@@ -1,9 +1,3 @@
-"""
-in preprocess_bcsd:
-
-Error during execution of task: TypeError("unsupported operand type(s) for -: 'Array' and 'NoneType'") """
-
-
 # Imports -----------------------------------------------------------
 import os
 
@@ -26,16 +20,17 @@ from cmip6_downscaling.methods.bcsd import (
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 
 storage = Azure("prefect")
-image = "carbonplan/cmip6-downscaling-prefect:latest"
-
+image = "carbonplan/cmip6-downscaling-prefect:2021.12.02"
+env_config = {
+    "AZURE_STORAGE_CONNECTION_STRING": os.environ["AZURE_STORAGE_CONNECTION_STRING"],
+    "EXTRA_PIP_PACKAGES": "git+https://github.com/carbonplan/cmip6-downscaling.git@param_json git+https://github.com/carbonplan/xarray-schema.git git+https://github.com/orianac/scikit-downscale.git@bcsd-workflow",
+}
 run_config = KubernetesRun(
     cpu_request=7,
     memory_request="16Gi",
     image=image,
     labels=["az-eu-west"],
-    env={
-        "EXTRA_PIP_PACKAGES": "git+https://github.com/carbonplan/cmip6-downscaling.git@param_json git+https://github.com/carbonplan/xarray-schema.git git+https://github.com/orianac/scikit-downscale.git@bcsd-workflow"
-    },
+    env=env_config,
 )
 
 executor = DaskExecutor(
@@ -47,10 +42,7 @@ executor = DaskExecutor(
             threads_per_worker=2,
             cpu_limit=2,
             cpu_request=2,
-            env={
-                "AZURE_STORAGE_CONNECTION_STRING": os.environ["AZURE_STORAGE_CONNECTION_STRING"],
-                "EXTRA_PIP_PACKAGES": "git+https://github.com/carbonplan/cmip6-downscaling.git@param_json git+https://github.com/carbonplan/xarray-schema.git git+https://github.com/orianac/scikit-downscale.git@bcsd-workflow",
-            },
+            env=env_config,
         )
     ),
     adapt_kwargs={"minimum": 4, "maximum": 20},
