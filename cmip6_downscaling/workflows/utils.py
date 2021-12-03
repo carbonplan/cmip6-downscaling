@@ -13,7 +13,7 @@ from rechunker import rechunk
 from xarray_schema import DataArraySchema
 from xarray_schema.base import SchemaError
 
-schema_maps_chunks = DataArraySchema(chunks={'lat': -1, 'lon': -1})
+schema_maps_chunks = DataArraySchema(chunks={"lat": -1, "lon": -1})
 
 
 def get_store(prefix, account_key=None):
@@ -31,7 +31,9 @@ def get_store(prefix, account_key=None):
     return store
 
 
-def load_paths(paths):  # What type do i use here since paths is of unknown length? : list[str]):
+def load_paths(
+    paths,
+):  # What type do i use here since paths is of unknown length? : list[str]):
     ds_list = [xr.open_zarr(path) for path in paths]
     return ds_list
 
@@ -43,11 +45,11 @@ def temp_file_name():
 
 def delete_chunks_encoding(ds: Union[xr.Dataset, xr.DataArray]):
     for data_var in ds.data_vars:
-        if 'chunks' in ds[data_var].encoding:
-            del ds[data_var].encoding['chunks']
+        if "chunks" in ds[data_var].encoding:
+            del ds[data_var].encoding["chunks"]
     for coord in ds.coords:
-        if 'chunks' in ds[coord].encoding:
-            del ds[coord].encoding['chunks']
+        if "chunks" in ds[coord].encoding:
+            del ds[coord].encoding["chunks"]
 
 
 def make_rechunker_stores(
@@ -77,7 +79,7 @@ def rechunk_zarr_array(
     zarr_array_location: str,
     connection_string: str,
     variable: str,
-    chunk_dims: Union[Tuple, dict] = ('time',),
+    chunk_dims: Union[Tuple, dict] = ("time",),
     max_mem: str = "200MB",
 ):
     """Use `rechunker` package to adjust chunks of dataset to a form
@@ -112,16 +114,16 @@ def rechunk_zarr_array(
     if type(chunk_dims) == tuple:
         chunks_dict = {
             variable: calc_auspicious_chunks_dict(zarr_array, chunk_dims=chunk_dims),
-            'time': None,  # write None here because you don't want to rechunk this array
-            'lon': None,
-            'lat': None,
+            "time": None,  # write None here because you don't want to rechunk this array
+            "lon": None,
+            "lat": None,
         }
     elif type(chunk_dims) == dict:
         chunks_dict = chunk_dims
         # ensure that the chunks_dict looks the way you want it to as {variable: {'lat': chunk_size_lat, 'lon': chunk_size_lon, 'time': chunk_size_lon}
         # 'lon': None, 'lat': None, 'time': none}
         assert variable in chunks_dict
-        for dim in ['lat', 'lon', 'time']:
+        for dim in ["lat", "lon", "time"]:
             chunks_dict[dim] = None
             assert dim in chunks_dict[variable]
 
@@ -149,7 +151,7 @@ def rechunk_zarr_array(
             rechunk_plan.execute(retries=5)
         except ValueError:
             print(
-                'WARNING: Failed to write zarr store, perhaps because of variable chunk sizes, trying to rechunk it'
+                "WARNING: Failed to write zarr store, perhaps because of variable chunk sizes, trying to rechunk it"
             )
             # make new stores in case it failed mid-write. alternatively could clean up that store but
             # we don't have delete permission currently
@@ -175,8 +177,8 @@ def rechunk_zarr_array(
 
 def calc_auspicious_chunks_dict(
     da: Union[xr.DataArray, xr.Dataset],
-    target_size: str = '100mb',
-    chunk_dims: Tuple = ('lat', 'lon'),
+    target_size: str = "100mb",
+    chunk_dims: Tuple = ("lat", "lon"),
 ) -> dict:
     """Figure out a chunk size that, given the size of the dataset, the dimension(s) you want to chunk on
     and the data type, will fit under the target_size. Currently only works for 100mb which
@@ -196,7 +198,7 @@ def calc_auspicious_chunks_dict(
     chunks_dict : dict
         Dictionary of chunk sizes
     """
-    assert target_size == '100mb', "Apologies, but not implemented for anything but 100m right now!"
+    assert target_size == "100mb", "Apologies, but not implemented for anything but 100m right now!"
     assert (
         type(chunk_dims) == tuple
     ), "Your chunk_dims likely includes one string but needs a comma after it! to be a tuple!"
@@ -212,7 +214,7 @@ def calc_auspicious_chunks_dict(
             #  so we'll always just give it the full length of the dimension
             chunks_dict[dim] = array_dims[dim]
     # calculate the bytesize given the dtype
-    data_bytesize = int(re.findall(r'\d+', str(da.dtype))[0])
+    data_bytesize = int(re.findall(r"\d+", str(da.dtype))[0])
     # calculate single non_chunked_size based upon dtype
     smallest_size_one_chunk = data_bytesize * np.prod(
         [array_dims[dim] for dim in chunks_dict.keys()]
@@ -268,10 +270,21 @@ def regrid_dataset(
     except SchemaError:
         # assert ds_path is not None, 'Must pass path to dataset so that you can rechunk it'
         ds_rechunked, ds_rechunked_path = rechunk_zarr_array(
-            ds, ds_path, connection_string, variable, chunk_dims=('time',), max_mem="1GB"
+            ds,
+            ds_path,
+            connection_string,
+            variable,
+            chunk_dims=("time",),
+            max_mem="1GB",
         )
 
-    regridder = xe.Regridder(ds_rechunked, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
+    regridder = xe.Regridder(
+        ds_rechunked,
+        target_grid_ds,
+        "bilinear",
+        extrap_method="nearest_s2d",
+        reuse_weights=True,
+    )
     ds_regridded = regridder(ds_rechunked)
     return ds_regridded, ds_rechunked_path
 
@@ -324,7 +337,7 @@ def get_spatial_anomalies(
     return seasonal_cycle_spatial_anomalies
 
 
-def write_dataset(ds: xr.Dataset, path: str, chunks_dims: Tuple = ('time',)) -> None:
+def write_dataset(ds: xr.Dataset, path: str, chunks_dims: Tuple = ("time",)) -> None:
     """Write out a dataset.
 
     Parameters
@@ -338,13 +351,13 @@ def write_dataset(ds: xr.Dataset, path: str, chunks_dims: Tuple = ('time',)) -> 
     """
     store = fsspec.get_mapper(path)
     try:
-        ds.to_zarr(store, mode='w', consolidated=True)
+        ds.to_zarr(store, mode="w", consolidated=True)
     except ValueError:
         # if your chunk size isn't uniform you'll probably get a value error so
         # you can try doing this you can rechunk it
         print(
-            'WARNING: Failed to write zarr store, perhaps because of variable chunk sizes, trying to rechunk it'
+            "WARNING: Failed to write zarr store, perhaps because of variable chunk sizes, trying to rechunk it"
         )
         chunks_dict = calc_auspicious_chunks_dict(ds, chunk_dims=chunks_dims)
         delete_chunks_encoding(ds)
-        ds.chunk(chunks_dict).to_zarr(store, mode='w', consolidated=True)
+        ds.chunk(chunks_dict).to_zarr(store, mode="w", consolidated=True)
