@@ -18,7 +18,7 @@ def generate_subdomains(
     Parameters
     ----------
     ex_output_grid : xarray dataarray or dataset. example output grid definition. both the bounding box and resolution in lat/lon directions will be used.
-    buffer_size    : int/float. for each subdomain, how much buffer area to run.
+    buffer_size    : int/float in unit of degree. for each subdomain, how much buffer area to run
     region_def     : str. whether to use SREX region definition or ar6 region definition to define subdomain.
                      see the docs https://regionmask.readthedocs.io/en/stable/defined_scientific.html for more details.
 
@@ -36,7 +36,7 @@ def generate_subdomains(
 
     mask = regions.mask(ex_output_grid)
     region_codes = np.unique(mask.values)
-    region_codes = region_codes[~np.isnan(region_codes)]
+    region_codes = region_codes[np.isfinite(region_codes)]
 
     subdomains = {}
     for n, bound in zip(regions.numbers, regions.bounds):
@@ -50,6 +50,8 @@ def generate_subdomains(
             # but since it's difficult to get a subdomain crossing the -180 longitude line, add this region into region 1 instead
             if n == 1 and region_def == 'ar6':
                 min_lon = -180
+            elif n == 28 and region_def == 'ar6':
+                min_lon = 40.0 - buffer_size
             subdomains[n] = (min_lon, min_lat, max_lon, max_lat)
 
     return subdomains, mask
@@ -72,12 +74,14 @@ def combine_outputs(
     --------
     ds      : the combined output where values come from the respective ds in ds_dict according to mask
     """
+    # compare the region codes in ds_dict and in mask to make sure that they match with each other
     region_codes_available = list(ds_dict.keys())
     region_codes = np.unique(mask.values)
-    region_codes = region_codes[~np.isnan(region_codes)]
+    region_codes = region_codes[np.isfinite(region_codes)]
     for code in region_codes:
         assert code in region_codes_available
 
+    # construct the output
     out = xr.Dataset()
     template = ds_dict[region_codes_available[0]]
     for v in template.data_vars:
@@ -87,8 +91,9 @@ def combine_outputs(
             coords={'time': template.time, 'lat': mask.lat, 'lon': mask.lon},
         )
         for code in region_codes:
-            downscale_output = ds_dict[code][v]
-            downscale_output = downscale_output.reindex({'lat': mask.lat, 'lon': mask.lon})
-            out[v] = xr.where(mask == code, downscale_output, out[v])
+            # this is the values in ds_dict, which contains the information for each region separately
+            single_region_output = ds_dict[code][v]
+            single_region_output = single_region_output.reindex({'lat': mask.lat, 'lon': mask.lon})
+            out[v] = xr.where(mask == code, single_region_output, out[v])
 
     return out
