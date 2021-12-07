@@ -20,10 +20,10 @@ from cmip6_downscaling.methods.bcsd import (
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 
 storage = Azure("prefect")
-image = "carbonplan/cmip6-downscaling-prefect:2021.12.02"
+image = "carbonplan/cmip6-downscaling-prefect:2021.12.06"
 env_config = {
     "AZURE_STORAGE_CONNECTION_STRING": os.environ["AZURE_STORAGE_CONNECTION_STRING"],
-    "EXTRA_PIP_PACKAGES": "git+https://github.com/carbonplan/cmip6-downscaling.git@param_json git+https://github.com/carbonplan/xarray-schema.git git+https://github.com/orianac/scikit-downscale.git@bcsd-workflow",
+    "EXTRA_PIP_PACKAGES": "git+https://github.com/carbonplan/cmip6-downscaling.git@param_json git+https://github.com/orianac/scikit-downscale.git@bcsd-workflow",
 }
 run_config = KubernetesRun(
     cpu_request=7,
@@ -80,7 +80,6 @@ def show_params(
 # with Flow(name="bcsd-testing") as flow:
 # with Flow(name="bcsd-testing", storage=storage, run_config=run_config) as flow:
 with Flow(name="bcsd-testing", storage=storage, run_config=run_config, executor=executor) as flow:
-
     flow_name = Parameter("FLOW_NAME")
     gcm = Parameter("GCM")
     scenario = Parameter("SCENARIO")
