@@ -109,6 +109,7 @@ def preprocess_bcsd(
     #  since it will just help us not repeat the coarsening/spatial anomalies step
     if (not (fs.exists(coarse_obs_path) and fs.exists(spatial_anomalies_path))) or rerun:
         obs_ds = open_era5(variable, start_year=train_period_start, end_year=train_period_end)
+        obs_ds = obs_ds.chunk({'time': 365})
 
         gcm_one_slice = load_cmip(return_type='xr', variable_ids=[variable]).isel(time=0)
         # # calculate and write out the coarsened version of obs dataset to match the gcm
