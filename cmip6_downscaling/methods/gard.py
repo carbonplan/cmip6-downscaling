@@ -23,7 +23,7 @@ def gard_preprocess(
     train_period_start: str,
     train_period_end: str,
     predict_period_start: str,
-    predict_period_end: str, 
+    predict_period_end: str,
     variable: str,
     features: List[str],
     connection_string: str,
@@ -52,37 +52,37 @@ def gard_preprocess(
     -------
 
     """
-    # get all the variables 
+    # get all the variables
     all_vars = list(set([variable] + features))
 
-    # get observation 
+    # get observation
     ds_obs = open_era5(all_vars, start_year=train_period_start, end_year=train_period_end)
 
-    # get gcm 
+    # get gcm
     historical_gcm = load_cmip(
         activity_ids='CMIP',
         experiment_ids='historical',
         source_ids=gcm,
         variable_ids=all_vars],
-        return_type='xr', 
+        return_type='xr',
     ).sel(time=slice(train_period_start, train_period_end))
     future_gcm = load_cmip(
         activity_ids='ScenarioMIP',
         experiment_ids=scenario,
         source_ids=gcm,
         variable_ids=all_vars],
-        return_type='xr', 
+        return_type='xr',
     ).sel(time=slice(predict_period_start, predict_period_end))
     ds_gcm = xr.combine_by_coords([historical_gcm, future_gcm])
 
-    # TODO: how do we define grid spec?? 
+    # TODO: how do we define grid spec??
     gcm_grid_spec = get_grid_spec(ds_gcm)
 
-    # input needs to be in chunked in the space dimension 
-    # goal here is to cache: 1) the rechunked fine obs, 2) the coarsened obs, and 3) the regridded obs 
+    # input needs to be in chunked in the space dimension
+    # goal here is to cache: 1) the rechunked fine obs, 2) the coarsened obs, and 3) the regridded obs
     ds_obs_regridded = coarsen_then_interpolate(ds_obs, gcm_grid_spec)
 
-    # can we use this function?? 
+    # can we use this function??
     coarse_obs, fine_obs_rechunked_path = regrid_dataset(
         ds=obs_ds,
         ds_path=None,
@@ -91,9 +91,9 @@ def gard_preprocess(
         connection_string=connection_string,
     )
 
-    # bias correction 
+    # bias correction
 
-    return 
+    return
 
 def bias_correction_by_var(
     da_gcm: xr.DataArray,
