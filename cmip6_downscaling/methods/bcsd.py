@@ -1,6 +1,7 @@
 import os
 from typing import Tuple
 
+import dask
 import fsspec
 from skdownscale.pointwise_models import BcAbsolute, BcRelative, PointWiseDownscaler
 
@@ -312,6 +313,7 @@ def postprocess_bcsd(
         connection_string=connection_string,
     )
     bcsd_results = y_predict_fine.groupby("time.month") + spatial_anomalies
-    write_dataset(bcsd_results, final_out_path)
+    with dask.config.set(scheduler="single-threaded"):
+        write_dataset(bcsd_results, final_out_path)
 
     return final_out_path

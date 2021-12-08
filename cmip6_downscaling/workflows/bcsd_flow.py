@@ -77,8 +77,9 @@ def show_params(
 
 # Main Flow -----------------------------------------------------------
 
-# with Flow(name="bcsd-testing") as flow:
 # with Flow(name="bcsd-testing", storage=storage, run_config=run_config) as flow:
+# with Flow(name="bcsd-testing") as flow:
+
 with Flow(name="bcsd-testing", storage=storage, run_config=run_config, executor=executor) as flow:
     flow_name = Parameter("FLOW_NAME")
     gcm = Parameter("GCM")
@@ -100,49 +101,53 @@ with Flow(name="bcsd-testing", storage=storage, run_config=run_config, executor=
         variable,
     )
 
-    (
-        coarse_obs_path,
-        spatial_anomalies_path,
-        bias_corrected_path,
-        final_out_path,
-    ) = make_flow_paths_task(
-        GCM=gcm,
-        SCENARIO=scenario,
-        TRAIN_PERIOD_START=train_period_start,
-        TRAIN_PERIOD_END=train_period_end,
-        PREDICT_PERIOD_START=predict_period_start,
-        PREDICT_PERIOD_END=predict_period_end,
-        VARIABLE=variable,
-    )
+    # (
+    #     coarse_obs_path,
+    #     spatial_anomalies_path,
+    #     bias_corrected_path,
+    #     final_out_path,
+    # ) = make_flow_paths_task(
+    #     GCM=gcm,
+    #     SCENARIO=scenario,
+    #     TRAIN_PERIOD_START=train_period_start,
+    #     TRAIN_PERIOD_END=train_period_end,
+    #     PREDICT_PERIOD_START=predict_period_start,
+    #     PREDICT_PERIOD_END=predict_period_end,
+    #     VARIABLE=variable,
+    # )
 
-    coarse_obs_path, spatial_anomalies_path = preprocess_bcsd_task(
-        gcm=gcm,
-        train_period_start=train_period_start,
-        train_period_end=train_period_end,
-        variable=variable,
-        coarse_obs_path=coarse_obs_path,
-        spatial_anomalies_path=spatial_anomalies_path,
-        connection_string=connection_string,
-        rerun=True,
-    )
+    # coarse_obs_path, spatial_anomalies_path = preprocess_bcsd_task(
+    #     gcm=gcm,
+    #     train_period_start=train_period_start,
+    #     train_period_end=train_period_end,
+    #     variable=variable,
+    #     coarse_obs_path=coarse_obs_path,
+    #     spatial_anomalies_path=spatial_anomalies_path,
+    #     connection_string=connection_string,
+    #     rerun=True,
+    # )
 
-    (y_rechunked_path, X_train_rechunked_path, X_predict_rechunked_path,) = prep_bcsd_inputs_task(
-        coarse_obs_path=coarse_obs_path,
-        gcm=gcm,
-        scenario=scenario,
-        train_period_start=train_period_start,
-        train_period_end=train_period_end,
-        predict_period_start=predict_period_start,
-        predict_period_end=predict_period_end,
-        variable=variable,
-    )
+    # (y_rechunked_path, X_train_rechunked_path, X_predict_rechunked_path,) = prep_bcsd_inputs_task(
+    #     coarse_obs_path=coarse_obs_path,
+    #     gcm=gcm,
+    #     scenario=scenario,
+    #     train_period_start=train_period_start,
+    #     train_period_end=train_period_end,
+    #     predict_period_start=predict_period_start,
+    #     predict_period_end=predict_period_end,
+    #     variable=variable,
+    # )
 
-    bias_corrected_path = fit_and_predict_task(
-        X_train_rechunked_path,
-        y_rechunked_path,
-        X_predict_rechunked_path,
-        bias_corrected_path,
-    )
+    # bias_corrected_path = fit_and_predict_task(
+    #     X_train_rechunked_path,
+    #     y_rechunked_path,
+    #     X_predict_rechunked_path,
+    #     bias_corrected_path,
+    # )
+
+    bias_corrected_path = 'az://cmip6/intermediates/bc_ssp370_MIROC6_2090_2095_tasmax.zarr'
+    spatial_anomalies_path = 'az://cmip6/intermediates/anomalies_MIROC6_1990_1995_tasmax.zarr'
+    final_out_path = 'az://cmip6/results/bcsd_ssp370_MIROC6_2090_2095_tasmax.zarr'
 
     out_path = postprocess_bcsd_task(
         bias_corrected_path,

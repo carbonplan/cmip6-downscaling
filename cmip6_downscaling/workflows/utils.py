@@ -270,7 +270,7 @@ def regrid_dataset(
         ds_rechunked_path = ds_path
     except SchemaError:
         print('Entering rechunking...')
-        # assert ds_path is not None, 'Must pass path to dataset so that you can rechunk it'
+        assert ds_path is not None, 'Must pass path to dataset so that you can rechunk it'
         ds_rechunked, ds_rechunked_path = rechunk_zarr_array(
             ds,
             ds_path,
