@@ -142,7 +142,7 @@ def gard_fit_and_predict(
 
     out = xr.Dataset()
     out['pred'] = model.predict(ds_gcm_interpolated)
-    # TODO: fix syntax here 
+    # TODO: fix syntax here
     out['error'] = model.predict(ds_gcm_interpolated, return_errors=True)
     out['exceedance_prob'] = model.predict(ds_gcm_interpolated, return_exceedance_prob=True)
 
@@ -172,7 +172,7 @@ def calc_correlation_length_scale(
 
     # find spatial length scale
     bin_center, gamma = gs.vario_estimate(
-        # TODO: need to figure whether we need to do .values for this function 
+        # TODO: need to figure whether we need to do .values for this function
         pos=(detrended.lon.values, detrended.lat.values),
         field=detrended.values,
         latlon=True,
@@ -186,7 +186,7 @@ def calc_correlation_length_scale(
     fields = []
     day_in_year = 365
     for yr, group in detrended.groupby('time.year'):
-        # TODO: this is a very long list for a large domain, perhaps need random sampling 
+        # TODO: this is a very long list for a large domain, perhaps need random sampling
         v = (
             group.isel(time=slice(0, day_in_year))
             .stack(point=['lat', 'lon'])
@@ -233,7 +233,7 @@ def generate_scrf(
     model = gs.Gaussian(dim=3, var=1.0, len_scale=[ss, ss, ts])
     srf = gs.SRF(model, seed=seed)
 
-    # TODO: figure out how to chunk this 
+    # TODO: figure out how to chunk this
     field = xr.DataArray(
         srf.structured((x, y, t)), dims=['lon', 'lat', 'time'], coords=[x, y, output_template.time]
     ).rio.write_crs(crs)

@@ -6,11 +6,7 @@ from prefect.executors import DaskExecutor
 from prefect.run_configs import KubernetesRun
 from prefect.storage import Azure
 
-from cmip6_downscaling.methods.gard import (
-    gard_preprocess,
-    gard_fit_and_predict,
-    gard_postprocess,
-)
+from cmip6_downscaling.methods.gard import gard_fit_and_predict, gard_postprocess, gard_preprocess
 
 make_flow_paths_task = task(make_flow_paths, log_stdout=True, nout=4)
 
