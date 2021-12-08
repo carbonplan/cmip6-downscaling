@@ -26,8 +26,10 @@ def generate_subdomains(
 
     Returns
     -------
-    subdomains : dictionary mapping subdomain code to bounding boxes ([min_lon, min_lat, max_lon, max_lat]) for each subdomain
-    mask       : mask of which subdomain code to use for each grid cell
+    subdomains : dict
+        Dictionary mapping subdomain code to bounding boxes ([min_lon, min_lat, max_lon, max_lat]) for each subdomain
+    mask : xarray.DataArray
+        Mask of which subdomain code to use for each grid cell
     """
     if region_def == 'ar6':
         regions = regionmask.defined_regions.ar6.land
@@ -69,12 +71,15 @@ def combine_outputs(
 
     Parameters
     ----------
-    ds_dict : dictionary mapping subdomain code to output
-    mask    : mask of which subdomain code to use for each grid cell (2D, lat/lon)
+    ds_dict : dict 
+        Dictionary mapping subdomain code to output (subdomain code : xr.Dataset)
+    mask : xarray.DataArray
+        Mask of which subdomain code to use for each grid cell (2D, lat/lon)
 
     Returns
     --------
-    ds      : the combined output where values come from the respective ds in ds_dict according to mask
+    ds : xarray.Dataset 
+        The combined output where values come from the respective ds in ds_dict according to mask
     """
     # compare the region codes in ds_dict and in mask to make sure that they match with each other
     region_codes_available = list(ds_dict.keys())
