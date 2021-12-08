@@ -71,14 +71,14 @@ def combine_outputs(
 
     Parameters
     ----------
-    ds_dict : dict 
+    ds_dict : dict
         Dictionary mapping subdomain code to output (subdomain code : xr.Dataset)
     mask : xarray.DataArray
         Mask of which subdomain code to use for each grid cell (2D, lat/lon)
 
     Returns
     --------
-    ds : xarray.Dataset 
+    ds : xarray.Dataset
         The combined output where values come from the respective ds in ds_dict according to mask
     """
     # compare the region codes in ds_dict and in mask to make sure that they match with each other
