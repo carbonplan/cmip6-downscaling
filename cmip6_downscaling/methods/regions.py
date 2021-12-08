@@ -17,10 +17,12 @@ def generate_subdomains(
 
     Parameters
     ----------
-    ex_output_grid : xarray dataarray or dataset. example output grid definition. both the bounding box and resolution in lat/lon directions will be used.
-    buffer_size    : int/float in unit of degree. for each subdomain, how much buffer area to run
-    region_def     : str. whether to use SREX region definition or ar6 region definition to define subdomain.
-                     see the docs https://regionmask.readthedocs.io/en/stable/defined_scientific.html for more details.
+    ex_output_grid : xarray.DataArray or xarray.Dataset
+        Example output grid definition. both the bounding box and resolution in lat/lon directions will be used.
+    buffer_size : int or float
+        Buffer size in unit of degree. for each subdomain, how much buffer area to run
+    region_def : str
+        Subregion definition name. Options are `'ar6'` or `'srex'`. See the docs https://regionmask.readthedocs.io/en/stable/defined_scientific.html for more details.
 
     Returns
     -------
