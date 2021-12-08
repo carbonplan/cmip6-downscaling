@@ -1,9 +1,10 @@
 import os
 
 os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "True"
+from typing import List, Union
+
 import xarray as xr
 import zarr
-from typing import Union, List
 
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 
