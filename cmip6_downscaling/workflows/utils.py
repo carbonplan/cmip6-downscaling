@@ -87,7 +87,7 @@ def rechunk_zarr_array(
     zarr_array : zarr or xarray dataset
         Dataset you want to rechunk.
     zarr_array_location: str
-        Path to where the input data is sitting. Only returned/used if zarr_array does not need to rechunked 
+        Path to where the input data is sitting. Only returned/used if zarr_array does not need to rechunked
     chunk_dims : Union[Tuple, dict]
         Information for chunking the ds. If a dict is passed, it will rechunk following sizes as specified. The dict should look like:
             {variable: {'lat': chunk_size_lat,

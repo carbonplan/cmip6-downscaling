@@ -15,6 +15,7 @@ from skdownscale.pointwise_models.utils import default_none_kwargs
 from sklearn.linear_model import LinearRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import QuantileTransformer, StandardScaler
+
 from cmip6_downscaling.data.observations import open_era5
 
 
@@ -63,14 +64,14 @@ def gard_preprocess(
         experiment_ids='historical',
         source_ids=gcm,
         variable_ids=[all_vars],
-        return_type='xr', 
+        return_type='xr',
     ).sel(time=0)
 
-    # TODO: how do we define grid spec?? 
+    # TODO: how do we define grid spec??
     gcm_grid_spec = get_grid_spec(gcm)
 
-    # input needs to be in chunked in the space dimension 
-    # goal here is to cache: 1) the rechunked fine obs, 2) the coarsened obs, and 3) the regridded obs 
+    # input needs to be in chunked in the space dimension
+    # goal here is to cache: 1) the rechunked fine obs, 2) the coarsened obs, and 3) the regridded obs
     ds_obs_regridded = coarsen_then_interpolate(ds_obs, gcm_grid_spec, example_data)
 
     # can we use this function??
@@ -171,14 +172,14 @@ def gard_bias_correction(
         experiment_ids='historical',
         source_ids=gcm,
         variable_ids=[all_vars],
-        return_type='xr', 
+        return_type='xr',
     ).sel(time=slice(train_period_start, train_period_end))
     future_gcm = load_cmip(
         activity_ids='ScenarioMIP',
         experiment_ids=scenario,
         source_ids=gcm,
         variable_ids=all_vars],
-        return_type='xr', 
+        return_type='xr',
     ).sel(time=slice(predict_period_start, predict_period_end))
     ds_gcm = xr.combine_by_coords([historical_gcm, future_gcm])
 
