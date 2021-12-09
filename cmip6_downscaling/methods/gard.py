@@ -22,6 +22,11 @@ def gard_preprocess(
     gcm: str,
     train_period_start: str,
     train_period_end: str,
+<<<<<<< HEAD
+=======
+    predict_period_start: str,
+    predict_period_end: str,
+>>>>>>> 52b96b39e87e0de548ab8966dc5cb60d5ac446c6
     variable: str,
     features: List[str],
     connection_string: str,
@@ -46,13 +51,13 @@ def gard_preprocess(
     -------
 
     """
-    # get all the variables 
+    # get all the variables
     all_vars = list(set([variable] + features))
 
-    # get observation 
+    # get observation
     ds_obs = open_era5(all_vars, start_year=train_period_start, end_year=train_period_end)
 
-    # get gcm 
+    # get gcm
     historical_gcm = load_cmip(
         activity_ids='CMIP',
         experiment_ids='historical',
@@ -68,7 +73,7 @@ def gard_preprocess(
     # goal here is to cache: 1) the rechunked fine obs, 2) the coarsened obs, and 3) the regridded obs 
     ds_obs_regridded = coarsen_then_interpolate(ds_obs, gcm_grid_spec, example_data)
 
-    # can we use this function?? 
+    # can we use this function??
     coarse_obs, fine_obs_rechunked_path = regrid_dataset(
         ds=obs_ds,
         ds_path=None,
@@ -77,9 +82,9 @@ def gard_preprocess(
         connection_string=connection_string,
     )
 
-    # bias correction 
+    # bias correction
 
-    return 
+    return
 
 def bias_correction_by_var(
     da_gcm: xr.DataArray,
