@@ -23,11 +23,6 @@ def gard_preprocess(
     gcm: str,
     train_period_start: str,
     train_period_end: str,
-<<<<<<< HEAD
-=======
-    predict_period_start: str,
-    predict_period_end: str,
->>>>>>> 52b96b39e87e0de548ab8966dc5cb60d5ac446c6
     variable: str,
     features: List[str],
     connection_string: str,
