@@ -15,15 +15,13 @@ from skdownscale.pointwise_models.utils import default_none_kwargs
 from sklearn.linear_model import LinearRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import QuantileTransformer, StandardScaler
+from cmip6_downscaling.data.observations import open_era5
 
 
 def gard_preprocess(
     gcm: str,
-    scenario: str,
     train_period_start: str,
     train_period_end: str,
-    predict_period_start: str,
-    predict_period_end: str, 
     variable: str,
     features: List[str],
     connection_string: str,
@@ -39,10 +37,6 @@ def gard_preprocess(
         Date for training period start (e.g. '1985')
     train_period_end : str
         Date for training period end (e.g. '2015')
-    predict_period_start : str
-        Date for predict period start (e.g. '1985')
-    predict_period_end : str
-        Date for predict period end (e.g. '2015')
     variable : str
         Variable of interest in CMIP conventions (e.g. 'tasmax')
     connection_string : str
@@ -63,24 +57,16 @@ def gard_preprocess(
         activity_ids='CMIP',
         experiment_ids='historical',
         source_ids=gcm,
-        variable_ids=all_vars],
+        variable_ids=[all_vars],
         return_type='xr', 
-    ).sel(time=slice(train_period_start, train_period_end))
-    future_gcm = load_cmip(
-        activity_ids='ScenarioMIP',
-        experiment_ids=scenario,
-        source_ids=gcm,
-        variable_ids=all_vars],
-        return_type='xr', 
-    ).sel(time=slice(predict_period_start, predict_period_end))
-    ds_gcm = xr.combine_by_coords([historical_gcm, future_gcm])
+    ).sel(time=0)
 
     # TODO: how do we define grid spec?? 
-    gcm_grid_spec = get_grid_spec(ds_gcm)
+    gcm_grid_spec = get_grid_spec(gcm)
 
     # input needs to be in chunked in the space dimension 
     # goal here is to cache: 1) the rechunked fine obs, 2) the coarsened obs, and 3) the regridded obs 
-    ds_obs_regridded = coarsen_then_interpolate(ds_obs, gcm_grid_spec)
+    ds_obs_regridded = coarsen_then_interpolate(ds_obs, gcm_grid_spec, example_data)
 
     # can we use this function?? 
     coarse_obs, fine_obs_rechunked_path = regrid_dataset(
@@ -174,6 +160,22 @@ def gard_bias_correction(
     # TODO: if needed, rechunk in this function
     if isinstance(variables, str):
         variables = [variables]
+
+    historical_gcm = load_cmip(
+        activity_ids='CMIP',
+        experiment_ids='historical',
+        source_ids=gcm,
+        variable_ids=[all_vars],
+        return_type='xr', 
+    ).sel(time=slice(train_period_start, train_period_end))
+    future_gcm = load_cmip(
+        activity_ids='ScenarioMIP',
+        experiment_ids=scenario,
+        source_ids=gcm,
+        variable_ids=all_vars],
+        return_type='xr', 
+    ).sel(time=slice(predict_period_start, predict_period_end))
+    ds_gcm = xr.combine_by_coords([historical_gcm, future_gcm])
 
     ds_gcm_out, ds_obs_out = xr.Dataset(), xr.Dataset()
     for v in variables:

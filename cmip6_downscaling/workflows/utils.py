@@ -87,7 +87,7 @@ def rechunk_zarr_array(
     zarr_array : zarr or xarray dataset
         Dataset you want to rechunk.
     zarr_array_location: str
-        Path to where the data is sitting.
+        Path to where the input data is sitting. Only returned/used if zarr_array does not need to rechunked 
     chunk_dims : Union[Tuple, dict]
         Information for chunking the ds. If a dict is passed, it will rechunk following sizes as specified. The dict should look like:
             {variable: {'lat': chunk_size_lat,
@@ -156,6 +156,7 @@ def rechunk_zarr_array(
             print(chunks_dict[variable])
             delete_chunks_encoding(zarr_array)
             print(zarr_array.chunk(chunks_dict[variable]))
+            # TODO: will always work but need to double check the result and if it's taking a long time
             rechunk_plan = rechunk(
                 zarr_array.chunk(chunks_dict[variable]),
                 chunks_dict,
@@ -346,3 +347,6 @@ def write_dataset(ds: xr.Dataset, path: str, chunks_dims: Tuple = ('time',)) -> 
         chunks_dict = calc_auspicious_chunks_dict(ds, chunk_dims=chunks_dims)
         delete_chunks_encoding(ds)
         ds.chunk(chunks_dict).to_zarr(store, mode='w', consolidated=True)
+
+
+def get_grid_spec():
