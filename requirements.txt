@@ -7,6 +7,7 @@ intake
 intake-esm
 intake-xarray
 prefect
+regionmask
 scikit-downscale
 scikit-learn
 tenacity
