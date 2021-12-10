@@ -1,23 +1,30 @@
 # Imports -----------------------------------------------------------
 import os
 
+os.environ['PREFECT__FLOWS__CHECKPOINTING'] = 'true'
 from dask_kubernetes import KubeCluster, make_pod_spec
+from funnel import CacheStore
+from funnel.prefect.result import FunnelResult
 from prefect import Flow, Parameter, task
 from prefect.executors import DaskExecutor
 from prefect.run_configs import KubernetesRun
 from prefect.storage import Azure
 
-from cmip6_downscaling.methods.bcsd import (
+from cmip6_downscaling.methods.bcsd import (  # preprocess_bcsd,; get_transformed_data,; prep_bcsd_inputs,
     fit_and_predict,
+    get_coarse_obs,
+    get_spatial_anomalies,
     make_flow_paths,
     postprocess_bcsd,
-    prep_bcsd_inputs,
-    preprocess_bcsd,
+    return_obs,
+    return_x_predict_rechunked,
+    return_x_train_rechunked,
+    return_y_rechunked,
+    write_bcsd_results,
 )
 
 # Config -----------------------------------------------------------
 
-connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 
 storage = Azure("prefect")
 image = "carbonplan/cmip6-downscaling-prefect:2021.12.06"
@@ -48,17 +55,53 @@ executor = DaskExecutor(
     adapt_kwargs={"minimum": 4, "maximum": 20},
 )
 
+cache_store = CacheStore('az://flow-outputs/bcsd')
+serializer = 'xarray.zarr'
+connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
+
+
 # Transform Functions into Tasks -----------------------------------------------------------
 
 make_flow_paths_task = task(make_flow_paths, log_stdout=True, nout=4)
 
-preprocess_bcsd_task = task(preprocess_bcsd, log_stdout=True, nout=2)
+return_obs_task = task(
+    return_obs, result=FunnelResult(cache_store, serializer=serializer), target='obs-ds'
+)
+get_coarse_obs_task = task(
+    get_coarse_obs, result=FunnelResult(cache_store, serializer=serializer), target='coarse-obs-ds'
+)
+get_spatial_anomalies_task = task(
+    get_spatial_anomalies,
+    result=FunnelResult(cache_store, serializer=serializer),
+    target='spatial-anomalies',
+)
 
-prep_bcsd_inputs_task = task(prep_bcsd_inputs, log_stdout=True, nout=3)
-
-fit_and_predict_task = task(fit_and_predict, log_stdout=True)
-
-postprocess_bcsd_task = task(postprocess_bcsd, log_stdout=True)
+return_y_rechunked_task = task(
+    return_y_rechunked,
+    result=FunnelResult(cache_store, serializer=serializer),
+    target='y-rechunked',
+)
+return_x_train_rechunked_task = task(
+    return_x_train_rechunked,
+    result=FunnelResult(cache_store, serializer=serializer),
+    target='x-train-rechunked',
+)
+return_x_predict_rechunked_task = task(
+    return_x_predict_rechunked,
+    result=FunnelResult(cache_store, serializer=serializer),
+    target='x-predict-rechunked',
+)
+fit_and_predict_task = task(
+    fit_and_predict,
+    result=FunnelResult(cache_store, serializer=serializer),
+    target='fit-and-predict',
+)
+postprocess_bcsd_task = task(
+    postprocess_bcsd,
+    result=FunnelResult(cache_store, serializer=serializer),
+    target='post-process',
+)
+write_bcsd_results_task = task(write_bcsd_results, log_stdout=True)
 
 
 @task(log_stdout=True)
@@ -72,15 +115,15 @@ def show_params(
     PREDICT_PERIOD_END,
     VARIABLE,
 ):
-    print(type(VARIABLE), type(TRAIN_PERIOD_START), type(TRAIN_PERIOD_END))
+    pass
 
 
 # Main Flow -----------------------------------------------------------
 
 # with Flow(name="bcsd-testing", storage=storage, run_config=run_config) as flow:
-# with Flow(name="bcsd-testing") as flow:
+# with Flow(name="bcsd-testing", storage=storage, run_config=run_config, executor=executor) as flow:
+with Flow(name="bcsd-testing") as flow:
 
-with Flow(name="bcsd-testing", storage=storage, run_config=run_config, executor=executor) as flow:
     flow_name = Parameter("FLOW_NAME")
     gcm = Parameter("GCM")
     scenario = Parameter("SCENARIO")
@@ -115,44 +158,31 @@ with Flow(name="bcsd-testing", storage=storage, run_config=run_config, executor=
         PREDICT_PERIOD_END=predict_period_end,
         VARIABLE=variable,
     )
-
-    coarse_obs_path, spatial_anomalies_path = preprocess_bcsd_task(
-        gcm=gcm,
-        train_period_start=train_period_start,
-        train_period_end=train_period_end,
-        variable=variable,
-        coarse_obs_path=coarse_obs_path,
-        spatial_anomalies_path=spatial_anomalies_path,
-        connection_string=connection_string,
-        rerun=True,
+    # preprocess_bcsd_tasks(s):
+    obs_ds = return_obs_task(train_period_start, train_period_end, variable)
+    coarse_obs_ds = get_coarse_obs_task(obs_ds, variable, connection_string)
+    spatial_anomalies_ds = get_spatial_anomalies_task(
+        coarse_obs_ds, obs_ds, variable, connection_string
     )
 
-    (y_rechunked_path, X_train_rechunked_path, X_predict_rechunked_path,) = prep_bcsd_inputs_task(
-        coarse_obs_path=coarse_obs_path,
-        gcm=gcm,
-        scenario=scenario,
-        train_period_start=train_period_start,
-        train_period_end=train_period_end,
-        predict_period_start=predict_period_start,
-        predict_period_end=predict_period_end,
-        variable=variable,
+    # prep_bcsd_inputs_task(s):
+    y_rechunked_ds = return_y_rechunked_task(coarse_obs_ds, variable)
+    x_train_rechunked_ds = return_x_train_rechunked_task(
+        gcm, variable, train_period_start, train_period_end, y_rechunked_ds
+    )
+    x_predict_rechunked_ds = return_x_predict_rechunked_task(
+        gcm, scenario, variable, predict_period_start, predict_period_end, x_train_rechunked_ds
     )
 
-    bias_corrected_path = fit_and_predict_task(
-        X_train_rechunked_path,
-        y_rechunked_path,
-        X_predict_rechunked_path,
-        bias_corrected_path,
+    # #fit and predict tasks(s):
+    bias_corrected_ds = fit_and_predict_task(
+        x_train_rechunked_ds, y_rechunked_ds, x_predict_rechunked_ds, variable, "time"
     )
+
+    # #postprocess_bcsd_task(s):
+    postprocess_bcsd_ds = postprocess_bcsd_task(bias_corrected_ds, spatial_anomalies_ds, variable)
+    write_bcsd_results_task(postprocess_bcsd_ds, 'az://cmip6/results/{ADD_PARAMS}')
 
     # bias_corrected_path = 'az://cmip6/intermediates/bc_ssp370_MIROC6_1990_1995_tasmax.zarr'
     # spatial_anomalies_path = 'az://cmip6/intermediates/anomalies_MIROC6_1990_1995_tasmax.zarr'
     # final_out_path = 'az://cmip6/results/bcsd_ssp370_MIROC6_2090_2095_tasmax.zarr'
-
-    out_path = postprocess_bcsd_task(
-        bias_corrected_path,
-        spatial_anomalies_path,
-        final_out_path,
-        variable,
-        connection_string,
-    )

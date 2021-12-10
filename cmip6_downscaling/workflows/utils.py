@@ -168,9 +168,8 @@ def rechunk_zarr_array(
                 temp_store=temp_store,
             )
             rechunk_plan.execute(retries=5)
-        rechunked_ds = xr.open_zarr(
-            target_store
-        )  # ideally we want consolidated=True but it seems that functionality isn't offered in rechunker right now
+        rechunked_ds = xr.open_zarr(target_store)
+        # ideally we want consolidated=True but it seems that functionality isn't offered in rechunker right now
         # we can just add a consolidate_metadata step here to do it after the fact (once rechunker is done) but only
         # necessary if we'll reopen this rechukned_ds multiple times
         return rechunked_ds, path_tgt
@@ -335,6 +334,54 @@ def get_spatial_anomalies(
     # calculate seasonal cycle (12 time points)
     seasonal_cycle_spatial_anomalies = spatial_anomalies.groupby("time.month").mean()
     return seasonal_cycle_spatial_anomalies
+
+
+# def get_spatial_anomalies(
+#     coarse_obs_path, fine_obs_rechunked_path, variable, connection_string
+# ) -> xr.Dataset:
+#     """Calculate the seasonal cycle (12 timesteps) spatial anomaly associated
+#     with aggregating the fine_obs to a given coarsened scale and then reinterpolating
+#     it back to the original spatial resolution. The outputs of this function are
+#     dependent on three parameters:
+#     * a grid (as opposed to a specific GCM since some GCMs run on the same grid)
+#     * the time period which fine_obs (and by construct coarse_obs) cover
+#     * the variable
+
+#     Parameters
+#     ----------
+#     coarse_obs : xr.Dataset
+#         Coarsened to a GCM resolution. Chunked along time.
+#     fine_obs_rechunked_path : xr.Dataset
+#         Original observation spatial resolution. Chunked along time.
+#     variable: str
+#         The variable included in the dataset.
+
+#     Returns
+#     -------
+#     seasonal_cycle_spatial_anomalies : xr.Dataset
+#         Spatial anomaly for each month (i.e. of shape (nlat, nlon, 12))
+#     """
+#     # interpolate coarse_obs back to the original scale
+#     [coarse_obs, fine_obs_rechunked] = load_paths([coarse_obs_path, fine_obs_rechunked_path])
+
+#     obs_interpolated, _ = regrid_dataset(
+#         ds=coarse_obs,
+#         ds_path=coarse_obs_path,
+#         target_grid_ds=fine_obs_rechunked.isel(time=0),
+#         variable=variable,
+#         connection_string=connection_string,
+#     )
+#     # use rechunked fine_obs from coarsening step above because that is in map chunks so it
+#     # will play nice with the interpolated obs
+
+#     schema_maps_chunks.validate(fine_obs_rechunked[variable])
+
+#     # calculate difference between interpolated obs and the original obs
+#     spatial_anomalies = obs_interpolated - fine_obs_rechunked
+
+#     # calculate seasonal cycle (12 time points)
+#     seasonal_cycle_spatial_anomalies = spatial_anomalies.groupby("time.month").mean()
+#     return seasonal_cycle_spatial_anomalies
 
 
 def write_dataset(ds: xr.Dataset, path: str, chunks_dims: Tuple = ("time",)) -> None:

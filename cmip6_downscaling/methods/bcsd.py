@@ -1,15 +1,19 @@
 import os
+
+os.environ['PREFECT__FLOWS__CHECKPOINTING'] = 'true'
 from typing import Tuple
 
 import dask
 import fsspec
+import xarray
+import xarray as xr
 from skdownscale.pointwise_models import BcAbsolute, BcRelative, PointWiseDownscaler
+from xarray_schema import DataArraySchema
 
 from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
 from cmip6_downscaling.data.cmip import load_cmip
 from cmip6_downscaling.data.observations import open_era5
 from cmip6_downscaling.workflows.utils import (
-    get_spatial_anomalies,
     load_paths,
     rechunk_zarr_array,
     regrid_dataset,
@@ -18,7 +22,6 @@ from cmip6_downscaling.workflows.utils import (
 
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 fs = fsspec.filesystem('az')
-# TODO: add templates for paths, maybe using prefect context. Do this once functions ported to prefect world in bcsd_flow.py
 
 
 def make_flow_paths(
@@ -65,6 +68,169 @@ def make_flow_paths(
     bias_corrected_path = f"{workdir}/intermediates/bc_{SCENARIO}_{GCM}_{TRAIN_PERIOD_START}_{TRAIN_PERIOD_END}_{VARIABLE}.zarr"
     final_out_path = f"{outdir}/bcsd_{SCENARIO}_{GCM}_{PREDICT_PERIOD_START}_{PREDICT_PERIOD_END}_{VARIABLE}.zarr"
     return coarse_obs_path, spatial_anomalies_path, bias_corrected_path, final_out_path
+
+
+def get_transformed_data():
+    ds = xr.tutorial.open_dataset('air_temperature').chunk({'lat': 50, 'lon': 50})
+    ds['air'] = ds['air'] - 273.13
+    ds['air'].attrs['units'] = 'degC'
+    # compute a dask array to confirm that dask tasks are executed on the executor's client
+    dask.array.zeros((10000, 10000), chunks=(100, 100)).mean().compute()
+    return ds
+
+
+def return_obs(train_period_start: str, train_period_end: str, variable: str) -> xarray.Dataset:
+    obs_ds = open_era5(variable, start_year=train_period_start, end_year=train_period_end)
+    obs_ds = obs_ds.chunk({'time': 365})
+    return obs_ds
+
+
+def get_coarse_obs(
+    obs_ds: xarray.Dataset,
+    variable: str,
+    connection_string: str,
+) -> xarray.Dataset:
+
+    """Part 1. of preprocess_bcsd with caching. Returns coarse_obs"""
+
+    gcm_one_slice = load_cmip(return_type='xr', variable_ids=[variable]).isel(time=0)
+    # # calculate and write out the coarsened version of obs dataset to match the gcm
+    # # (will be used in training)
+    coarse_obs_ds, fine_obs_rechunked_path = regrid_dataset(
+        ds=obs_ds,
+        ds_path=None,
+        target_grid_ds=gcm_one_slice,
+        variable=variable,
+        connection_string=connection_string,
+    )
+    return coarse_obs_ds
+
+
+def get_spatial_anomalies(
+    coarse_obs: xarray.Dataset,
+    obs_ds: xarray.Dataset,
+    variable: str,
+    connection_string: str,
+) -> xarray.Dataset:
+
+    """Part 2. of preprocess_bcsd with caching. Returns spatial anomalies
+    Calculate the seasonal cycle (12 timesteps) spatial anomaly associated
+    with aggregating the fine_obs to a given coarsened scale and then reinterpolating
+    it back to the original spatial resolution. The outputs of this function are
+    dependent on three parameters:
+    * a grid (as opposed to a specific GCM since some GCMs run on the same grid)
+    * the time period which fine_obs (and by construct coarse_obs) cover
+    * the variable
+
+    Parameters
+    ----------
+    coarse_obs : xr.Dataset
+        Coarsened to a GCM resolution. Chunked along time.
+    fine_obs_rechunked_path : xr.Dataset
+        Original observation spatial resolution. Chunked along time.
+    variable: str
+        The variable included in the dataset.
+
+    Returns
+    -------
+    seasonal_cycle_spatial_anomalies : xr.Dataset
+        Spatial anomaly for each month (i.e. of shape (nlat, nlon, 12))
+    """
+    print(obs_ds)
+    obs_interpolated, _ = regrid_dataset(
+        ds=coarse_obs,
+        ds_path=None,
+        target_grid_ds=obs_ds.isel(time=0),
+        variable=variable,
+        connection_string=connection_string,
+    )
+    print(obs_interpolated)
+
+    # # use rechunked fine_obs from coarsening step above because that is in map chunks so it
+    # # will play nice with the interpolated obs
+    schema_maps_chunks = DataArraySchema(chunks={"lat": -1, "lon": -1})
+
+    schema_maps_chunks.validate(obs_ds[variable])
+
+    # calculate difference between interpolated obs and the original obs
+    spatial_anomalies = obs_interpolated - obs_ds
+
+    # calculate seasonal cycle (12 time points)
+    seasonal_cycle_spatial_anomalies = spatial_anomalies.groupby("time.month").mean()
+    return seasonal_cycle_spatial_anomalies
+
+
+def return_y_rechunked(coarse_obs_ds: xarray.Dataset, variable: str) -> xarray.Dataset:
+    y_rechunked_ds, y_rechunked_ds_path = rechunk_zarr_array(
+        coarse_obs_ds,
+        None,
+        chunk_dims=('lat', 'lon'),
+        variable=variable,
+        connection_string=connection_string,
+        max_mem='1GB',
+    )
+    print('y_rechunked ds: ', y_rechunked_ds)
+
+    return y_rechunked_ds
+
+
+def return_x_train_rechunked(
+    gcm: str,
+    variable: str,
+    train_period_start: str,
+    train_period_end: str,
+    y_rechunked_ds: xarray.Dataset,
+) -> xarray.Dataset:
+    X_train = load_cmip(source_ids=gcm, variable_ids=[variable], return_type='xr').sel(
+        time=slice(train_period_start, train_period_end)
+    )
+    X_train['time'] = y_rechunked_ds.time.values
+
+    X_train_rechunked_ds, X_train_rechunked_path = rechunk_zarr_array(
+        X_train,
+        zarr_array_location=None,
+        variable=variable,
+        chunk_dims=('lat', 'lon'),
+        connection_string=connection_string,
+        max_mem='1GB',
+    )
+    return X_train_rechunked_ds
+
+
+def return_x_predict_rechunked(
+    gcm: str,
+    scenario: str,
+    variable: str,
+    predict_period_start: str,
+    predict_period_end: str,
+    X_train_rechunked_ds: xarray.Dataset,
+) -> xarray.Dataset:
+    X_predict = load_cmip(
+        source_ids=gcm,
+        activity_ids='ScenarioMIP',
+        experiment_ids=scenario,
+        variable_ids=[variable],
+        return_type='xr',
+    ).sel(time=slice(predict_period_start, predict_period_end))
+    # validate that X_predict spatial chunks match those of X_train since the spatial chunks of predict data need
+    # to match when they get passed to the fit_and_predict utility
+    # if they are not, rechunk X_predict to match those spatial chunks specifically (don't just pass lat/lon as the chunking dims)
+    matching_chunks_dict = {
+        variable: {
+            'time': X_train_rechunked_ds.chunks['time'][0],
+            'lat': X_train_rechunked_ds.chunks['lat'][0],
+            'lon': X_train_rechunked_ds.chunks['lon'][0],
+        }
+    }
+    x_predict_rechunked_ds, X_predict_rechunked_path = rechunk_zarr_array(
+        X_predict,
+        zarr_array_location=None,
+        variable=variable,
+        chunk_dims=matching_chunks_dict,
+        connection_string=connection_string,
+        max_mem='1GB',
+    )
+    return x_predict_rechunked_ds
 
 
 def preprocess_bcsd(
@@ -230,90 +396,78 @@ def prep_bcsd_inputs(
 
 
 def fit_and_predict(
-    X_train_path: str,
-    y_path: str,
-    X_predict_path: str,
-    bias_corrected_path: str,
-    dim: str = "time",
+    x_train_rechunked_ds: xarray.Dataset,
+    y_rechunked_ds: xarray.Dataset,
+    x_predict_rechunked_ds: xarray.Dataset,
     variable: str = "tasmax",
-) -> str:
+    dim: str = "time",
+) -> xarray.Dataset:
     """Fit bcsd model on prepared CMIP data with obs at corresponding spatial scale.
     Then predict for a set of CMIP data (likely future).
 
     Parameters
     ----------
-    X_train_path : str
-        Path to GCM training data chunked along space
-    y_path : str
-        Path to obs training data chunked along space
-    X_predict_path : str
-        Path to GCM prediction data chunked along space.
-    bias_corrected_path : str
-        Path to final bias corrected data (matches dims of X_predict).
-    dim : str, optional
-        dimension on which you want to do the modelling, by default "time"
+    x_train_rechunked_ds : xarray.Dataset
+        GCM training dataset chunked along space
+    y_rechunked_ds : xarray.Dataset
+        Obs training dataset chunked along space
+    x_predict_rechunked_ds : xarray.Dataset
+        GCM prediction dataset chunked along space.
     variable : str, optional
         variable you're modelling, by default "tasmax"
+    dim : str, optional
+        dimension on which you want to do the modelling, by default "time"
+
 
     Returns
     -------
-    bias_corrected_path : str
-        Path to where coarse bias-corrected data is
+    bias_corrected_ds : xarray.Dataset
+        Bias-corrected dataset
     """
-    y, X_train, X_predict = load_paths([y_path, X_train_path, X_predict_path])
-
     if variable in ABSOLUTE_VARS:
         bcsd_model = BcAbsolute(return_anoms=False)
     elif variable in RELATIVE_VARS:
         bcsd_model = BcRelative(return_anoms=False)
     pointwise_model = PointWiseDownscaler(model=bcsd_model, dim=dim)
-    pointwise_model.fit(X_train[variable], y[variable])
-    bias_corrected = pointwise_model.predict(X_predict[variable])
-    write_dataset(bias_corrected.to_dataset(name=variable), bias_corrected_path)
-    return bias_corrected_path
+    pointwise_model.fit(x_train_rechunked_ds[variable], y_rechunked_ds[variable])
+    bias_corrected_da = pointwise_model.predict(x_predict_rechunked_ds[variable])
+    bias_corrected_ds = bias_corrected_da.to_dataset(name=variable)
+    return bias_corrected_ds
 
 
 def postprocess_bcsd(
-    y_predict_path: str,
-    spatial_anomalies_path: str,
-    final_out_path: str,
-    variable: str,
-    connection_string: str,
-) -> str:
+    bias_corrected_ds: xarray.Dataset, spatial_anomalies_ds: xarray.Dataset, variable: str
+) -> xarray.Dataset:
     """Downscale the bias-corrected data by interpolating and then
     adding the spatial anomalies back in.
 
     Parameters
     ----------
-    y_predict_path : str
-        location where bias-corrected data is.
-    spatial_anomalies_path : str
-        location where spatial anomalies are
-    final_out_path : str
-        location to write final BCSD data
+    bias_corrected_ds : xarray.Dataset
+        bias-corrected dataset
+    spatial_anomalies_ds : xarray.Dataset
+        spatial anomalies dataset
     variable : str
-        variable you're working on
-    connection_string : str
-        Connection string to give you read/write access to the out buckets specified above
+        Input variable
 
     Returns
     -------
-    final_out_path : str
-        location where final BCSD data was written
+    bcsd_results_ds : xarray.Dataset
+        Final BCSD dataset
     """
-    y_predict, spatial_anomalies = load_paths([y_predict_path, spatial_anomalies_path])
 
-    # TODO: test - create sample input, run it through rechunk/regridder and then
-    # assert that it looks like i want it to
     y_predict_fine, _ = regrid_dataset(
-        ds=y_predict,
-        ds_path=y_predict_path,
-        target_grid_ds=spatial_anomalies,
+        ds=bias_corrected_ds,
+        ds_path=None,
+        target_grid_ds=spatial_anomalies_ds,
         variable=variable,
         connection_string=connection_string,
     )
-    bcsd_results = y_predict_fine.groupby("time.month") + spatial_anomalies
-    with dask.config.set(scheduler="single-threaded"):
-        write_dataset(bcsd_results, final_out_path)
+    bcsd_results_ds = y_predict_fine.groupby("time.month") + spatial_anomalies_ds
 
-    return final_out_path
+    return bcsd_results_ds
+
+
+def write_bcsd_results(bcsd_results_ds: xarray.Dataset, output_path: str):
+    with dask.config.set(scheduler="single-threaded"):
+        write_dataset(bcsd_results_ds, output_path)
