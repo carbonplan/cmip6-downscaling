@@ -1,5 +1,4 @@
 {
-  "FLOW_NAME": "BCSD_testing",
   "GCM": "MIROC6",
   "SCENARIO": "ssp370",
   "TRAIN_PERIOD_START": "1990",
