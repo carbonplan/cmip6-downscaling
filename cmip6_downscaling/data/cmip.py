@@ -213,6 +213,7 @@ def load_cmip(
         .df['zstore']
         .to_list()
     )
+    print(stores)
     if len(stores) > 1:
         raise ValueError('can only get 1 store at a time')
     if return_type == 'zarr':
@@ -269,3 +270,19 @@ def gcm_munge(ds: xr.Dataset) -> xr.Dataset:
         ds = ds.drop('height')
     ds = ds.squeeze(drop=True)
     return ds
+
+
+def get_gcm_grid_spec(gcm: str) -> str:
+    gcm_grid = load_cmip(
+        source_ids=gcm,
+        return_type='xr',
+    ).sel(time=0)
+
+    nlat = len(gcm_grid.lat)
+    nlon = len(gcm_grid.lon)
+    lat_spacing = int(round(abs(gcm_grid.lat[0] - gcm_grid.lat[1]), 1) * 10)
+    lon_spacing = int(round(abs(gcm_grid.lon[0] - gcm_grid.lon[1]), 1) * 10)
+    min_lat = int(round(gcm_grid.lat.min(), 1))
+    min_lon = int(round(gcm_grid.lon.min(), 1))
+
+    return f'{nlat:d}x{nlon:d}_gridsize_{lat_spacing:d}_{lon_spacing:d}_llcorner_{min_lat:d}_{min_lon:d}'
