@@ -213,7 +213,6 @@ def load_cmip(
         .df['zstore']
         .to_list()
     )
-    print(stores)
     if len(stores) > 1:
         raise ValueError('can only get 1 store at a time')
     if return_type == 'zarr':
