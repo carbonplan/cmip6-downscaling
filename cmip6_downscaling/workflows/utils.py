@@ -10,7 +10,7 @@ import xarray as xr
 import xesmf as xe
 import zarr
 from rechunker import rechunk
-from xarray_schema.core import DataArraySchema, SchemaError
+from xarray_schema.core import DataArraySchema, SchemaError, DatasetSchema
 from cmip6_downscaling.data.cmip import load_cmip
 
 
@@ -467,12 +467,3 @@ def rechunk_zarr_array_with_caching(
         # we can just add a consolidate_metadata step here to do it after the fact (once rechunker is done) but only
         # necessary if we'll reopen this rechukned_ds multiple times
         return rechunked_ds
-
-    
-def get_gcm_grid_spec(gcm: str) -> str:
-    gcm_data = load_cmip(
-        source_ids=gcm,
-        return_type='xr',
-    ).sel(time=0)
-    
-    return ''
