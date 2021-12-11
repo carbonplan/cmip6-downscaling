@@ -6,7 +6,7 @@ def build_obs_identifier(
     train_period_start: str,
     train_period_end: str,
     variables: Union[str, List[str]],
-    chunk_by: str,
+    chunking_approach: str,
 ) -> str:
     """
     Build the common identifier for observation related data: the same pattern is used for: 1) chunked raw obs, 2) coarsened obs, and 3) coarsened then interpolated obs
@@ -21,8 +21,8 @@ def build_obs_identifier(
         From run hyperparameters
     variables : str
         From run hyperparameters
-    chunk_by: str
-        Whether the data is chunked by time or space
+    chunking_approach: str
+        'full_space' or 'full_time'
 
     Returns
     -------
@@ -32,7 +32,7 @@ def build_obs_identifier(
     if isinstance(variables, str):
         variables = [variables]
     var_string = '_'.join(variables)
-    return f'{obs}_{train_period_start}_{train_period_end}_{var_string}_{chunk_by}_chunked'
+    return f'{obs}_{train_period_start}_{train_period_end}_{var_string}_{chunking_approach}'
 
 
 def make_rechunked_obs_path(
@@ -40,7 +40,7 @@ def make_rechunked_obs_path(
     train_period_start: str,
     train_period_end: str,
     variables: Union[str, List[str]],
-    chunk_by: str,
+    chunking_approach: str,
     workdir: str = "az://cmip6",
 ) -> str:
     """Build the path for rechunked observation
@@ -55,8 +55,8 @@ def make_rechunked_obs_path(
         From run hyperparameters
     variables : str
         From run hyperparameters
-    chunk_by: str
-        Whether the data is chunked by time or space
+    chunking_approach: str
+        'full_space' or 'full_time'
     workdir : str, optional
         Intermediate files for caching (and might be used by other gcms), by default "az://cmip6"
 
@@ -70,7 +70,7 @@ def make_rechunked_obs_path(
         train_period_start=train_period_start,
         train_period_end=train_period_end,
         variables=variables,
-        chunk_by=chunk_by,
+        chunking_approach=chunking_approach,
     )
     return f"{workdir}/intermediates/{obs_identifier}.zarr"
 
@@ -81,7 +81,7 @@ def make_coarse_obs_path(
     train_period_end: str,
     variables: Union[str, List[str]],
     gcm_grid_spec: str,
-    chunk_by: str,
+    chunking_approach: str,
     workdir: str = "az://cmip6",
 ) -> str:
     """Build the path for coarsened observation
@@ -98,8 +98,8 @@ def make_coarse_obs_path(
         From run hyperparameters
     gcm_grid_spec: str
         Output of get_gcm_grid_spec
-    chunk_by: str
-        Whether the data is chunked by time or space
+    chunking_approach: str
+        'full_space' or 'full_time'
     workdir : str, optional
         Intermediate files for caching (and might be used by other gcms), by default "az://cmip6"
 
@@ -113,7 +113,7 @@ def make_coarse_obs_path(
         train_period_start=train_period_start,
         train_period_end=train_period_end,
         variables=variables,
-        chunk_by=chunk_by,
+        chunking_approach=chunking_approach,
     )
     return f"{workdir}/intermediates/coarsened_{obs_identifier}_{gcm_grid_spec}.zarr"
 
@@ -124,7 +124,7 @@ def make_interpolated_obs_path(
     train_period_end: str,
     variables: Union[str, List[str]],
     gcm_grid_spec: str,
-    chunk_by: str,
+    chunking_approach: str,
     workdir: str = "az://cmip6",
 ) -> str:
     """Build the path for coarsened observation that has then been interpolated back to the observation grid
@@ -141,8 +141,8 @@ def make_interpolated_obs_path(
         From run hyperparameters
     gcm_grid_spec: str
         Output of get_gcm_grid_spec
-    chunk_by: str
-        Whether the data is chunked by time or space
+    chunking_approach: str
+        'full_space' or 'full_time'
     workdir : str, optional
         Intermediate files for caching (and might be used by other gcms), by default "az://cmip6"
 
@@ -156,6 +156,6 @@ def make_interpolated_obs_path(
         train_period_start=train_period_start,
         train_period_end=train_period_end,
         variables=variables,
-        chunk_by=chunk_by,
+        chunking_approach=chunking_approach,
     )
     return f"{workdir}/intermediates/interpolated_{obs_identifier}_{gcm_grid_spec}.zarr"
