@@ -235,6 +235,7 @@ def regrid_dataset(
     ds: xr.Dataset,
     ds_path: Union[str, None],
     target_grid_ds: xr.Dataset,
+    variable: str,
     connection_string: str,
 ) -> Tuple[xr.Dataset, str]:
     """Regrid a dataset to a target grid. For use in both coarsening or interpolating to finer resolution.
