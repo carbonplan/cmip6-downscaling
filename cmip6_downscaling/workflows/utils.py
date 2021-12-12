@@ -371,7 +371,7 @@ def rechunk_zarr_array_with_caching(
         Path to where the output data is saved. If output path is not empty, the content would be loaded and the schema checked. If the schema check passed,
         the content will be returned without rechunking again (i.e. caching); else, the content can be overwritten (see overwrite option).
     chunking_approach : str
-        Has to be one of `full_space` or `full_time`. If `full_space`, the data will be rechunked such that the space dimensions are contiguous (i.e. each chunk 
+        Has to be one of `full_space` or `full_time`. If `full_space`, the data will be rechunked such that the space dimensions are contiguous (i.e. each chunk
         will contain full maps). If `full_time`, the data will be rechunked such that the time dimension is contiguous (i.e. each chunk will contain full time
         series)
     connection_string : str
@@ -389,9 +389,12 @@ def rechunk_zarr_array_with_caching(
     """
     # determine the chunking schema
     if chunking_approach == 'full_space':
-        chunk_dims = ('time', )  # if we need full maps, chunk along the time dimension 
+        chunk_dims = ('time',)  # if we need full maps, chunk along the time dimension
     elif chunking_approach == 'full_time':
-        chunk_dims = ('lat', 'lon', )  # if we need full time series, chunk along the lat/lon dimensions 
+        chunk_dims = (
+            'lat',
+            'lon',
+        )  # if we need full time series, chunk along the lat/lon dimensions
     else:
         raise NotImplementedError("chunking_approach must be in ['full_space', 'full_time']")
     chunk_def = calc_auspicious_chunks_dict(zarr_array, chunk_dims=chunk_dims)
@@ -422,7 +425,7 @@ def rechunk_zarr_array_with_caching(
         try:
             # if the content in target path is correctly chunked, return
             target_schema.validate(output)
-            return output 
+            return output
 
         except SchemaError:
             if overwrite:
