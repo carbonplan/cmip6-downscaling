@@ -28,7 +28,7 @@ def get_store(bucket, prefix, account_key=None):
 
 
 def open_era5(variables: Union[str, List[str]], start_year: str, end_year: str) -> xr.Dataset:
-    """Open ERA5 daily data for a single variable for period 1979-2021
+    """Open ERA5 daily data for one or more variables for period 1979-2021
 
     Parameters
     ----------
