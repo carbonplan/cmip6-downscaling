@@ -352,6 +352,7 @@ def write_dataset(ds: xr.Dataset, path: str, chunks_dims: Tuple = ('time',)) -> 
         delete_chunks_encoding(ds)
         ds.chunk(chunks_dict).to_zarr(store, mode='w', consolidated=True)
 
+
 def rechunk_zarr_array_with_caching(
     zarr_array: xr.Dataset,
     output_path: str,
@@ -412,7 +413,6 @@ def rechunk_zarr_array_with_caching(
     schema_dict = {}
     for var in zarr_array.data_vars:
         schema_dict[var] = DataArraySchema(chunks=chunks_dict[var])
-
     target_schema = DatasetSchema(schema_dict)
 
     # make storage patterns
