@@ -38,7 +38,6 @@ get_spatial_anomalies_task = task(
     result=FunnelResult(cache_store, serializer=serializer),
     target='spatial-anomalies',
 )
-
 return_y_rechunked_task = task(
     return_y_rechunked,
     result=FunnelResult(cache_store, serializer=serializer),
@@ -62,8 +61,9 @@ fit_and_predict_task = task(
 postprocess_bcsd_task = task(
     postprocess_bcsd,
     result=FunnelResult(cache_store, serializer=serializer),
-    target='postprocess_results',
+    target='postprocessresults',
 )
+
 write_bcsd_results_task = task(write_bcsd_results, log_stdout=True)
 
 
@@ -116,7 +116,10 @@ with Flow(name="bcsd-testing") as flow:
     bias_corrected_ds = fit_and_predict_task(
         x_train_rechunked_ds, y_rechunked_ds, x_predict_rechunked_ds, variable, "time"
     )
-
     # #postprocess_bcsd_task(s):
-    # postprocess_bcsd_ds = postprocess_bcsd_task(bias_corrected_ds, spatial_anomalies_ds, variable)
-    # write_bcsd_results_task(postprocess_bcsd_ds, 'az://cmip6/results/{ADD_PARAMS}')
+    postprocess_bcsd_ds = postprocess_bcsd_task(bias_corrected_ds, spatial_anomalies_ds, variable)
+    # write results
+    write_bcsd_results_task(
+        postprocess_bcsd_ds,
+        f'az://results/{gcm}_{scenario}_{train_period_start}_{train_period_end}_{predict_period_start}_{predict_period_end}_{variable}.zarr',
+    )
