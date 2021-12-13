@@ -355,9 +355,9 @@ def write_dataset(ds: xr.Dataset, path: str, chunks_dims: Tuple = ('time',)) -> 
 
 def rechunk_zarr_array_with_caching(
     zarr_array: xr.Dataset,
-    output_path: str,
     connection_string: str,
     chunking_approach: str,
+    output_path: Optional[str] = None,
     max_mem: str = "200MB",
     overwrite: bool = False,
 ) -> xr.Dataset:
@@ -461,3 +461,51 @@ def rechunk_zarr_array_with_caching(
         # we can just add a consolidate_metadata step here to do it after the fact (once rechunker is done) but only
         # necessary if we'll reopen this rechukned_ds multiple times
         return rechunked_ds
+
+
+def regrid_ds(
+    ds: xr.Dataset,
+    target_grid_ds: xr.Dataset,
+    connection_string: str,
+    rechunked_ds_path: Optional[str] = None,
+    **kwargs,
+) -> xr.Dataset:
+    """Regrid a dataset to a target grid. For use in both coarsening or interpolating to finer resolution.
+    The function will check whether the dataset is chunked along time (into spatially-contiguous maps)
+    and if not it will rechunk it. **kwargs are used to construct target path 
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Dataset you want to regrid
+    target_grid_ds : xr.Dataset
+        Template dataset whose grid you'll match
+    connection_string : str
+        Connection string to give you write access to the stores
+
+    Returns
+    -------
+    ds_regridded : xr.Dataset
+        Final regridded dataset
+    """
+    # regridding requires ds to be contiguous in lat/lon, check if the input matches the 
+    # target_schema. 
+    schema_dict = {}
+    for var in ds.data_vars:
+        schema_dict[var] = schema_maps_chunks
+    target_schema = DatasetSchema(schema_dict)
+
+    try:
+        target_schema.validate(ds[variable])
+        ds_rechunked = ds
+    except SchemaError:
+        ds_rechunked = rechunk_zarr_array_with_caching(
+            zarr_array=ds,
+            connection_string=connection_string,
+            chunking_approach='full_space',
+            max_mem='1GB'
+        )
+
+    regridder = xe.Regridder(ds_rechunked, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
+    ds_regridded = regridder(ds_rechunked)
+    return ds_regridded

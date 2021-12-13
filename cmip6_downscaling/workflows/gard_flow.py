@@ -8,7 +8,11 @@ from prefect.storage import Azure
 
 from cmip6_downscaling.methods.gard import gard_fit_and_predict, gard_postprocess, gard_preprocess
 
-make_flow_paths_task = task(make_flow_paths, log_stdout=True, nout=4)
+coarsen_obs_task = task(
+    get_coarse_obs, 
+    result=FunnelResult(cache_store, serializer=serializer), 
+    target=make_coarse_obs_path
+)
 
 preprocess_bcsd_task = task(preprocess_bcsd, log_stdout=True, nout=2)
 
@@ -17,6 +21,136 @@ prep_bcsd_inputs_task = task(prep_bcsd_inputs, log_stdout=True, nout=3)
 fit_and_predict_task = task(fit_and_predict, log_stdout=True)
 
 postprocess_bcsd_task = task(postprocess_bcsd, log_stdout=True)
+
+
+@task(result=FunnelResult(cache_store, serializer=serializer), target=make_interpolated_obs_path)
+def coarsen_and_interpolate_obs(
+    ds_obs, 
+    gcm,
+    connection_string,
+    obs_identifier,
+    gcm_grid_spec, 
+    workdir,
+):
+    """
+    # goal here is to cache: 1) the rechunked fine obs, 2) the coarsened obs, and 3) the regridded obs
+    """
+    # make the correct path patterns 
+    path_dict = {
+        'obs_identifier': obs_identifier,
+        'gcm_grid_spec': gcm_grid_spec,
+        'workdir': workdir,
+
+    }
+    rechunked_obs_path = make_rechunked_obs_path(**path_dict)
+
+    # rechunked to full space 
+    ds_obs_full_space = rechunk_zarr_array_with_caching(
+        zarr_array=ds_obs,
+        output_path=rechunked_obs_path,
+        connection_string=connection_string,
+        chunking_approach='full_space',
+    )
+
+    # regrid to coarse scale 
+    ds_obs_coarse = coarsen_obs_task(
+        ds_obs=ds_obs_full_space, 
+        gcm=gcm,
+        connection_string=connection_string,
+        **path_dict
+    )
+
+    # interpolate to fine scale again 
+    ds_obs_interpolated = regrid_ds(
+        ds=ds_obs_coarse,
+        target_grid_ds=ds_obs_full_space.isel(time=0),
+        connection_string=connection_string,
+    )
+
+    return ds_obs_interpolated
+
+
+def gard_preprocess(
+    obs: str,
+    gcm: str,
+    train_period_start: str,
+    train_period_end: str,
+    variable: str,
+    features: List[str],
+    connection_string: str,
+    workdir: str
+):
+    """
+
+
+    Parameters
+    ----------
+    obs: str
+        Name of observation dataset 
+    gcm : str
+        Name of GCM
+    train_period_start : str
+        Date for training period start (e.g. '1985')
+    train_period_end : str
+        Date for training period end (e.g. '2015')
+    variable : str
+        Variable of interest in CMIP conventions (e.g. 'tasmax')
+    connection_string : str
+        Connection string to give you read/write access to the out buckets specified above
+
+    Returns
+    -------
+
+    """
+    # get all the variables
+    all_vars = list(set([variable] + features))
+
+    # get observation and gcm 
+    ds_obs = open_era5(all_vars, start_year=train_period_start, end_year=train_period_end)
+    ds_gcm = get_gcm(
+        gcm=gcm,
+        scenario=scenario,
+        variables=all_vars,
+        train_period_start=train_period_start,
+        train_period_end=train_period_end,
+        predict_period_start=predict_period_start,
+        predict_period_end=predict_period_end,
+    )
+
+    # get gcm grid spec 
+    gcm_grid_spec = get_gcm_grid_spec(gcm_ds=ds_gcm)
+
+    # get interpolated observation 
+    obs_identifier = build_obs_identifier(
+        obs=obs,
+        train_period_start=train_period_start,
+        train_period_end=train_period_end,
+        variables=all_vars,
+        chunking_approach='full_space',
+    )
+    ds_obs_regridded = coarsen_and_interpolate_obs(
+        ds_obs=ds_obs, 
+        obs_identifier=obs_identifier,
+        gcm=gcm,
+        gcm_grid_spec=gcm_grid_spec, 
+        workdir=workdir,
+        connection_string=connection_string
+    )
+
+    # 
+
+    # bias correct the interpolated obs and gcm 
+    ds_obs_bias_corrected, ds_obs_bias_corrected = bias_correct(
+        ds_obs=ds_obs_regridded,
+        train_period_start=train_period_start,
+        train_period_end=train_period_end,
+        predict_period_start=predict_period_start,
+        predict_period_end=predict_period_end,
+        variables=all_vars,
+
+    )
+
+    return ds_obs, ds_obs_bias_corrected, ds_gcm_bias_corrected
 
 
 def gard_flow(

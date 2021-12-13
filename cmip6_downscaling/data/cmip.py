@@ -273,11 +273,70 @@ def gcm_munge(ds: xr.Dataset) -> xr.Dataset:
     return ds
 
 
-def get_gcm_grid_spec(gcm: str) -> str:
-    gcm_grid = load_cmip(
+def get_gcm(
+    gcm: str,
+    scenario: str,
+    variables: Union[str, List[str]],
+    train_period_start: str,
+    train_period_end: str,
+    predict_period_start: str,
+    predict_period_end: str
+) -> xr.Dataset:
+    """
+    Load and combine historical and future GCM into one dataset. 
+
+    Parameters
+    ----------
+    gcm: str
+        Name of GCM
+    scenario: str
+        Name of scenario 
+    variables: str or list 
+        Name of variable(s) to load 
+    train_period_start: str
+        Start year of train/historical period 
+    train_period_end: str
+        End year of train/historical period 
+    predict_period_start: str
+        Start year of predict/future period
+    predict_period_end: str
+        End year of predict/future period 
+    
+    Returns 
+    -------
+    ds_gcm: xr.Dataset 
+        A dataset containing both historical and future period of GCM data 
+    """
+    historical_gcm = load_cmip(
+        activity_ids='CMIP',
+        experiment_ids='historical',
         source_ids=gcm,
+        variable_ids=variables,
         return_type='xr',
-    ).isel(time=0)
+    ).sel(time=slice(train_period_start, train_period_end))
+    future_gcm = load_cmip(
+        activity_ids='ScenarioMIP',
+        experiment_ids=scenario,
+        source_ids=gcm,
+        variable_ids=variables,
+        return_type='xr',
+    ).sel(time=slice(predict_period_start, predict_period_end))
+    ds_gcm = xr.combine_by_coords([historical_gcm, future_gcm])
+    return ds_gcm 
+
+
+def get_gcm_grid_spec(
+    gcm_name: Optional[str] = None,
+    gcm_ds: Optional[Union[xr.Dataset, xr.DataArray]] = None
+) -> str:
+    if gcm_ds is None:
+        assert gcm_name is not None, 'one of gcm_ds or gcm_name has to be not empty'
+        gcm_grid = load_cmip(
+            source_ids=gcm,
+            return_type='xr',
+        ).isel(time=0)
+    else:
+        gcm_grid = gcm_ds.isel(time=0)
 
     nlat = len(gcm_grid.lat)
     nlon = len(gcm_grid.lon)

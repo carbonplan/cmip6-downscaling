@@ -17,93 +17,46 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import QuantileTransformer, StandardScaler
 
 from cmip6_downscaling.data.observations import open_era5
+from cmip6_downscaling.data.cmip import get_gcm_grid_spec
+import xarray as xr
 
 
-def gard_preprocess(
+def get_coarse_obs(
+    ds_obs: xr.Dataset, 
     gcm: str,
-    train_period_start: str,
-    train_period_end: str,
-    variable: str,
-    features: List[str],
     connection_string: str,
-):
+    **kwargs
+) -> xr.Dataset:
     """
-
-
-    Parameters
-    ----------
-    gcm : str
-        Name of GCM
-    train_period_start : str
-        Date for training period start (e.g. '1985')
-    train_period_end : str
-        Date for training period end (e.g. '2015')
-    variable : str
-        Variable of interest in CMIP conventions (e.g. 'tasmax')
-    connection_string : str
-        Connection string to give you read/write access to the out buckets specified above
-
-    Returns
-    -------
-
+    **kwargs are used to construct target file path
     """
-    # get all the variables
-    all_vars = list(set([variable] + features))
-
-    # get observation
-    ds_obs = open_era5(all_vars, start_year=train_period_start, end_year=train_period_end)
-
-    # get gcm
-    historical_gcm = load_cmip(
-        activity_ids='CMIP',
-        experiment_ids='historical',
+    # Load single slice of target cmip6 dataset for target grid dimensions
+    gcm_grid = load_cmip(
         source_ids=gcm,
-        variable_ids=[all_vars],
         return_type='xr',
-    ).sel(time=0)
+    ).isel(time=0)
 
-    # TODO: how do we define grid spec??
-    gcm_grid_spec = get_grid_spec(gcm)
-
-    # input needs to be in chunked in the space dimension
-    # goal here is to cache: 1) the rechunked fine obs, 2) the coarsened obs, and 3) the regridded obs
-    ds_obs_regridded = coarsen_then_interpolate(ds_obs, gcm_grid_spec, example_data)
-
-    # can we use this function??
-    coarse_obs, fine_obs_rechunked_path = regrid_dataset(
-        ds=obs_ds,
-        ds_path=None,
-        target_grid_ds=ds_gcm.isel(time=0),
-        variable=variable,
+    # rechunk and regrid observation dataset to target gcm resolution
+    ds_obs_coarse = regrid_ds(
+        ds=ds_obs,
+        target_grid_ds=gcm_grid,
         connection_string=connection_string,
     )
+    return ds_obs_coarse
 
-    # bias correction
 
-    return
-
-def bias_correction_by_var(
-    da_gcm: xr.DataArray,
+def bias_correct_obs(
     da_obs: xr.DataArray,
-    historical_period: slice,
-    method: str,
+    methods: str,
     bc_kwargs: Dict[str, Any],
 ) -> xr.DataArray:
 
     if method == 'quantile_transform':
-        # transform obs
         if 'n_quantiles' not in bc_kwargs:
             bc_kwargs['n_quantiles'] = len(da_obs)
         qt = PointWiseDownscaler(model=QuantileTransformer(**bc_kwargs))
         qt.fit(da_obs)
         obs_out = qt.transform(da_obs)
-
-        # transform gcm
-        if 'n_quantiles' not in bc_kws:
-            bc_kws['n_quantiles'] = len(da_gcm.sel(time=historical_period))
-        qt = PointWiseDownscaler(model=QuantileTransformer(**bc_kwargs))
-        qt.fit(da_gcm.sel(time=historical_period))
-        gcm_out = qt.transform(da_gcm)
 
     elif method == 'z_score':
         # transform obs
@@ -111,27 +64,7 @@ def bias_correction_by_var(
         sc.fit(da_obs)
         obs_out = sc.transform(da_obs)
 
-        # transform gcm
-        sc = PointWiseDownscaler(model=StandardScaler(**bc_kwargs))
-        sc.fit(da_gcm.sel(time=historical_period))
-        gcm_out = sc.transform(da_gcm)
-
-    elif method == 'quantile_map':
-        qm = PointWiseDownscaler(model=QuantileMappingReressor(**bc_kwargs), dim='time')
-        qm.fit(da_gcm.sel(time=historical_period), da_obs)
-        gcm_out = qm.predict(da_gcm)
-        obs_out = da_obs
-
-    elif self.bias_correction_method == 'detrended_quantile_map':
-        qm = PointWiseDownscaler(
-            TrendAwareQuantileMappingRegressor(QuantileMappingReressor(**bc_kwargs))
-        )
-        qm.fit(da_gcm.sel(time=historical_period), da_obs)
-        gcm_out = qm.predict(da_gcm)
-        obs_out = da_obs
-
-    elif method == 'none':
-        gcm_out = da_gcm
+    elif method in ['quantile_map', 'detrended_quantile_map', 'none']:
         obs_out = da_obs
 
     else:
@@ -144,40 +77,72 @@ def bias_correction_by_var(
         ]
         raise NotImplementedError(f'bias correction method must be one of {availalbe_methods}')
 
-    return gcm_out, obs_out
+    return obs_out
+
+
+def bias_correct_gcm(
+    da_gcm: xr.DataArray,
+    da_obs: xr.DataArray,
+    historical_period_start: str,
+    historical_period_end: str,
+    method: str,
+    bc_kwargs: Dict[str, Any],
+) -> xr.DataArray:
+    historical_period = slice(historical_period_start, historical_period_end)
+
+    if method == 'quantile_transform':
+        # transform gcm
+        if 'n_quantiles' not in bc_kws:
+            bc_kws['n_quantiles'] = len(da_gcm.sel(time=historical_period))
+        qt = PointWiseDownscaler(model=QuantileTransformer(**bc_kwargs))
+        qt.fit(da_gcm.sel(time=historical_period))
+        gcm_out = qt.transform(da_gcm)
+
+    elif method == 'z_score':
+        # transform gcm
+        sc = PointWiseDownscaler(model=StandardScaler(**bc_kwargs))
+        sc.fit(da_gcm.sel(time=historical_period))
+        gcm_out = sc.transform(da_gcm)
+
+    elif method == 'quantile_map':
+        qm = PointWiseDownscaler(model=QuantileMappingReressor(**bc_kwargs), dim='time')
+        qm.fit(da_gcm.sel(time=historical_period), da_obs)
+        gcm_out = qm.predict(da_gcm)
+
+    elif self.bias_correction_method == 'detrended_quantile_map':
+        qm = PointWiseDownscaler(
+            TrendAwareQuantileMappingRegressor(QuantileMappingReressor(**bc_kwargs))
+        )
+        qm.fit(da_gcm.sel(time=historical_period), da_obs)
+        gcm_out = qm.predict(da_gcm)
+
+    elif method == 'none':
+        gcm_out = da_gcm
+
+    else:
+        availalbe_methods = [
+            'quantile_transform',
+            'z_score',
+            'quantile_map',
+            'detrended_quantile_map',
+            'none',
+        ]
+        raise NotImplementedError(f'bias correction method must be one of {availalbe_methods}')
+
+    return gcm_out
 
 
 def gard_bias_correction(
-    ds_gcm: xr.Dataset,
     ds_obs: xr.Dataset,
-    historical_period: slice,
-    variables: Union[str, List[str]],
-    methods: Dict[str, str],
+    ds_gcm: xr.Dataset,
+    train_period_start: str,
+    train_period_end: str,
+    methods: Union[Dict[str, str], str],
     bias_correction_kwargs: Dict[str, Dict[str, Any]],
 ) -> xr.Dataset:
     """
     Bias correct or otherwise preprocess input gcm and obs data
     """
-    # TODO: if needed, rechunk in this function
-    if isinstance(variables, str):
-        variables = [variables]
-
-    historical_gcm = load_cmip(
-        activity_ids='CMIP',
-        experiment_ids='historical',
-        source_ids=gcm,
-        variable_ids=[all_vars],
-        return_type='xr',
-    ).sel(time=slice(train_period_start, train_period_end))
-    future_gcm = load_cmip(
-        activity_ids='ScenarioMIP',
-        experiment_ids=scenario,
-        source_ids=gcm,
-        variable_ids=all_vars],
-        return_type='xr',
-    ).sel(time=slice(predict_period_start, predict_period_end))
-    ds_gcm = xr.combine_by_coords([historical_gcm, future_gcm])
-
     ds_gcm_out, ds_obs_out = xr.Dataset(), xr.Dataset()
     for v in variables:
         bc_kws = default_none_kwargs(bias_correction_kwargs.get(v, {}), copy=True)
