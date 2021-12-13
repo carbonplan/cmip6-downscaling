@@ -1,6 +1,8 @@
 import os
 
 os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "True"
+from typing import List, Union
+
 import xarray as xr
 import zarr
 
@@ -25,13 +27,13 @@ def get_store(bucket, prefix, account_key=None):
     return store
 
 
-def open_era5(var: str, start_year: str, end_year: str) -> xr.Dataset:
-    """Open ERA5 daily data for a single variable for period 1979-2021
+def open_era5(variables: Union[str, List[str]], start_year: str, end_year: str) -> xr.Dataset:
+    """Open ERA5 daily data for one or more variables for period 1979-2021
 
     Parameters
     ----------
-    var : str
-        The variable you want to grab from the ERA5 dataset.
+    variables : str or list of string
+        The variable(s) you want to grab from the ERA5 dataset.
 
     start_year : str
         The first year of the time period you want to grab from ERA5 dataset.
@@ -44,9 +46,12 @@ def open_era5(var: str, start_year: str, end_year: str) -> xr.Dataset:
     xarray.Dataset
         A daily dataset for one variable.
     """
+    if isinstance(variables, str):
+        variables = [variables]
+
     stores = [
         f'https://cmip6downscaling.blob.core.windows.net/cmip6/ERA5_daily/{y}'
         for y in range(int(start_year), int(end_year) + 1)
     ]
     ds = xr.open_mfdataset(stores, engine='zarr', consolidated=True)
-    return ds[[var]]
+    return ds[variables]

@@ -2,7 +2,7 @@ import os
 import random
 import re
 import string
-from typing import Tuple, Union
+from typing import Optional, Tuple, Union
 
 import dask
 import fsspec
@@ -11,7 +11,7 @@ import xarray as xr
 import xesmf as xe
 import zarr
 from rechunker import rechunk
-from xarray_schema import DataArraySchema
+from xarray_schema import DataArraySchema, DatasetSchema
 from xarray_schema.base import SchemaError
 
 schema_maps_chunks = DataArraySchema(chunks={"lat": -1, "lon": -1})
@@ -55,7 +55,8 @@ def delete_chunks_encoding(ds: Union[xr.Dataset, xr.DataArray]):
 
 def make_rechunker_stores(
     connection_string: str,
-):  # -> tuple[fsspec.mapping.FSmap, fsspec.mapping.FSmap]:
+    output_path: Optional[str] = None,
+) -> Tuple[fsspec.FSMap, fsspec.FSMap, str]:
     """Initialize two stores for rechunker to use as temporary and final rechunked locations
 
     Parameters
@@ -69,10 +70,12 @@ def make_rechunker_stores(
         Stores where rechunker will write and the path to the target store
     """
     path_tmp = "az://cmip6/temp/{}.zarr".format(temp_file_name())
-    path_tgt = "az://cmip6/temp/{}.zarr".format(temp_file_name())
     temp_store = fsspec.get_mapper(path_tmp, connection_string=connection_string)
-    target_store = fsspec.get_mapper(path_tgt, connection_string=connection_string)
-    return temp_store, target_store, path_tgt
+
+    if output_path is None:
+        output_path = "az://cmip6/temp/{}.zarr".format(temp_file_name())
+    target_store = fsspec.get_mapper(output_path, connection_string=connection_string)
+    return temp_store, target_store, output_path
 
 
 def rechunk_zarr_array(
@@ -91,7 +94,7 @@ def rechunk_zarr_array(
     zarr_array : zarr or xarray dataset
         Dataset you want to rechunk.
     zarr_array_location: str
-        Path to where the data is sitting.
+        Path to where the input data is sitting. Only returned/used if zarr_array does not need to rechunked
     chunk_dims : Union[Tuple, dict]
         Information for chunking the ds. If a dict is passed, it will rechunk following sizes as specified. The dict should look like:
             {variable: {'lat': chunk_size_lat,
@@ -160,6 +163,7 @@ def rechunk_zarr_array(
             print(chunks_dict[variable])
             delete_chunks_encoding(zarr_array)
             print(zarr_array.chunk(chunks_dict[variable]))
+            # TODO: will always work but need to double check the result and if it's taking a long time
             rechunk_plan = rechunk(
                 zarr_array.chunk(chunks_dict[variable]),
                 chunks_dict,
@@ -407,4 +411,119 @@ def write_dataset(ds: xr.Dataset, path: str, chunks_dims: Tuple = ("time",)) -> 
         )
         chunks_dict = calc_auspicious_chunks_dict(ds, chunk_dims=chunks_dims)
         delete_chunks_encoding(ds)
-        ds.chunk(chunks_dict).to_zarr(store, mode="w", consolidated=True)
+
+        ds.chunk(chunks_dict).to_zarr(store, mode='w', consolidated=True)
+
+
+def rechunk_zarr_array_with_caching(
+    zarr_array: xr.Dataset,
+    output_path: str,
+    connection_string: str,
+    chunking_approach: str,
+    max_mem: str = "200MB",
+    overwrite: bool = False,
+) -> xr.Dataset:
+    """Use `rechunker` package to adjust chunks of dataset to a form
+    conducive for your processing.
+
+    Parameters
+    ----------
+    zarr_array : zarr or xarray dataset
+        Dataset you want to rechunk.
+    output_path: str
+        Path to where the output data is saved. If output path is not empty, the content would be loaded and the schema checked. If the schema check passed,
+        the content will be returned without rechunking again (i.e. caching); else, the content can be overwritten (see overwrite option).
+    chunking_approach : str
+        Has to be one of `full_space` or `full_time`. If `full_space`, the data will be rechunked such that the space dimensions are contiguous (i.e. each chunk
+        will contain full maps). If `full_time`, the data will be rechunked such that the time dimension is contiguous (i.e. each chunk will contain full time
+        series)
+    connection_string : str
+        Connection string to give you write access
+    max_mem : str
+        The max memory you want to allow for a chunk. Probably want it to be around 100 MB, but that
+        is also controlled by the `calc_auspicious_chunk_sizes` calls.
+    overwrite : bool
+        Whether to overwrite the content saved at output_path if the content did not pass schema check.
+
+    Returns
+    -------
+    rechunked_ds : xr.Dataset
+        Rechunked dataset
+    """
+    # determine the chunking schema
+    if chunking_approach == 'full_space':
+        chunk_dims = ('time',)  # if we need full maps, chunk along the time dimension
+    elif chunking_approach == 'full_time':
+        chunk_dims = (
+            'lat',
+            'lon',
+        )  # if we need full time series, chunk along the lat/lon dimensions
+    else:
+        raise NotImplementedError("chunking_approach must be in ['full_space', 'full_time']")
+    chunk_def = calc_auspicious_chunks_dict(zarr_array, chunk_dims=chunk_dims)
+    chunks_dict = {
+        'time': None,  # write None here because you don't want to rechunk this array
+        'lon': None,
+        'lat': None,
+    }
+    for var in zarr_array.data_vars:
+        chunks_dict[var] = chunk_def
+
+    # make the schema for what you want the rechunking routine to produce
+    # so that you can check whether what you passed in (zarr_array) already looks like that
+    # if it does, you'll skip the rechunking!
+    schema_dict = {}
+    for var in zarr_array.data_vars:
+        schema_dict[var] = DataArraySchema(chunks=chunks_dict[var])
+    print(schema_dict)
+    target_schema = DatasetSchema(schema_dict)
+
+    # make storage patterns
+    temp_store, target_store, target_path = make_rechunker_stores(connection_string, output_path)
+
+    # check and see if the output is empty, if there is content, check that it's chunked correctly
+    if len(target_store) > 0:
+        print('in caching')
+        output = xr.open_zarr(target_store)
+        try:
+            # if the content in target path is correctly chunked, return
+            target_schema.validate(output)
+            return output
+
+        except SchemaError:
+            if overwrite:
+                target_store.clear()
+            else:
+                raise NotImplementedError(
+                    'The content in the output path is incorrectly chunked, but overwrite is disabled.'
+                    'Either clear the output or enable overwrite by setting overwrite=True'
+                )
+
+    # process the input zarr array
+    delete_chunks_encoding(zarr_array)
+    try:
+        print('verifying current shape')
+        # now check if the input is already correctly chunked. If so, save to the output location and return
+        target_schema.validate(zarr_array)
+        zarr_array.to_zarr(target_store, mode='w', consolidated=True)
+        return zarr_array
+
+    except SchemaError:
+        print('rechunking')
+        # TODO: could switch this to a validation with xarray schema - confirm that the chunks are all uniform and
+        # if not, chunk them according to the spec provided by `calc_auspicious_chunks_dict`
+        example_var = list(zarr_array.data_vars)[0]
+        rechunk_plan = rechunk(
+            zarr_array.chunk(chunks_dict[example_var]),
+            chunks_dict,
+            max_mem,
+            target_store,
+            temp_store=temp_store,
+        )
+        rechunk_plan.execute(retries=5)
+        rechunked_ds = xr.open_zarr(
+            target_store
+        )  # ideally we want consolidated=True but it seems that functionality isn't offered in rechunker right now
+        # we can just add a consolidate_metadata step here to do it after the fact (once rechunker is done) but only
+        # necessary if we'll reopen this rechukned_ds multiple times
+        return rechunked_ds
