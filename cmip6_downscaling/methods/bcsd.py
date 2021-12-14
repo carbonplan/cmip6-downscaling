@@ -7,7 +7,7 @@ import dask
 import fsspec
 import xarray
 import xarray as xr
-from skdownscale.pointwise_models import BcAbsolute, BcRelative, PointWiseDownscaler
+from skdownscale.pointwise_models import BcsdPrecip, BcsdTemp, PointWiseDownscaler
 from xarray_schema import DataArraySchema
 
 from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
@@ -346,9 +346,9 @@ def fit_and_predict(
         Bias-corrected dataset
     """
     if variable in ABSOLUTE_VARS:
-        bcsd_model = BcAbsolute(return_anoms=False)
+        bcsd_model = BcsdTemp(return_anoms=False)
     elif variable in RELATIVE_VARS:
-        bcsd_model = BcRelative(return_anoms=False)
+        bcsd_model = BcsdPrecip(return_anoms=False)
     pointwise_model = PointWiseDownscaler(model=bcsd_model, dim=dim)
     pointwise_model.fit(x_train_rechunked_ds[variable], y_rechunked_ds[variable])
     bias_corrected_da = pointwise_model.predict(x_predict_rechunked_ds[variable])
