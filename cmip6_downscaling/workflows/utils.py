@@ -509,3 +509,27 @@ def regrid_ds(
     regridder = xe.Regridder(ds_rechunked, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
     ds_regridded = regridder(ds_rechunked)
     return ds_regridded
+
+
+def get_coarse_obs(
+    ds_obs: xr.Dataset, 
+    gcm: str,
+    connection_string: str,
+    **kwargs
+) -> xr.Dataset:
+    """
+    **kwargs are used to construct target file path
+    """
+    # Load single slice of target cmip6 dataset for target grid dimensions
+    gcm_grid = load_cmip(
+        source_ids=gcm,
+        return_type='xr',
+    ).isel(time=0)
+
+    # rechunk and regrid observation dataset to target gcm resolution
+    ds_obs_coarse = regrid_ds(
+        ds=ds_obs,
+        target_grid_ds=gcm_grid,
+        connection_string=connection_string,
+    )
+    return ds_obs_coarse

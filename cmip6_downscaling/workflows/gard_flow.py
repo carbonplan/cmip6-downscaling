@@ -7,6 +7,14 @@ from prefect.run_configs import KubernetesRun
 from prefect.storage import Azure
 
 from cmip6_downscaling.methods.gard import gard_fit_and_predict, gard_postprocess, gard_preprocess
+from cmip6_downscaling.data.cmip import get_gcm
+from cmip6_downscaling.data.observations import open_era5
+from cmip6_downscaling.workflow.utils import (
+    get_coarse_obs, 
+    rechunk_zarr_array_with_caching, 
+    regrid_ds
+)
+
 
 coarsen_obs_task = task(
     get_coarse_obs, 
@@ -14,9 +22,17 @@ coarsen_obs_task = task(
     target=make_coarse_obs_path
 )
 
-preprocess_bcsd_task = task(preprocess_bcsd, log_stdout=True, nout=2)
+bias_correct_obs_task = task(
+    bias_correct_obs,
+    result=FunnelResult(cache_store, serializer=serializer), 
+    target=make_bias_corrected_obs_path
+)
 
-prep_bcsd_inputs_task = task(prep_bcsd_inputs, log_stdout=True, nout=3)
+bias_correct_gcm_task = task(
+    bias_correct_gcm,
+    result=FunnelResult(cache_store, serializer=serializer), 
+    target=make_bias_corrected_gcm_path
+)
 
 fit_and_predict_task = task(fit_and_predict, log_stdout=True)
 
@@ -130,24 +146,28 @@ def gard_preprocess(
     )
     ds_obs_regridded = coarsen_and_interpolate_obs(
         ds_obs=ds_obs, 
-        obs_identifier=obs_identifier,
         gcm=gcm,
+        connection_string=connection_string,
+        obs_identifier=obs_identifier,
         gcm_grid_spec=gcm_grid_spec, 
         workdir=workdir,
-        connection_string=connection_string
     )
 
-    # 
-
     # bias correct the interpolated obs and gcm 
-    ds_obs_bias_corrected, ds_obs_bias_corrected = bias_correct(
+    # TODO: chunk and cache 
+    ds_obs_bias_corrected = bias_correct_obs_task(
         ds_obs=ds_obs_regridded,
-        train_period_start=train_period_start,
-        train_period_end=train_period_end,
-        predict_period_start=predict_period_start,
-        predict_period_end=predict_period_end,
-        variables=all_vars,
+        methods=bias_correction_method,
+        bc_kwargs=bias_correction_kwargs,
+    )
 
+    ds_gcm_bias_corrected = bias_correct_gcm_task(
+        ds_gcm=ds_gcm,
+        ds_obs=ds_obs_regridded,
+        historical_period_start=train_period_start,
+        historical_period_end=train_period_end,
+        methods=bias_correction_method,
+        bc_kwargs=bias_correction_kwargs,
     )
 
     return ds_obs, ds_obs_bias_corrected, ds_gcm_bias_corrected
