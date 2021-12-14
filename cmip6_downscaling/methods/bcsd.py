@@ -1,11 +1,7 @@
 import os
-
-os.environ['PREFECT__FLOWS__CHECKPOINTING'] = 'true'
 from typing import Tuple
 
-import dask
 import fsspec
-import xarray
 import xarray as xr
 from skdownscale.pointwise_models import BcsdPrecip, BcsdTemp, PointWiseDownscaler
 from xarray_schema import DataArraySchema
@@ -17,7 +13,6 @@ from cmip6_downscaling.workflows.utils import (
     delete_chunks_encoding,
     rechunk_zarr_array,
     regrid_dataset,
-    write_dataset,
 )
 
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
@@ -70,16 +65,7 @@ def make_flow_paths(
     return coarse_obs_path, spatial_anomalies_path, bias_corrected_path, final_out_path
 
 
-def get_transformed_data():
-    ds = xr.tutorial.open_dataset('air_temperature').chunk({'lat': 50, 'lon': 50})
-    ds['air'] = ds['air'] - 273.13
-    ds['air'].attrs['units'] = 'degC'
-    # compute a dask array to confirm that dask tasks are executed on the executor's client
-    dask.array.zeros((10000, 10000), chunks=(100, 100)).mean().compute()
-    return ds
-
-
-def return_obs(train_period_start: str, train_period_end: str, variable: str) -> xarray.Dataset:
+def return_obs(train_period_start: str, train_period_end: str, variable: str) -> xr.Dataset:
     """Loads ERA5 observation data for given time bounds and variable
 
     Parameters
@@ -93,7 +79,7 @@ def return_obs(train_period_start: str, train_period_end: str, variable: str) ->
 
     Returns
     -------
-    xarray.Dataset
+    xr.Dataset
         Loaded xarray dataset of ERA5 observation data. Chunked in time: 365
     """
     obs_ds = open_era5(variable, start_year=train_period_start, end_year=train_period_end)
@@ -102,15 +88,15 @@ def return_obs(train_period_start: str, train_period_end: str, variable: str) ->
 
 
 def get_coarse_obs(
-    obs_ds: xarray.Dataset,
+    obs_ds: xr.Dataset,
     variable: str,
     connection_string: str,
-) -> xarray.Dataset:
+) -> xr.Dataset:
     """Regrids the observation dataset to match the GCM resolution
 
     Parameters
     ----------
-    obs_ds : xarray.Dataset
+    obs_ds : xr.Dataset
         Observation dataset
     variable : str
         Input variable. ex. 'tasmax'
@@ -119,7 +105,7 @@ def get_coarse_obs(
 
     Returns
     -------
-    xarray.Dataset
+    xr.Dataset
         observation dataset at coarse resolution
     """
     # Load single slice of target cmip6 dataset for target grid dimensions
@@ -137,11 +123,11 @@ def get_coarse_obs(
 
 
 def get_spatial_anomalies(
-    coarse_obs: xarray.Dataset,
-    obs_ds: xarray.Dataset,
+    coarse_obs: xr.Dataset,
+    obs_ds: xr.Dataset,
     variable: str,
     connection_string: str,
-) -> xarray.Dataset:
+) -> xr.Dataset:
 
     """Returns spatial anomalies
     Calculate the seasonal cycle (12 timesteps) spatial anomaly associated
@@ -187,22 +173,22 @@ def get_spatial_anomalies(
     return seasonal_cycle_spatial_anomalies
 
 
-def return_y_rechunked(coarse_obs_ds: xarray.Dataset, variable: str) -> xarray.Dataset:
-    """Return y rechunked dataset from coarse observation dataset
+def return_y_full_time(coarse_obs_ds: xr.Dataset, variable: str) -> xr.Dataset:
+    """Return y full time rechunked dataset from coarse observation dataset
 
     Parameters
     ----------
-    coarse_obs_ds : xarray.Dataset
+    coarse_obs_ds : xr.Dataset
         Input coarse observation dataset
     variable : str
         The variable included in the dataset.
 
     Returns
     -------
-    xarray.Dataset
-        y_rechunked dataset
+    xr.Dataset
+        y_full_time rechunked dataset
     """
-    y_rechunked_ds, y_rechunked_ds_path = rechunk_zarr_array(
+    y_full_time_ds, y_full_time_path = rechunk_zarr_array(
         coarse_obs_ds,
         None,
         chunk_dims=('lat', 'lon'),
@@ -210,19 +196,17 @@ def return_y_rechunked(coarse_obs_ds: xarray.Dataset, variable: str) -> xarray.D
         connection_string=connection_string,
         max_mem='1GB',
     )
-    print('y_rechunked ds: ', y_rechunked_ds)
-
-    return y_rechunked_ds
+    return y_full_time_ds
 
 
-def return_x_train_rechunked(
+def return_x_train_full_time(
     gcm: str,
     variable: str,
     train_period_start: str,
     train_period_end: str,
-    y_rechunked_ds: xarray.Dataset,
-) -> xarray.Dataset:
-    """Returns x training rechunked dataset.
+    y_full_time_ds: xr.Dataset,
+) -> xr.Dataset:
+    """Returns x training rechunked dataset in full time.
 
     Parameters
     ----------
@@ -234,20 +218,20 @@ def return_x_train_rechunked(
         Date for training period start (e.g. '1985')
     train_period_end : str
         Date for training period end (e.g. '2015')
-    y_rechunked_ds : xarray.Dataset
-        Output y rechunked dataset
+    y_full_time_ds : xr.Dataset
+        Output y rechunked dataset in full_time
 
     Returns
     -------
-    xarray.Dataset
-        [description]
+    xr.Dataset
+        x_train rechunked dataset in full time.
     """
     X_train = load_cmip(source_ids=gcm, variable_ids=[variable], return_type='xr').sel(
         time=slice(train_period_start, train_period_end)
     )
-    X_train['time'] = y_rechunked_ds.time.values
+    # X_train['time'] = y_rechunked_ds.time.values
 
-    X_train_rechunked_ds, X_train_rechunked_path = rechunk_zarr_array(
+    X_train_full_time_ds, X_train_full_time_path = rechunk_zarr_array(
         X_train,
         zarr_array_location=None,
         variable=variable,
@@ -255,7 +239,7 @@ def return_x_train_rechunked(
         connection_string=connection_string,
         max_mem='1GB',
     )
-    return X_train_rechunked_ds
+    return X_train_full_time_ds
 
 
 def return_x_predict_rechunked(
@@ -264,9 +248,9 @@ def return_x_predict_rechunked(
     variable: str,
     predict_period_start: str,
     predict_period_end: str,
-    X_train_rechunked_ds: xarray.Dataset,
-) -> xarray.Dataset:
-    """Return x training rechunked dataset
+    X_train_rechunked_ds: xr.Dataset,
+) -> xr.Dataset:
+    """Return x training rechunked dataset. Chunks are matched to chunks of X train. In the current use case, this means in full_time.
 
     Parameters
     ----------
@@ -280,12 +264,12 @@ def return_x_predict_rechunked(
         Date for prediction period start (e.g. '2090')
     predict_period_end : str
         Date for prediction period end (e.g. '2090')
-    X_train_rechunked_ds : xarray.Dataset
+    X_train_rechunked_ds : xr.Dataset
         Input x training rechunked dataset
 
     Returns
     -------
-    xarray.Dataset
+    xr.Dataset
         x prediction rechunked dataset
     """
     X_predict = load_cmip(
@@ -317,22 +301,22 @@ def return_x_predict_rechunked(
 
 
 def fit_and_predict(
-    x_train_rechunked_ds: xarray.Dataset,
-    y_rechunked_ds: xarray.Dataset,
-    x_predict_rechunked_ds: xarray.Dataset,
+    x_train_rechunked_ds: xr.Dataset,
+    y_rechunked_ds: xr.Dataset,
+    x_predict_rechunked_ds: xr.Dataset,
     variable: str = "tasmax",
     dim: str = "time",
-) -> xarray.Dataset:
+) -> xr.Dataset:
     """Fit bcsd model on prepared CMIP data with obs at corresponding spatial scale.
     Then predict for a set of CMIP data (likely future).
 
     Parameters
     ----------
-    x_train_rechunked_ds : xarray.Dataset
+    x_train_rechunked_ds : xr.Dataset
         GCM training dataset chunked along space
-    y_rechunked_ds : xarray.Dataset
+    y_rechunked_ds : xr.Dataset
         Obs training dataset chunked along space
-    x_predict_rechunked_ds : xarray.Dataset
+    x_predict_rechunked_ds : xr.Dataset
         GCM prediction dataset chunked along space.
     variable : str, optional
         variable you're modelling, by default "tasmax"
@@ -342,7 +326,7 @@ def fit_and_predict(
 
     Returns
     -------
-    bias_corrected_ds : xarray.Dataset
+    bias_corrected_ds : xr.Dataset
         Bias-corrected dataset
     """
     if variable in ABSOLUTE_VARS:
@@ -357,23 +341,23 @@ def fit_and_predict(
 
 
 def postprocess_bcsd(
-    bias_corrected_ds: xarray.Dataset, spatial_anomalies_ds: xarray.Dataset, variable: str
-) -> xarray.Dataset:
+    bias_corrected_ds: xr.Dataset, spatial_anomalies_ds: xr.Dataset, variable: str
+) -> xr.Dataset:
     """Downscale the bias-corrected data by interpolating and then
     adding the spatial anomalies back in.
 
     Parameters
     ----------
-    bias_corrected_ds : xarray.Dataset
+    bias_corrected_ds : xr.Dataset
         bias-corrected dataset
-    spatial_anomalies_ds : xarray.Dataset
+    spatial_anomalies_ds : xr.Dataset
         spatial anomalies dataset
     variable : str
         Input variable
 
     Returns
     -------
-    bcsd_results_ds : xarray.Dataset
+    bcsd_results_ds : xr.Dataset
         Final BCSD dataset
     """
 
@@ -385,13 +369,10 @@ def postprocess_bcsd(
         connection_string=connection_string,
     )
     bcsd_results_ds = y_predict_fine.groupby("time.month") + spatial_anomalies_ds
-    print(bcsd_results_ds)
     delete_chunks_encoding(bcsd_results_ds)
-    print(bcsd_results_ds)
     bcsd_results_ds = bcsd_results_ds.chunk({'time': 30})
     return bcsd_results_ds
 
 
-def write_bcsd_results(bcsd_results_ds: xarray.Dataset, output_path: str):
-    with dask.config.set(scheduler="single-threaded"):
-        write_dataset(bcsd_results_ds, output_path)
+# def write_bcsd_results(bcsd_results_ds: xr.Dataset, output_path: str):
+#     write_dataset(bcsd_results_ds, output_path)
