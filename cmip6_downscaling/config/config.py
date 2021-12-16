@@ -35,7 +35,7 @@ dask_executor_adapt_min = 4
 dask_executor_adapt_max = 20
 
 extra_pip_packages = {
-    "EXTRA_PIP_PACKAGES": "git+https://github.com/carbonplan/cmip6-downscaling.git@param_json git+https://github.com/pangeo-data/scikit-downscale.git"
+    "EXTRA_PIP_PACKAGES": "git+https://github.com/carbonplan/cmip6-downscaling.git git+https://github.com/pangeo-data/scikit-downscale.git"
 }
 env_config = {
     "AZURE_STORAGE_CONNECTION_STRING": connection_string,
