@@ -83,6 +83,7 @@ def return_obs(train_period_start: str, train_period_end: str, variable: str) ->
         Loaded xarray dataset of ERA5 observation data. Chunked in time: 365
     """
     obs_ds = open_era5(variable, start_year=train_period_start, end_year=train_period_end)
+    # Chunking the observation dataset by 'time':365 fixes irregular zarr chunking issues caused by leap-years.
     obs_ds = obs_ds.chunk({'time': 365})
     return obs_ds
 

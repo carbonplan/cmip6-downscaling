@@ -70,7 +70,6 @@ postprocess_bcsd_task = task(
     target="postprocess-results-" + target_naming_str,
 )
 
-
 # Main Flow -----------------------------------------------------------
 
 # with Flow(name="bcsd-testing", storage=storage, run_config=run_config) as flow:
@@ -83,11 +82,6 @@ with Flow(name="bcsd-testing") as flow:
     predict_period_start = Parameter("PREDICT_PERIOD_START")
     predict_period_end = Parameter("PREDICT_PERIOD_END")
     variable = Parameter("VARIABLE")
-    # params_dict = {gcm:gcm,scenario:scenario,train_period_start:train_period_start,train_period_end:train_period_end,
-    # predict_period_start:predict_period_start,predict_period_end:predict_period_end,variable:variable}
-
-    # gcm, scenario, train_period_start,train_period_end,predict_period_start,predict_period_end,variable
-
     (
         coarse_obs_path,
         spatial_anomalies_path,
@@ -116,7 +110,6 @@ with Flow(name="bcsd-testing") as flow:
         predict_period_end,
         variable,
     )
-
     # prep_bcsd_inputs_task(s):
     y_full_time_ds = return_y_full_time_task(
         coarse_obs_ds,
@@ -128,7 +121,6 @@ with Flow(name="bcsd-testing") as flow:
         predict_period_end,
         variable,
     )
-
     x_train_full_time_ds = return_x_train_full_time_task(
         y_full_time_ds,
         gcm,
@@ -139,7 +131,6 @@ with Flow(name="bcsd-testing") as flow:
         predict_period_end,
         variable,
     )
-
     x_predict_rechunked_ds = return_x_predict_rechunked_task(
         x_train_full_time_ds,
         gcm,
@@ -150,7 +141,6 @@ with Flow(name="bcsd-testing") as flow:
         predict_period_end,
         variable,
     )
-
     # fit and predict tasks(s):
     bias_corrected_ds = fit_and_predict_task(
         x_train_full_time_ds,
