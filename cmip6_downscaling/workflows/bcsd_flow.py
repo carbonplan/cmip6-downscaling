@@ -2,8 +2,8 @@
 import os
 
 os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "true"
-from funnel.prefect.result import FunnelResult
 from prefect import Flow, Parameter, task
+from xpersist.prefect.result import XpersistResult
 
 from cmip6_downscaling.config.config import (  # dask_executor,; kubernetes_run_config,; storage,
     intermediate_cache_store,
@@ -30,43 +30,43 @@ make_flow_paths_task = task(make_flow_paths, log_stdout=True, nout=4)
 
 return_obs_task = task(
     return_obs,
-    result=FunnelResult(intermediate_cache_store, serializer=serializer),
+    result=XpersistResult(intermediate_cache_store, serializer=serializer),
     target="obs-ds",
 )
 get_coarse_obs_task = task(
     get_coarse_obs,
-    result=FunnelResult(intermediate_cache_store, serializer=serializer),
+    result=XpersistResult(intermediate_cache_store, serializer=serializer),
     target="coarse-obs-ds",
 )
 get_spatial_anomalies_task = task(
     get_spatial_anomalies,
-    result=FunnelResult(intermediate_cache_store, serializer=serializer),
+    result=XpersistResult(intermediate_cache_store, serializer=serializer),
     target="spatial-anomalies-ds-" + target_naming_str,
 )
 return_y_full_time_task = task(
     return_y_full_time,
-    result=FunnelResult(intermediate_cache_store, serializer=serializer),
+    result=XpersistResult(intermediate_cache_store, serializer=serializer),
     target="y-full-time-" + target_naming_str,
 )
 return_x_train_full_time_task = task(
     return_x_train_full_time,
-    result=FunnelResult(intermediate_cache_store, serializer=serializer),
+    result=XpersistResult(intermediate_cache_store, serializer=serializer),
     target="x-train-full-time-" + target_naming_str,
 )
 return_x_predict_rechunked_task = task(
     return_x_predict_rechunked,
-    result=FunnelResult(intermediate_cache_store, serializer=serializer),
+    result=XpersistResult(intermediate_cache_store, serializer=serializer),
     target="x-predict-rechunked-" + target_naming_str,
 )
 fit_and_predict_task = task(
     fit_and_predict,
-    result=FunnelResult(intermediate_cache_store, serializer=serializer),
+    result=XpersistResult(intermediate_cache_store, serializer=serializer),
     target="fit-and-predict-" + target_naming_str,
 )
 postprocess_bcsd_task = task(
     postprocess_bcsd,
     log_stdout=True,
-    result=FunnelResult(results_cache_store, serializer=serializer),
+    result=XpersistResult(results_cache_store, serializer=serializer),
     target="postprocess-results-" + target_naming_str,
 )
 
