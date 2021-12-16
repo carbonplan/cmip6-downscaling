@@ -1,116 +1,168 @@
+# Imports -----------------------------------------------------------
 import os
 
-from dask_kubernetes import KubeCluster, make_pod_spec
-from prefect import Flow, task
-from prefect.executors import DaskExecutor
-from prefect.run_configs import KubernetesRun
-from prefect.storage import Azure
+os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "true"
+from funnel.prefect.result import FunnelResult
+from prefect import Flow, Parameter, task
 
+from cmip6_downscaling.config.config import (  # dask_executor,; kubernetes_run_config,; storage,
+    intermediate_cache_store,
+    results_cache_store,
+    serializer,
+)
 from cmip6_downscaling.methods.bcsd import (
     fit_and_predict,
+    get_coarse_obs,
+    get_spatial_anomalies,
     make_flow_paths,
     postprocess_bcsd,
-    prep_bcsd_inputs,
-    preprocess_bcsd,
+    return_obs,
+    return_x_predict_rechunked,
+    return_x_train_full_time,
+    return_y_full_time,
 )
 
-connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
+# Transform Functions into Tasks -----------------------------------------------------------
 
-run_hyperparameters = {
-    "FLOW_NAME": "BCSD_testing",
-    "GCM": "MIROC6",
-    "SCENARIO": "ssp370",
-    "TRAIN_PERIOD_START": "1991",
-    "TRAIN_PERIOD_END": "1991",
-    "PREDICT_PERIOD_START": "2079",
-    "PREDICT_PERIOD_END": "2079",
-    "VARIABLE": "tasmax",
-}
-
-storage = Azure("prefect")
-image = "carbonplan/cmip6-downscaling-prefect:latest"
-# install three specific branches (cmip6, skdownscale, xarray-schema)
-run_config = KubernetesRun(
-    cpu_request=7,
-    memory_request="16Gi",
-    image=image,
-    labels=["az-eu-west"],
-    env={
-        "EXTRA_PIP_PACKAGES": "git+git://github.com/carbonplan/cmip6-downscaling:bugfix_bcsd_workflow git+git://github.com/carbonplan/xarray-schema:chunks git+git://github.com/orianac/scikit-downscale:bcsd-workflow"
-    },
-)
-
-executor = DaskExecutor(
-    cluster_class=lambda: KubeCluster(
-        make_pod_spec(
-            image=image,
-            memory_limit="16Gi",
-            memory_request="16Gi",
-            threads_per_worker=2,
-            cpu_limit=2,
-            cpu_request=2,
-            env={
-                "AZURE_STORAGE_CONNECTION_STRING": os.environ["AZURE_STORAGE_CONNECTION_STRING"],
-            },
-        )
-    ),
-    adapt_kwargs={"minimum": 4, "maximum": 20},
-)
-
-
-flow_name = run_hyperparameters.pop("FLOW_NAME")  # pop it out because if you leave it in the dict
-# but don't call it as a parameter it'll complain
+target_naming_str = "{gcm}-{scenario}-{train_period_start}-{train_period_end}-{predict_period_start}-{predict_period_end}-{variable}.zarr"
 
 make_flow_paths_task = task(make_flow_paths, log_stdout=True, nout=4)
 
-preprocess_bcsd_task = task(preprocess_bcsd, log_stdout=True, nout=2)
+return_obs_task = task(
+    return_obs,
+    result=FunnelResult(intermediate_cache_store, serializer=serializer),
+    target="obs-ds",
+)
+get_coarse_obs_task = task(
+    get_coarse_obs,
+    result=FunnelResult(intermediate_cache_store, serializer=serializer),
+    target="coarse-obs-ds",
+)
+get_spatial_anomalies_task = task(
+    get_spatial_anomalies,
+    result=FunnelResult(intermediate_cache_store, serializer=serializer),
+    target="spatial-anomalies-ds-" + target_naming_str,
+)
+return_y_full_time_task = task(
+    return_y_full_time,
+    result=FunnelResult(intermediate_cache_store, serializer=serializer),
+    target="y-full-time-" + target_naming_str,
+)
+return_x_train_full_time_task = task(
+    return_x_train_full_time,
+    result=FunnelResult(intermediate_cache_store, serializer=serializer),
+    target="x-train-full-time-" + target_naming_str,
+)
+return_x_predict_rechunked_task = task(
+    return_x_predict_rechunked,
+    result=FunnelResult(intermediate_cache_store, serializer=serializer),
+    target="x-predict-rechunked-" + target_naming_str,
+)
+fit_and_predict_task = task(
+    fit_and_predict,
+    result=FunnelResult(intermediate_cache_store, serializer=serializer),
+    target="fit-and-predict-" + target_naming_str,
+)
+postprocess_bcsd_task = task(
+    postprocess_bcsd,
+    log_stdout=True,
+    result=FunnelResult(results_cache_store, serializer=serializer),
+    target="postprocess-results-" + target_naming_str,
+)
 
-prep_bcsd_inputs_task = task(prep_bcsd_inputs, log_stdout=True, nout=3)
+# Main Flow -----------------------------------------------------------
 
-fit_and_predict_task = task(fit_and_predict, log_stdout=True)
-
-postprocess_bcsd_task = task(postprocess_bcsd, log_stdout=True)
-
-with Flow(name=flow_name) as flow:
-    gcm = run_hyperparameters["GCM"]
-    scenario = run_hyperparameters["SCENARIO"]
-    train_period_start = run_hyperparameters["TRAIN_PERIOD_START"]
-    train_period_end = run_hyperparameters["TRAIN_PERIOD_END"]
-    predict_period_start = run_hyperparameters["PREDICT_PERIOD_START"]
-    predict_period_end = run_hyperparameters["PREDICT_PERIOD_END"]
-    variable = run_hyperparameters["VARIABLE"]
-
-    coarse_obs_path, spatial_anomalies_path, bias_corrected_path, final_out_path = make_flow_paths(
-        **run_hyperparameters
+# with Flow(name="bcsd-testing", storage=storage, run_config=run_config) as flow:
+# with Flow(name="bcsd-testing", storage=storage, run_config=kubernetes_run_config, executor=dask_executor) as flow:
+with Flow(name="bcsd-testing") as flow:
+    gcm = Parameter("GCM")
+    scenario = Parameter("SCENARIO")
+    train_period_start = Parameter("TRAIN_PERIOD_START")
+    train_period_end = Parameter("TRAIN_PERIOD_END")
+    predict_period_start = Parameter("PREDICT_PERIOD_START")
+    predict_period_end = Parameter("PREDICT_PERIOD_END")
+    variable = Parameter("VARIABLE")
+    (
+        coarse_obs_path,
+        spatial_anomalies_path,
+        bias_corrected_path,
+        final_out_path,
+    ) = make_flow_paths_task(
+        GCM=gcm,
+        SCENARIO=scenario,
+        TRAIN_PERIOD_START=train_period_start,
+        TRAIN_PERIOD_END=train_period_end,
+        PREDICT_PERIOD_START=predict_period_start,
+        PREDICT_PERIOD_END=predict_period_end,
+        VARIABLE=variable,
     )
-
-    coarse_obs_path, spatial_anomalies_path = preprocess_bcsd(
-        gcm=gcm,
-        train_period_start=train_period_start,
-        train_period_end=train_period_end,
-        variable=variable,
-        coarse_obs_path=coarse_obs_path,
-        spatial_anomalies_path=spatial_anomalies_path,
-        connection_string=connection_string,
-        rerun=True,
+    # preprocess_bcsd_tasks(s):
+    obs_ds = return_obs_task(train_period_start, train_period_end, variable)
+    coarse_obs_ds = get_coarse_obs_task(obs_ds, variable)
+    spatial_anomalies_ds = get_spatial_anomalies_task(
+        coarse_obs_ds,
+        obs_ds,
+        gcm,
+        scenario,
+        train_period_start,
+        train_period_end,
+        predict_period_start,
+        predict_period_end,
+        variable,
     )
-
-    y_rechunked_path, X_train_rechunked_path, X_predict_rechunked_path = prep_bcsd_inputs(
-        coarse_obs_path=coarse_obs_path,
-        gcm=gcm,
-        scenario=scenario,
-        train_period_start=train_period_start,
-        train_period_end=train_period_end,
-        predict_period_start=predict_period_start,
-        predict_period_end=predict_period_end,
-        variable=variable,
+    # prep_bcsd_inputs_task(s):
+    y_full_time_ds = return_y_full_time_task(
+        coarse_obs_ds,
+        gcm,
+        scenario,
+        train_period_start,
+        train_period_end,
+        predict_period_start,
+        predict_period_end,
+        variable,
     )
-
-    bias_corrected_path = fit_and_predict(
-        X_train_rechunked_path, y_rechunked_path, X_predict_rechunked_path, bias_corrected_path
+    x_train_full_time_ds = return_x_train_full_time_task(
+        y_full_time_ds,
+        gcm,
+        scenario,
+        train_period_start,
+        train_period_end,
+        predict_period_start,
+        predict_period_end,
+        variable,
     )
-
-    out_path = postprocess_bcsd(
-        bias_corrected_path, spatial_anomalies_path, final_out_path, variable, connection_string
+    x_predict_rechunked_ds = return_x_predict_rechunked_task(
+        x_train_full_time_ds,
+        gcm,
+        scenario,
+        train_period_start,
+        train_period_end,
+        predict_period_start,
+        predict_period_end,
+        variable,
     )
-flow.run(parameters=run_hyperparameters)
+    # fit and predict tasks(s):
+    bias_corrected_ds = fit_and_predict_task(
+        x_train_full_time_ds,
+        y_full_time_ds,
+        x_predict_rechunked_ds,
+        gcm,
+        scenario,
+        train_period_start,
+        train_period_end,
+        predict_period_start,
+        predict_period_end,
+        variable,
+    )
+    # postprocess_bcsd_task(s):
+    postprocess_bcsd_ds = postprocess_bcsd_task(
+        bias_corrected_ds,
+        spatial_anomalies_ds,
+        gcm,
+        scenario,
+        train_period_start,
+        train_period_end,
+        predict_period_start,
+        predict_period_end,
+        variable,
+    )
