@@ -2,10 +2,10 @@ import os
 
 os.environ['PREFECT__FLOWS__CHECKPOINTING'] = 'true'
 from dask_kubernetes import KubeCluster, make_pod_spec
-from funnel import CacheStore
 from prefect.executors import DaskExecutor
 from prefect.run_configs import KubernetesRun
 from prefect.storage import Azure
+from xpersist import CacheStore
 
 # Azure --------------------------------------------------------------------
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
@@ -38,7 +38,7 @@ dask_executor_adapt_min = 4
 dask_executor_adapt_max = 20
 
 extra_pip_packages = {
-    "EXTRA_PIP_PACKAGES": "git+https://github.com/carbonplan/cmip6-downscaling.git git+https://github.com/pangeo-data/scikit-downscale.git"
+    "EXTRA_PIP_PACKAGES": "git+https://github.com/carbonplan/cmip6-downscaling.git git+https://github.com/pangeo-data/scikit-downscale.git git+https://github.com/NCAR/xpersist.git"
 }
 env_config = {
     "AZURE_STORAGE_CONNECTION_STRING": connection_string,
