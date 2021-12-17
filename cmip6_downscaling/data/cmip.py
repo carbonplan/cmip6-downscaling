@@ -1,6 +1,3 @@
-import os 
-os.environ['PREFECT__FLOWS__CHECKPOINTING'] = 'true'
-
 from collections import defaultdict
 from typing import List, Union, Optional
 
@@ -12,6 +9,7 @@ import zarr
 from intake_esm.merge_util import AggregationError
 
 from cmip6_downscaling.config.config import CONNECTION_STRING
+from cmip6_downscaling.workflows.paths import make_rechunked_gcm_path
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching
 
 
@@ -357,7 +355,7 @@ def get_gcm(
         }
         rechunked_path = make_rechunked_gcm_path(
             chunking_approach=chunking_approach,
-            path_dict=path_dict
+            **path_dict
         )
     else:
         rechunked_path = None 

@@ -151,7 +151,7 @@ def make_interpolated_obs_path(
 def make_interpolated_gcm_path(
     obs: str,
     chunking_approach: str,
-    gcm_identifier: str,
+    gcm_identifier: Optional[str] = None,
     **kwargs
 ) -> str:
     """Build the path for GCM that has then been interpolated back to the observation grid
@@ -237,28 +237,3 @@ def make_gard_predict_output_path(
     **kwargs
 ):
     return f"gard_pred_output/{gcm_identifier}_{bias_correction_method}_{model_type}_{label}.zarr"
-
-
-
-# def make_rechunked_path(
-#     original_path: str,
-#     chunking_approach: str,
-#     original_chunk: Optional[str] = None,
-# ) -> str:
-#     """
-#     Replace the chunking approach string in the input path to match the desired chunking approach 
-#     """
-#     if original_chunk is None:
-#         if chunking_approach == 'full_space':
-#             original_chunk = 'full_time'
-#         elif chunking_approach == 'full_time':
-#             original_chunk = 'full_space'
-#         else:
-#             raise NotImplementedError('chunking approach must either be full_space or full_time')
-    
-#     if original_chunk in original_path:
-#         return original_path.replace(original_chunk, chunking_approach)
-#     else:
-#         ext = original_path.split('.')[-1]
-#         new_ext = f'_{chunking_approach}.{ext}'
-#         return original_path.replace(ext, new_ext)

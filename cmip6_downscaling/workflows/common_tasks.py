@@ -7,7 +7,7 @@ from typing import Dict, Any, Optional, List, Tuple, Union
 from funnel.prefect.result import FunnelResult
 from prefect import task
 
-from cmip6_downscaling.config.config import CONNECTION_STRING, cache_store, serializer
+from cmip6_downscaling.config.config import CONNECTION_STRING, intermediate_cache_store, serializer
 from cmip6_downscaling.data.observations import get_obs
 from cmip6_downscaling.data.cmip import get_gcm, load_cmip, get_gcm_grid_spec
 
@@ -18,7 +18,7 @@ from cmip6_downscaling.workflows.paths import (
     make_rechunked_gcm_path,
     make_coarse_obs_path, 
     make_interpolated_obs_path,
-    make_interpolated_gcm_path
+    make_interpolated_gcm_path,
     make_bias_corrected_obs_path, 
     make_bias_corrected_gcm_path,
 )
@@ -53,7 +53,7 @@ def path_builder_task(
     return gcm_grid_spec, obs_identifier, gcm_identifier
 
 
-@task(checkpoint=True, result=FunnelResult(cache_store, serializer=serializer), target=make_coarse_obs_path)
+@task(checkpoint=True, result=FunnelResult(intermediate_cache_store, serializer=serializer), target=make_coarse_obs_path)
 def get_coarse_obs_task(
     ds_obs: xr.Dataset, 
     gcm: str,
@@ -77,7 +77,7 @@ def get_coarse_obs_task(
     return ds_obs_coarse
 
 
-@task(checkpoint=True, result=FunnelResult(cache_store, serializer=serializer), target=make_interpolated_obs_path)
+@task(checkpoint=True, result=FunnelResult(intermediate_cache_store, serializer=serializer), target=make_interpolated_obs_path)
 def coarsen_and_interpolate_obs_task(
     obs, 
     train_period_start,
@@ -97,7 +97,7 @@ def coarsen_and_interpolate_obs_task(
         train_period_end=train_period_end,
         variables=variables,
         chunking_approach='full_space',
-        cache_within_rechunk=False,
+        cache_within_rechunk=True,
     )
 
     # regrid to coarse scale 
@@ -117,7 +117,7 @@ def coarsen_and_interpolate_obs_task(
     
     # rechunked to final output chunking approach if needed 
     ds_obs_interpolated_rechunked = rechunk_zarr_array_with_caching(
-        zarr_array=ds_obs_interpolated_full_space,
+        zarr_array=ds_obs_interpolated,
         output_path=None,
         chunking_approach=chunking_approach
     )
@@ -125,7 +125,7 @@ def coarsen_and_interpolate_obs_task(
     return ds_obs_interpolated_rechunked
 
 
-@task(checkpoint=True, result=FunnelResult(cache_store, serializer=serializer), target=make_interpolated_gcm_path)
+@task(checkpoint=True, result=FunnelResult(intermediate_cache_store, serializer=serializer), target=make_interpolated_gcm_path)
 def interpolate_gcm_task(
     obs: str,
     gcm: str,
@@ -181,7 +181,7 @@ def interpolate_gcm_task(
     return ds_gcm_interpolated_rechunked
 
 
-@task(log_stdout=True, result=FunnelResult(cache_store, serializer=serializer), target=make_bias_corrected_obs_path)
+@task(log_stdout=True, result=FunnelResult(intermediate_cache_store, serializer=serializer), target=make_bias_corrected_obs_path)
 def bias_correct_obs_task(
     ds_obs: xr.Dataset,
     method: str,
@@ -217,7 +217,7 @@ def bias_correct_obs_task(
     return bias_corrected
 
 
-@task(result=FunnelResult(cache_store, serializer=serializer), target=make_bias_corrected_gcm_path)
+@task(result=FunnelResult(intermediate_cache_store, serializer=serializer), target=make_bias_corrected_gcm_path)
 def bias_correct_gcm_task(
     ds_gcm: xr.Dataset,
     ds_obs: xr.Dataset,

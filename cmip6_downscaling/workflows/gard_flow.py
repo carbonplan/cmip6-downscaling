@@ -11,14 +11,12 @@ from prefect.storage import Azure
 from funnel.prefect.result import FunnelResult
 import xarray as xr
 
-from cmip6_downscaling.config.config import CONNECTION_STRING, cache_store, serializer
+from cmip6_downscaling.config.config import CONNECTION_STRING, intermediate_cache_store, serializer
 from cmip6_downscaling.data.cmip import get_gcm, get_gcm_grid_spec
 from cmip6_downscaling.data.observations import get_obs
 
 from cmip6_downscaling.methods.gard import gard_fit_and_predict
 from cmip6_downscaling.workflows.common_tasks import (
-    get_obs_task,
-    get_gcm_task,
     coarsen_and_interpolate_obs_task,
     bias_correct_obs_task,
     bias_correct_gcm_task
@@ -40,7 +38,7 @@ from cmip6_downscaling.workflows.paths import (
 fit_and_predict_task = task(
     gard_fit_and_predict, 
     checkpoint=True,
-    result=FunnelResult(cache_store, serializer=serializer),
+    result=FunnelResult(intermediate_cache_store, serializer=serializer),
     target=make_gard_predict_output_path
 )
 
@@ -90,40 +88,3 @@ def prep_gard_input_task(
     )
 
     return X_train, y_train_rechunked, X_pred_rechunked
-
-
-# def gard_flow(
-#     model,
-#     label_name,
-#     feature_list=None,
-#     dim='time',
-#     bias_correction_method='quantile_transform',
-#     bc_kwargs=None,
-#     generate_scrf=True,
-# ):
-#     """
-#     Parameters
-#     ----------
-#     model                 : a GARD model instance to be fitted pointwise
-#     feature_list          : a list of feature names to be used in predicting
-#     dim                   : string. dimension to apply the model along. Default is ``time``.
-#     bias_correction_method: string of the name of bias correction model
-#     bc_kwargs             : kwargs dict. directly passed to the bias correction model
-#     generate_scrf         : boolean. indicates whether a spatio-temporal correlated random field (scrf) will be
-#                             generated based on the fine resolution data provided in .fit as y. if false, it is
-#                             assumed that a pre-generated scrf will be passed into .predict as an argument that
-#                             matches the prediction result dimensions.
-#     spatial_feature       : (3, 3)
-#     """
-#     self._dim = dim
-#     if not isinstance(model, (AnalogBase, PureRegression)):
-#         raise TypeError('model must be part of the GARD family of pointwise models ')
-#     self.features = feature_list
-#     self.label_name = label_name
-#     self._model = model
-#     self.thresh = model.thresh
-
-#     # shared between multiple method types but point wise
-#     # TODO: spatial features
-#     # TODO: extend this to include transforming the feature space into PCA, etc
-#     # map + 1d component (pca) of ocean surface temperature for precip prediction

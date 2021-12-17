@@ -84,8 +84,8 @@ def get_obs(
             'variables': variables,
         }
         rechunked_path = make_rechunked_obs_path(
-            path_dict=path_dict,
             chunking_approach=chunking_approach,
+            **path_dict,
         )
     else:
         rechunked_path = None 

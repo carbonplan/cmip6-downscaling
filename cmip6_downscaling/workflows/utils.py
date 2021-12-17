@@ -14,7 +14,7 @@ from rechunker import rechunk
 from xarray_schema import DataArraySchema, DatasetSchema
 from xarray_schema.base import SchemaError
 
-from cmip6_downscaling.config.config import CONNECTION_STRING, cache_path
+from cmip6_downscaling.config.config import CONNECTION_STRING, intermediate_cache_path
 
 schema_maps_chunks = DataArraySchema(chunks={'lat': -1, 'lon': -1})
 
@@ -425,7 +425,7 @@ def rechunk_zarr_array_with_caching(
     max_mem: str = "200MB",
     overwrite: bool = False,
     connection_string: Optional[str] = CONNECTION_STRING,
-    cache_path: Optional[str] = cache_path, 
+    cache_path: Optional[str] = intermediate_cache_path, 
 ) -> xr.Dataset:
     """Use `rechunker` package to adjust chunks of dataset to a form
     conducive for your processing.
