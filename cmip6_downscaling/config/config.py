@@ -13,7 +13,8 @@ CONNECTION_STRING = connection_string
 storage = Azure("prefect")
 intermediate_cache_path = 'az://flow-outputs/intermediate'
 intermediate_cache_store = CacheStore(intermediate_cache_path)
-results_cache_store = CacheStore('az://flow-outputs/results')
+results_cache_path = 'az://flow-outputs/results'
+results_cache_store = CacheStore(results_cache_path)
 serializer = 'xarray.zarr'
 
 # Prefect --------------------------------------------------------------------
