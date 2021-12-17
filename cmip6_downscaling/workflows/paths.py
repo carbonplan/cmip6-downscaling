@@ -1,4 +1,4 @@
-from typing import List, Union, Optional, Dict, Any, Tuple
+from typing import List, Optional, Tuple, Union
 
 
 def build_obs_identifier(
@@ -6,7 +6,7 @@ def build_obs_identifier(
     train_period_start: str,
     train_period_end: str,
     variables: Union[str, List[str], Tuple[str]],
-    **kwargs
+    **kwargs,
 ) -> str:
     """
     Build the common identifier for observation related data: the same pattern is used for: 1) chunked raw obs, 2) coarsened obs, and 3) coarsened then interpolated obs
@@ -41,7 +41,7 @@ def build_gcm_identifier(
     predict_period_start: str,
     predict_period_end: str,
     variables: Union[str, List[str]],
-    **kwargs
+    **kwargs,
 ) -> str:
     """
     Build the common identifier for GCM related data
@@ -75,9 +75,7 @@ def build_gcm_identifier(
 
 
 def make_rechunked_obs_path(
-    chunking_approach: str,
-    obs_identifier: Optional[str] = None,
-    **kwargs
+    chunking_approach: str, obs_identifier: Optional[str] = None, **kwargs
 ) -> str:
     """Build the path for rechunked observation
 
@@ -98,10 +96,7 @@ def make_rechunked_obs_path(
 
 
 def make_coarse_obs_path(
-    gcm_grid_spec: str,
-    chunking_approach: str,
-    obs_identifier: Optional[str] = None,
-    **kwargs
+    gcm_grid_spec: str, chunking_approach: str, obs_identifier: Optional[str] = None, **kwargs
 ) -> str:
     """Build the path for coarsened observation
 
@@ -124,10 +119,7 @@ def make_coarse_obs_path(
 
 
 def make_interpolated_obs_path(
-    gcm_grid_spec: str,
-    chunking_approach: str,
-    obs_identifier: str,
-    **kwargs
+    gcm_grid_spec: str, chunking_approach: str, obs_identifier: str, **kwargs
 ) -> str:
     """Build the path for coarsened observation that has then been interpolated back to the observation grid
 
@@ -149,17 +141,14 @@ def make_interpolated_obs_path(
 
 
 def make_interpolated_gcm_path(
-    obs: str,
-    chunking_approach: str,
-    gcm_identifier: Optional[str] = None,
-    **kwargs
+    obs: str, chunking_approach: str, gcm_identifier: Optional[str] = None, **kwargs
 ) -> str:
     """Build the path for GCM that has then been interpolated back to the observation grid
 
     Parameters
     ----------
     obs: str
-        name of obs dataset 
+        name of obs dataset
     gcm_identifier : str
         From run hyperparameters
 
@@ -178,7 +167,7 @@ def make_bias_corrected_obs_path(
     gcm_grid_spec: str,
     obs_identifier: Optional[str] = None,
     chunking_approach: Optional[str] = None,
-    **kwargs
+    **kwargs,
 ):
     if obs_identifier is None:
         obs_identifier = build_obs_identifier(**kwargs)
@@ -191,9 +180,7 @@ def make_bias_corrected_obs_path(
 
 
 def make_rechunked_gcm_path(
-    chunking_approach: str,
-    gcm_identifier: Optional[str] = None,
-    **kwargs
+    chunking_approach: str, gcm_identifier: Optional[str] = None, **kwargs
 ) -> str:
     """Build the path for rechunked GCM
 
@@ -217,7 +204,7 @@ def make_bias_corrected_gcm_path(
     method: str,
     gcm_identifier: Optional[str] = None,
     chunking_approach: Optional[str] = None,
-    **kwargs
+    **kwargs,
 ):
     if gcm_identifier is None:
         gcm_identifier = build_gcm_identifier(**kwargs)
@@ -230,10 +217,6 @@ def make_bias_corrected_gcm_path(
 
 
 def make_gard_predict_output_path(
-    gcm_identifier: str,
-    bias_correction_method: str,
-    model_type: str,
-    label: str,
-    **kwargs
+    gcm_identifier: str, bias_correction_method: str, model_type: str, label: str, **kwargs
 ):
     return f"gard_pred_output/{gcm_identifier}_{bias_correction_method}_{model_type}_{label}.zarr"

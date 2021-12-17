@@ -425,7 +425,7 @@ def rechunk_zarr_array_with_caching(
     max_mem: str = "200MB",
     overwrite: bool = False,
     connection_string: Optional[str] = CONNECTION_STRING,
-    cache_path: Optional[str] = intermediate_cache_path, 
+    cache_path: Optional[str] = intermediate_cache_path,
 ) -> xr.Dataset:
     """Use `rechunker` package to adjust chunks of dataset to a form
     conducive for your processing.
@@ -457,7 +457,10 @@ def rechunk_zarr_array_with_caching(
         if chunking_approach == 'full_space':
             chunk_dims = ('time',)  # if we need full maps, chunk along the time dimension
         elif chunking_approach == 'full_time':
-            chunk_dims = ('lat', 'lon',)  # if we need full time series, chunk along the lat/lon dimensions
+            chunk_dims = (
+                'lat',
+                'lon',
+            )  # if we need full time series, chunk along the lat/lon dimensions
         else:
             raise NotImplementedError("chunking_approach must be in ['full_space', 'full_time']")
         example_var = list(zarr_array.data_vars)[0]
@@ -533,8 +536,8 @@ def rechunk_zarr_array_with_caching(
             print(
                 'WARNING: Failed to write zarr store, perhaps because of variable chunk sizes, trying to rechunk it'
             )
-            # clearing the store because the target store has already been created in the try statement above 
-            # and rechunker fails if there's already content at the target 
+            # clearing the store because the target store has already been created in the try statement above
+            # and rechunker fails if there's already content at the target
             target_store.clear()
             zarr_array = zarr_array.chunk(chunks_dict[example_var])
             rechunk_plan = rechunk(
@@ -562,7 +565,7 @@ def regrid_ds(
 ) -> xr.Dataset:
     """Regrid a dataset to a target grid. For use in both coarsening or interpolating to finer resolution.
     The function will check whether the dataset is chunked along time (into spatially-contiguous maps)
-    and if not it will rechunk it. **kwargs are used to construct target path 
+    and if not it will rechunk it. **kwargs are used to construct target path
 
     Parameters
     ----------
@@ -576,8 +579,8 @@ def regrid_ds(
     ds_regridded : xr.Dataset
         Final regridded dataset
     """
-    # regridding requires ds to be contiguous in lat/lon, check if the input matches the 
-    # target_schema. 
+    # regridding requires ds to be contiguous in lat/lon, check if the input matches the
+    # target_schema.
     schema_dict = {}
     for var in ds.data_vars:
         schema_dict[var] = schema_maps_chunks
@@ -591,9 +594,9 @@ def regrid_ds(
             zarr_array=ds,
             chunking_approach='full_space',
             max_mem='1GB',
-            connection_string=connection_string
+            connection_string=connection_string,
         )
-    
+
     regridder = xe.Regridder(ds_rechunked, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
     ds_regridded = regridder(ds_rechunked)
     return ds_regridded
