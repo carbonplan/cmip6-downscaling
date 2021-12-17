@@ -8,10 +8,12 @@ from prefect.run_configs import KubernetesRun
 from prefect.storage import Azure
 
 # Azure --------------------------------------------------------------------
-CONNECTION_STRING = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
+connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
+CONNECTION_STRING = connection_string
 storage = Azure("prefect")
-cache_path = 'az://flow-outputs/intermediate'
-cache_store = CacheStore(cache_path)
+intermediate_cache_path = 'az://flow-outputs/intermediate'
+intermediate_cache_store = CacheStore(intermediate_cache_path)
+results_cache_store = CacheStore('az://flow-outputs/results')
 serializer = 'xarray.zarr'
 
 # Prefect --------------------------------------------------------------------
@@ -35,10 +37,10 @@ dask_executor_adapt_min = 4
 dask_executor_adapt_max = 20
 
 extra_pip_packages = {
-    "EXTRA_PIP_PACKAGES": "git+https://github.com/carbonplan/cmip6-downscaling.git@param_json git+https://github.com/orianac/scikit-downscale.git@bcsd-workflow"
+    "EXTRA_PIP_PACKAGES": "git+https://github.com/carbonplan/cmip6-downscaling.git git+https://github.com/pangeo-data/scikit-downscale.git"
 }
 env_config = {
-    "AZURE_STORAGE_CONNECTION_STRING": CONNECTION_STRING,
+    "AZURE_STORAGE_CONNECTION_STRING": connection_string,
     "EXTRA_PIP_PACKAGES": extra_pip_packages,
     'OMP_NUM_THREADS': '1',
     'MPI_NUM_THREADS': '1',
