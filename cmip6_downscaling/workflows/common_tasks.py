@@ -6,11 +6,13 @@ import xarray as xr
 from typing import Dict, Any, Optional, List, Tuple, Union
 from funnel.prefect.result import FunnelResult
 from prefect import task
+from skdownscale.pointwise_models.utils import default_none_kwargs
+
 
 from cmip6_downscaling.config.config import CONNECTION_STRING, intermediate_cache_store, serializer
 from cmip6_downscaling.data.observations import get_obs
 from cmip6_downscaling.data.cmip import get_gcm, load_cmip, get_gcm_grid_spec
-
+from cmip6_downscaling.methods.bias_correction import bias_correct_gcm_by_method, bias_correct_obs_by_method
 from cmip6_downscaling.workflows.paths import (
     build_obs_identifier,
     build_gcm_identifier,

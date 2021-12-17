@@ -1,5 +1,7 @@
+from typing import Union, Dict, Any 
+import xarray as xr
+
 from sklearn.preprocessing import QuantileTransformer, StandardScaler
-from skdownscale.pointwise_models.utils import default_none_kwargs
 from skdownscale.pointwise_models import (
     PointWiseDownscaler,
     QuantileMappingReressor,
