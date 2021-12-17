@@ -9,9 +9,12 @@ from prefect.storage import Azure
 
 # Azure --------------------------------------------------------------------
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
+CONNECTION_STRING = connection_string
 storage = Azure("prefect")
-intermediate_cache_store = CacheStore('az://flow-outputs/intermediate')
-results_cache_store = CacheStore('az://flow-outputs/results')
+intermediate_cache_path = 'az://flow-outputs/intermediate'
+intermediate_cache_store = CacheStore(intermediate_cache_path)
+results_cache_path = 'az://flow-outputs/results'
+results_cache_store = CacheStore(results_cache_path)
 serializer = 'xarray.zarr'
 
 # Prefect --------------------------------------------------------------------
