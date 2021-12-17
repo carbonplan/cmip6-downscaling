@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import List, Union, Optional
+from typing import List, Optional, Union
 
 import intake
 import numpy as np
@@ -11,7 +11,6 @@ from intake_esm.merge_util import AggregationError
 from cmip6_downscaling.config.config import CONNECTION_STRING
 from cmip6_downscaling.workflows.paths import make_rechunked_gcm_path
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching
-
 
 variable_ids = ['pr', 'tasmin', 'tasmax', 'rsds', 'hurs', 'ps']
 
@@ -295,34 +294,34 @@ def get_gcm(
     predict_period_start: str,
     predict_period_end: str,
     chunking_approach: Optional[str] = None,
-    cache_within_rechunk: Optional[bool] = True
+    cache_within_rechunk: Optional[bool] = True,
 ) -> xr.Dataset:
     """
-    Load and combine historical and future GCM into one dataset. 
+    Load and combine historical and future GCM into one dataset.
 
     Parameters
     ----------
     gcm: str
         Name of GCM
     scenario: str
-        Name of scenario 
-    variables: str or list 
-        Name of variable(s) to load 
+        Name of scenario
+    variables: str or list
+        Name of variable(s) to load
     train_period_start: str
-        Start year of train/historical period 
+        Start year of train/historical period
     train_period_end: str
-        End year of train/historical period 
+        End year of train/historical period
     predict_period_start: str
         Start year of predict/future period
     predict_period_end: str
-        End year of predict/future period 
+        End year of predict/future period
     chunking_approach: Optional[str]
-        'full_space', 'full_time', or None 
-    
-    Returns 
+        'full_space', 'full_time', or None
+
+    Returns
     -------
-    ds_gcm: xr.Dataset 
-        A dataset containing both historical and future period of GCM data 
+    ds_gcm: xr.Dataset
+        A dataset containing both historical and future period of GCM data
     """
     historical_gcm = load_cmip(
         activity_ids='CMIP',
@@ -341,7 +340,7 @@ def get_gcm(
     ds_gcm = xr.combine_by_coords([historical_gcm, future_gcm], combine_attrs='drop_conflicts')
 
     if chunking_approach is None:
-        return ds_gcm 
+        return ds_gcm
 
     if cache_within_rechunk:
         path_dict = {
@@ -353,12 +352,9 @@ def get_gcm(
             'predict_period_end': predict_period_end,
             'variables': variables,
         }
-        rechunked_path = make_rechunked_gcm_path(
-            chunking_approach=chunking_approach,
-            **path_dict
-        )
+        rechunked_path = make_rechunked_gcm_path(chunking_approach=chunking_approach, **path_dict)
     else:
-        rechunked_path = None 
+        rechunked_path = None
     ds_gcm_rechunked = rechunk_zarr_array_with_caching(
         zarr_array=ds_gcm,
         connection_string=CONNECTION_STRING,
@@ -370,8 +366,7 @@ def get_gcm(
 
 
 def get_gcm_grid_spec(
-    gcm_name: Optional[str] = None,
-    gcm_ds: Optional[Union[xr.Dataset, xr.DataArray]] = None
+    gcm_name: Optional[str] = None, gcm_ds: Optional[Union[xr.Dataset, xr.DataArray]] = None
 ) -> str:
     if gcm_ds is None:
         assert gcm_name is not None, 'one of gcm_ds or gcm_name has to be not empty'
