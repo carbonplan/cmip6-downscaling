@@ -8,7 +8,7 @@ from prefect import Flow, task
 from prefect.executors import DaskExecutor
 from prefect.run_configs import KubernetesRun
 from prefect.storage import Azure
-from funnel.prefect.result import FunnelResult
+from xpersist.prefect.result import XpersistResult
 import xarray as xr
 
 from cmip6_downscaling.config.config import CONNECTION_STRING, intermediate_cache_store, serializer
@@ -38,7 +38,7 @@ from cmip6_downscaling.workflows.paths import (
 fit_and_predict_task = task(
     gard_fit_and_predict, 
     checkpoint=True,
-    result=FunnelResult(intermediate_cache_store, serializer=serializer),
+    result=XpersistResult(intermediate_cache_store, serializer=serializer),
     target=make_gard_predict_output_path
 )
 

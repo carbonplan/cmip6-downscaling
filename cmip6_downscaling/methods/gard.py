@@ -61,6 +61,7 @@ def gard_fit_and_predict(
 
     out = xr.Dataset()
     out['pred'] = model.predict(X_pred)
+    print(type(out['pred']))
     out['prediction_error'] = model.get_attr('prediction_error_', dtype='float64', template_output=out['pred'])
     out['exceedance_prob'] = model.get_attr('exceedance_prob_', dtype='float64', template_output=out['pred'])
 

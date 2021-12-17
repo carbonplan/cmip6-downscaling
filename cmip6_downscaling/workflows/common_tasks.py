@@ -4,7 +4,7 @@ os.environ['PREFECT__FLOWS__CHECKPOINTING'] = 'true'
 import xarray as xr
 
 from typing import Dict, Any, Optional, List, Tuple, Union
-from funnel.prefect.result import FunnelResult
+from xpersist.prefect.result import XpersistResult
 from prefect import task
 from skdownscale.pointwise_models.utils import default_none_kwargs
 
@@ -55,7 +55,7 @@ def path_builder_task(
     return gcm_grid_spec, obs_identifier, gcm_identifier
 
 
-@task(checkpoint=True, result=FunnelResult(intermediate_cache_store, serializer=serializer), target=make_coarse_obs_path)
+@task(checkpoint=True, result=XpersistResult(intermediate_cache_store, serializer=serializer), target=make_coarse_obs_path)
 def get_coarse_obs_task(
     ds_obs: xr.Dataset, 
     gcm: str,
@@ -79,7 +79,7 @@ def get_coarse_obs_task(
     return ds_obs_coarse
 
 
-@task(checkpoint=True, result=FunnelResult(intermediate_cache_store, serializer=serializer), target=make_interpolated_obs_path)
+@task(checkpoint=True, result=XpersistResult(intermediate_cache_store, serializer=serializer), target=make_interpolated_obs_path)
 def coarsen_and_interpolate_obs_task(
     obs, 
     train_period_start,
@@ -127,7 +127,7 @@ def coarsen_and_interpolate_obs_task(
     return ds_obs_interpolated_rechunked
 
 
-@task(checkpoint=True, result=FunnelResult(intermediate_cache_store, serializer=serializer), target=make_interpolated_gcm_path)
+@task(checkpoint=True, result=XpersistResult(intermediate_cache_store, serializer=serializer), target=make_interpolated_gcm_path)
 def interpolate_gcm_task(
     obs: str,
     gcm: str,
@@ -183,7 +183,7 @@ def interpolate_gcm_task(
     return ds_gcm_interpolated_rechunked
 
 
-@task(log_stdout=True, result=FunnelResult(intermediate_cache_store, serializer=serializer), target=make_bias_corrected_obs_path)
+@task(log_stdout=True, result=XpersistResult(intermediate_cache_store, serializer=serializer), target=make_bias_corrected_obs_path)
 def bias_correct_obs_task(
     ds_obs: xr.Dataset,
     method: str,
@@ -219,7 +219,7 @@ def bias_correct_obs_task(
     return bias_corrected
 
 
-@task(result=FunnelResult(intermediate_cache_store, serializer=serializer), target=make_bias_corrected_gcm_path)
+@task(result=XpersistResult(intermediate_cache_store, serializer=serializer), target=make_bias_corrected_gcm_path)
 def bias_correct_gcm_task(
     ds_gcm: xr.Dataset,
     ds_obs: xr.Dataset,
