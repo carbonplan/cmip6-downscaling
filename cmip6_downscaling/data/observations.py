@@ -1,12 +1,15 @@
 import os
 
 os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "True"
-from typing import List, Union
+from typing import List, Union, Optional
 
 import xarray as xr
 import zarr
 
-connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
+from cmip6_downscaling.config.config import CONNECTION_STRING
+from cmip6_downscaling.workflows.paths import make_rechunked_obs_path
+from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching
+
 
 variable_name_dict = {
     "tasmax": "air_temperature_at_2_metres_1hour_Maximum",
@@ -55,3 +58,42 @@ def open_era5(variables: Union[str, List[str]], start_year: str, end_year: str) 
     ]
     ds = xr.open_mfdataset(stores, engine='zarr', consolidated=True)
     return ds[variables]
+
+
+def get_obs(
+    obs: str,
+    train_period_start: str,
+    train_period_end: str,
+    variables: Union[str, List[str]],
+    chunking_approach: Optional[str] = None,
+    cache_within_rechunk: Optional[bool] = True
+) -> xr.Dataset:
+    if obs == 'ERA5':
+        ds_obs = open_era5(variables=variables, start_year=train_period_start, end_year=train_period_end)
+    else:
+        raise NotImplementedError('only ERA5 is available as observation dataset right now')
+
+    if chunking_approach is None:
+        return ds_obs 
+
+    if cache_within_rechunk: 
+        path_dict = {
+            'obs': obs,
+            'train_period_start': train_period_start,
+            'train_period_end': train_period_end,
+            'variables': variables,
+        }
+        rechunked_path = make_rechunked_obs_path(
+            chunking_approach=chunking_approach,
+            **path_dict,
+        )
+    else:
+        rechunked_path = None 
+    ds_obs_rechunked = rechunk_zarr_array_with_caching(
+        zarr_array=ds_obs,
+        connection_string=CONNECTION_STRING,
+        chunking_approach=chunking_approach,
+        output_path=rechunked_path,
+    )
+
+    return ds_obs_rechunked
