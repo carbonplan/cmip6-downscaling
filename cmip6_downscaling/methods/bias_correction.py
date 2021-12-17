@@ -1,12 +1,12 @@
-from typing import Union, Dict, Any 
-import xarray as xr
+from typing import Any, Dict, Union
 
-from sklearn.preprocessing import QuantileTransformer, StandardScaler
+import xarray as xr
 from skdownscale.pointwise_models import (
     PointWiseDownscaler,
     QuantileMappingReressor,
     TrendAwareQuantileMappingRegressor,
 )
+from sklearn.preprocessing import QuantileTransformer, StandardScaler
 
 VALID_CORRECTIONS = ['absolute', 'relative']
 
@@ -144,13 +144,13 @@ def bias_correct_gcm_by_method(
         return sc.transform(da_gcm)
 
     # TODO: test to see QuantileMappingReressor and TrendAwareQuantileMappingRegressor
-    # can handle multiple variables at once 
+    # can handle multiple variables at once
     elif method == 'quantile_map':
         qm = PointWiseDownscaler(model=QuantileMappingReressor(**bc_kwargs), dim='time')
         qm.fit(da_gcm.sel(time=historical_period), da_obs)
         return qm.predict(da_gcm)
 
-    elif self.bias_correction_method == 'detrended_quantile_map':
+    elif method == 'detrended_quantile_map':
         qm = PointWiseDownscaler(
             TrendAwareQuantileMappingRegressor(QuantileMappingReressor(**bc_kwargs))
         )
