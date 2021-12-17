@@ -13,6 +13,8 @@ from rechunker import rechunk
 from xarray_schema import DataArraySchema, DatasetSchema
 from xarray_schema.base import SchemaError
 
+from cmip6_downscaling.config.config import CONNECTION_STRING, cache_path
+
 schema_maps_chunks = DataArraySchema(chunks={'lat': -1, 'lon': -1})
 
 
@@ -51,7 +53,7 @@ def delete_chunks_encoding(ds: Union[xr.Dataset, xr.DataArray]):
 
 
 def make_rechunker_stores(
-    connection_string: str,
+    connection_string: Optional[str] = CONNECTION_STRING,
     output_path: Optional[str] = None,
 ) -> Tuple[fsspec.FSMap, fsspec.FSMap, str]:
     """Initialize two stores for rechunker to use as temporary and final rechunked locations
@@ -355,11 +357,13 @@ def write_dataset(ds: xr.Dataset, path: str, chunks_dims: Tuple = ('time',)) -> 
 
 def rechunk_zarr_array_with_caching(
     zarr_array: xr.Dataset,
-    connection_string: str,
-    chunking_approach: str,
+    chunking_approach: Optional[str] = None,
+    template_chunk_array: Optional[xr.Dataset] = None,
     output_path: Optional[str] = None,
     max_mem: str = "200MB",
     overwrite: bool = False,
+    connection_string: Optional[str] = CONNECTION_STRING,
+    cache_path: Optional[str] = cache_path, 
 ) -> xr.Dataset:
     """Use `rechunker` package to adjust chunks of dataset to a form
     conducive for your processing.
@@ -375,8 +379,6 @@ def rechunk_zarr_array_with_caching(
         Has to be one of `full_space` or `full_time`. If `full_space`, the data will be rechunked such that the space dimensions are contiguous (i.e. each chunk
         will contain full maps). If `full_time`, the data will be rechunked such that the time dimension is contiguous (i.e. each chunk will contain full time
         series)
-    connection_string : str
-        Connection string to give you write access
     max_mem : str
         The max memory you want to allow for a chunk. Probably want it to be around 100 MB, but that
         is also controlled by the `calc_auspicious_chunk_sizes` calls.
@@ -389,16 +391,21 @@ def rechunk_zarr_array_with_caching(
         Rechunked dataset
     """
     # determine the chunking schema
-    if chunking_approach == 'full_space':
-        chunk_dims = ('time',)  # if we need full maps, chunk along the time dimension
-    elif chunking_approach == 'full_time':
-        chunk_dims = (
-            'lat',
-            'lon',
-        )  # if we need full time series, chunk along the lat/lon dimensions
+    if template_chunk_array is None:
+        if chunking_approach == 'full_space':
+            chunk_dims = ('time',)  # if we need full maps, chunk along the time dimension
+        elif chunking_approach == 'full_time':
+            chunk_dims = ('lat', 'lon',)  # if we need full time series, chunk along the lat/lon dimensions
+        else:
+            raise NotImplementedError("chunking_approach must be in ['full_space', 'full_time']")
+        example_var = list(zarr_array.data_vars)[0]
+        chunk_def = calc_auspicious_chunks_dict(zarr_array[example_var], chunk_dims=chunk_dims)
     else:
-        raise NotImplementedError("chunking_approach must be in ['full_space', 'full_time']")
-    chunk_def = calc_auspicious_chunks_dict(zarr_array, chunk_dims=chunk_dims)
+        chunk_def = {
+            'time': template_chunk_array.chunks['time'][0],
+            'lat': template_chunk_array.chunks['lat'][0],
+            'lon': template_chunk_array.chunks['lon'][0],
+        }
     chunks_dict = {
         'time': None,  # write None here because you don't want to rechunk this array
         'lon': None,
@@ -406,20 +413,25 @@ def rechunk_zarr_array_with_caching(
     }
     for var in zarr_array.data_vars:
         chunks_dict[var] = chunk_def
+    
 
     # make the schema for what you want the rechunking routine to produce
     # so that you can check whether what you passed in (zarr_array) already looks like that
     # if it does, you'll skip the rechunking!
     schema_dict = {}
     for var in zarr_array.data_vars:
-        schema_dict[var] = DataArraySchema(chunks=chunks_dict[var])
+        schema_dict[var] = DataArraySchema(chunks=chunk_def)
     target_schema = DatasetSchema(schema_dict)
 
     # make storage patterns
+    if output_path is not None:
+        output_path = cache_path + '/' + output_path
     temp_store, target_store, target_path = make_rechunker_stores(connection_string, output_path)
+    print(f'target path is {target_path}')
 
     # check and see if the output is empty, if there is content, check that it's chunked correctly
     if len(target_store) > 0:
+        print('checking the cache')
         output = xr.open_zarr(target_store)
         try:
             # if the content in target path is correctly chunked, return
@@ -438,23 +450,39 @@ def rechunk_zarr_array_with_caching(
     # process the input zarr array
     delete_chunks_encoding(zarr_array)
     try:
+        print('checking the chunk')
         # now check if the input is already correctly chunked. If so, save to the output location and return
         target_schema.validate(zarr_array)
         zarr_array.to_zarr(target_store, mode='w', consolidated=True)
         return zarr_array
 
     except SchemaError:
-        # TODO: could switch this to a validation with xarray schema - confirm that the chunks are all uniform and
-        # if not, chunk them according to the spec provided by `calc_auspicious_chunks_dict`
-        example_var = list(zarr_array.data_vars)[0]
-        rechunk_plan = rechunk(
-            zarr_array.chunk(chunks_dict[example_var]),
-            chunks_dict,
-            max_mem,
-            target_store,
-            temp_store=temp_store,
-        )
-        rechunk_plan.execute(retries=5)
+        print('rechunking')
+        try:
+            rechunk_plan = rechunk(
+                zarr_array,
+                chunks_dict,
+                max_mem,
+                target_store,
+                temp_store=temp_store,
+            )
+            rechunk_plan.execute(retries=5)
+        except ValueError:
+            print(
+                'WARNING: Failed to write zarr store, perhaps because of variable chunk sizes, trying to rechunk it'
+            )
+            # clearing the store because the target store has already been created in the try statement above 
+            # and rechunker fails if there's already content at the target 
+            target_store.clear()
+            zarr_array = zarr_array.chunk(chunks_dict[example_var])
+            rechunk_plan = rechunk(
+                zarr_array,
+                chunks_dict,
+                max_mem,
+                target_store,
+                temp_store=temp_store,
+            )
+            rechunk_plan.execute(retries=5)
         rechunked_ds = xr.open_zarr(
             target_store
         )  # ideally we want consolidated=True but it seems that functionality isn't offered in rechunker right now
@@ -466,8 +494,8 @@ def rechunk_zarr_array_with_caching(
 def regrid_ds(
     ds: xr.Dataset,
     target_grid_ds: xr.Dataset,
-    connection_string: str,
     rechunked_ds_path: Optional[str] = None,
+    connection_string: Optional[str] = CONNECTION_STRING,
     **kwargs,
 ) -> xr.Dataset:
     """Regrid a dataset to a target grid. For use in both coarsening or interpolating to finer resolution.
@@ -480,8 +508,6 @@ def regrid_ds(
         Dataset you want to regrid
     target_grid_ds : xr.Dataset
         Template dataset whose grid you'll match
-    connection_string : str
-        Connection string to give you write access to the stores
 
     Returns
     -------
@@ -496,40 +522,16 @@ def regrid_ds(
     target_schema = DatasetSchema(schema_dict)
 
     try:
-        target_schema.validate(ds[variable])
+        target_schema.validate(ds)
         ds_rechunked = ds
     except SchemaError:
         ds_rechunked = rechunk_zarr_array_with_caching(
             zarr_array=ds,
-            connection_string=connection_string,
             chunking_approach='full_space',
-            max_mem='1GB'
+            max_mem='1GB',
+            connection_string=connection_string
         )
-
+    
     regridder = xe.Regridder(ds_rechunked, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
     ds_regridded = regridder(ds_rechunked)
     return ds_regridded
-
-
-def get_coarse_obs(
-    ds_obs: xr.Dataset, 
-    gcm: str,
-    connection_string: str,
-    **kwargs
-) -> xr.Dataset:
-    """
-    **kwargs are used to construct target file path
-    """
-    # Load single slice of target cmip6 dataset for target grid dimensions
-    gcm_grid = load_cmip(
-        source_ids=gcm,
-        return_type='xr',
-    ).isel(time=0)
-
-    # rechunk and regrid observation dataset to target gcm resolution
-    ds_obs_coarse = regrid_ds(
-        ds=ds_obs,
-        target_grid_ds=gcm_grid,
-        connection_string=connection_string,
-    )
-    return ds_obs_coarse

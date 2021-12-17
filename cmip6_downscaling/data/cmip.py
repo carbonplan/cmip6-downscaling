@@ -1,5 +1,8 @@
+import os 
+os.environ['PREFECT__FLOWS__CHECKPOINTING'] = 'true'
+
 from collections import defaultdict
-from typing import List, Union
+from typing import List, Union, Optional
 
 import intake
 import numpy as np
@@ -7,6 +10,10 @@ import pandas as pd
 import xarray as xr
 import zarr
 from intake_esm.merge_util import AggregationError
+
+from cmip6_downscaling.config.config import CONNECTION_STRING
+from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching
+
 
 variable_ids = ['pr', 'tasmin', 'tasmax', 'rsds', 'hurs', 'ps']
 
@@ -200,33 +207,41 @@ def load_cmip(
     """
     col_url = "https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.json"
 
-    stores = (
-        intake.open_esm_datastore(col_url)
-        .search(
-            activity_id=activity_ids,
-            experiment_id=experiment_ids,
-            member_id=member_ids,
-            source_id=source_ids,
-            table_id=table_ids,
-            grid_label=grid_labels,
-            variable_id=variable_ids,
+    if isinstance(variable_ids, str):
+        variable_ids = [variable_ids]
+
+    for i, var in enumerate(variable_ids):
+        stores = (
+            intake.open_esm_datastore(col_url)
+            .search(
+                activity_id=activity_ids,
+                experiment_id=experiment_ids,
+                member_id=member_ids,
+                source_id=source_ids,
+                table_id=table_ids,
+                grid_label=grid_labels,
+                variable_id=[var],
+            )
+            .df['zstore']
+            .to_list()
         )
-        .df['zstore']
-        .to_list()
-    )
-    print(stores)
-    if len(stores) > 1:
-        raise ValueError('can only get 1 store at a time')
-    if return_type == 'zarr':
-        ds = zarr.open_consolidated(stores[0], mode='r')
-    elif return_type == 'xr':
-        ds = xr.open_zarr(stores[0], consolidated=True)
 
-    # flip the lats if necessary and drop the extra dims/vars like bnds
+        if len(stores) > 1:
+            raise ValueError('can only get 1 store at a time')
+        if return_type == 'zarr':
+            ds = zarr.open_consolidated(stores[0], mode='r')
+        elif return_type == 'xr':
+            ds = xr.open_zarr(stores[0], consolidated=True)
 
-    ds = gcm_munge(ds)
+        # flip the lats if necessary and drop the extra dims/vars like bnds
+        ds = gcm_munge(ds)
 
-    return ds
+        if i == 0:
+            ds_out = ds
+        else:
+            ds_out[var] = ds[var]
+
+    return ds_out
 
 
 def convert_to_360(lon: Union[float, int]) -> Union[float, int]:
@@ -280,7 +295,9 @@ def get_gcm(
     train_period_start: str,
     train_period_end: str,
     predict_period_start: str,
-    predict_period_end: str
+    predict_period_end: str,
+    chunking_approach: Optional[str] = None,
+    cache_within_rechunk: Optional[bool] = True
 ) -> xr.Dataset:
     """
     Load and combine historical and future GCM into one dataset. 
@@ -301,6 +318,8 @@ def get_gcm(
         Start year of predict/future period
     predict_period_end: str
         End year of predict/future period 
+    chunking_approach: Optional[str]
+        'full_space', 'full_time', or None 
     
     Returns 
     -------
@@ -321,8 +340,35 @@ def get_gcm(
         variable_ids=variables,
         return_type='xr',
     ).sel(time=slice(predict_period_start, predict_period_end))
-    ds_gcm = xr.combine_by_coords([historical_gcm, future_gcm])
-    return ds_gcm 
+    ds_gcm = xr.combine_by_coords([historical_gcm, future_gcm], combine_attrs='drop_conflicts')
+
+    if chunking_approach is None:
+        return ds_gcm 
+
+    if cache_within_rechunk:
+        path_dict = {
+            'gcm': gcm,
+            'scenario': scenario,
+            'train_period_start': train_period_start,
+            'train_period_end': train_period_end,
+            'predict_period_start': predict_period_start,
+            'predict_period_end': predict_period_end,
+            'variables': variables,
+        }
+        rechunked_path = make_rechunked_gcm_path(
+            chunking_approach=chunking_approach,
+            path_dict=path_dict
+        )
+    else:
+        rechunked_path = None 
+    ds_gcm_rechunked = rechunk_zarr_array_with_caching(
+        zarr_array=ds_gcm,
+        connection_string=CONNECTION_STRING,
+        chunking_approach=chunking_approach,
+        output_path=rechunked_path,
+    )
+
+    return ds_gcm_rechunked
 
 
 def get_gcm_grid_spec(
@@ -332,7 +378,7 @@ def get_gcm_grid_spec(
     if gcm_ds is None:
         assert gcm_name is not None, 'one of gcm_ds or gcm_name has to be not empty'
         gcm_grid = load_cmip(
-            source_ids=gcm,
+            source_ids=gcm_name,
             return_type='xr',
         ).isel(time=0)
     else:

@@ -1,3 +1,11 @@
+from sklearn.preprocessing import QuantileTransformer, StandardScaler
+from skdownscale.pointwise_models.utils import default_none_kwargs
+from skdownscale.pointwise_models import (
+    PointWiseDownscaler,
+    QuantileMappingReressor,
+    TrendAwareQuantileMappingRegressor,
+)
+
 VALID_CORRECTIONS = ['absolute', 'relative']
 
 
@@ -80,8 +88,8 @@ class MontlyBiasCorrection:
         return self
 
 
-def bias_correct_obs_by_var(
-    da_obs: xr.DataArray,
+def bias_correct_obs_by_method(
+    da_obs: Union[xr.DataArray, xr.Dataset],
     method: str,
     bc_kwargs: Dict[str, Any],
 ) -> xr.DataArray:
@@ -112,52 +120,9 @@ def bias_correct_obs_by_var(
         raise NotImplementedError(f'bias correction method must be one of {availalbe_methods}')
 
 
-def bias_correct_obs(
-    ds_obs: xr.Dataset,
-    methods: Union[str, Dict[str, str]],
-    bc_kwargs: Optional[Union[Dict[str, Any], Dict[str, Dict[str, Any]]]] = None,
-) -> xr.DataArray:
-    """
-    Bias correct observation data according to methods and kwargs. 
-
-    Parameters
-    ----------
-    ds_obs : xr.Dataset
-        Observation dataset 
-    methods : string or dict of string
-        Bias correction methods to be used. If string, the same method would be applied to all variables. 
-        If dict, the variables that are not in the keys of the dictionary would not be transformed. 
-    bc_kwargs: dict, dict of dicts, or None 
-        Keyword arguments to be used with the bias correction method 
-
-    Returns
-    -------
-    ds_obs_bias_corrected : xr.Dataset
-        Bias corrected observation dataset 
-    """
-    bias_corrected = xr.Dataset()
-
-    for v in ds_obs.data_vars:
-        method = methods.get(v, 'none') if isinstance(methods, dict) else methods 
-        if bc_kwargs is not None and v in bc_kwargs:
-            bc_kws = default_none_kwargs(bc_kwargs[v], copy=True)
-        elif bc_kwargs is not None:
-            kws = default_none_kwargs(bc_kwargs, copy=True)
-        else:
-            kws = default_none_kwargs({}, copy=True)
-
-        bias_corrected[v] = bias_correct_obs_by_var(
-            da_obs=ds_obs[v],
-            method=method,
-            bc_kwargs=kws
-        )
-
-    return bias_corrected
-
-
-def bias_correct_gcm_by_var(
-    da_gcm: xr.DataArray,
-    da_obs: xr.DataArray,
+def bias_correct_gcm_by_method(
+    da_gcm: Union[xr.DataArray, xr.Dataset],
+    da_obs: Union[xr.DataArray, xr.Dataset],
     historical_period: slice,
     method: str,
     bc_kwargs: Dict[str, Any],
@@ -176,6 +141,8 @@ def bias_correct_gcm_by_var(
         sc.fit(da_gcm.sel(time=historical_period))
         return sc.transform(da_gcm)
 
+    # TODO: test to see QuantileMappingReressor and TrendAwareQuantileMappingRegressor
+    # can handle multiple variables at once 
     elif method == 'quantile_map':
         qm = PointWiseDownscaler(model=QuantileMappingReressor(**bc_kwargs), dim='time')
         qm.fit(da_gcm.sel(time=historical_period), da_obs)
@@ -200,60 +167,3 @@ def bias_correct_gcm_by_var(
             'none',
         ]
         raise NotImplementedError(f'bias correction method must be one of {availalbe_methods}')
-
-
-def bias_correct_gcm(
-    ds_gcm: xr.Dataset,
-    ds_obs: xr.Dataset,
-    historical_period_start: str,
-    historical_period_end: str,
-    methods: Union[str, Dict[str, str]],
-    bc_kwargs: Optional[Union[Dict[str, Any], Dict[str, Dict[str, Any]]]] = None,
-) -> xr.DataArray:
-    """
-    Bias correct gcm data to the provided observation data according to methods and kwargs. 
-
-    Parameters
-    ----------
-    ds_gcm : xr.Dataset
-        GCM dataset to be bias corrected 
-    ds_obs : xr.Dataset
-        Observation dataset to bias correct to 
-    historical_period_start : str
-        Start year of the historical/training period 
-    historical_period_end : str
-        End year of the historical/training period 
-    methods : string or dict of string
-        Bias correction methods to be used. If string, the same method would be applied to all variables. 
-        If dict, the variables that are not in the keys of the dictionary would not be transformed. 
-    bc_kwargs: dict, dict of dicts, or None 
-        Keyword arguments to be used with the bias correction method 
-
-    Returns
-    -------
-    ds_gcm_bias_corrected : xr.Dataset
-        Bias corrected GCM dataset 
-    """
-    historical_period = slice(historical_period_start, historical_period_end)
-
-    bias_corrected = xr.Dataset()
-
-    for v in ds_gcm.data_vars:
-        assert v in ds_obs.data_vars
-        method = methods.get(v, 'none') if isinstance(methods, dict) else methods 
-        if bc_kwargs is not None and v in bc_kwargs:
-            bc_kws = default_none_kwargs(bc_kwargs[v], copy=True)
-        elif bc_kwargs is not None:
-            kws = default_none_kwargs(bc_kwargs, copy=True)
-        else:
-            kws = default_none_kwargs({}, copy=True)
-
-        bias_corrected[v] = bias_correct_gcm_by_var(
-            da_gcm=ds_gcm[v],
-            da_obs=ds_obs[v],
-            historical_period=historical_period,
-            method=method,
-            bc_kwargs=kws
-        )
-
-    return bias_corrected
