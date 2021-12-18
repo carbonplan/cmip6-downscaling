@@ -479,7 +479,6 @@ def rechunk_zarr_array_with_caching(
     for var in zarr_array.data_vars:
         chunks_dict[var] = chunk_def
     
-
     # make the schema for what you want the rechunking routine to produce
     # so that you can check whether what you passed in (zarr_array) already looks like that
     # if it does, you'll skip the rechunking!
