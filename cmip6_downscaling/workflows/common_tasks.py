@@ -211,7 +211,7 @@ def bias_correct_obs_task(
     """
     kws = default_none_kwargs(bc_kwargs, copy=True)
     bias_corrected = bias_correct_obs_by_method(
-        da_obs=ds_obs.isel(lat=slice(0, 100), lon=slice(0, 100)), method=method, bc_kwargs=kws
+        da_obs=ds_obs, method=method, bc_kwargs=kws
     ).to_dataset(dim='variable')
 
     return bias_corrected
@@ -261,8 +261,8 @@ def bias_correct_gcm_task(
     for v in ds_gcm.data_vars:
         assert v in ds_obs.data_vars
     bias_corrected = bias_correct_gcm_by_method(
-        da_gcm=ds_gcm.isel(lat=slice(0, 100), lon=slice(0, 100)),
-        da_obs=ds_obs.isel(lat=slice(0, 100), lon=slice(0, 100)),
+        da_gcm=ds_gcm,
+        da_obs=ds_obs,
         historical_period=historical_period,
         method=method,
         bc_kwargs=kws,
