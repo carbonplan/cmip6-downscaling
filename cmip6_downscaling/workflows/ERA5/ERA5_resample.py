@@ -10,8 +10,6 @@ from prefect import Flow, task
 from prefect.run_configs import KubernetesRun
 from prefect.storage import Azure
 
-# from cmip6_downscaling.workflows.share import get_store
-
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 image = "carbonplan/cmip6-downscaling-prefect:latest"
 
