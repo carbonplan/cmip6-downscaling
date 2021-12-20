@@ -223,7 +223,9 @@ def make_gard_predict_output_path(
 
 
 def make_scrf_path(
-    obs_identifier: str, label: str, **kwargs,
+    obs_identifier: str,
+    label: str,
+    **kwargs,
 ):
     return f"scrf/{obs_identifier}_{label}.zarr"
 
