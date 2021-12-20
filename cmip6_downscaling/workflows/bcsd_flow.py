@@ -5,10 +5,13 @@ os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "true"
 from prefect import Flow, Parameter, task
 from xpersist.prefect.result import XpersistResult
 
-from cmip6_downscaling.config.config import (  # dask_executor,; kubernetes_run_config,; storage,
+from cmip6_downscaling.config.config import (
+    dask_executor,
     intermediate_cache_store,
+    kubernetes_run_config,
     results_cache_store,
     serializer,
+    storage,
 )
 from cmip6_downscaling.methods.bcsd import (
     fit_and_predict,
@@ -28,43 +31,63 @@ target_naming_str = "{gcm}-{scenario}-{train_period_start}-{train_period_end}-{p
 
 make_flow_paths_task = task(make_flow_paths, log_stdout=True, nout=4)
 
+# no rechunking
 return_obs_task = task(
     return_obs,
     result=XpersistResult(intermediate_cache_store, serializer=serializer),
     target="obs-ds",
 )
+# yes rechunking
 get_coarse_obs_task = task(
     get_coarse_obs,
+    tags=['dask-resource:TASKSLOTS=1'],
     result=XpersistResult(intermediate_cache_store, serializer=serializer),
     target="coarse-obs-ds",
 )
+# yes rechunk
 get_spatial_anomalies_task = task(
     get_spatial_anomalies,
+    tags=['dask-resource:TASKSLOTS=1'],
     result=XpersistResult(intermediate_cache_store, serializer=serializer),
     target="spatial-anomalies-ds-" + target_naming_str,
 )
+
+# yes rechunk
+
 return_y_full_time_task = task(
     return_y_full_time,
+    tags=['dask-resource:TASKSLOTS=1'],
     result=XpersistResult(intermediate_cache_store, serializer=serializer),
     target="y-full-time-" + target_naming_str,
 )
+# yes rechunk
+
 return_x_train_full_time_task = task(
     return_x_train_full_time,
+    tags=['dask-resource:TASKSLOTS=1'],
     result=XpersistResult(intermediate_cache_store, serializer=serializer),
     target="x-train-full-time-" + target_naming_str,
 )
+# yes rechunk
+
 return_x_predict_rechunked_task = task(
     return_x_predict_rechunked,
+    tags=['dask-resource:TASKSLOTS=1'],
     result=XpersistResult(intermediate_cache_store, serializer=serializer),
     target="x-predict-rechunked-" + target_naming_str,
 )
+# no rechunking
+
 fit_and_predict_task = task(
     fit_and_predict,
     result=XpersistResult(intermediate_cache_store, serializer=serializer),
     target="fit-and-predict-" + target_naming_str,
 )
+# yes rechunk
+
 postprocess_bcsd_task = task(
     postprocess_bcsd,
+    tags=['dask-resource:TASKSLOTS=1'],
     log_stdout=True,
     result=XpersistResult(results_cache_store, serializer=serializer),
     target="postprocess-results-" + target_naming_str,
@@ -73,8 +96,13 @@ postprocess_bcsd_task = task(
 # Main Flow -----------------------------------------------------------
 
 # with Flow(name="bcsd-testing", storage=storage, run_config=run_config) as flow:
-# with Flow(name="bcsd-testing", storage=storage, run_config=kubernetes_run_config, executor=dask_executor) as flow:
-with Flow(name="bcsd-testing") as flow:
+# with Flow(name="bcsd-testing") as flow:
+with Flow(
+    name="bcsd-single-threading-test",
+    storage=storage,
+    run_config=kubernetes_run_config,
+    executor=dask_executor,
+) as flow:
     gcm = Parameter("GCM")
     scenario = Parameter("SCENARIO")
     train_period_start = Parameter("TRAIN_PERIOD_START")

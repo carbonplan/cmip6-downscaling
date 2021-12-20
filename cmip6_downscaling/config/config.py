@@ -10,8 +10,9 @@ from xpersist import CacheStore
 # Azure --------------------------------------------------------------------
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 CONNECTION_STRING = connection_string
+
 storage = Azure("prefect")
-intermediate_cache_path = 'az://flow-outputs/intermediate'
+intermediate_cache_path = 'az://flow-outputs/intermediates'
 intermediate_cache_store = CacheStore(intermediate_cache_path)
 results_cache_path = 'az://flow-outputs/results'
 results_cache_store = CacheStore(results_cache_path)
@@ -25,8 +26,8 @@ agent = ["az-eu-west"]
 image = "carbonplan/cmip6-downscaling-prefect:2021.12.06"
 
 # Kubernetes config
-kubernetes_cpu = 7
-kubernetes_memory = "16Gi"
+kubernetes_cpu = 4
+kubernetes_memory = "8Gi"
 
 # Dask executor config
 dask_executor_memory_limit = "16Gi"
@@ -37,38 +38,61 @@ dask_executor_cpu_request = 2
 dask_executor_adapt_min = 4
 dask_executor_adapt_max = 20
 
-extra_pip_packages = {
-    "EXTRA_PIP_PACKAGES": "git+https://github.com/carbonplan/cmip6-downscaling.git git+https://github.com/pangeo-data/scikit-downscale.git git+https://github.com/NCAR/xpersist.git"
-}
-env_config = {
+# pod config
+pod_memory_limit = "4Gi"
+pod_memory_request = "4Gi"
+pod_threads_per_worker = 2
+pod_cpu_limit = 2
+pod_cpu_request = 2
+
+
+OMP_NUM_THREADS = '1'
+MPI_NUM_THREADS = '1'
+MKL_NUM_THREADS = '1'
+OPENBLAS_NUM_THREADS = '1'
+DASK_DISTRIBUTED__WORKER__RESOURCES__TASKSLOTS = '1'
+
+
+extra_pip_packages = "git+https://github.com/carbonplan/cmip6-downscaling.git git+https://github.com/pangeo-data/scikit-downscale.git git+https://github.com/NCAR/xpersist.git"
+kubernetes_config = {
     "AZURE_STORAGE_CONNECTION_STRING": connection_string,
     "EXTRA_PIP_PACKAGES": extra_pip_packages,
-    'OMP_NUM_THREADS': '1',
-    'MPI_NUM_THREADS': '1',
-    'MKL_NUM_THREADS': '1',
-    'OPENBLAS_NUM_THREADS': '1',
+    'OMP_NUM_THREADS': OMP_NUM_THREADS,
+    'MPI_NUM_THREADS': MPI_NUM_THREADS,
+    'MKL_NUM_THREADS': MKL_NUM_THREADS,
+    'OPENBLAS_NUM_THREADS': OPENBLAS_NUM_THREADS,
+    'DASK_DISTRIBUTED__WORKER__RESOURCES__TASKSLOTS': DASK_DISTRIBUTED__WORKER__RESOURCES__TASKSLOTS,
 }
 
+# pod_config = {
+#     "AZURE_STORAGE_CONNECTION_STRING": connection_string,
+#     'OMP_NUM_THREADS': OMP_NUM_THREADS,
+#     'MPI_NUM_THREADS': MPI_NUM_THREADS,
+#     'MKL_NUM_THREADS': MKL_NUM_THREADS,
+#     'OPENBLAS_NUM_THREADS': OPENBLAS_NUM_THREADS,
+#     'DASK_DISTRIBUTED__WORKER__RESOURCES__TASKSLOTS': DASK_DISTRIBUTED__WORKER__RESOURCES__TASKSLOTS
+# }
 
 kubernetes_run_config = KubernetesRun(
     cpu_request=kubernetes_cpu,
     memory_request=kubernetes_memory,
     image=image,
     labels=agent,
-    env=env_config,
+    env=kubernetes_config,
 )
 
+pod_spec = make_pod_spec(
+    image=image,
+    memory_limit=pod_memory_limit,
+    memory_request=pod_memory_request,
+    threads_per_worker=pod_threads_per_worker,
+    cpu_limit=pod_cpu_limit,
+    cpu_request=pod_cpu_request,
+    env=kubernetes_config,
+)
+pod_spec.spec.containers[0].args.extend(['--resources', 'TASKSLOTS=1'])
+
 dask_executor = DaskExecutor(
-    cluster_class=lambda: KubeCluster(
-        make_pod_spec(
-            image=image,
-            memory_limit=dask_executor_memory_limit,
-            memory_request=dask_executor_memory_request,
-            threads_per_worker=dask_executor_threads_per_worker,
-            cpu_limit=dask_executor_cpu_limit,
-            cpu_request=dask_executor_cpu_request,
-            env=env_config,
-        )
-    ),
-    adapt_kwargs={"minimum": dask_executor_adapt_min, "maximum": dask_executor_adapt_max},
+    cluster_class=lambda: KubeCluster(pod_spec, deploy_mode='remote'),
+    adapt_kwargs={"minimum": 1, "maximum": 2},
 )
