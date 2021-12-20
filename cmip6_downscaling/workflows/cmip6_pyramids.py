@@ -141,6 +141,8 @@ def regrid(key: str, levels: int = LEVELS) -> None:
 
             uri = f'scratch/cmip6-web-test-7/{key}/{member_id}'
             mapper = fs.get_mapper(uri)
+            if '.zmetadata' in mapper:
+                return
 
             # with dask.config.set(scheduler='single-threaded'):
 
