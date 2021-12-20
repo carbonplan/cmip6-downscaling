@@ -1,33 +1,36 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Optional, Union
 
-# import gstools as gs
+import gstools as gs
+import numpy as np
+import xarray as xr
 from scipy.stats import norm as norm
 from skdownscale.pointwise_models import (
     AnalogRegression,
     PointWiseDownscaler,
     PureAnalog,
     PureRegression,
-    QuantileMappingReressor,
-    TrendAwareQuantileMappingRegressor,
 )
-from skdownscale.pointwise_models.core import xenumerate
-from skdownscale.pointwise_models.utils import default_none_kwargs
-from sklearn.linear_model import LinearRegression
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import QuantileTransformer, StandardScaler
-
-from cmip6_downscaling.data.observations import open_era5
-from cmip6_downscaling.data.cmip import get_gcm_grid_spec
-import xarray as xr
-
-
-
 
 
 def get_gard_model(
     model_type: str,
     model_params: Dict[str, Any],
 ) -> Union[AnalogRegression, PureAnalog, PureRegression]:
+    """
+    Based on input, return the corresponding GARD model instance
+
+    Parameters
+    ----------
+    model_type : str
+        Name of the GARD model type to be used, should be one of AnalogRegression, PureAnalog, or PureRegression
+    model_params : Dict
+        Model parameter dictionary
+
+    Returns
+    -------
+    model : AnalogRegression, PureAnalog, or PureRegression model instance
+        skdownscale GARD model instance
+    """
     if model_type == 'AnalogRegression':
         return AnalogRegression(**model_params)
     elif model_type == 'PureAnalog':
@@ -48,8 +51,34 @@ def gard_fit_and_predict(
     model_type: str,
     model_params: Dict[str, Any],
     dim: str = 'time',
-    **kwargs
+    **kwargs,
 ) -> xr.Dataset:
+    """
+    Fit a GARD model for each point in the input training data then return the prediction using predict input
+
+    Parameters
+    ----------
+    X_train : xr.Dataset
+        Training features dataset
+    y_train : xr.Dataset
+        Training label dataset
+    X_pred : xr.Dataset
+        Prediction feature dataset
+    label : str
+        Name of the variable to be predicted
+    model_type : str
+        Name of the GARD model type to be used, should be one of AnalogRegression, PureAnalog, or PureRegression
+    model_params : Dict
+        Model parameter dictionary
+    dim : str, optional
+        Dimension to apply the model along. Default is ``time``.
+
+    Returns
+    -------
+    output : xr.Dataset
+        GARD model prediction output. Should contain three variables: pred (predicted mean), prediction_error
+        (prediction error in fit), and exceedance_prob (probability of exceedance for threshold)
+    """
 
     X_train = X_train.isel(lat=slice(0, 100), lon=slice(0, 100))
     y_train = y_train.isel(lat=slice(0, 100), lon=slice(0, 100))
@@ -61,143 +90,169 @@ def gard_fit_and_predict(
 
     out = xr.Dataset()
     out['pred'] = model.predict(X_pred)
-    print(type(out['pred']))
-    out['prediction_error'] = model.get_attr('prediction_error_', dtype='float64', template_output=out['pred'])
-    out['exceedance_prob'] = model.get_attr('exceedance_prob_', dtype='float64', template_output=out['pred'])
+    out['prediction_error'] = model.get_attr(
+        'prediction_error_', dtype='float64', template_output=out['pred']
+    )
+    out['exceedance_prob'] = model.get_attr(
+        'exceedance_prob_', dtype='float64', template_output=out['pred']
+    )
 
     return out
 
 
-# def calc_correlation_length_scale(
-#     da: xr.DataArray,
-#     seasonality_period: int = 31,
-#     temporal_scaler: float = 1000.0,
-# ) -> Dict[str, float]:
-#     """
-#     find the correlation length for a dataarray with dimensions lat, lon and time
-#     it is assumed that the correlation length in lat and lon directions are the same due to the implementation in gstools
-#     """
-#     for dim in ['lat', 'lon', 'time']:
-#         assert dim in da
+def calc_correlation_length_scale(
+    data: xr.DataArray,
+    seasonality_period: int = 31,
+    temporal_scaler: float = 1000.0,
+) -> Dict[str, float]:
+    """
+    find the correlation length for a dataarray with dimensions lat, lon and time
+    it is assumed that the correlation length in lat and lon directions are the same due to the implementation in gstools
+    """
+    for dim in ['lat', 'lon', 'time']:
+        assert dim in data.dims
 
-#     # remove seasonality before finding correlation length, otherwise the seasonality correlation dominates
-#     seasonality = (
-#         data.rolling({'time': seasonality_period}, center=True, min_periods=1)
-#         .mean()
-#         .groupby('time.dayofyear')
-#         .mean()
-#     )
-#     detrended = data.groupby("time.dayofyear") - seasonality
+    # remove seasonality before finding correlation length, otherwise the seasonality correlation dominates
+    seasonality = (
+        data.rolling({'time': seasonality_period}, center=True, min_periods=1)
+        .mean()
+        .groupby('time.dayofyear')
+        .mean()
+    )
+    detrended = data.groupby("time.dayofyear") - seasonality
 
-#     # find spatial length scale
-#     bin_center, gamma = gs.vario_estimate(
-#         # TODO: need to figure whether we need to do .values for this function
-#         pos=(detrended.lon.values, detrended.lat.values),
-#         field=detrended.values,
-#         latlon=True,
-#         mesh_type='structured',
-#     )
-#     spatial = gs.Gaussian(dim=2, latlon=True, rescale=gs.EARTH_RADIUS)
-#     spatial.fit_variogram(bin_center, gamma, sill=np.mean(np.var(fields, axis=(1, 2))))
+    # find spatial length scale
+    fields = detrended.values
+    bin_center, gamma = gs.vario_estimate(
+        # TODO: need to figure whether we need to do .values for this function
+        pos=(detrended.lon.values, detrended.lat.values),
+        field=fields,
+        latlon=True,
+        mesh_type='structured',
+    )
+    spatial = gs.Gaussian(dim=2, latlon=True, rescale=gs.EARTH_RADIUS)
+    spatial.fit_variogram(bin_center, gamma, sill=np.mean(np.var(fields, axis=(1, 2))))
 
-#     # find temporal length scale
-#     # break the time series into fields of 1 year length, since otherwise the algorithm struggles to find the correct length scale
-#     fields = []
-#     day_in_year = 365
-#     for yr, group in detrended.groupby('time.year'):
-#         # TODO: this is a very long list for a large domain, perhaps need random sampling
-#         v = (
-#             group.isel(time=slice(0, day_in_year))
-#             .stack(point=['lat', 'lon'])
-#             .transpose('point', 'time')
-#             .values
-#         )
-#         fields.extend(list(v))
-#     t = np.arange(day_in_year) / temporal_scaler
-#     bin_center, gamma = gs.vario_estimate(pos=t, field=fields, mesh_type='structured')
-#     temporal = gs.Gaussian(dim=1)
-#     temporal.fit_variogram(bin_center, gamma, sill=np.mean(np.var(fields, axis=1)))
+    # find temporal length scale
+    # break the time series into fields of 1 year length, since otherwise the algorithm struggles to find the correct length scale
+    fields = []
+    day_in_year = 365
+    for yr, group in detrended.groupby('time.year'):
+        # TODO: this is a very long list for a large domain, perhaps need random sampling
+        v = (
+            group.isel(time=slice(0, day_in_year))
+            .stack(point=['lat', 'lon'])
+            .transpose('point', 'time')
+            .values
+        )
+        fields.extend(list(v))
+    t = np.arange(day_in_year) / temporal_scaler
+    bin_center, gamma = gs.vario_estimate(pos=t, field=fields, mesh_type='structured')
+    temporal = gs.Gaussian(dim=1)
+    temporal.fit_variogram(bin_center, gamma, sill=np.mean(np.var(fields, axis=1)))
 
-#     return {'temporal': temporal.len_scale, 'spatial': spatial.len_scale}
-
-
-# def generate_scrf(
-#     source_da: xr.DataArray,
-#     output_template: xr.DataArray,
-#     seasonality_period: int = 31,
-#     seed: int = 0,
-#     temporal_scaler: float = 1000.0,
-#     crs: str = 'ESRI:54008',
-# ) -> xr.DataArray:
-#     # find correlation length from source data
-#     length_scale = calc_correlation_length_scale(
-#         da=source_da,
-#         seasonality_period=seasonality_period,
-#         temporal_scaler=temporal_scaler,
-#     )
-#     ss = length_scale['spatial']
-#     ts = length_scale['temporal']
-
-#     # reproject template into Sinusoidal projection
-#     # TODO: any better ones for preserving distance between two arbitrary points on the map?
-#     template = output_template.isel(time=0)
-#     if 'x' not in output_template:
-#         template = template.rename({'lon': 'x', 'lat': y})
-#     projected = template.isel(time=0).rio.write_crs('EPSG:4326').rio.reproject(crs)
-#     x = projected.x
-#     y = projected.y
-#     t = np.arange(len(output_template.time)) / temporal_scaler
-
-#     # model is specified as spatial_dim1, spatial_dim2, temporal_scale
-#     model = gs.Gaussian(dim=3, var=1.0, len_scale=[ss, ss, ts])
-#     srf = gs.SRF(model, seed=seed)
-
-#     # TODO: figure out how to chunk this
-#     field = xr.DataArray(
-#         srf.structured((x, y, t)), dims=['lon', 'lat', 'time'], coords=[x, y, output_template.time]
-#     ).rio.write_crs(crs)
-
-#     field = field.rio.reproject('EPSG:4326')
-#     return field
+    return {'temporal': temporal.len_scale, 'spatial': spatial.len_scale}
 
 
-# def gard_postprocess(
-#     ds_obs: xr.Dataset,
-#     variable: str,
-#     model_output: xr.Dataset,
-#     thresh: Union[float, None],
-#     seasonality_period: int = 31,
-#     seed: int = 0,
-#     temporal_scaler: float = 1000.0,
-#     crs: str = 'ESRI:54008',
-# ) -> xr.DataArray:
-#     # generate spatio-tempprally correlated random fields based on observation data
+def generate_scrf(
+    data: xr.Dataset,
+    label: str,
+    n_timepoints: int = 10958,
+    seasonality_period: int = 31,
+    seed: int = 0,
+    temporal_scaler: float = 1000.0,
+    crs: str = 'ESRI:54008',
+    **kwargs,
+) -> xr.DataArray:
+    """
 
-#     if thresh is not None:
-#         # convert scrf from a normal distribution to a uniform distribution
-#         scrf_uniform = xr.apply_ufunc(
-#             norm.cdf, scrf, dask='parallelized', output_dtypes=[scrf.dtype]
-#         )
 
-#         # find where exceedance prob is exceeded
-#         mask = scrf_uniform > (1 - model_output['exceedance_prob'])
+    Parameters
+    ----------
+    data : xr.Dataset
+        Data used to find the spatial and temporal correlation lengths
+    label : str
+        Name of the variable to be predicted
+    n_timepoints : int, optional
+        Number of timepoints to return
+    seasonality_period: int = 31,
+    seed: int = 0,
+    temporal_scaler: float = 1000.0,
+    crs: str = 'ESRI:54008',
 
-#         # Rescale the uniform distribution
-#         new_uniform = (scrf_uniform - (1 - model_output['exceedance_prob'])) / model_output[
-#             'exceedance_prob'
-#         ]
+    """
+    # find correlation length from source data
+    length_scale = calc_correlation_length_scale(
+        data=data[label].isel(lat=slice(100, 110), lon=slice(100, 110)),
+        seasonality_period=seasonality_period,
+        temporal_scaler=temporal_scaler,
+    )
+    ss = length_scale['spatial']
+    ts = length_scale['temporal']
 
-#         # Get the normal distribution equivalent of new_uniform
-#         r_normal = xr.apply_ufunc(
-#             norm.ppf, new_uniform, dask='parallelized', output_dtypes=[new_uniform.dtype]
-#         )
+    # reproject template into Sinusoidal projection
+    # TODO: any better ones for preserving distance between two arbitrary points on the map?
+    if 'x' not in data[label].dims:
+        template = data[label].rename({'lon': 'x', 'lat': 'y'})
+    projected = template.isel(time=0).rio.write_crs('EPSG:4326').rio.reproject(crs)
+    x = projected.x
+    y = projected.y
+    t = np.arange(n_timepoints) / temporal_scaler
 
-#         downscaled = model_output['pred'] + r_normal * model_output['error']
+    # model is specified as spatial_dim1, spatial_dim2, temporal_scale
+    model = gs.Gaussian(dim=3, var=1.0, len_scale=[ss, ss, ts])
+    srf = gs.SRF(model, seed=seed)
 
-#         # what do we do for thresholds like heat wave?
-#         valids = xr.ufuncs.logical_or(mask, downscaled >= 0)
-#         downscaled = downscaled.where(valids, 0)
-#     else:
-#         downscaled = model_output['pred'] + scrf * model_output['error']
+    print('putting into dataarray')
+    # TODO: figure out how to chunk this
+    field = xr.DataArray(
+        srf.structured((x, y, t)),
+        dims=['lon', 'lat', 'time'],
+        coords=[x, y, np.arange(n_timepoints)],
+    ).rio.write_crs(crs)
 
-#     return downscaled
+    print('reprojecting')
+    field = field.rio.reproject('EPSG:4326')
+    return field.to_dataset(name='scrf')
+
+
+def gard_postprocess(
+    model_output: xr.Dataset,
+    scrf: xr.Dataset,
+    model_params: Optional[Dict[str, Any]] = None,
+    **kwargs,
+) -> xr.DataArray:
+
+    if model_params is not None:
+        thresh = model_params.get('thresh')
+    else:
+        thresh = None
+
+    if thresh is not None:
+        # convert scrf from a normal distribution to a uniform distribution
+        scrf_uniform = xr.apply_ufunc(
+            norm.cdf, scrf, dask='parallelized', output_dtypes=[scrf.dtype]
+        )
+
+        # find where exceedance prob is exceeded
+        mask = scrf_uniform > (1 - model_output['exceedance_prob'])
+
+        # Rescale the uniform distribution
+        new_uniform = (scrf_uniform - (1 - model_output['exceedance_prob'])) / model_output[
+            'exceedance_prob'
+        ]
+
+        # Get the normal distribution equivalent of new_uniform
+        r_normal = xr.apply_ufunc(
+            norm.ppf, new_uniform, dask='parallelized', output_dtypes=[new_uniform.dtype]
+        )
+
+        downscaled = model_output['pred'] + r_normal * model_output['prediction_error']
+
+        # what do we do for thresholds like heat wave?
+        valids = xr.ufuncs.logical_or(mask, downscaled >= 0)
+        downscaled = downscaled.where(valids, 0)
+    else:
+        downscaled = model_output['pred'] + scrf * model_output['prediction_error']
+
+    return downscaled

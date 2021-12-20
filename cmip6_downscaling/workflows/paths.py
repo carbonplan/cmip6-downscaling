@@ -220,3 +220,15 @@ def make_gard_predict_output_path(
     gcm_identifier: str, bias_correction_method: str, model_type: str, label: str, **kwargs
 ):
     return f"gard_pred_output/{gcm_identifier}_{bias_correction_method}_{model_type}_{label}.zarr"
+
+
+def make_scrf_path(
+    obs_identifier: str, label: str, **kwargs,
+):
+    return f"scrf/{obs_identifier}_{label}.zarr"
+
+
+def make_gard_post_processed_output_path(
+    gcm_identifier: str, bias_correction_method: str, model_type: str, label: str, **kwargs
+):
+    return f"gard_post_processed_output/{gcm_identifier}_{bias_correction_method}_{model_type}_{label}.zarr"
