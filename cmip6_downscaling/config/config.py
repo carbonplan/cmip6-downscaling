@@ -53,7 +53,7 @@ OPENBLAS_NUM_THREADS = '1'
 DASK_DISTRIBUTED__WORKER__RESOURCES__TASKSLOTS = '1'
 
 
-extra_pip_packages = "git+https://github.com/carbonplan/cmip6-downscaling.git git+https://github.com/pangeo-data/scikit-downscale.git git+https://github.com/NCAR/xpersist.git"
+extra_pip_packages = "git+https://github.com/carbonplan/cmip6-downscaling.git@esmf_threading git+https://github.com/pangeo-data/scikit-downscale.git git+https://github.com/NCAR/xpersist.git"
 kubernetes_config = {
     "AZURE_STORAGE_CONNECTION_STRING": connection_string,
     "EXTRA_PIP_PACKAGES": extra_pip_packages,
