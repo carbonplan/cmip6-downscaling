@@ -157,7 +157,7 @@ def calc_correlation_length_scale(
 def generate_scrf(
     data: xr.Dataset,
     label: str,
-    n_timepoints: int = 10958,
+    n_timepoints: int = 365,
     seasonality_period: int = 31,
     seed: int = 0,
     temporal_scaler: float = 1000.0,
@@ -165,21 +165,30 @@ def generate_scrf(
     **kwargs,
 ) -> xr.DataArray:
     """
-
+    Generate spatio-temporally correlated random fields (SCRF) based on the input data.
 
     Parameters
     ----------
     data : xr.Dataset
-        Data used to find the spatial and temporal correlation lengths
+        Data used to define the spatial and temporal correlation lengths that are later used to generate the random fields
     label : str
         Name of the variable to be predicted
     n_timepoints : int, optional
-        Number of timepoints to return
-    seasonality_period: int = 31,
-    seed: int = 0,
-    temporal_scaler: float = 1000.0,
-    crs: str = 'ESRI:54008',
+        Number of timepoints to return in generated random fields
+    seasonality_period : int, optional
+        The period to get rolling average from in order to remove seasonality
+    seed : int, optional
+        Random seed
+    temporal_scaler : float, optional
+        Value to be used to scale the temporal aspect of the data. Used because it's more difficult for the variogram estimate
+        to converge when the time series is too long and thus the scale is too large
+    crs : str, optional
+        The projection in which the SCRF will be first generated before being projected back to lat/lon space
 
+    Returns
+    -------
+    scrf : xr.Dataset
+        Spatio-temporally correlated random fields (SCRF) based on the input data.
     """
     # find correlation length from source data
     length_scale = calc_correlation_length_scale(
@@ -195,8 +204,8 @@ def generate_scrf(
     if 'x' not in data[label].dims:
         template = data[label].rename({'lon': 'x', 'lat': 'y'})
     projected = template.isel(time=0).rio.write_crs('EPSG:4326').rio.reproject(crs)
-    x = projected.x[0:100]
-    y = projected.y[0:100]
+    x = projected.x
+    y = projected.y
     t = np.arange(n_timepoints) / temporal_scaler
 
     # model is specified as spatial_dim1, spatial_dim2, temporal_scale
@@ -221,8 +230,26 @@ def gard_postprocess(
     scrf: xr.Dataset,
     model_params: Optional[Dict[str, Any]] = None,
     **kwargs,
-) -> xr.DataArray:
+) -> xr.Dataset:
+    """
+    Add perturbation to the mean prediction of GARD to more accurately represent extreme events. The perturbation is
+    generated with the prediction error during model fit scaled with a spatio-temporally correlated random field.
 
+    Parameters
+    ----------
+    model_output : xr.Dataset
+        GARD model prediction output. Should contain three variables: pred (predicted mean), prediction_error
+        (prediction error in fit), and exceedance_prob (probability of exceedance for threshold)
+    scrf : xr.Dataset
+        Spatio-temporally correlated random fields (SCRF)
+    model_params : Dict
+        Model parameter dictionary
+
+    Returns
+    -------
+    downscaled : xr.Dataset
+        Final downscaled output
+    """
     if model_params is not None:
         thresh = model_params.get('thresh')
     else:
@@ -255,4 +282,4 @@ def gard_postprocess(
     else:
         downscaled = model_output['pred'] + scrf * model_output['prediction_error']
 
-    return downscaled
+    return downscaled.to_dataset(name='downscaled')
