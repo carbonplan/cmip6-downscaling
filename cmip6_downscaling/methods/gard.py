@@ -195,8 +195,8 @@ def generate_scrf(
     if 'x' not in data[label].dims:
         template = data[label].rename({'lon': 'x', 'lat': 'y'})
     projected = template.isel(time=0).rio.write_crs('EPSG:4326').rio.reproject(crs)
-    x = projected.x
-    y = projected.y
+    x = projected.x[0:100]
+    y = projected.y[0:100]
     t = np.arange(n_timepoints) / temporal_scaler
 
     # model is specified as spatial_dim1, spatial_dim2, temporal_scale
@@ -212,7 +212,7 @@ def generate_scrf(
     ).rio.write_crs(crs)
 
     print('reprojecting')
-    field = field.rio.reproject('EPSG:4326')
+    field = field.transpose('time', 'lat', 'lon').rio.reproject('EPSG:4326')
     return field.to_dataset(name='scrf')
 
 

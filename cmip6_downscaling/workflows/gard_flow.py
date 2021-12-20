@@ -13,7 +13,6 @@ from prefect.storage import Azure
 from xpersist.prefect.result import XpersistResult
 
 from cmip6_downscaling.config.config import (
-    CONNECTION_STRING,
     intermediate_cache_store,
     results_cache_store,
     serializer,
@@ -25,14 +24,15 @@ from cmip6_downscaling.tasks.common_tasks import (
     bias_correct_obs_task,
     coarsen_and_interpolate_obs_task,
 )
-from cmip6_downscaling.workflows.paths import (
-    make_bias_corrected_gcm_path,
-    make_gard_post_processed_output_path,
-    make_gard_predict_output_path,
-    make_rechunked_obs_path,
-    make_scrf_path,
+from cmip6_downscaling.tasks.common_tasks import (
+    path_builder_task, 
+    coarsen_and_interpolate_obs_task,
+    interpolate_gcm_task,
+    bias_correct_obs_task,
+    bias_correct_gcm_task
 )
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching, regrid_ds
+
 
 fit_and_predict_task = task(
     gard_fit_and_predict,
@@ -95,3 +95,122 @@ def prep_gard_input_task(
     )
 
     return X_train, y_train_rechunked, X_pred_rechunked
+
+
+flow_name = make_gard_flow_name(run_hyperparameters)
+with Flow(name=flow_name) as gard_flow:
+    obs = Parameter("OBS")
+    gcm = Parameter("GCM")
+    scenario = Parameter("SCENARIO")
+    train_period_start = Parameter("TRAIN_PERIOD_START")
+    train_period_end = Parameter("TRAIN_PERIOD_END")
+    predict_period_start = Parameter("PREDICT_PERIOD_START")
+    predict_period_end = Parameter("PREDICT_PERIOD_END")
+    variables = Parameter("VARIABLES")
+    bias_correction_method = Parameter("BIAS_CORRECTION_METHOD")
+    bias_correction_kwargs = Parameter("BIAS_CORRECTION_KWARGS")
+    label = Parameter("LABEL")
+    model_type = Parameter("MODEL_TYPE")
+    model_params = Parameter("MODEL_PARAMS")
+
+    # dictionary with information to build appropriate paths for caching 
+    gcm_grid_spec, obs_identifier, gcm_identifier = path_builder_task(
+        obs=obs,
+        gcm=gcm,
+        scenario=scenario,
+        train_period_start=train_period_start,
+        train_period_end=train_period_end,
+        predict_period_start=predict_period_start,
+        predict_period_end=predict_period_end,
+        variables=variables
+    )
+
+    # get interpolated observation 
+    ds_obs_interpolated_full_time = coarsen_and_interpolate_obs_task(
+        obs=obs,
+        train_period_start=train_period_start,
+        train_period_end=train_period_end,
+        variables=variables,
+        gcm=gcm,
+        chunking_approach='full_time',
+        gcm_grid_spec=gcm_grid_spec,
+        obs_identifier=obs_identifier,
+    )
+    
+    # get interpolated gcm 
+    ds_gcm_interpolated_full_time = interpolate_gcm_task(
+        obs=obs,
+        gcm=gcm,
+        scenario=scenario,
+        variables=variables,
+        train_period_start=train_period_start,
+        train_period_end=train_period_end,
+        predict_period_start=predict_period_start,
+        predict_period_end=predict_period_end,
+        chunking_approach='full_time',
+    )
+
+    # bias correction and transformation 
+    ds_obs_bias_corrected = bias_correct_obs_task(
+        ds_obs=ds_obs_interpolated_full_time,
+        method=bias_correction_method,
+        bc_kwargs=bias_correction_kwargs,
+        chunking_approach='full_time',
+        gcm_grid_spec=gcm_grid_spec,
+        obs_identifier=obs_identifier,
+    )
+    
+    # TODO: decide whether we are bias correcting to interpolated obs or actual obs 
+    ds_gcm_bias_corrected = bias_correct_gcm_task(
+        ds_gcm=ds_gcm_interpolated_full_time,
+        ds_obs=ds_obs_interpolated_full_time,
+        historical_period_start=train_period_start,
+        historical_period_end=train_period_end,
+        future_period_start=predict_period_start,
+        future_period_end=predict_period_end,
+        method=bias_correction_method,
+        bc_kwargs=bias_correction_kwargs,
+        chunking_approach='full_time',
+        gcm_identifier=gcm_identifier,
+    )
+    
+    X_train, y_train, X_pred = prep_gard_input_task(
+        obs=obs,
+        train_period_start=train_period_start,
+        train_period_end=train_period_end,
+        variables=variables,
+        X_train=ds_obs_bias_corrected,
+        X_pred=ds_gcm_bias_corrected,
+        gcm_identifier=gcm_identifier,
+        bias_correction_method=bias_correction_method,
+    )
+    
+    # fit and predict
+    model_output = fit_and_predict_task(
+        X_train=X_train,
+        y_train=y_train,
+        X_pred=X_pred,
+        label=label,
+        model_type=model_type,
+        model_params=model_params,
+        gcm_identifier=gcm_identifier,
+        bias_correction_method=bias_correction_method,
+    )
+    
+    # post process 
+    scrf = generate_scrf_task(
+        data=y_train, 
+        obs_identifier=obs_identifier,
+        label=label,
+        n_timepoints=365*2
+    )
+    
+    final_output = gard_postprocess_task(
+        model_output=model_output,
+        scrf=scrf, 
+        model_params=model_params,
+        gcm_identifier=gcm_identifier,
+        bias_correction_method=bias_correction_method,
+        model_type=model_type,
+        label=label,
+    )

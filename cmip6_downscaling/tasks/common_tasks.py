@@ -324,6 +324,8 @@ def bias_correct_gcm_task(
     ds_obs: xr.Dataset,
     historical_period_start: str,
     historical_period_end: str,
+    future_period_start: str,
+    future_period_end: str,
     method: str,
     bc_kwargs: Optional[Dict[str, Any]] = None,
     **kwargs
@@ -354,6 +356,8 @@ def bias_correct_gcm_task(
         Bias corrected GCM dataset
     """
     historical_period = slice(historical_period_start, historical_period_end)
+    future_period = slice(future_period_start, future_period_end)
+
     kws = default_none_kwargs(bc_kwargs, copy=True)
 
     for v in ds_gcm.data_vars:
@@ -366,4 +370,4 @@ def bias_correct_gcm_task(
         bc_kwargs=kws,
     ).to_dataset(dim='variable')
 
-    return bias_corrected
+    return bias_corrected.sel(time=future_period)
