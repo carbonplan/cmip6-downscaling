@@ -2,6 +2,8 @@ import os
 import time
 import uuid
 
+import ESMF
+import numpy as np
 from dask.distributed import get_worker
 from dask_kubernetes import KubeCluster, make_pod_spec
 from prefect import Flow, task
@@ -51,9 +53,24 @@ def my_task(num: int) -> None:
     print(num, get_worker().id, uuid.uuid4().hex)
 
 
+@task(log_stdout=True, tags=['dask-resource:TASKSLOTS=1'])
+def make_grid(shape):
+    print(shape, get_worker().id, uuid.uuid4().hex)
+    time.sleep(30)
+    _ = ESMF.Grid(
+        np.array(shape),
+        staggerloc=ESMF.StaggerLoc.CENTER,
+        coord_sys=ESMF.CoordSys.SPH_DEG,
+        num_peri_dims=None,  # with out this, ESMF seems to seg fault (clue?)
+    )
+    return shape
+
+
 with Flow(
     name="test_cloud_flow", storage=storage, run_config=run_config, executor=executor
 ) as flow:
 
-    nums = range(4)
-    my_task.map(nums)
+    # nums = range(4)
+    # my_task.map(nums)
+
+    tasks = [make_grid((59, 87)), make_grid((60, 88)), make_grid((61, 89)), make_grid((62, 90))]
