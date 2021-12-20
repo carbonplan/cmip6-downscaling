@@ -41,7 +41,7 @@ pod_spec.spec.containers[0].args.extend(['--resources', 'TASKSLOTS=1'])
 
 executor = DaskExecutor(
     cluster_class=lambda: KubeCluster(pod_spec, deploy_mode='remote'),
-    cluster_kwargs={"n_workers": 2},
+    adapt_kwargs={"minimum": 1, "maximum": 2},
 )
 
 
