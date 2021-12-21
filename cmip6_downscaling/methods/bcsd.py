@@ -65,18 +65,32 @@ def make_flow_paths(
     return coarse_obs_path, spatial_anomalies_path, bias_corrected_path, final_out_path
 
 
-def return_obs(train_period_start: str, train_period_end: str, variable: str) -> xr.Dataset:
+def return_obs(    gcm: str,
+    scenario: str,
+    train_period_start: str,
+    train_period_end: str,
+    predict_period_start: str,
+    predict_period_end: str,
+    variable: str,) -> xr.Dataset:
     """Loads ERA5 observation data for given time bounds and variable
 
     Parameters
     ----------
+    gcm : str
+        Input GCM
+    scenario: str
+        Input GCM scenario
     train_period_start : str
-        Starting time bounds
+        Date for training period start (e.g. '1985')
     train_period_end : str
-        Ending time bounds
-    variable : str
-        ERA5 variable. ex: 'tasmax'
-
+        Date for training period end (e.g. '2015')
+    predict_period_start : str
+        Date for prediction period start (e.g. '2090')
+    predict_period_end : str
+        Date for prediction period end (e.g. '2090')
+    variable: str
+        The variable included in the dataset.
+        
     Returns
     -------
     xr.Dataset
@@ -88,17 +102,33 @@ def return_obs(train_period_start: str, train_period_end: str, variable: str) ->
     return obs_ds
 
 
-def get_coarse_obs(obs_ds: xr.Dataset, variable: str) -> xr.Dataset:
+def get_coarse_obs(obs_ds: xr.Dataset,    gcm: str,
+    scenario: str,
+    train_period_start: str,
+    train_period_end: str,
+    predict_period_start: str,
+    predict_period_end: str,
+    variable: str,) -> xr.Dataset:
     """Regrids the observation dataset to match the GCM resolution
 
     Parameters
     ----------
     obs_ds : xr.Dataset
-        Observation dataset
-    variable : str
-        Input variable. ex. 'tasmax'
-    connection_string : str
-        Azure storage connection string.
+        Input observation dataset.
+    gcm : str
+        Input GCM
+    scenario: str
+        Input GCM scenario
+    train_period_start : str
+        Date for training period start (e.g. '1985')
+    train_period_end : str
+        Date for training period end (e.g. '2015')
+    predict_period_start : str
+        Date for prediction period start (e.g. '2090')
+    predict_period_end : str
+        Date for prediction period end (e.g. '2090')
+    variable: str
+        The variable included in the dataset.
 
     Returns
     -------
@@ -167,6 +197,9 @@ def get_spatial_anomalies(
         Spatial anomaly for each month (i.e. of shape (nlat, nlon, 12))
     """
     # Regrid coarse observation dataset
+    print('coarse obs:', coarse_obs)
+    print('\n')
+    print('obs_ds: ', obs_ds)
     obs_interpolated, _ = regrid_dataset(
         ds=coarse_obs,
         ds_path=None,

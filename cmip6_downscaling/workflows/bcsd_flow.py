@@ -35,74 +35,75 @@ make_flow_paths_task = task(make_flow_paths, log_stdout=True, nout=4)
 return_obs_task = task(
     return_obs,
     result=XpersistResult(intermediate_cache_store, serializer=serializer),
-    target="obs-ds",
+    target="obs-ds-" + target_naming_str,
 )
 # yes rechunking
 get_coarse_obs_task = task(
     get_coarse_obs,
     tags=['dask-resource:TASKSLOTS=1'],
     result=XpersistResult(intermediate_cache_store, serializer=serializer),
-    target="coarse-obs-ds",
+    target="coarse-obs-ds" + target_naming_str,
 )
 # yes rechunk
 get_spatial_anomalies_task = task(
     get_spatial_anomalies,
+    log_stdout=True,
     tags=['dask-resource:TASKSLOTS=1'],
     result=XpersistResult(intermediate_cache_store, serializer=serializer),
     target="spatial-anomalies-ds-" + target_naming_str,
 )
 
-# yes rechunk
+# # yes rechunk
 
-return_y_full_time_task = task(
-    return_y_full_time,
-    tags=['dask-resource:TASKSLOTS=1'],
-    result=XpersistResult(intermediate_cache_store, serializer=serializer),
-    target="y-full-time-" + target_naming_str,
-)
-# yes rechunk
+# return_y_full_time_task = task(
+#     return_y_full_time,
+#     tags=['dask-resource:TASKSLOTS=1'],
+#     result=XpersistResult(intermediate_cache_store, serializer=serializer),
+#     target="y-full-time-" + target_naming_str,
+# )
+# # yes rechunk
 
-return_x_train_full_time_task = task(
-    return_x_train_full_time,
-    tags=['dask-resource:TASKSLOTS=1'],
-    result=XpersistResult(intermediate_cache_store, serializer=serializer),
-    target="x-train-full-time-" + target_naming_str,
-)
-# yes rechunk
+# return_x_train_full_time_task = task(
+#     return_x_train_full_time,
+#     tags=['dask-resource:TASKSLOTS=1'],
+#     result=XpersistResult(intermediate_cache_store, serializer=serializer),
+#     target="x-train-full-time-" + target_naming_str,
+# )
+# # yes rechunk
 
-return_x_predict_rechunked_task = task(
-    return_x_predict_rechunked,
-    tags=['dask-resource:TASKSLOTS=1'],
-    result=XpersistResult(intermediate_cache_store, serializer=serializer),
-    target="x-predict-rechunked-" + target_naming_str,
-)
-# no rechunking
+# return_x_predict_rechunked_task = task(
+#     return_x_predict_rechunked,
+#     tags=['dask-resource:TASKSLOTS=1'],
+#     result=XpersistResult(intermediate_cache_store, serializer=serializer),
+#     target="x-predict-rechunked-" + target_naming_str,
+# )
+# # no rechunking
 
-fit_and_predict_task = task(
-    fit_and_predict,
-    result=XpersistResult(intermediate_cache_store, serializer=serializer),
-    target="fit-and-predict-" + target_naming_str,
-)
-# yes rechunk
+# fit_and_predict_task = task(
+#     fit_and_predict,
+#     result=XpersistResult(intermediate_cache_store, serializer=serializer),
+#     target="fit-and-predict-" + target_naming_str,
+# )
+# # yes rechunk
 
-postprocess_bcsd_task = task(
-    postprocess_bcsd,
-    tags=['dask-resource:TASKSLOTS=1'],
-    log_stdout=True,
-    result=XpersistResult(results_cache_store, serializer=serializer),
-    target="postprocess-results-" + target_naming_str,
-)
+# postprocess_bcsd_task = task(
+#     postprocess_bcsd,
+#     tags=['dask-resource:TASKSLOTS=1'],
+#     log_stdout=True,
+#     result=XpersistResult(results_cache_store, serializer=serializer),
+#     target="postprocess-results-" + target_naming_str,
+# )
 
 # Main Flow -----------------------------------------------------------
 
 # with Flow(name="bcsd-testing", storage=storage, run_config=run_config) as flow:
-# with Flow(name="bcsd-testing") as flow:
-with Flow(
-    name="bcsd-single-threading-test",
-    storage=storage,
-    run_config=kubernetes_run_config,
-    executor=dask_executor,
-) as flow:
+# with Flow(
+#     name="bcsd-long-time-domain-test",
+#     storage=storage,
+#     run_config=kubernetes_run_config,
+#     executor=dask_executor,
+# ) as flow:
+with Flow(name="bcsd-testing") as flow:
     gcm = Parameter("GCM")
     scenario = Parameter("SCENARIO")
     train_period_start = Parameter("TRAIN_PERIOD_START")
@@ -125,8 +126,20 @@ with Flow(
         VARIABLE=variable,
     )
     # preprocess_bcsd_tasks(s):
-    obs_ds = return_obs_task(train_period_start, train_period_end, variable)
-    coarse_obs_ds = get_coarse_obs_task(obs_ds, variable)
+    obs_ds = return_obs_task(        gcm,
+        scenario,
+        train_period_start,
+        train_period_end,
+        predict_period_start,
+        predict_period_end,
+        variable,)
+    coarse_obs_ds = get_coarse_obs_task(obs_ds,        gcm,
+        scenario,
+        train_period_start,
+        train_period_end,
+        predict_period_start,
+        predict_period_end,
+        variable)
     spatial_anomalies_ds = get_spatial_anomalies_task(
         coarse_obs_ds,
         obs_ds,
@@ -138,59 +151,59 @@ with Flow(
         predict_period_end,
         variable,
     )
-    # prep_bcsd_inputs_task(s):
-    y_full_time_ds = return_y_full_time_task(
-        coarse_obs_ds,
-        gcm,
-        scenario,
-        train_period_start,
-        train_period_end,
-        predict_period_start,
-        predict_period_end,
-        variable,
-    )
-    x_train_full_time_ds = return_x_train_full_time_task(
-        y_full_time_ds,
-        gcm,
-        scenario,
-        train_period_start,
-        train_period_end,
-        predict_period_start,
-        predict_period_end,
-        variable,
-    )
-    x_predict_rechunked_ds = return_x_predict_rechunked_task(
-        x_train_full_time_ds,
-        gcm,
-        scenario,
-        train_period_start,
-        train_period_end,
-        predict_period_start,
-        predict_period_end,
-        variable,
-    )
-    # fit and predict tasks(s):
-    bias_corrected_ds = fit_and_predict_task(
-        x_train_full_time_ds,
-        y_full_time_ds,
-        x_predict_rechunked_ds,
-        gcm,
-        scenario,
-        train_period_start,
-        train_period_end,
-        predict_period_start,
-        predict_period_end,
-        variable,
-    )
-    # postprocess_bcsd_task(s):
-    postprocess_bcsd_ds = postprocess_bcsd_task(
-        bias_corrected_ds,
-        spatial_anomalies_ds,
-        gcm,
-        scenario,
-        train_period_start,
-        train_period_end,
-        predict_period_start,
-        predict_period_end,
-        variable,
-    )
+    # # prep_bcsd_inputs_task(s):
+    # y_full_time_ds = return_y_full_time_task(
+    #     coarse_obs_ds,
+    #     gcm,
+    #     scenario,
+    #     train_period_start,
+    #     train_period_end,
+    #     predict_period_start,
+    #     predict_period_end,
+    #     variable,
+    # )
+    # x_train_full_time_ds = return_x_train_full_time_task(
+    #     y_full_time_ds,
+    #     gcm,
+    #     scenario,
+    #     train_period_start,
+    #     train_period_end,
+    #     predict_period_start,
+    #     predict_period_end,
+    #     variable,
+    # )
+    # x_predict_rechunked_ds = return_x_predict_rechunked_task(
+    #     x_train_full_time_ds,
+    #     gcm,
+    #     scenario,
+    #     train_period_start,
+    #     train_period_end,
+    #     predict_period_start,
+    #     predict_period_end,
+    #     variable,
+    # )
+    # # fit and predict tasks(s):
+    # bias_corrected_ds = fit_and_predict_task(
+    #     x_train_full_time_ds,
+    #     y_full_time_ds,
+    #     x_predict_rechunked_ds,
+    #     gcm,
+    #     scenario,
+    #     train_period_start,
+    #     train_period_end,
+    #     predict_period_start,
+    #     predict_period_end,
+    #     variable,
+    # )
+    # # postprocess_bcsd_task(s):
+    # postprocess_bcsd_ds = postprocess_bcsd_task(
+    #     bias_corrected_ds,
+    #     spatial_anomalies_ds,
+    #     gcm,
+    #     scenario,
+    #     train_period_start,
+    #     train_period_end,
+    #     predict_period_start,
+    #     predict_period_end,
+    #     variable,
+    # )
