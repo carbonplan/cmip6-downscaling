@@ -54,7 +54,7 @@ DASK_DISTRIBUTED__WORKER__RESOURCES__TASKSLOTS = '1'
 
 
 extra_pip_packages = "git+https://github.com/carbonplan/cmip6-downscaling.git@esmf_threading git+https://github.com/pangeo-data/scikit-downscale.git git+https://github.com/NCAR/xpersist.git"
-kubernetes_config = {
+config = {
     "AZURE_STORAGE_CONNECTION_STRING": connection_string,
     "EXTRA_PIP_PACKAGES": extra_pip_packages,
     'OMP_NUM_THREADS': OMP_NUM_THREADS,
@@ -64,21 +64,12 @@ kubernetes_config = {
     'DASK_DISTRIBUTED__WORKER__RESOURCES__TASKSLOTS': DASK_DISTRIBUTED__WORKER__RESOURCES__TASKSLOTS,
 }
 
-# pod_config = {
-#     "AZURE_STORAGE_CONNECTION_STRING": connection_string,
-#     'OMP_NUM_THREADS': OMP_NUM_THREADS,
-#     'MPI_NUM_THREADS': MPI_NUM_THREADS,
-#     'MKL_NUM_THREADS': MKL_NUM_THREADS,
-#     'OPENBLAS_NUM_THREADS': OPENBLAS_NUM_THREADS,
-#     'DASK_DISTRIBUTED__WORKER__RESOURCES__TASKSLOTS': DASK_DISTRIBUTED__WORKER__RESOURCES__TASKSLOTS
-# }
-
 kubernetes_run_config = KubernetesRun(
     cpu_request=kubernetes_cpu,
     memory_request=kubernetes_memory,
     image=image,
     labels=agent,
-    env=kubernetes_config,
+    env=config,
 )
 
 pod_spec = make_pod_spec(
@@ -88,7 +79,7 @@ pod_spec = make_pod_spec(
     threads_per_worker=pod_threads_per_worker,
     cpu_limit=pod_cpu_limit,
     cpu_request=pod_cpu_request,
-    env=kubernetes_config,
+    env=config,
 )
 pod_spec.spec.containers[0].args.extend(['--resources', 'TASKSLOTS=1'])
 
