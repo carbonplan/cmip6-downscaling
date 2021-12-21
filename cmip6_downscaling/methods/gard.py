@@ -79,11 +79,6 @@ def gard_fit_and_predict(
         GARD model prediction output. Should contain three variables: pred (predicted mean), prediction_error
         (prediction error in fit), and exceedance_prob (probability of exceedance for threshold)
     """
-
-    X_train = X_train.isel(lat=slice(0, 100), lon=slice(0, 100))
-    y_train = y_train.isel(lat=slice(0, 100), lon=slice(0, 100))
-    X_pred = X_pred.isel(lat=slice(0, 100), lon=slice(0, 100))
-
     # point wise downscaling
     model = PointWiseDownscaler(model=get_gard_model(model_type, model_params), dim=dim)
     model.fit(X_train, y_train[label])
@@ -254,6 +249,10 @@ def gard_postprocess(
         thresh = model_params.get('thresh')
     else:
         thresh = None
+
+    # trim the scrf dataset to the length of the model output
+    n_timepoints = len(model_output.time)
+    scrf = scrf.isel(time=slice(0, n_timepoints))
 
     if thresh is not None:
         # convert scrf from a normal distribution to a uniform distribution

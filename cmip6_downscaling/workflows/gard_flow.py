@@ -58,6 +58,8 @@ def prep_gard_input_task(
     obs: str,
     train_period_start: str,
     train_period_end: str,
+    predict_period_start: str,
+    predict_period_end: str,
     variables: List[str],
     X_train: xr.Dataset,
     X_pred: xr.Dataset,
@@ -91,7 +93,9 @@ def prep_gard_input_task(
         zarr_array=X_pred, template_chunk_array=X_train, output_path=rechunked_gcm_path
     )
 
-    return X_train, y_train_rechunked, X_pred_rechunked
+    predict_period = slice(predict_period_start, predict_period_end)
+
+    return X_train, y_train_rechunked, X_pred_rechunked.sel(time=predict_period)
 
 
 with Flow(name='gard-flow') as gard_flow:
@@ -162,8 +166,6 @@ with Flow(name='gard-flow') as gard_flow:
         ds_obs=ds_obs_interpolated_full_time,
         historical_period_start=train_period_start,
         historical_period_end=train_period_end,
-        future_period_start=predict_period_start,
-        future_period_end=predict_period_end,
         method=bias_correction_method,
         bc_kwargs=bias_correction_kwargs,
         chunking_approach='full_time',
@@ -174,6 +176,8 @@ with Flow(name='gard-flow') as gard_flow:
         obs=obs,
         train_period_start=train_period_start,
         train_period_end=train_period_end,
+        predict_period_start=predict_period_start,
+        predict_period_end=predict_period_end,
         variables=variables,
         X_train=ds_obs_bias_corrected,
         X_pred=ds_gcm_bias_corrected,
