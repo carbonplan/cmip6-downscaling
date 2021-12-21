@@ -439,6 +439,9 @@ def fit_and_predict(
     elif variable in RELATIVE_VARS:
         bcsd_model = BcsdPrecipitation(return_anoms=False)
     pointwise_model = PointWiseDownscaler(model=bcsd_model, dim=dim)
+    print('xtrainrechunked: ', x_train_rechunked_ds)
+    print('\n')
+    print('ytrained_rechunked: ',y_rechunked_ds)
     pointwise_model.fit(x_train_rechunked_ds[variable], y_rechunked_ds[variable])
     bias_corrected_da = pointwise_model.predict(x_predict_rechunked_ds[variable])
     bias_corrected_ds = bias_corrected_da.to_dataset(name=variable)

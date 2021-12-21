@@ -42,7 +42,7 @@ get_coarse_obs_task = task(
     get_coarse_obs,
     tags=['dask-resource:TASKSLOTS=1'],
     result=XpersistResult(intermediate_cache_store, serializer=serializer),
-    target="coarse-obs-ds" + target_naming_str,
+    target="coarse-obs-ds-" + target_naming_str,
 )
 # yes rechunk
 get_spatial_anomalies_task = task(
@@ -81,6 +81,7 @@ return_x_predict_rechunked_task = task(
 
 fit_and_predict_task = task(
     fit_and_predict,
+    log_stdout=True,
     result=XpersistResult(intermediate_cache_store, serializer=serializer),
     target="fit-and-predict-" + target_naming_str,
 )
@@ -95,14 +96,15 @@ postprocess_bcsd_task = task(
 )
 
 # Main Flow -----------------------------------------------------------
-# with Flow(name="bcsd-testing") as flow:
+# with Flow(
+#     name="bcsd-pr-test",
+#     storage=storage,
+#     run_config=kubernetes_run_config,
+#     executor=dask_executor,
+# ) as flow:
+with Flow(name="bcsd-testing") as flow:
 # with Flow(name="bcsd-testing", storage=storage, run_config=run_config) as flow:
-with Flow(
-    name="bcsd-long-time-domain-test",
-    storage=storage,
-    run_config=kubernetes_run_config,
-    executor=dask_executor,
-) as flow:
+
     gcm = Parameter("GCM")
     scenario = Parameter("SCENARIO")
     train_period_start = Parameter("TRAIN_PERIOD_START")
