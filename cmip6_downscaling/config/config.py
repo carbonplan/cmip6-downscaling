@@ -39,8 +39,8 @@ dask_executor_adapt_min = 4
 dask_executor_adapt_max = 20
 
 # pod config
-pod_memory_limit = "4Gi"
-pod_memory_request = "4Gi"
+pod_memory_limit = "8Gi"
+pod_memory_request = "8Gi"
 pod_threads_per_worker = 2
 pod_cpu_limit = 2
 pod_cpu_request = 2
