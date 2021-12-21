@@ -354,6 +354,7 @@ def bias_correct_gcm_task(
         Bias corrected GCM dataset
     """
     historical_period = slice(historical_period_start, historical_period_end)
+
     kws = default_none_kwargs(bc_kwargs, copy=True)
 
     for v in ds_gcm.data_vars:
