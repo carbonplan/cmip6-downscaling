@@ -65,13 +65,15 @@ def make_flow_paths(
     return coarse_obs_path, spatial_anomalies_path, bias_corrected_path, final_out_path
 
 
-def return_obs(    gcm: str,
+def return_obs(
+    gcm: str,
     scenario: str,
     train_period_start: str,
     train_period_end: str,
     predict_period_start: str,
     predict_period_end: str,
-    variable: str,) -> xr.Dataset:
+    variable: str,
+) -> xr.Dataset:
     """Loads ERA5 observation data for given time bounds and variable
 
     Parameters
@@ -90,7 +92,7 @@ def return_obs(    gcm: str,
         Date for prediction period end (e.g. '2090')
     variable: str
         The variable included in the dataset.
-        
+
     Returns
     -------
     xr.Dataset
@@ -102,13 +104,16 @@ def return_obs(    gcm: str,
     return obs_ds
 
 
-def get_coarse_obs(obs_ds: xr.Dataset,    gcm: str,
+def get_coarse_obs(
+    obs_ds: xr.Dataset,
+    gcm: str,
     scenario: str,
     train_period_start: str,
     train_period_end: str,
     predict_period_start: str,
     predict_period_end: str,
-    variable: str,) -> xr.Dataset:
+    variable: str,
+) -> xr.Dataset:
     """Regrids the observation dataset to match the GCM resolution
 
     Parameters
