@@ -115,6 +115,7 @@ def calc_correlation_length_scale(
         .mean()
     )
     detrended = data.groupby("time.dayofyear") - seasonality
+    detrended = detrended.transpose('time', 'lon', 'lat')
 
     # find spatial length scale
     fields = detrended.values
