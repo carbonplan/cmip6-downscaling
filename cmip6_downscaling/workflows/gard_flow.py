@@ -198,7 +198,13 @@ with Flow(name='gard-flow') as gard_flow:
     )
 
     # post process
-    scrf = generate_scrf_task(data=y_train, obs_identifier=obs_identifier, label=label)
+    scrf = generate_scrf_task(
+        data=y_train, 
+        obs=obs, 
+        label=label, 
+        start_year=predict_period_start,
+        end_year=predict_period_end,
+    )
 
     final_output = gard_postprocess_task(
         model_output=model_output,
