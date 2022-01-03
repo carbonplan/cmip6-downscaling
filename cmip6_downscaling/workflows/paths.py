@@ -234,3 +234,16 @@ def make_gard_post_processed_output_path(
     gcm_identifier: str, bias_correction_method: str, model_type: str, label: str, **kwargs
 ):
     return f"gard_post_processed_output/{gcm_identifier}_{bias_correction_method}_{model_type}_{label}.zarr"
+
+
+def make_epoch_trend_path(
+    gcm_identifier: str, day_rolling_window: int, year_rolling_window: int, **kwargs
+):
+    return f'gcm_epoch_trend/{gcm_identifier}_{day_rolling_window}_day_{year_rolling_window}_year_rolling.zarr'
+
+
+def make_epoch_adjusted_gcm_path(
+    gcm_identifier: str, day_rolling_window: int, year_rolling_window: int, **kwargs
+):
+    return f'epoch_adjusted_gcm/{gcm_identifier}_{day_rolling_window}_day_{year_rolling_window}_year_rolling.zarr'
+

@@ -3,91 +3,87 @@ from typing import Any, Dict, List, Optional, Union
 import numpy as np
 import xarray as xr
 import xesmf as xe
+from prefect import task
 from skdownscale.pointwise_models import EquidistantCdfMatcher, PointWiseDownscaler
 from sklearn.linear_model import LinearRegression
 
-from cmip6_downscaling.data.cmip import convert_to_360
-from cmip6_downscaling.data.observations import get_coarse_obs
-from cmip6_downscaling.methods.detrend import epoch_adjustment
-from cmip6_downscaling.workflows.utils import generate_batches
+from cmip6_downscaling.methods.detrend import calc_epoch_trend, remove_epoch_trend
+from cmip6_downscaling.methods.maca import maca_bias_correction
+from cmip6_downscaling.workflows.utils import generate_batches, rechunk_zarr_array_with_caching
+from xpersist.prefect.result import XpersistResult
 
+from cmip6_downscaling.config.config import intermediate_cache_store, serializer
+from cmip6_downscaling.workflows.paths import (
+    make_epoch_trend_path,
+    make_epoch_adjusted_gcm_path,
+    make_bias_corrected_gcm_path,
+)
 
-def maca_preprocess(
-    historical_gcm,
-    future_gcm,
-    obs,
-    min_lon,
-    max_lon,
-    min_lat,
-    max_lat,
+@task(
+    checkpoint=True,
+    result=XpersistResult(intermediate_cache_store, serializer=serializer),
+    target=make_epoch_trend_path,
+)
+def calc_epoch_trend_task(
+    data: xr.Dataset,
+    train_period_start: str,
+    train_period_end: str,
+    day_rolling_window: int = 21, 
+    year_rolling_window: int = 31,
+    **kwargs,
 ):
-    lon_slice = slice(convert_to_360(min_lon), convert_to_360(max_lon))
-    lat_slice = slice(max_lat, min_lat)
-    full_gcm = xr.combine_by_coords(
-        [
-            historical_gcm.sel(lon=lon_slice, lat=lat_slice),
-            future_gcm.sel(lon=lon_slice, lat=lat_slice),
-        ],
-        combine_attrs='drop',
-    ).rio.write_crs('EPSG:4326')
-    obs = obs.chunk({'lat': -1, 'lon': -1, 'time': 1})
-    coarse_obs = get_coarse_obs(obs=obs, gcm_ds_single_time_slice=full_gcm.isel(time=0))
-    return full_gcm, coarse_obs
+    """
+    Input data should be in full time chunks 
+    """
+    historical_period = slice(train_period_start, train_period_end)
+    trend = calc_epoch_trend(
+        data=data, 
+        historical_period=historical_period, 
+        day_rolling_window=day_rolling_window, 
+        year_rolling_window=year_rolling_window
+    )
+    return trend 
 
 
-def maca_bias_correction(
+remove_epoch_trend_task = task(
+    remove_epoch_trend,
+    result=XpersistResult(intermediate_cache_store, serializer=serializer),
+    target=make_epoch_adjusted_gcm_path,    
+)
+
+
+@task(
+    checkpoint=True,
+    result=XpersistResult(intermediate_cache_store, serializer=serializer),
+    target=make_bias_corrected_gcm_path,    
+)
+def maca_bias_correction_task(
     ds_gcm: xr.Dataset,
     ds_obs: xr.Dataset,
-    historical_period: slice,
+    train_period_start: str,
+    train_period_end: str,
     variables: Union[str, List[str]],
     batch_size: Optional[int] = 15,
     buffer_size: Optional[int] = 15,
-) -> xr.Dataset:
+    **kwargs,
+):
     """
-    ds_gcm and ds_obs must have a dimension called time on which we can call .dt.dayofyear on
     """
-    if isinstance(variables, str):
-        variables = [variables]
+    ds_gcm_rechunked = rechunk_zarr_array_with_caching(
+        zarr_array=ds_gcm, template_chunk_array=ds_obs
+    )
 
-    doy_gcm = ds_gcm.time.dt.dayofyear
-    doy_obs = ds_obs.time.dt.dayofyear
+    historical_period = slice(train_period_start, train_period_end)
+    bias_corrected = maca_bias_correction(
+        ds_gcm=ds_gcm_rechunked,
+        ds_obs=ds_obs,
+        historical_period=historical_period,
+        variables=variables,
+        batch_size=batch_size,
+        buffer_size=buffer_size,
+    )
 
-    ds_out = xr.Dataset()
-    for var in variables:
-        if var in ['pr', 'huss', 'vas', 'uas']:
-            kind = 'ratio'
-        else:
-            kind = 'difference'
-
-        bias_correction_model = PointWiseDownscaler(
-            EquidistantCdfMatcher(
-                kind=kind, extrapolate=None  # cdf in maca implementation spans [0, 1]
-            )
-        )
-
-        batches, cores = generate_batches(
-            n=doy_gcm.max().values, batch_size=batch_size, buffer_size=buffer_size, one_indexed=True
-        )
-
-        bc_result = []
-        for b, c in zip(batches, cores):
-            gcm_batch = ds_gcm.sel(time=doy_gcm.isin(b)).load()
-            obs_batch = ds_obs.sel(time=doy_obs.isin(b)).load()
-
-            bias_correction_model.fit(
-                gcm_batch.sel(time=historical_period)[[var]],  # dataset
-                obs_batch.sel(time=historical_period)[var],  # dataarray
-            )
-
-            bc_data = bias_correction_model.predict(X=gcm_batch)
-            bc_data.load()
-            del gcm_batch, obs_batch
-            bc_result.append(bc_data.sel(time=bc_data.time.dt.dayofyear.isin(c)))
-
-        # might need to cast into dataarray
-        ds_out[var] = xr.concat(bc_result, dim='time').sortby('time')
-
-    return ds_out
+    return bias_corrected
 
 
 def get_doy_mask(
@@ -294,7 +290,9 @@ def maca_flow(
         **bias_correction_kws
     )
 
-    # rechunk into space
+    # rechunk into time 
+    # split into sub region 
+    # rechunk into space 
     constructed_analogs_kws = {'n_analogs': 10, 'doy_range': 45}
     constructed_analogs_kws.update(
         {} if not constructed_analogs_kwargs else constructed_analogs_kwargs

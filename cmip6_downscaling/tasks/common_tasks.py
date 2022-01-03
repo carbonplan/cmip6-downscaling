@@ -28,6 +28,16 @@ from cmip6_downscaling.workflows.paths import (
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching, regrid_ds
 
 
+get_obs_task = task(
+    get_obs
+)
+
+
+get_gcm_task = task(
+    get_gcm
+)
+
+
 @task
 def path_builder_task(
     obs: str,
@@ -242,7 +252,7 @@ def interpolate_gcm_task(
     ds_gcm_interpolated_rechunked: xr.Dataset
         The GCM dataset that has been interpolated to the obs grid then rechunked.
     """
-    # get obs in full space chunks
+    # get gcm in full space chunks
     ds_gcm_full_space = get_gcm(
         gcm=gcm,
         scenario=scenario,
@@ -255,7 +265,7 @@ def interpolate_gcm_task(
         cache_within_rechunk=False,
     )
 
-    # regrid to coarse scale
+    # get obs as a template 
     ds_obs_full_space = get_obs(
         obs=obs,
         train_period_start=train_period_start,
@@ -265,7 +275,7 @@ def interpolate_gcm_task(
         cache_within_rechunk=False,
     )
 
-    # interpolate to fine scale again
+    # interpolate gcm to obs resolution 
     ds_gcm_interpolated = regrid_ds(
         ds=ds_gcm_full_space,
         target_grid_ds=ds_obs_full_space.isel(time=0).load(),

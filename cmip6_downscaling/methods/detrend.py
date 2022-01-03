@@ -58,7 +58,7 @@ def pad_with_edge_year(data):
     return padded
 
 
-def epoch_adjustment(data, historical_period, day_rolling_window=21, year_rolling_window=31):
+def calc_epoch_trend(data, historical_period, day_rolling_window=21, year_rolling_window=31):
     """
     data must have a dimension called time
     historical_period should be a slice() object that can be directly used in xr.DataArray.sel()
@@ -92,13 +92,16 @@ def epoch_adjustment(data, historical_period, day_rolling_window=21, year_rollin
         .dropna('time')
     )
 
-    rolling_doy_mean = rolling_doy_mean.load()
-
     # repeat the first/last year
     for i in range(y_offset):
         rolling_doy_mean = pad_with_edge_year(rolling_doy_mean)
 
     trend = rolling_doy_mean.groupby('time.dayofyear') - hist_mean
+
+    return trend
+
+
+def remove_epoch_trend(data, trend, **kwargs):
     ea_data = data - trend
 
-    return ea_data, trend
+    return ea_data 
