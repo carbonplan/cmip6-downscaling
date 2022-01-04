@@ -26,9 +26,7 @@ PIXELS_PER_TILE = 128
 
 image = "carbonplan/cmip6-downscaling-prefect:2021.12.06"
 storage = Azure("prefect")
-extra_pip_packages = (
-    'git+https://github.com/carbonplan/ndpyramid@e85b8365224f50b69783129000eb39eccdf6c711'
-)
+extra_pip_packages = 'git+https://github.com/carbonplan/ndpyramid@a326e5b97257147e05733e068801ecb6b0d17888 git+https://github.com/TomNicholas/datatree@54edbf77fdc756b74bfca00986f4a68e04643b29'
 env = {
     'EXTRA_PIP_PACKAGES': extra_pip_packages,
     'AZURE_STORAGE_CONNECTION_STRING': os.environ['AZURE_STORAGE_CONNECTION_STRING'],
@@ -86,21 +84,22 @@ def get_cat():
     return cat
 
 
-def postprocess(dt: dt.DataTree) -> dt.DataTree:
+def postprocess(dt: dt.DataTree, levels: int) -> dt.DataTree:
 
-    for level in range(len(dt.children)):
+    for level in range(levels):
+        slevel = str(level)
         dt.ds.attrs['multiscales'][0]['datasets'][level]['pixels_per_tile'] = PIXELS_PER_TILE
 
-    for child in dt.children:
-
-        child.ds = child.ds.chunk({"x": PIXELS_PER_TILE, "y": PIXELS_PER_TILE, "time": 31})
-        child.ds['date_str'] = child.ds['date_str'].chunk(-1)
-
-        child.ds = set_zarr_encoding(
-            child.ds, codec_config={"id": "zlib", "level": 1}, float_dtype="float32"
+        dt[slevel].ds = dt[slevel].ds.chunk(
+            {"x": PIXELS_PER_TILE, "y": PIXELS_PER_TILE, "time": 31}
         )
-        child.ds.time.encoding['dtype'] = 'int32'
-        child.ds.time_bnds.encoding['dtype'] = 'int32'
+        dt[slevel].ds['date_str'] = dt[slevel].ds['date_str'].chunk(-1)
+
+        dt[slevel].ds = set_zarr_encoding(
+            dt[slevel].ds, codec_config={"id": "zlib", "level": 1}, float_dtype="float32"
+        )
+        dt[slevel].ds['time'].encoding['dtype'] = 'int32'
+        dt[slevel].ds['time_bnds'].encoding['dtype'] = 'int32'
     dt.ds.attrs.update(**get_cf_global_attrs())
     return dt
 
@@ -139,7 +138,7 @@ def regrid(key: str, levels: int = LEVELS) -> None:
 
         for member_id in ds.member_id.data:
 
-            uri = f'scratch/cmip6-web-test-7/{key}/{member_id}'
+            uri = f'scratch/cmip6-web-test-8/{key}/{member_id}'
             mapper = fs.get_mapper(uri)
             if '.zmetadata' in mapper:
                 return
@@ -153,8 +152,10 @@ def regrid(key: str, levels: int = LEVELS) -> None:
                 levels=levels,
             )
 
+            print(dt.ds.attrs)
             print('postprocess')
-            dt = postprocess(dt)
+            print(str(dt))
+            dt = postprocess(dt, levels)
             print(str(dt))
 
             # write

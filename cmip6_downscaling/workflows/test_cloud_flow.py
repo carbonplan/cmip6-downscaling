@@ -43,7 +43,7 @@ pod_spec.spec.containers[0].args.extend(['--resources', 'TASKSLOTS=1'])
 
 executor = DaskExecutor(
     cluster_class=lambda: KubeCluster(pod_spec, deploy_mode='remote'),
-    adapt_kwargs={"minimum": 1, "maximum": 2},
+    adapt_kwargs={"minimum": 2, "maximum": 2},
 )
 
 
@@ -73,4 +73,9 @@ with Flow(
     # nums = range(4)
     # my_task.map(nums)
 
-    tasks = [make_grid((59, 87)), make_grid((60, 88)), make_grid((61, 89)), make_grid((62, 90))]
+    tasks = [
+        make_grid((590, 870)),
+        make_grid((600, 880)),
+        make_grid((610, 890)),
+        make_grid((620, 900)),
+    ]
