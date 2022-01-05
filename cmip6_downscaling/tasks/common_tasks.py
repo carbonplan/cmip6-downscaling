@@ -403,11 +403,6 @@ def to_standard_calendar(obj: T_Xarray) -> T_Xarray:
     if orig_calendar == '360_day':
         raise ValueError('360_day calendar is not supported')
 
-    # index frequency
-    freq = obj.indexes['time'].freq
-    if isinstance(freq, str) and len(freq) == 1:
-        freq = '1' + freq
-
     # reindex / interpolate
     obj_new = xclim.core.calendar.convert_calendar(obj, 'standard', missing=np.nan).interpolate_na(
         dim='time', method='linear'
