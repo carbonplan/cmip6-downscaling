@@ -12,6 +12,7 @@ from cmip6_downscaling.data.observations import open_era5
 from cmip6_downscaling.workflows.utils import (
     delete_chunks_encoding,
     rechunk_zarr_array,
+    rechunk_zarr_array_with_caching,
     regrid_dataset,
 )
 
@@ -436,13 +437,15 @@ def fit_and_predict(
     """
     if variable in ABSOLUTE_VARS:
         bcsd_model = BcsdTemperature(return_anoms=False)
+        print('bcsd_temp chosen')
     elif variable in RELATIVE_VARS:
         bcsd_model = BcsdPrecipitation(return_anoms=False)
+        print('bcsd_precip chosen')
     pointwise_model = PointWiseDownscaler(model=bcsd_model, dim=dim)
-    print('xtrainrechunked: ', x_train_rechunked_ds)
-    print('\n')
-    print('ytrained_rechunked: ',y_rechunked_ds)
-    pointwise_model.fit(x_train_rechunked_ds[variable], y_rechunked_ds[variable])
+    y_rechunked_validated_ds = rechunk_zarr_array_with_caching(
+        y_rechunked_ds, template_chunk_array=x_train_rechunked_ds
+    )
+    pointwise_model.fit(x_train_rechunked_ds[variable], y_rechunked_validated_ds[variable])
     bias_corrected_da = pointwise_model.predict(x_predict_rechunked_ds[variable])
     bias_corrected_ds = bias_corrected_da.to_dataset(name=variable)
     return bias_corrected_ds
