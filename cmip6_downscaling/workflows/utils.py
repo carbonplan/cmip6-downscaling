@@ -4,7 +4,6 @@ import re
 import string
 from typing import Optional, Tuple, Union
 
-import dask
 import fsspec
 import numpy as np
 import xarray as xr
@@ -285,9 +284,7 @@ def regrid_dataset(
             max_mem="1GB",
         )
 
-    regridder = xe.Regridder(
-        ds_rechunked, target_grid_ds, "bilinear", extrap_method="nearest_s2d"
-    )
+    regridder = xe.Regridder(ds_rechunked, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
     ds_regridded = regridder(ds_rechunked)
 
     return ds_regridded, ds_rechunked_path

@@ -104,7 +104,6 @@ with Flow(
     run_config=kubernetes_run_config,
     executor=dask_executor,
 ) as flow:
-
     gcm = Parameter("GCM")
     scenario = Parameter("SCENARIO")
     train_period_start = Parameter("TRAIN_PERIOD_START")
