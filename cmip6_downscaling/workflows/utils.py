@@ -55,6 +55,36 @@ def delete_chunks_encoding(ds: Union[xr.Dataset, xr.DataArray]):
             del ds[coord].encoding["chunks"]
 
 
+def lon_to_180(ds):
+    '''Converts longitude values to (-180, 180)
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset with `lon` coordinate
+
+    Returns
+    -------
+    xr.Dataset
+        Copy of `ds` with updated coordinates
+
+    See also
+    --------
+    cmip6_preprocessing.preprocessing.correct_lon
+    '''
+
+    ds = ds.copy()
+
+    lon = ds["lon"].where(ds["lon"] < 180, ds["lon"] - 360)
+    ds = ds.assign_coords(lon=lon)
+
+    if "lon_bounds" in ds.variables:
+        lon_b = ds["lon_bounds"].where(ds["lon_bounds"] < 180, ds["lon_bounds"] - 360)
+        ds = ds.assign_coords(lon_bounds=lon_b)
+
+    return ds
+
+
 def make_rechunker_stores(
     connection_string: Optional[str] = CONNECTION_STRING,
     output_path: Optional[str] = None,
