@@ -1,5 +1,6 @@
 adlfs
 dask[complete]
+dask-kubernetes
 fsspec
 google-cloud-storage
 gcsfs
