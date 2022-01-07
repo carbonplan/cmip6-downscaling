@@ -247,3 +247,24 @@ def make_epoch_adjusted_gcm_path(
 ):
     return f'epoch_adjusted_gcm/{gcm_identifier}_{day_rolling_window}_day_{year_rolling_window}_year_rolling.zarr'
 
+
+def make_epoch_adjusted_downscaled_gcm_path(
+    gcm_identifier: str, 
+    label: str, 
+    subdomain_bound: Optional[Tuple[float, float, float, float]] = (0, -90, 360, 90), 
+    **kwargs
+):
+    min_lon, min_lat, max_lon, max_lat = subdomain_bound
+    return f'maca_epoch_adjusted_downscaled_output/{gcm_identifier}_{label}_{min_lon:0.1f}_{min_lat:0.1f}_{max_lon:0.1f}_{max_lat:0.1f}.zarr'
+
+
+def make_epoch_replaced_downscaled_gcm_path(
+    gcm_identifier: str, day_rolling_window: int, year_rolling_window: int, **kwargs
+):
+    return f'epoch_replaced_gcm/{gcm_identifier}_{day_rolling_window}_day_{year_rolling_window}_year_rolling.zarr'
+
+
+def make_maca_output_path(
+    gcm_identifier: str, label: str, **kwargs
+):
+    return f"maca_output/{gcm_identifier}_{label}.zarr"

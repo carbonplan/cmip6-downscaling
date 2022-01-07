@@ -3,6 +3,7 @@ from typing import Any, Dict, Tuple, Union
 import numpy as np
 import regionmask
 import xarray as xr
+from cmip6_downscaling.data.cmip import convert_to_360
 
 
 def generate_subdomains(
@@ -13,7 +14,7 @@ def generate_subdomains(
     """
     Given an example output grid, determine all subdomains that need to be process in order to generate the final output.
     Outputs the list of bounding boxes for each subdomain considering the buffer size, as well as a mask in the resolution of the example output grid specifying
-    which subdomain's value to use for each grid cell.
+    which subdomain's value to use for each grid cell. Longitudes are in 0-360 
 
     Parameters
     ----------
@@ -56,8 +57,15 @@ def generate_subdomains(
                 min_lon = -180
             elif n == 28 and region_def == 'ar6':
                 min_lon = 40.0 - buffer_size
-            subdomains[n] = (min_lon, min_lat, max_lon, max_lat)
+            mask = xr.where((mask == 28) & (mask.lon > 180), x=1, y=mask)
 
+            # convert the bounds into 0-360 longitude, capturing the special case spanning entire globe 
+            if min_lon == -180 and max_lon == 180:
+                min_lon, max_lon = 0, 360
+            else:
+                min_lon = convert_to_360(min_lon)
+                max_lon = convert_to_360(max_lon)
+            subdomains[n] = (min(min_lon, max_lon), min_lat, max(min_lon, max_lon), max_lat)
     return subdomains, mask
 
 
@@ -92,6 +100,7 @@ def combine_outputs(
     out = xr.Dataset()
     template = ds_dict[region_codes_available[0]]
     for v in template.data_vars:
+        # TODO: this might be prohibitive in terms of memory usage 
         out[v] = xr.DataArray(
             np.nan,
             dims=template.dims,

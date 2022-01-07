@@ -90,7 +90,7 @@ def calc_epoch_trend(data, historical_period, day_rolling_window=21, year_rollin
         .groupby('time.dayofyear')
         .apply(func)
         .dropna('time')
-    )
+    ).compute()  # this .compute is needed otherwise the pad_with_edge_year function below returns all nulls for unknown reasons
 
     # repeat the first/last year
     for i in range(y_offset):

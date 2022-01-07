@@ -1,23 +1,34 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Tuple
 
 import numpy as np
 import xarray as xr
 import xesmf as xe
 from prefect import task
-from skdownscale.pointwise_models import EquidistantCdfMatcher, PointWiseDownscaler
-from sklearn.linear_model import LinearRegression
 
 from cmip6_downscaling.methods.detrend import calc_epoch_trend, remove_epoch_trend
-from cmip6_downscaling.methods.maca import maca_bias_correction
+from cmip6_downscaling.methods.maca import maca_bias_correction, maca_construct_analogs
 from cmip6_downscaling.workflows.utils import generate_batches, rechunk_zarr_array_with_caching
+from cmip6_downscaling.methods.regions import generate_subdomains, combine_outputs
 from xpersist.prefect.result import XpersistResult
 
 from cmip6_downscaling.config.config import intermediate_cache_store, serializer
+from cmip6_downscaling.workflows.utils import regrid_ds
 from cmip6_downscaling.workflows.paths import (
     make_epoch_trend_path,
     make_epoch_adjusted_gcm_path,
     make_bias_corrected_gcm_path,
+    make_epoch_adjusted_downscaled_gcm_path,
+    make_epoch_replaced_downscaled_gcm_path,
+    make_maca_output_path,
 )
+from cmip6_downscaling.tasks.common_tasks import (
+    path_builder_task,
+    get_obs_task,
+    get_coarse_obs_task,
+    get_gcm_task,
+    rechunker_task,
+)
+
 
 @task(
     checkpoint=True,
@@ -57,20 +68,22 @@ remove_epoch_trend_task = task(
     result=XpersistResult(intermediate_cache_store, serializer=serializer),
     target=make_bias_corrected_gcm_path,    
 )
-def maca_bias_correction_task(
+def maca_coarse_bias_correction_task(
     ds_gcm: xr.Dataset,
     ds_obs: xr.Dataset,
     train_period_start: str,
     train_period_end: str,
     variables: Union[str, List[str]],
+    chunking_approach: str,
     batch_size: Optional[int] = 15,
     buffer_size: Optional[int] = 15,
     **kwargs,
 ):
     """
     """
+    # TODO: test if this is needed if both ds_gcm and ds_obs are chunked in full time 
     ds_gcm_rechunked = rechunk_zarr_array_with_caching(
-        zarr_array=ds_gcm, template_chunk_array=ds_obs
+        zarr_array=ds_gcm, template_chunk_array=ds_obs, output_path='maca_test_bias_correction_rechunk.zarr'  # TODO: remove this 
     )
 
     historical_period = slice(train_period_start, train_period_end)
@@ -83,241 +96,328 @@ def maca_bias_correction_task(
         buffer_size=buffer_size,
     )
 
-    return bias_corrected
+    return bias_corrected_rechunked
 
 
-def get_doy_mask(
-    source_doy: xr.DataArray,
-    target_doy: xr.DataArray,
-    doy_range: int = 45,
-) -> xr.DataArray:
-    """
-    source_doy and target_doy are 1D xr data arrays with day of year information
-    return a mask in the shape of len(target_doy) x len(source_doy),
-    where cell (i, j) is True if the source doy j is within doy_range days of the target doy i,
-    and False otherwise
-    """
-    # get the min and max doy within doy_range days to target doy
-    target_doy_min = target_doy - doy_range
-    target_doy_max = target_doy + doy_range
-    # make sure the range is within 0-365
-    # TODO: what to do with leap years???
-    target_doy_min[target_doy_min <= 0] += 365
-    target_doy_max[target_doy_max > 365] -= 365
-
-    # if the min is larger than max, the target doy is at the edge of a year, and we can accept the
-    # source if any one of the condition is True
-    one_sided = target_doy_min > target_doy_max
-    edges = ((source_doy >= target_doy_min) | (source_doy <= target_doy_max)) & (one_sided)
-    # otherwise the source doy needs to be within min and max
-    within = (source_doy >= target_doy_min) & (source_doy <= target_doy_max) & (~one_sided)
-
-    # mask is true if either one of the condition is satisfied
-    mask = edges | within
-
-    return mask
-
-
-def maca_constructed_analogs(
-    ds_gcm: xr.DataArray,
-    ds_obs_coarse: xr.DataArray,
-    ds_obs_fine: xr.DataArray,
-    n_analogs: int = 10,
-    doy_range: int = 45,
-) -> xr.DataArray:
-    """
-    it is assumed that ds_obs and ds_gcm have dimensions time, lat, lon
-    """
-    for dim in ['time', 'lat', 'lon']:
-        for ds in [ds_gcm, ds_obs_coarse, ds_obs_fine]:
-            assert dim in ds.dims
-
-    assert len(ds_obs_coarse.time) == len(ds_obs_fine.time)
-
-    # get dimension sizes from input data
-    ndays_in_obs = len(ds_obs_coarse.time)
-    ndays_in_gcm = len(ds_gcm.time)
-    domain_shape_coarse = (len(ds_obs_coarse.lat), len(ds_obs_coarse.lon))
-    n_pixel_coarse = domain_shape_coarse[0] * domain_shape_coarse[1]
-    domain_shape_fine = (len(ds_obs_fine.lat), len(ds_obs_fine.lon))
-    n_pixel_fine = domain_shape_fine[0] * domain_shape_fine[1]
-
-    # rename the time dimension in order to get cross products
-    X = ds_obs_coarse.rename({'time': 'ndays_in_obs'})  # coarse obs
-    y = ds_gcm.rename({'time': 'ndays_in_gcm'})  # coarse gcm
-
-    # get rmse between each GCM slices to be downscaled and each observation slices
-    # will have the shape ndays_in_gcm x ndays_in_obs
-    rmse = np.sqrt(((X - y) ** 2).sum(dim=['lat', 'lon'])) / n_pixel_coarse
-
-    # get a day of year mask in the same shape of rmse according to the day range input
-    mask = get_doy_mask(
-        source_doy=X.ndays_in_obs.dt.dayofyear,
-        target_doy=y.ndays_in_gcm.dt.dayofyear,
-        doy_range=doy_range,
+@task(nout=4)
+def get_subdomains_task(
+    ds_obs: xr.Dataset,
+    buffer_size: Union[float, int] = 5,
+    region_def: str = 'ar6'
+):
+    subdomains_dict, mask = generate_subdomains(
+        ex_output_grid=ds_obs.isel(time=0),
+        buffer_size=buffer_size,
+        region_def=region_def,
     )
 
-    # find the analogs with the lowest rmse within the day of year constraint
-    dim_order = ['ndays_in_gcm', 'ndays_in_obs']
+    subdomains_list = []
+    for k in sorted(subdomains_dict.keys()):
+        subdomains_list.append(subdomains_dict[k])
 
-    inds = (
-        xr.apply_ufunc(
-            np.argsort,
-            rmse.where(mask),
-            vectorize=True,
-            input_core_dims=[['ndays_in_obs']],
-            output_core_dims=[['ndays_in_obs']],
-            dask='parallelized',
-            output_dtypes=['int'],
-            dask_gufunc_kwargs={'allow_rechunk': True},
-        )
-        .isel(ndays_in_obs=slice(0, n_analogs))
-        .transpose(*dim_order)
-        .compute()
+    return subdomains_list, subdomains_dict, mask, len(subdomains_list)
+
+
+@task(nout=3)
+def subset_task(
+    ds_gcm: xr.Dataset,
+    ds_obs_coarse: xr.Dataset,
+    ds_obs_fine: xr.Dataset,
+    subdomains_list: List[Tuple[float, float, float, float]],
+):
+    ds_gcm_list, ds_obs_coarse_list, ds_obs_fine_list = [], [], []
+    for (min_lon, min_lat, max_lon, max_lat) in subdomains_list:
+        lat_slice = slice(max_lat, min_lat)
+        lon_slice = slice(min_lon, max_lon)
+        ds_gcm_list.append(ds_gcm.sel(lat=lat_slice, lon=lon_slice))
+        ds_obs_coarse_list.append(ds_obs_coarse.sel(lat=lat_slice, lon=lon_slice))
+        ds_obs_fine_list.append(ds_obs_fine.sel(lat=lat_slice, lon=lon_slice))
+
+    return ds_gcm_list, ds_obs_coarse_list, ds_obs_fine_list
+
+
+maca_construct_analogs_task = task(
+    maca_construct_analogs,
+    result=XpersistResult(intermediate_cache_store, serializer=serializer),
+    target=make_epoch_adjusted_downscaled_gcm_path,   
+)
+
+
+@task(
+    checkpoint=True,
+    result=XpersistResult(intermediate_cache_store, serializer=serializer),
+    target=make_epoch_adjusted_downscaled_gcm_path,
+)
+def combine_outputs_task(
+    ds_list: List[xr.Dataset],
+    subdomains_dict: Dict[Union[int, float], Any], 
+    mask: xr.DataArray, 
+    **kwargs,
+):  
+    ds_dict = {}
+    for k in sorted(subdomains_dict.keys()):
+        ds_dict[k] = ds_list.pop(0)
+
+    combined_output = combine_outputs(
+        ds_dict=ds_dict,
+        mask=mask
     )
 
-    # train one linear regression model per gcm slice
-    X = X.stack(pixel_coarse=['lat', 'lon'])
-    y = y.stack(pixel_coarse=['lat', 'lon'])
-
-    lr_model = LinearRegression()
-    # double check whether this is actually created (??)
-    regridder = xe.Regridder(
-        ds_obs_coarse.isel(time=0),
-        ds_obs_fine.isel(time=0),
-        "bilinear",
-        extrap_method="nearest_s2d",
-    )
-    downscaled = []
-
-    # make sure X and y are spatially contiguous
-    for i in range(len(y)):
-        # get input data
-        ind = inds.isel(ndays_in_gcm=i).values
-        xi = X.isel(ndays_in_obs=ind).transpose('pixel_coarse', 'ndays_in_obs')
-        yi = y.isel(ndays_in_gcm=i)
-
-        # fit model
-        lr_model.fit(xi, yi)
-
-        # construct prediction at the fine resolution
-        residual = yi - lr_model.predict(xi)
-
-        # check if residual is spatially contiguous
-        interpolated_residual = regridder(residual.unstack('pixel_coarse'))
-        fine_pred = (
-            (ds_obs_fine.isel(time=ind).transpose('lat', 'lon', 'time') * lr_model.coef_).sum(
-                dim='time'
-            )
-            + lr_model.intercept_
-            + interpolated_residual
-        )
-        downscaled.append(fine_pred)
-
-    downscaled = xr.concat(downscaled, dim='time').sortby('time')
-    return downscaled
+    return combined_output
 
 
-def maca_epoch_replacement(
+@task(
+    checkpoint=True,
+    result=XpersistResult(intermediate_cache_store, serializer=serializer),
+    target=make_epoch_replaced_downscaled_gcm_path,
+)
+def maca_epoch_replacement_task(
     ds_gcm_fine: xr.Dataset,
     trend_coarse: xr.Dataset,
+    **kwargs,
 ) -> xr.Dataset:
 
-    regridder = xe.Regridder(
-        trend_coarse.isel(time=0), ds_gcm_fine.isel(time=0), "bilinear", extrap_method="nearest_s2d"
+    trend_fine = regrid_ds(
+        ds=trend_coarse,
+        target_grid_ds=ds_gcm_fine.isel(time=0).chunk({'lat': -1, 'lon': -1}),
+        rechunked_ds_path='maca_test_epoch_replacement_rechunk.zarr'  # TODO: remove this
     )
-
-    trend_fine = regridder(trend_coarse)
 
     return ds_gcm_fine + trend_fine
 
 
-def maca_flow(
-    gcm: str,
-    obs: str,
-    scenario: str,
-    variables: Union[List[str], str],
-    historical_start: str,
-    historical_end: str,
-    future_start: str,
-    future_end: str,
-    min_lat: float,
-    max_lat: float,
-    min_lon: float,
-    max_lon: float,
-    member: Optional[str] = "r1i1p1f1",
-    epoch_adjustment_kwargs: Optional[Dict[str, Any]] = None,
-    bias_correction_kwargs: Optional[Dict[str, Any]] = None,
-) -> str:
+@task(
+    checkpoint=True,
+    result=XpersistResult(intermediate_cache_store, serializer=serializer),
+    target=make_maca_output_path,    
+)
+def maca_fine_bias_correction_task(
+    ds_gcm: xr.Dataset,
+    ds_obs: xr.Dataset,
+    train_period_start: str,
+    train_period_end: str,
+    label: str,
+    batch_size: Optional[int] = 15,
+    buffer_size: Optional[int] = 15,
+    **kwargs,
+):
     """
-    gcm     : string. name of gcm model to use.
-    obs     : string. name of observation data to use.
-    scenario: string. name of the emission scenario to use (e.g. ssp370)
     """
-    # load data: historical gcm, future gcm, obs
+    ds_gcm_rechunked = rechunk_zarr_array_with_caching(
+        zarr_array=ds_gcm, template_chunk_array=ds_obs, output_path='maca_test_fine_bias_correction_rechunk.zarr'  # TODO: remove this 
+    )
 
-    # get params
-    historical_period = slice(historical_start, historical_end)
-    future_period = slice(future_start, future_end)
+    historical_period = slice(train_period_start, train_period_end)
+    bias_corrected = maca_bias_correction(
+        ds_gcm=ds_gcm_rechunked,
+        ds_obs=ds_obs,
+        historical_period=historical_period,
+        variables=[label],
+        batch_size=batch_size,
+        buffer_size=buffer_size,
+    )
 
-    # bounding box of downscaling region
-    full_gcm, coarse_obs = maca_preprocess(
-        historical_gcm=historical_gcm.sel(time=historical_period),
-        future_gcm=future_gcm.sel(time=future_period),
+    return bias_corrected
+
+
+with Flow(name='maca-flow') as maca_flow:
+    obs = Parameter("OBS")
+    gcm = Parameter("GCM")
+    scenario = Parameter("SCENARIO")
+    label = Parameter("LABEL")
+
+    train_period_start = Parameter("TRAIN_PERIOD_START")
+    train_period_end = Parameter("TRAIN_PERIOD_END")
+    predict_period_start = Parameter("PREDICT_PERIOD_START")
+    predict_period_end = Parameter("PREDICT_PERIOD_END")
+
+    epoch_adjustment_day_rolling_window = Parameter("EPOCH_ADJUSTMENT_DAY_ROLLING_WINDOW")
+    epoch_adjustment_year_rolling_window = Parameter("EPOCH_ADJUSTMENT_YEAR_ROLLING_WINDOW")
+    bias_correction_batch_size = Parameter("BIAS_CORRECTION_BATCH_SIZE")
+    bias_correction_buffer_size = Parameter("BIAS_CORRECTION_BUFFER_SIZE")
+    constructed_analog_n_analogs = Parameter("CONSTRUCTED_ANALOG_N_ANALOGS")
+    constructed_analog_doy_range = Parameter("CONSTRUCTED_ANALOG_DOY_RANGE")
+
+    # dictionary with information to build appropriate paths for caching
+    gcm_grid_spec, obs_identifier, gcm_identifier = path_builder_task(
         obs=obs,
-        min_lon=min_lon,
-        max_lon=max_lon,
-        min_lat=min_lat,
-        max_lat=max_lat,
+        gcm=gcm,
+        scenario=scenario,
+        train_period_start=train_period_start,
+        train_period_end=train_period_end,
+        predict_period_start=predict_period_start,
+        predict_period_end=predict_period_end,
+        variables=[label],
+    )
+    
+    # get original resolution observations 
+    ds_obs_full_space = get_obs_task(
+        obs=obs,
+        train_period_start=train_period_start,
+        train_period_end=train_period_end,
+        variables=[label],
+        chunking_approach='full_space',
+        cache_within_rechunk=True,
     )
 
-    epoch_adjustment_kws = {'day_rolling_window': 21, 'year_rolling_window': 31}
-    epoch_adjustment_kws.update({} if not epoch_adjustment_kwargs else epoch_adjustment_kwargs)
+    # get coarsened resolution observations 
+    # this coarse obs is going to be used in bias correction next, so rechunk into full time first 
+    ds_obs_coarse_full_time = get_coarse_obs_task(
+        ds_obs=ds_obs_full_space, 
+        gcm=gcm, 
+        chunking_approach='full_time', 
+        gcm_grid_spec=gcm_grid_spec,
+        obs_identifier=obs_identifier,
+    )
+    
+    # get gcm 
+    ds_gcm_full_time = get_gcm_task(
+        gcm=gcm,
+        scenario=scenario,
+        variables=[label],
+        train_period_start=train_period_start,
+        train_period_end=train_period_end,
+        predict_period_start=predict_period_start,
+        predict_period_end=predict_period_end,
+        chunking_approach='full_time',
+        cache_within_rechunk=True,
+    )
+    
+    # epoch adjustment #1 -- all variables undergo this epoch adjustment 
+    coarse_epoch_trend = calc_epoch_trend_task(
+        data=ds_gcm_full_time,
+        train_period_start=train_period_start,
+        train_period_end=train_period_end,
+        day_rolling_window=epoch_adjustment_day_rolling_window,
+        year_rolling_window=epoch_adjustment_year_rolling_window,
+        gcm_identifier=gcm_identifier,
+    )
+    
+    epoch_adjusted_gcm = remove_epoch_trend_task(
+        data=ds_gcm_full_time,
+        trend=coarse_epoch_trend,
+        day_rolling_window=epoch_adjustment_day_rolling_window,
+        year_rolling_window=epoch_adjustment_year_rolling_window,
+        gcm_identifier=gcm_identifier,
+    )
+    
+    # coarse scale bias correction 
+    bias_corrected_gcm = maca_coarse_bias_correction_task(
+        ds_gcm=epoch_adjusted_gcm,
+        ds_obs=ds_obs_coarse_full_time,
+        train_period_start=train_period_start,
+        train_period_end=train_period_end,
+        variables=[label],
+        batch_size=bias_correction_batch_size,
+        buffer_size=bias_correction_buffer_size,
+        method='maca_edcdfm',
+        gcm_identifier=gcm_identifier,
+        chunking_approach='matched',
+    )
+    
+    # do epoch adjustment again for multiplicative variables 
+    if label in ['pr', 'huss', 'vas', 'uas']:
+        coarse_epoch_trend_2 = calc_epoch_trend_task(
+            data=bias_corrected_gcm,
+            train_period_start=train_period_start,
+            train_period_end=train_period_end,
+            day_rolling_window=epoch_adjustment_day_rolling_window,
+            year_rolling_window=epoch_adjustment_year_rolling_window,
+            gcm_identifier=gcm_identifier+'_2',
+        )
 
-    # here, the time dimension of ea_gcm needs to be in 1 chunk
-    ea_gcm, trend = epoch_adjustment(
-        data=full_gcm, historical_period=historical_period, **epoch_adjustment_kws
+        bias_corrected_gcm = remove_epoch_trend_task(
+            data=bias_corrected_gcm,
+            trend=coarse_epoch_trend_2,
+            day_rolling_window=epoch_adjustment_day_rolling_window,
+            year_rolling_window=epoch_adjustment_year_rolling_window,
+            gcm_identifier=gcm_identifier+'_2',
+        )    
+        
+    # rechunk into full space and cache the output 
+    bias_corrected_gcm_full_space = rechunker_task(
+        zarr_array=bias_corrected, 
+        chunking_approach='full_space',
+        naming_func=make_bias_corrected_gcm_path,
+        gcm_identifier=gcm_identifier,
     )
 
-    # also need to be time: -1 chunked
-    bias_correction_kws = {'batch_size': 15, 'buffer_size': 15}
-    bias_correction_kws.update({} if not bias_correction_kwargs else bias_correction_kwargs)
-    bc_ea_gcm = maca_bias_correction(
-        ds_gcm=ea_gcm,
-        ds_obs=coarse_obs,
-        historical_period=historical_period,
-        variables=variables,
-        **bias_correction_kws
+    # subset into regions 
+    subdomains_list, subdomains_dict, mask, n_subdomains = get_subdomains_task(
+        ds_obs=ds_obs_full_space
     )
-
-    # rechunk into time 
-    # split into sub region 
-    # rechunk into space 
-    constructed_analogs_kws = {'n_analogs': 10, 'doy_range': 45}
-    constructed_analogs_kws.update(
-        {} if not constructed_analogs_kwargs else constructed_analogs_kwargs
+    
+    # everything should be rechunked to full space and then subset 
+    ds_obs_coarse_full_space = get_coarse_obs_task(
+        ds_obs=ds_obs_full_space, 
+        gcm=gcm, 
+        chunking_approach='full_space', 
+        gcm_grid_spec=gcm_grid_spec,
+        obs_identifier=obs_identifier,
     )
-
-    downscaled_bc_ea_gcm = maca_constructed_analogs(
-        ds_gcm=bc_ea_gcm[variables],
-        ds_obs_coarse=coarse_obs[variables],
-        ds_obs_fine=obs[variables],
-        **constructed_analogs_kws
+    # all inputs into the map function needs to be a list 
+    ds_gcm_list, ds_obs_coarse_list, ds_obs_fine_list = subset_task(
+        ds_gcm=bias_corrected_gcm_full_space,
+        ds_obs_coarse=ds_obs_coarse_full_space,
+        ds_obs_fine=ds_obs_full_space,
+        subdomains_list=subdomains_list,
     )
-
-    # epoch replacement
-    downscaled_bc_gcm = maca_epoch_replacement(
-        ds_gcm_fine=downscaled_bc_ea_gcm,
-        trend_coarse=trend,
+    
+    # downscaling by constructing analogs 
+    downscaled_gcm_list = maca_construct_analogs_task.map(
+        ds_gcm=ds_gcm_list,
+        ds_obs_coarse=ds_obs_coarse_list,
+        ds_obs_fine=ds_obs_fine_list,
+        subdomain_bound=subdomains_list,
+        n_analogs=[constructed_analog_n_analogs] * n_subdomains,
+        doy_range=[constructed_analog_doy_range] * n_subdomains,
+        gcm_identifier=[gcm_identifier] * n_subdomains,
+        label=[label] * n_subdomains,
     )
-
-    # fine scale bias correction
-    final_gcm = maca_bias_correction(
-        ds_gcm=downscaled_bc_gcm,
-        ds_obs=obs,
-        historical_period=historical_period,
-        variables=variables,
-        **bias_correction_kws
+    
+    # combine back into full domain 
+    combined_downscaled_output = combine_outputs_task(
+        ds_list=downscaled_gcm_list,
+        subdomains_dict=subdomains_dict, 
+        mask=mask,
+        gcm_identifier=gcm_identifier,
+        label=label
     )
-
-    return final_gcm
+    
+    # replace epoch 
+    if label in ['pr', 'huss', 'vas', 'uas']:
+        combined_downscaled_output = maca_epoch_replacement_task(
+            ds_gcm_fine=combined_downscaled_output,
+            trend_coarse=coarse_epoch_trend_2,
+            day_rolling_window=epoch_adjustment_day_rolling_window,
+            year_rolling_window=epoch_adjustment_year_rolling_window,
+            gcm_identifier=gcm_identifier+'_2',
+        )
+        
+    epoch_replaced_gcm = maca_epoch_replacement_task(
+        ds_gcm_fine=combined_downscaled_output,
+        trend_coarse=coarse_epoch_trend,
+        day_rolling_window=epoch_adjustment_day_rolling_window,
+        year_rolling_window=epoch_adjustment_year_rolling_window,
+        gcm_identifier=gcm_identifier,
+    )
+    
+    ds_obs_full_time = get_obs_task(
+        obs=obs,
+        train_period_start=train_period_start,
+        train_period_end=train_period_end,
+        variables=[label],
+        chunking_approach='full_time',
+        cache_within_rechunk=True,
+    )
+    # fine scale bias correction 
+    final_output = maca_fine_bias_correction_task(
+        ds_gcm=epoch_replaced_gcm,
+        ds_obs=ds_obs_full_time,
+        train_period_start=train_period_start,
+        train_period_end=train_period_end,
+        label=label,
+        batch_size=bias_correction_batch_size,
+        buffer_size=bias_correction_buffer_size,
+        gcm_identifier=gcm_identifier,
+    )

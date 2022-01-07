@@ -2,7 +2,7 @@ import os
 
 os.environ['PREFECT__FLOWS__CHECKPOINTING'] = 'true'
 
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union, Callable
 
 import xarray as xr
 from prefect import task
@@ -36,6 +36,28 @@ get_obs_task = task(
 get_gcm_task = task(
     get_gcm
 )
+
+@task
+def rechunker_task(
+    zarr_array: xr.Dataset,
+    chunking_approach: Optional[str] = None,
+    template_chunk_array: Optional[xr.Dataset] = None,
+    naming_func = Optional[Callable] = None,
+    **kwargs,
+): 
+    if naming_func is not None:
+        output_path = naming_func(chunking_approach=chunking_approach, **kwargs)
+    else:
+        output_path = None
+
+    rechunked = rechunk_zarr_array_with_caching(
+        zarr_array=zarr_array,
+        chunking_approach=chunking_approach,
+        template_chunk_array=template_chunk_array,
+        output_path=output_path
+    )
+
+    return rechunked
 
 
 @task
@@ -106,7 +128,7 @@ def path_builder_task(
     result=XpersistResult(intermediate_cache_store, serializer=serializer),
     target=make_coarse_obs_path,
 )
-def get_coarse_obs_task(ds_obs: xr.Dataset, gcm: str, **kwargs) -> xr.Dataset:
+def get_coarse_obs_task(ds_obs: xr.Dataset, gcm: str, chunking_approach: str, **kwargs) -> xr.Dataset:
     """
     Coarsen the observation dataset to the grid of the GCM model specified in inputs.
 
@@ -136,6 +158,14 @@ def get_coarse_obs_task(ds_obs: xr.Dataset, gcm: str, **kwargs) -> xr.Dataset:
         target_grid_ds=gcm_grid,
         connection_string=CONNECTION_STRING,
     )
+
+    if chunking_approach != 'full_space':
+        ds_obs_coarse = rechunk_zarr_array_with_caching(
+            zarr_array=ds_obs_coarse,
+            chunking_approach=chunking_approach,
+            output_path=None
+        )
+
     return ds_obs_coarse
 
 

@@ -260,7 +260,7 @@ def calc_auspicious_chunks_dict(
     # then make reasonable chunk size by rounding up (avoids corner case of it rounding down to 0...)
     perfect_chunk_length = int(np.ceil(perfect_chunk ** (1 / len(chunk_dims))))
     for dim in chunk_dims:
-        chunks_dict[dim] = perfect_chunk_length
+        chunks_dict[dim] = min(perfect_chunk_length, array_dims[dim])
 
     return chunks_dict
 
@@ -497,9 +497,9 @@ def rechunk_zarr_array_with_caching(
         chunk_def = calc_auspicious_chunks_dict(zarr_array[example_var], chunk_dims=chunk_dims)
     else:
         chunk_def = {
-            'time': template_chunk_array.chunks['time'][0],
-            'lat': template_chunk_array.chunks['lat'][0],
-            'lon': template_chunk_array.chunks['lon'][0],
+            'time': min(template_chunk_array.chunks['time'][0], len(zarr_array.time)),
+            'lat': min(template_chunk_array.chunks['lat'][0], len(zarr_array.lat)),
+            'lon': min(template_chunk_array.chunks['lon'][0], len(zarr_array.lon)),
         }
     chunks_dict = {
         'time': None,  # write None here because you don't want to rechunk this array
@@ -624,6 +624,7 @@ def regrid_ds(
             chunking_approach='full_space',
             max_mem='1GB',
             connection_string=connection_string,
+            output_path=rechunked_ds_path,
         )
 
     regridder = xe.Regridder(ds_rechunked, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
