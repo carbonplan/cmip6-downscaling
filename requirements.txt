@@ -12,5 +12,6 @@ scikit-downscale
 scikit-learn
 tenacity
 xarray
+xpersist
 xclim
 zarr
