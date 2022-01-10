@@ -79,17 +79,15 @@ def calc_epoch_trend_task(
         The long term average trend
     """
     y_offset = int((year_rolling_window - 1) / 2)
-    predict_period_start = str(int(int(predict_period_start) - y_offset))
-    predict_period_end = str(int(int(predict_period_end) - y_offset))
 
     ds_gcm_full_time = get_gcm_task.run(
         gcm=gcm,
         scenario=scenario,
         variables=[label],
-        train_period_start=train_period_start,
-        train_period_end=train_period_end,
-        predict_period_start=predict_period_start,
-        predict_period_end=predict_period_end,
+        train_period_start=str(int(int(train_period_start) - y_offset)),
+        train_period_end=str(int(int(train_period_end) + y_offset)),
+        predict_period_start=str(int(int(predict_period_start) - y_offset)),
+        predict_period_end=str(int(int(predict_period_end) + y_offset)),
         chunking_approach='full_time',
         cache_within_rechunk=True,
     )
@@ -101,6 +99,11 @@ def calc_epoch_trend_task(
         day_rolling_window=day_rolling_window,
         year_rolling_window=year_rolling_window,
     )
+
+    hist_trend = trend.sel(historical_period)
+    pred_trend = trend.sel(slice(predict_period_start, predict_period_end))
+
+    trend = xr.combine_by_coords([hist_trend, pred_trend], combine_attrs='drop_conflicts')
     return trend
 
 
