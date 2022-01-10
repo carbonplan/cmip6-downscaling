@@ -156,7 +156,7 @@ def maca_coarse_bias_correction_task(
     """
     # TODO: test if this is needed if both ds_gcm and ds_obs are chunked in full time 
     ds_gcm_rechunked = rechunk_zarr_array_with_caching(
-        zarr_array=ds_gcm, template_chunk_array=ds_obs, output_path='maca_test_bias_correction_rechunk.zarr'  # TODO: remove this 
+        zarr_array=ds_gcm, template_chunk_array=ds_obs
     )
 
     historical_period = slice(train_period_start, train_period_end)
@@ -331,7 +331,6 @@ def maca_epoch_replacement_task(
     trend_fine = regrid_ds(
         ds=trend_coarse,
         target_grid_ds=ds_gcm_fine.isel(time=0).chunk({'lat': -1, 'lon': -1}),
-        rechunked_ds_path='maca_test_epoch_replacement_rechunk.zarr'  # TODO: remove this
     )
 
     return ds_gcm_fine + trend_fine
@@ -380,7 +379,7 @@ def maca_fine_bias_correction_task(
         Bias corrected GCM dataset     
     """
     ds_gcm_rechunked = rechunk_zarr_array_with_caching(
-        zarr_array=ds_gcm, template_chunk_array=ds_obs, output_path='maca_test_fine_bias_correction_rechunk.zarr'  # TODO: remove this 
+        zarr_array=ds_gcm, template_chunk_array=ds_obs
     )
 
     historical_period = slice(train_period_start, train_period_end)
