@@ -28,3 +28,13 @@ def load_obs():
     ds = xr.open_zarr(mapper, consolidated=True)
 
     return ds
+
+def load_downscaled_ds(variable: str = 'tasmax',
+                        gcm: str = "MIROC6",
+                        obs_id:str = 'ERA5',
+                        predict_period_start:str ='2079',
+                        predict_period_end:str ='2079',
+                        downscale_method:str ='bcsd',
+                        scenario:str ='ssp370') -> xr.Dataset:
+    path = f"az://cmip6/results/{downscale_method}_{scenario}_{gcm}_{predict_period_start}_{predict_period_end}_{variable}.zarr"
+    return xr.open_zarr(path)

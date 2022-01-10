@@ -36,3 +36,5 @@ def plot_seasonal_mean(ds1, ds2, limits_dict=None):
         ds2[var].plot(ax=axarr[i], vmin=vmin, vmax=vmax)
 
     return fig, axarr
+
+
