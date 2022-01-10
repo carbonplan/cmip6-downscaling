@@ -42,9 +42,31 @@ def rechunker_task(
     zarr_array: xr.Dataset,
     chunking_approach: Optional[str] = None,
     template_chunk_array: Optional[xr.Dataset] = None,
-    naming_func = Optional[Callable] = None,
+    naming_func: Optional[Callable] = None,
     **kwargs,
 ): 
+    """
+    Task to rechunk a dataset 
+
+    Parameters
+    ----------
+    zarr_array : zarr or xarray dataset
+        Dataset you want to rechunk.
+    chunking_approach : str, optional 
+        Has to be one of `full_space` or `full_time`. If `full_space`, the data will be rechunked such that the space dimensions are contiguous (i.e. each chunk
+        will contain full maps). If `full_time`, the data will be rechunked such that the time dimension is contiguous (i.e. each chunk will contain full time
+        series). Either the chunking approach or the template chunk array must be provided. 
+    template_chunk_array: zarr or xarray dataset, optional 
+        A template dataset with the desired chunksizes. Either the chunking approach or the template chunk array must be provided. 
+    naming_func: callable, optional 
+        A function that returns a string that represents the output caching location that the rechunk task should save to. 
+        The input arguments of this naming func must be provided as kwargs to this method 
+
+    Returns
+    -------
+    rechunked_ds : xr.Dataset
+        Rechunked dataset
+    """
     if naming_func is not None:
         output_path = naming_func(chunking_approach=chunking_approach, **kwargs)
     else:

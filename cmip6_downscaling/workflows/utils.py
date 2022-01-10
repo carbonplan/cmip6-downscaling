@@ -38,9 +38,6 @@ def generate_batches(n, batch_size, buffer_size, one_indexed=False):
     """
     ds must have a dimension called time that is a valid datetime index
     """
-    # TODO: add tests. if buffer_size == 0, batches == cores
-    # construct 2 test cases
-
     cores = []
     batches = []
     if one_indexed:
