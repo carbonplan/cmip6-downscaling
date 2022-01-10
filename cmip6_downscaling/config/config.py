@@ -52,7 +52,7 @@ MKL_NUM_THREADS = '1'
 OPENBLAS_NUM_THREADS = '1'
 DASK_DISTRIBUTED__WORKER__RESOURCES__TASKSLOTS = '1'
 
-extra_pip_packages = "git+https://github.com/carbonplan/cmip6-downscaling.git@esmf_threading git+https://github.com/norlandrhagen/scikit-downscale.git@patch-2 git+https://github.com/NCAR/xpersist.git"
+extra_pip_packages = "git+https://github.com/carbonplan/cmip6-downscaling.git@esmf_threading git+https://github.com/norlandrhagen/scikit-downscale.git@bcsd_precip_bugfix git+https://github.com/NCAR/xpersist.git"
 config = {
     "AZURE_STORAGE_CONNECTION_STRING": connection_string,
     "EXTRA_PIP_PACKAGES": extra_pip_packages,

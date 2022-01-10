@@ -232,7 +232,6 @@ def load_cmip(
 
         # flip the lats if necessary and drop the extra dims/vars like bnds
         ds = gcm_munge(ds)
-
         if i == 0:
             ds_out = ds
         else:
@@ -323,6 +322,7 @@ def get_gcm(
     ds_gcm: xr.Dataset
         A dataset containing both historical and future period of GCM data
     """
+    print(gcm)
     historical_gcm = load_cmip(
         activity_ids='CMIP',
         experiment_ids='historical',

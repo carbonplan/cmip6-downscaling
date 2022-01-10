@@ -33,6 +33,77 @@ def get_store(prefix, account_key=None):
     return store
 
 
+def subset_dataset(
+    ds: xr.Dataset,
+    start_time: str,
+    end_time: str,
+    latmin: str,
+    latmax: str,
+    lonmin: str,
+    lonmax: str,
+) -> xr.Dataset:
+    """Uses Xarray slicing to spatially subset a dataset based on input params.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+         Input Xarray dataset
+    start_time : str
+        Starting Time
+    end_time : str
+        Ending Time
+    latmin : str
+        Latitude Minimum
+    latmax : str
+        Latitude Maximum
+    lonmin : str
+        Longitude Minimum
+    lonmax : str
+        Longitude Maximum
+
+    Returns
+    -------
+    Xarray Dataset
+        Spatially subsetted Xarray dataset.
+    """
+    subset_ds = ds.sel(
+        time=slice(start_time, end_time),
+        lon=slice(float(lonmin), float(lonmax)),
+        lat=slice(float(latmax), float(latmin)),
+    )
+    return subset_ds
+
+
+def generate_batches(n, batch_size, buffer_size, one_indexed=False):
+    """
+    ds must have a dimension called time that is a valid datetime index
+    """
+    # TODO: add tests. if buffer_size == 0, batches == cores
+    # construct 2 test cases
+
+    cores = []
+    batches = []
+    if one_indexed:
+        xmin = 1
+        xmax = n + 1
+    else:
+        xmin = 0
+        xmax = n
+    for start in range(xmin, xmax, batch_size):
+        end = min(start + batch_size, xmax)
+        cores.append(np.arange(start, end))
+
+        # add buffer
+        end = end + buffer_size
+        start = start - buffer_size
+        batch = np.arange(start, end)
+        batch[batch < xmin] += n
+        batch[batch > xmax - 1] -= n
+        batches.append(batch)
+
+    return batches, cores
+
+
 def load_paths(
     paths,
 ):  # What type do i use here since paths is of unknown length? : list[str]):
@@ -59,12 +130,10 @@ def make_rechunker_stores(
     output_path: Optional[str] = None,
 ) -> Tuple[fsspec.FSMap, fsspec.FSMap, str]:
     """Initialize two stores for rechunker to use as temporary and final rechunked locations
-
     Parameters
     ----------
     connection_string : str
         Connection string to give you write access to the stores
-
     Returns
     -------
     temp_store, target_store, path_tgt : tuple[fsspec.mapping.FSmap, fsspec.mapping.FSmap, string]
@@ -89,7 +158,6 @@ def rechunk_zarr_array(
 ):
     """Use `rechunker` package to adjust chunks of dataset to a form
     conducive for your processing.
-
     Parameters
     ----------
     zarr_array : zarr or xarray dataset
@@ -110,7 +178,6 @@ def rechunk_zarr_array(
     max_mem : str
         The max memory you want to allow for a chunk. Probably want it to be around 100 MB, but that
         is also controlled by the `calc_auspicious_chunk_sizes` calls.
-
     Returns
     -------
     rechunked_ds, path_tgt : Tuple[xr.Dataset, str]
@@ -188,7 +255,6 @@ def calc_auspicious_chunks_dict(
     """Figure out a chunk size that, given the size of the dataset, the dimension(s) you want to chunk on
     and the data type, will fit under the target_size. Currently only works for 100mb which
     is the recommended chunk size for dask processing.
-
     Parameters
     ----------
     da : Union[xr.DataArray, xr.Dataset]
@@ -197,7 +263,6 @@ def calc_auspicious_chunks_dict(
         Target size for chunk- dask recommends 100mb, by default '100mb'
     chunk_dims : tuple, optional
         Dimension(s) you want to chunk along, by default ('lat', 'lon')
-
     Returns
     -------
     chunks_dict : dict
@@ -229,7 +294,7 @@ def calc_auspicious_chunks_dict(
     # then make reasonable chunk size by rounding up (avoids corner case of it rounding down to 0...)
     perfect_chunk_length = int(np.ceil(perfect_chunk ** (1 / len(chunk_dims))))
     for dim in chunk_dims:
-        chunks_dict[dim] = perfect_chunk_length
+        chunks_dict[dim] = min(perfect_chunk_length, array_dims[dim])
 
     return chunks_dict
 
@@ -244,7 +309,6 @@ def regrid_dataset(
     """Regrid a dataset to a target grid. For use in both coarsening or interpolating to finer resolution.
     The function will check whether the dataset is chunked along time (into spatially-contiguous maps)
     and if not it will rechunk it.
-
     Parameters
     ----------
     ds : xr.Dataset
@@ -257,7 +321,6 @@ def regrid_dataset(
         variable you're working with
     connection_string : str
         Connection string to give you write access to the stores
-
     Returns
     -------
     ds_regridded : xr.Dataset
@@ -300,7 +363,6 @@ def get_spatial_anomalies(
     * a grid (as opposed to a specific GCM since some GCMs run on the same grid)
     * the time period which fine_obs (and by construct coarse_obs) cover
     * the variable
-
     Parameters
     ----------
     coarse_obs : xr.Dataset
@@ -309,7 +371,6 @@ def get_spatial_anomalies(
         Original observation spatial resolution. Chunked along time.
     variable: str
         The variable included in the dataset.
-
     Returns
     -------
     seasonal_cycle_spatial_anomalies : xr.Dataset
@@ -340,7 +401,6 @@ def get_spatial_anomalies(
 
 def write_dataset(ds: xr.Dataset, path: str, chunks_dims: Tuple = ("time",)) -> None:
     """Write out a dataset.
-
     Parameters
     ----------
     ds : xr.Dataset
@@ -377,7 +437,6 @@ def rechunk_zarr_array_with_caching(
 ) -> xr.Dataset:
     """Use `rechunker` package to adjust chunks of dataset to a form
     conducive for your processing.
-
     Parameters
     ----------
     zarr_array : zarr or xarray dataset
@@ -394,7 +453,6 @@ def rechunk_zarr_array_with_caching(
         is also controlled by the `calc_auspicious_chunk_sizes` calls.
     overwrite : bool
         Whether to overwrite the content saved at output_path if the content did not pass schema check.
-
     Returns
     -------
     rechunked_ds : xr.Dataset
@@ -415,9 +473,9 @@ def rechunk_zarr_array_with_caching(
         chunk_def = calc_auspicious_chunks_dict(zarr_array[example_var], chunk_dims=chunk_dims)
     else:
         chunk_def = {
-            'time': template_chunk_array.chunks['time'][0],
-            'lat': template_chunk_array.chunks['lat'][0],
-            'lon': template_chunk_array.chunks['lon'][0],
+            'time': min(template_chunk_array.chunks['time'][0], len(zarr_array.time)),
+            'lat': min(template_chunk_array.chunks['lat'][0], len(zarr_array.lat)),
+            'lon': min(template_chunk_array.chunks['lon'][0], len(zarr_array.lon)),
         }
     chunks_dict = {
         'time': None,  # write None here because you don't want to rechunk this array
@@ -513,14 +571,12 @@ def regrid_ds(
     """Regrid a dataset to a target grid. For use in both coarsening or interpolating to finer resolution.
     The function will check whether the dataset is chunked along time (into spatially-contiguous maps)
     and if not it will rechunk it. **kwargs are used to construct target path
-
     Parameters
     ----------
     ds : xr.Dataset
         Dataset you want to regrid
     target_grid_ds : xr.Dataset
         Template dataset whose grid you'll match
-
     Returns
     -------
     ds_regridded : xr.Dataset
@@ -542,6 +598,7 @@ def regrid_ds(
             chunking_approach='full_space',
             max_mem='1GB',
             connection_string=connection_string,
+            output_path=rechunked_ds_path,
         )
 
     regridder = xe.Regridder(ds_rechunked, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
