@@ -36,29 +36,29 @@ def get_store(prefix, account_key=None):
 
 def generate_batches(n, batch_size, buffer_size, one_indexed=False):
     """
-    Given the max value n, batch_size, and buffer_size, returns batches (include the buffer) and 
-    cores (exclude the buffer). For the smallest numbers, the largest values would be included in the buffer, and 
-    vice versa. For example, with n=10, batch_size=5, buffer_size=3, one_indexed=False. The `cores` output will contain 
-    [[0, 1, 2, 3, 4], [5, 6, 7, 8, 9]], and `batches` output will contain [[7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7], [2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2]]. 
+    Given the max value n, batch_size, and buffer_size, returns batches (include the buffer) and
+    cores (exclude the buffer). For the smallest numbers, the largest values would be included in the buffer, and
+    vice versa. For example, with n=10, batch_size=5, buffer_size=3, one_indexed=False. The `cores` output will contain
+    [[0, 1, 2, 3, 4], [5, 6, 7, 8, 9]], and `batches` output will contain [[7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7], [2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2]].
 
     Parameters
     ----------
     n: int
-        The max value to be included. 
+        The max value to be included.
     batch_size: int
-        The number of core values to include in each batch. 
+        The number of core values to include in each batch.
     buffer_size: int
-        The number of buffer values to include in each batch in both directions. 
+        The number of buffer values to include in each batch in both directions.
     one_indexed: bool
-        Whether we should consider n to be one indexed or not. With n = 2, one_indexed=False would generate cores containing [0, 1]. 
-        One_indexed=True would generate cores containing [1, 2]. 
+        Whether we should consider n to be one indexed or not. With n = 2, one_indexed=False would generate cores containing [0, 1].
+        One_indexed=True would generate cores containing [1, 2].
 
     Returns
     -------
     batches: List
-        List of batches including buffer values. 
+        List of batches including buffer values.
     cores: List
-        List of core values in each batch excluding buffer values. 
+        List of core values in each batch excluding buffer values.
     """
     cores = []
     batches = []
@@ -82,7 +82,7 @@ def generate_batches(n, batch_size, buffer_size, one_indexed=False):
 
     return batches, cores
 
-  
+
 def load_paths(
     paths,
 ):  # What type do i use here since paths is of unknown length? : list[str]):

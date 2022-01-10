@@ -1,7 +1,8 @@
-import xarray as xr
+from typing import List, Optional, Union
+
 import numpy as np
+import xarray as xr
 import xesmf as xe
-from typing import Union, List, Optional 
 from skdownscale.pointwise_models import EquidistantCdfMatcher, PointWiseDownscaler
 from sklearn.linear_model import LinearRegression
 
@@ -18,7 +19,7 @@ def maca_bias_correction(
 ) -> xr.Dataset:
     """
     Run bias correction as it is done in the MACA method. See https://climate.northwestknowledge.net/MACA/MACAmethod.php
-    for more details. Briefly, the bias correction is performed using the Equidistant CDF matching method in batches. 
+    for more details. Briefly, the bias correction is performed using the Equidistant CDF matching method in batches.
     Neighboring day of years are bias corrected together with a buffer. That is, with a batch size of 15 and a buffer size
     of 15, the 45 neighboring days of year are bias corrected together, but only the result of the center 15 days are used.
     The historical GCM is mapped to historical coarsened observation in the bias correction.
@@ -30,18 +31,18 @@ def maca_bias_correction(
     ds_obs: xr.Dataset
         Observation dataset, must have a dimension called time on which we can call .dt.dayofyear on
     historical_period: slice
-        The historical period 
+        The historical period
     variables: List[str]
         Names of the variables used in obs and gcm dataset (including features and label)
     batch_size: Optional[int]
-        The batch size in terms of day of year to bias correct together 
+        The batch size in terms of day of year to bias correct together
     buffer_size: Optional[int]
-        The buffer size in terms of day of year to include in the bias correction 
+        The buffer size in terms of day of year to include in the bias correction
 
     Returns
     -------
-    ds_out: xr.Dataset 
-        The bias corrected dataset 
+    ds_out: xr.Dataset
+        The bias corrected dataset
     """
     if isinstance(variables, str):
         variables = [variables]
@@ -67,7 +68,7 @@ def maca_bias_correction(
         )
 
         bc_result = []
-        # TODO: currently running in sequence but can be mapped out into separate workers/runners 
+        # TODO: currently running in sequence but can be mapped out into separate workers/runners
         for i, (b, c) in enumerate(zip(batches, cores)):
             gcm_batch = ds_gcm.sel(time=doy_gcm.isin(b))
             obs_batch = ds_obs.sel(time=doy_obs.isin(b))
@@ -75,8 +76,8 @@ def maca_bias_correction(
             train_x = gcm_batch.sel(time=historical_period)[[var]]
             train_y = obs_batch.sel(time=historical_period)[var]
 
-            # TODO: this is a total hack to get around the different calendars of observation dataset and GCM 
-            # should be able to remove once we unify all calendars 
+            # TODO: this is a total hack to get around the different calendars of observation dataset and GCM
+            # should be able to remove once we unify all calendars
             if len(train_x.time) > len(train_y.time):
                 train_x = train_x.isel(time=slice(0, len(train_y.time)))
             elif len(train_x.time) < len(train_y.time):
@@ -89,8 +90,8 @@ def maca_bias_correction(
             )
 
             bc_data = bias_correction_model.predict(X=gcm_batch.unify_chunks())
-            # needs the .compute here otherwise the code fails with errors 
-            # TODO: not sure if this is scalable 
+            # needs the .compute here otherwise the code fails with errors
+            # TODO: not sure if this is scalable
             bc_result.append(bc_data.sel(time=bc_data.time.dt.dayofyear.isin(c)).compute())
 
         ds_out[var] = xr.concat(bc_result, dim='time').sortby('time')
@@ -105,7 +106,7 @@ def get_doy_mask(
 ) -> xr.DataArray:
     """
     Given two 1D dataarrays containing day of year informations: source_doy and target_doy , return a matrix of shape
-    len(target_doy) x len(source_doy). Cell (i, j) is True if the source doy j is within doy_range days of the target 
+    len(target_doy) x len(source_doy). Cell (i, j) is True if the source doy j is within doy_range days of the target
     doy i, and False otherwise
 
     Parameters
@@ -151,52 +152,48 @@ def maca_construct_analogs(
     **kwargs,
 ) -> xr.DataArray:
     """
-    Find analog days for each coarse scale GCM day from coarsened observations, then use the fine scale versions of 
-    these analogs to construct the downscaled GCM data. The fine scale analogs are combined together using a linear 
-    combination where the coefficients come from a linear regression of coarsened observation to the GCM day to be 
-    downscaled. Analogs are selected based on the lowest RMSE between coarsened obs and target GCM pattern. See 
-    https://climate.northwestknowledge.net/MACA/MACAmethod.php for more details. 
+    Find analog days for each coarse scale GCM day from coarsened observations, then use the fine scale versions of
+    these analogs to construct the downscaled GCM data. The fine scale analogs are combined together using a linear
+    combination where the coefficients come from a linear regression of coarsened observation to the GCM day to be
+    downscaled. Analogs are selected based on the lowest RMSE between coarsened obs and target GCM pattern. See
+    https://climate.northwestknowledge.net/MACA/MACAmethod.php for more details.
 
     Parameters
     ----------
     ds_gcm: xr.Dataset
         GCM dataset, original/coarse resolution
     ds_obs_coarse: xr.Dataset
-        Observation dataset coarsened to the GCM resolution 
+        Observation dataset coarsened to the GCM resolution
     ds_obs_fine: xr.Dataset
         Observation dataset, original/fine resolution
     label: str
-        Name of variable to be downscaled 
+        Name of variable to be downscaled
     n_analogs: int
-        Number of analog days to look for 
+        Number of analog days to look for
     doy_range: int
-        The range of day of year to look for analogs within 
+        The range of day of year to look for analogs within
 
     Returns
     -------
-    downscaled: xr.Dataset 
-        The downscaled dataset 
+    downscaled: xr.Dataset
+        The downscaled dataset
     """
-    # make sure the input data is valid with the correct shape and dims 
+    # make sure the input data is valid with the correct shape and dims
     for dim in ['time', 'lat', 'lon']:
         for ds in [ds_gcm, ds_obs_coarse, ds_obs_fine]:
             assert dim in ds.dims
     assert len(ds_obs_coarse.time) == len(ds_obs_fine.time)
 
-    # work with dataarrays instead of datasets 
+    # work with dataarrays instead of datasets
     ds_gcm = ds_gcm[label]
     ds_obs_coarse = ds_obs_coarse[label]
     ds_obs_fine = ds_obs_fine[label]
 
     # get dimension sizes from input data
-    ndays_in_obs = len(ds_obs_coarse.time)
-    ndays_in_gcm = len(ds_gcm.time)
     domain_shape_coarse = (len(ds_obs_coarse.lat), len(ds_obs_coarse.lon))
     n_pixel_coarse = domain_shape_coarse[0] * domain_shape_coarse[1]
-    domain_shape_fine = (len(ds_obs_fine.lat), len(ds_obs_fine.lon))
-    n_pixel_fine = domain_shape_fine[0] * domain_shape_fine[1]
 
-    # rename the time dimension to keep track of them 
+    # rename the time dimension to keep track of them
     X = ds_obs_coarse.rename({'time': 'ndays_in_obs'})  # coarse obs
     y = ds_gcm.rename({'time': 'ndays_in_gcm'})  # coarse gcm
 
@@ -229,15 +226,15 @@ def maca_construct_analogs(
         .compute()
     )
 
-    # rearrage the data into tabular format in order to train linear regression models to get coefficients 
+    # rearrage the data into tabular format in order to train linear regression models to get coefficients
     X = X.stack(pixel_coarse=['lat', 'lon'])
     y = y.stack(pixel_coarse=['lat', 'lon'])
 
-    # initialize models to be used 
+    # initialize models to be used
     lr_model = LinearRegression()
 
     # TODO: check if the rechunk can be removed
-    # initialize a regridder to interpolate the residuals from coarse to fine scale later 
+    # initialize a regridder to interpolate the residuals from coarse to fine scale later
     coarse_template = ds_obs_coarse.isel(time=0).chunk({'lat': -1, 'lon': -1})
     fine_template = ds_obs_fine.isel(time=0).chunk({'lat': -1, 'lon': -1})
     regridder = xe.Regridder(
@@ -247,29 +244,29 @@ def maca_construct_analogs(
         extrap_method="nearest_s2d",
     )
 
-    # initialize output 
+    # initialize output
     downscaled = []
     # train a linear regression model for each day in coarsen GCM dataset, where the features are each coarsened observation
-    # analogs, and examples are each pixels within the coarsened domain 
+    # analogs, and examples are each pixels within the coarsened domain
     for i in range(len(y)):
-        # get data from the GCM day being downscaled 
+        # get data from the GCM day being downscaled
         yi = y.isel(ndays_in_gcm=i)
-        # get data from the coarsened obs analogs 
+        # get data from the coarsened obs analogs
         ind = inds.isel(ndays_in_gcm=i).values
         xi = X.isel(ndays_in_obs=ind).transpose('pixel_coarse', 'ndays_in_obs')
 
         # fit model
         lr_model.fit(xi, yi)
-        # save the residuals to be interpolated and included in the final prediction 
+        # save the residuals to be interpolated and included in the final prediction
         residual = yi - lr_model.predict(xi)
 
-        # chunk so that residual is spatially contiguous before interpolation 
+        # chunk so that residual is spatially contiguous before interpolation
         # TODO: check if the rechunk can be removed
         residual = residual.unstack('pixel_coarse').chunk({'lat': -1, 'lon': -1})
         interpolated_residual = regridder(residual)
-        
-        # construct fine scale prediction by combining the fine scale analogs with the coefficients found in the linear model 
-        # then add the intercept and interpolated residuals 
+
+        # construct fine scale prediction by combining the fine scale analogs with the coefficients found in the linear model
+        # then add the intercept and interpolated residuals
         fine_pred = (
             (ds_obs_fine.isel(time=ind).transpose('lat', 'lon', 'time') * lr_model.coef_).sum(
                 dim='time'

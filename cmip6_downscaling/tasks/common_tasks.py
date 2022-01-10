@@ -2,7 +2,7 @@ import os
 
 os.environ['PREFECT__FLOWS__CHECKPOINTING'] = 'true'
 
-from typing import Any, Dict, List, Optional, Tuple, Union, Callable
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import xarray as xr
 from prefect import task
@@ -27,15 +27,11 @@ from cmip6_downscaling.workflows.paths import (
 )
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching, regrid_ds
 
-
-get_obs_task = task(
-    get_obs
-)
+get_obs_task = task(get_obs)
 
 
-get_gcm_task = task(
-    get_gcm
-)
+get_gcm_task = task(get_gcm)
+
 
 @task
 def rechunker_task(
@@ -44,23 +40,23 @@ def rechunker_task(
     template_chunk_array: Optional[xr.Dataset] = None,
     naming_func: Optional[Callable] = None,
     **kwargs,
-): 
+):
     """
-    Task to rechunk a dataset 
+    Task to rechunk a dataset
 
     Parameters
     ----------
     zarr_array : zarr or xarray dataset
         Dataset you want to rechunk.
-    chunking_approach : str, optional 
+    chunking_approach : str, optional
         Has to be one of `full_space` or `full_time`. If `full_space`, the data will be rechunked such that the space dimensions are contiguous (i.e. each chunk
         will contain full maps). If `full_time`, the data will be rechunked such that the time dimension is contiguous (i.e. each chunk will contain full time
-        series). Either the chunking approach or the template chunk array must be provided. 
-    template_chunk_array: zarr or xarray dataset, optional 
-        A template dataset with the desired chunksizes. Either the chunking approach or the template chunk array must be provided. 
-    naming_func: callable, optional 
-        A function that returns a string that represents the output caching location that the rechunk task should save to. 
-        The input arguments of this naming func must be provided as kwargs to this method 
+        series). Either the chunking approach or the template chunk array must be provided.
+    template_chunk_array: zarr or xarray dataset, optional
+        A template dataset with the desired chunksizes. Either the chunking approach or the template chunk array must be provided.
+    naming_func: callable, optional
+        A function that returns a string that represents the output caching location that the rechunk task should save to.
+        The input arguments of this naming func must be provided as kwargs to this method
 
     Returns
     -------
@@ -76,7 +72,7 @@ def rechunker_task(
         zarr_array=zarr_array,
         chunking_approach=chunking_approach,
         template_chunk_array=template_chunk_array,
-        output_path=output_path
+        output_path=output_path,
     )
 
     return rechunked
@@ -150,7 +146,9 @@ def path_builder_task(
     result=XpersistResult(intermediate_cache_store, serializer=serializer),
     target=make_coarse_obs_path,
 )
-def get_coarse_obs_task(ds_obs: xr.Dataset, gcm: str, chunking_approach: str, **kwargs) -> xr.Dataset:
+def get_coarse_obs_task(
+    ds_obs: xr.Dataset, gcm: str, chunking_approach: str, **kwargs
+) -> xr.Dataset:
     """
     Coarsen the observation dataset to the grid of the GCM model specified in inputs.
 
@@ -183,9 +181,7 @@ def get_coarse_obs_task(ds_obs: xr.Dataset, gcm: str, chunking_approach: str, **
 
     if chunking_approach != 'full_space':
         ds_obs_coarse = rechunk_zarr_array_with_caching(
-            zarr_array=ds_obs_coarse,
-            chunking_approach=chunking_approach,
-            output_path=None
+            zarr_array=ds_obs_coarse, chunking_approach=chunking_approach, output_path=None
         )
 
     return ds_obs_coarse
@@ -270,7 +266,7 @@ def interpolate_gcm_task(
     predict_period_end: str,
     variables: Union[str, List[str]],
     chunking_approach: str,
-    **kwargs
+    **kwargs,
 ):
     """
     Interpolate the GCM dataset to the grid of the observation dataset.
@@ -317,7 +313,7 @@ def interpolate_gcm_task(
         cache_within_rechunk=False,
     )
 
-    # get obs as a template 
+    # get obs as a template
     ds_obs_full_space = get_obs(
         obs=obs,
         train_period_start=train_period_start,
@@ -327,7 +323,7 @@ def interpolate_gcm_task(
         cache_within_rechunk=False,
     )
 
-    # interpolate gcm to obs resolution 
+    # interpolate gcm to obs resolution
     ds_gcm_interpolated = regrid_ds(
         ds=ds_gcm_full_space,
         target_grid_ds=ds_obs_full_space.isel(time=0).load(),
@@ -388,7 +384,7 @@ def bias_correct_gcm_task(
     historical_period_end: str,
     method: str,
     bc_kwargs: Optional[Dict[str, Any]] = None,
-    **kwargs
+    **kwargs,
 ) -> xr.DataArray:
     """
     Bias correct gcm data to the provided observation data according to methods and kwargs.
