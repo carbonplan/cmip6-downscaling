@@ -188,24 +188,8 @@ with Flow(name="bcsd-testing") as flow:
 
     monthly_summary_ds = monthly_summary_task(
         postprocess_bcsd_ds,
-        spatial_anomalies_ds,
-        gcm,
-        scenario,
-        train_period_start,
-        train_period_end,
-        predict_period_start,
-        predict_period_end,
-        variable,
     )
 
     annual_summary_ds = annual_summary_task(
-        postprocess_bcsd_ds,
-        spatial_anomalies_ds,
-        gcm,
-        scenario,
-        train_period_start,
-        train_period_end,
-        predict_period_start,
-        predict_period_end,
-        variable,
+        postprocess_bcsd_ds
     )
