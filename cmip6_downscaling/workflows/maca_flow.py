@@ -78,21 +78,36 @@ def calc_epoch_trend_task(
     trend: xr.Dataset
         The long term average trend
     """
+    # obtain a buffer period for both training and prediction period equal to half of the year_rolling_window
     y_offset = int((year_rolling_window - 1) / 2)
+
+    train_start = int(train_period_start) - y_offset
+    train_end = int(train_period_end) + y_offset
+    predict_start = int(predict_period_start) - y_offset
+    predict_end = int(predict_period_end) + y_offset
+
+    # make sure there are no overlapping years
+    if train_end > int(predict_period_start):
+        train_end = int(predict_period_start) - 1
+        predict_start = int(predict_period_start)
+    elif train_end > predict_start:
+        predict_start = train_end + 1
 
     ds_gcm_full_time = get_gcm_task.run(
         gcm=gcm,
         scenario=scenario,
         variables=[label],
-        train_period_start=str(int(int(train_period_start) - y_offset)),
-        train_period_end=str(int(int(train_period_end) + y_offset)),
-        predict_period_start=str(int(int(predict_period_start) - y_offset)),
-        predict_period_end=str(int(int(predict_period_end) + y_offset)),
+        train_period_start=str(int(train_start)),
+        train_period_end=str(int(train_end)),
+        predict_period_start=str(int(predict_start)),
+        predict_period_end=str(int(predict_end)),
         chunking_approach='full_time',
         cache_within_rechunk=True,
     )
 
+    # note that this is the non-buffered slice
     historical_period = slice(train_period_start, train_period_end)
+    predict_period = slice(predict_period_start, predict_period_end)
     trend = calc_epoch_trend(
         data=ds_gcm_full_time,
         historical_period=historical_period,
@@ -100,8 +115,8 @@ def calc_epoch_trend_task(
         year_rolling_window=year_rolling_window,
     )
 
-    hist_trend = trend.sel(historical_period)
-    pred_trend = trend.sel(slice(predict_period_start, predict_period_end))
+    hist_trend = trend.sel(time=historical_period)
+    pred_trend = trend.sel(time=predict_period)
 
     trend = xr.combine_by_coords([hist_trend, pred_trend], combine_attrs='drop_conflicts')
     return trend

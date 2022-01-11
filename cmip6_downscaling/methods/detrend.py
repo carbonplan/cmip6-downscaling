@@ -97,9 +97,21 @@ def calc_epoch_trend(data, historical_period, day_rolling_window=21, year_rollin
     Calculate the epoch trend as a multi-day, multi-year rolling average. The trend is calculated as the anomaly
     against the historical mean (also a multi-day rolling average).
 
+    Parameters
+    ----------
+    data : xr.Dataset
+        Data to calculate epoch trend on
+    historical_period: slice
+        Slice indicating the historical period to be used when calculating historical mean
+    day_rolling_window: int
+        Number of days to include when calculating the rolling average
+    year_rolling_window: int
+        Number of years to include when calculating the rolling average
 
-    data must have a dimension called time
-    historical_period should be a slice() object that can be directly used in xr.DataArray.sel()
+    Returns
+    -------
+    trend: xr.Dataset
+        The long term average trend
     """
     # the rolling windows need to be odd numbers since the rolling average is centered
     assert day_rolling_window % 2 == 1
@@ -107,8 +119,6 @@ def calc_epoch_trend(data, historical_period, day_rolling_window=21, year_rollin
 
     assert year_rolling_window % 2 == 1
     y_offset = int((year_rolling_window - 1) / 2)
-
-    # TODO: remove trend for historical period independently from future period? or jointly.
 
     # get historical mean as a rolling average -- the result has one number for each day of year
     # which is the average of the neighboring day of years over multiple years
