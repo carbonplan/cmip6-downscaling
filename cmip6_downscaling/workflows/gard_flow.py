@@ -8,11 +8,7 @@ import xarray as xr
 from prefect import Flow, Parameter, task
 from xpersist.prefect.result import XpersistResult
 
-from cmip6_downscaling.config.config import (
-    intermediate_cache_store,
-    results_cache_store,
-    serializer,
-)
+import cmip6_downscaling.config.config as config
 from cmip6_downscaling.data.observations import get_obs
 from cmip6_downscaling.methods.gard import gard_fit_and_predict, gard_postprocess, generate_scrf
 from cmip6_downscaling.tasks.common_tasks import (
@@ -30,6 +26,10 @@ from cmip6_downscaling.workflows.paths import (
     make_scrf_path,
 )
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching
+
+intermediate_cache_store = config.return_azure_config()["intermediate_cache_store"]
+results_cache_store = config.return_azure_config()["results_cache_store"]
+serializer = config.return_azure_config()["serializer"]
 
 fit_and_predict_task = task(
     gard_fit_and_predict,
