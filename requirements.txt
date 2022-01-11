@@ -1,5 +1,6 @@
 adlfs
 dask[complete]
+dask-kubernetes
 fsspec
 google-cloud-storage
 gcsfs
@@ -13,4 +14,6 @@ scikit-downscale
 scikit-learn
 tenacity
 xarray
+xpersist
+xclim
 zarr
