@@ -10,8 +10,9 @@ from xpersist import CacheStore
 
 # Azure --------------------------------------------------------------------
 def return_azure_config():
+    connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
     azure_config_dict = {
-        'connection_string': os.environ.get("AZURE_STORAGE_CONNECTION_STRING"),
+        'connection_string': connection_string,
         'storage': Azure("prefect"),
         'intermediate_cache_store': CacheStore('az://flow-outputs/intermediate'),
         'results_cache_store': CacheStore('az://flow-outputs/results'),
