@@ -3,6 +3,7 @@ import os
 
 os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "true"
 from prefect import Flow, Parameter, task
+from xpersist import CacheStore
 from xpersist.prefect.result import XpersistResult
 
 import cmip6_downscaling.config.config as config
@@ -22,8 +23,8 @@ from cmip6_downscaling.methods.bcsd import (
 
 target_naming_str = "{gcm}-{scenario}-{train_period_start}-{train_period_end}-{predict_period_start}-{predict_period_end}-{variable}.zarr"
 
-intermediate_cache_store = config.return_azure_config()["intermediate_cache_store"]
-results_cache_store = config.return_azure_config()["results_cache_store"]
+intermediate_cache_store = CacheStore(config.return_azure_config()["intermediate_cache_path"])
+results_cache_store = CacheStore(config.return_azure_config()["results_cache_path"])
 serializer = config.return_azure_config()["serializer"]
 
 make_flow_paths_task = task(make_flow_paths, log_stdout=True, nout=4)

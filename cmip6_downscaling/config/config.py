@@ -5,17 +5,15 @@ from dask_kubernetes import KubeCluster, make_pod_spec
 from prefect.executors import DaskExecutor
 from prefect.run_configs import KubernetesRun
 from prefect.storage import Azure
-from xpersist import CacheStore
 
 
 # Azure --------------------------------------------------------------------
 def return_azure_config():
-    connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
     azure_config_dict = {
-        'connection_string': connection_string,
+        'connection_string': os.environ.get("AZURE_STORAGE_CONNECTION_STRING"),
         'storage': Azure("prefect"),
-        'intermediate_cache_store': CacheStore('az://flow-outputs/intermediate'),
-        'results_cache_store': CacheStore('az://flow-outputs/results'),
+        'intermediate_cache_path': 'az://flow-outputs/intermediate',
+        'results_cache_path': 'az://flow-outputs/results',
         'serializer': 'xarray.zarr',
     }
     return azure_config_dict

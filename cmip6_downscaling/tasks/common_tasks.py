@@ -10,11 +10,12 @@ import xclim
 from prefect import task
 from skdownscale.pointwise_models.utils import default_none_kwargs
 from xarray.core.types import T_Xarray
+from xpersist import CacheStore
 from xpersist.prefect.result import XpersistResult
 
 import cmip6_downscaling.config.config as config
 
-intermediate_cache_store = config.return_azure_config()["intermediate_cache_store"]
+intermediate_cache_store = CacheStore(config.return_azure_config()["intermediate_cache_path"])
 serializer = config.return_azure_config()["serializer"]
 
 from cmip6_downscaling.data.cmip import get_gcm, get_gcm_grid_spec, load_cmip

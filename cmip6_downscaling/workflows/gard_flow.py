@@ -6,6 +6,7 @@ from typing import List
 
 import xarray as xr
 from prefect import Flow, Parameter, task
+from xpersist import CacheStore
 from xpersist.prefect.result import XpersistResult
 
 import cmip6_downscaling.config.config as config
@@ -27,8 +28,8 @@ from cmip6_downscaling.workflows.paths import (
 )
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching
 
-intermediate_cache_store = config.return_azure_config()["intermediate_cache_store"]
-results_cache_store = config.return_azure_config()["results_cache_store"]
+intermediate_cache_store = CacheStore(config.return_azure_config()["intermediate_cache_path"])
+results_cache_store = CacheStore(config.return_azure_config()["results_cache_path"])
 serializer = config.return_azure_config()["serializer"]
 
 fit_and_predict_task = task(

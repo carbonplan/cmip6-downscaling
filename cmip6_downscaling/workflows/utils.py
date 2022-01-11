@@ -16,7 +16,7 @@ from xarray_schema.base import SchemaError
 
 import cmip6_downscaling.config.config as config
 
-intermediate_cache_path = config.return_azure_config()["intermediate_cache_store"]
+intermediate_cache_path = config.return_azure_config()["intermediate_cache_path"]
 connection_string = config.return_azure_config()["serializer"]
 
 schema_maps_chunks = DataArraySchema(chunks={'lat': -1, 'lon': -1})
