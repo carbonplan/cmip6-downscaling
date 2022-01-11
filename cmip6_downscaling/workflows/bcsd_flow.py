@@ -90,13 +90,14 @@ postprocess_bcsd_task = task(
 
 # Main Flow -----------------------------------------------------------
 # with Flow(name="bcsd-testing", storage=storage, run_config=run_config) as flow:
-# with Flow(name="pr-testing") as flow:
-with Flow(
-    name="bcsd-subset-test",
-    storage=storage,
-    run_config=kubernetes_run_config,
-    executor=dask_executor,
-) as flow:
+# with Flow(
+#     name="bcsd-subset-test",
+#     storage=storage,
+#     run_config=kubernetes_run_config,
+#     executor=dask_executor,
+# ) as flow:
+with Flow(name="subset-testing") as flow:
+
 
     gcm = Parameter("GCM")
     scenario = Parameter("SCENARIO")
