@@ -38,6 +38,11 @@ results_cache_store = CacheStore(
 )
 
 
+from cmip6_downscaling.analysis.analysis import (
+    monthly_summary,
+    annual_summary
+)
+
 # Transform Functions into Tasks -----------------------------------------------------------
 
 
@@ -99,6 +104,21 @@ postprocess_bcsd_task = task(
     target="postprocess-results-" + target_naming_str,
 )
 
+monthly_summary_task = task(
+    monthly_summary,
+    log_stdout=True,
+    result=XpersistResult(results_cache_store, serializer=serializer),
+    target="monthly-summary-" + target_naming_str,
+)
+
+annual_summary_task = task(
+    annual_summary,
+    log_stdout=True,
+    result=XpersistResult(results_cache_store, serializer=serializer),
+    target="annual-summary-" + target_naming_str,
+)
+
+# Main Flow -----------------------------------------------------------
 
 with Flow(
     name='bcsd',
@@ -261,4 +281,28 @@ with Flow(
     # format naming w/ prefect context
     pyramid_location = pyramid.regrid(
         postprocess_bcsd_ds, uri=config.get('storage.results.uri') + '/pyramids/' + 'test.pyr'
+    )
+
+    monthly_summary_ds = monthly_summary_task(
+        postprocess_bcsd_ds,
+        spatial_anomalies_ds,
+        gcm,
+        scenario,
+        train_period_start,
+        train_period_end,
+        predict_period_start,
+        predict_period_end,
+        variable,
+    )
+
+    annual_summary_ds = annual_summary_task(
+        postprocess_bcsd_ds,
+        spatial_anomalies_ds,
+        gcm,
+        scenario,
+        train_period_start,
+        train_period_end,
+        predict_period_start,
+        predict_period_end,
+        variable,
     )
