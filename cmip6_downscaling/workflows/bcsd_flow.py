@@ -22,6 +22,11 @@ from cmip6_downscaling.methods.bcsd import (
     return_y_full_time,
 )
 
+from cmip6_downscaling.analysis.analysis import (
+    monthly_summary,
+    annual_summary
+)
+
 # Transform Functions into Tasks -----------------------------------------------------------
 
 target_naming_str = "{gcm}-{scenario}-{train_period_start}-{train_period_end}-{predict_period_start}-{predict_period_end}-{variable}.zarr"
@@ -68,6 +73,20 @@ postprocess_bcsd_task = task(
     log_stdout=True,
     result=XpersistResult(results_cache_store, serializer=serializer),
     target="postprocess-results-" + target_naming_str,
+)
+
+monthly_summary_task = task(
+    monthly_summary,
+    log_stdout=True,
+    result=XpersistResult(results_cache_store, serializer=serializer),
+    target="monthly-summary-" + target_naming_str,
+)
+
+annual_summary_task = task(
+    annual_summary,
+    log_stdout=True,
+    result=XpersistResult(results_cache_store, serializer=serializer),
+    target="annual-summary-" + target_naming_str,
 )
 
 # Main Flow -----------------------------------------------------------
@@ -157,6 +176,30 @@ with Flow(name="bcsd-testing") as flow:
     # postprocess_bcsd_task(s):
     postprocess_bcsd_ds = postprocess_bcsd_task(
         bias_corrected_ds,
+        spatial_anomalies_ds,
+        gcm,
+        scenario,
+        train_period_start,
+        train_period_end,
+        predict_period_start,
+        predict_period_end,
+        variable,
+    )
+
+    monthly_summary_ds = monthly_summary_task(
+        postprocess_bcsd_ds,
+        spatial_anomalies_ds,
+        gcm,
+        scenario,
+        train_period_start,
+        train_period_end,
+        predict_period_start,
+        predict_period_end,
+        variable,
+    )
+
+    annual_summary_ds = annual_summary_task(
+        postprocess_bcsd_ds,
         spatial_anomalies_ds,
         gcm,
         scenario,
