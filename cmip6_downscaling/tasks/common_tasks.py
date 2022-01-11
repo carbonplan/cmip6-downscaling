@@ -1,6 +1,6 @@
 import os
 
-os.environ['PREFECT__FLOWS__CHECKPOINTING'] = 'true'
+os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "true"
 
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -12,7 +12,11 @@ from skdownscale.pointwise_models.utils import default_none_kwargs
 from xarray.core.types import T_Xarray
 from xpersist.prefect.result import XpersistResult
 
-from cmip6_downscaling.config.config import CONNECTION_STRING, intermediate_cache_store, serializer
+import cmip6_downscaling.config.config as config
+
+intermediate_cache_store = config.return_azure_config()["intermediate_cache_store"]
+serializer = config.return_azure_config()["serializer"]
+
 from cmip6_downscaling.data.cmip import get_gcm, get_gcm_grid_spec, load_cmip
 from cmip6_downscaling.data.observations import get_obs
 from cmip6_downscaling.methods.bias_correction import (
@@ -120,14 +124,14 @@ def get_coarse_obs_task(ds_obs: xr.Dataset, gcm: str, **kwargs) -> xr.Dataset:
     # Load single slice of target cmip6 dataset for target grid dimensions
     gcm_grid = load_cmip(
         source_ids=gcm,
-        return_type='xr',
+        return_type="xr",
     ).isel(time=0)
 
     # rechunk and regrid observation dataset to target gcm resolution
     ds_obs_coarse = regrid_ds(
         ds=ds_obs,
         target_grid_ds=gcm_grid,
-        connection_string=CONNECTION_STRING,
+        connection_string=config.return_azure_config()["connection_string"],
     )
     return ds_obs_coarse
 
@@ -172,25 +176,27 @@ def coarsen_and_interpolate_obs_task(
         train_period_start=train_period_start,
         train_period_end=train_period_end,
         variables=variables,
-        chunking_approach='full_space',
+        chunking_approach="full_space",
         cache_within_rechunk=True,
     )
 
     # regrid to coarse scale
     ds_obs_coarse = get_coarse_obs_task.run(
-        ds_obs=ds_obs_full_space, gcm=gcm, chunking_approach='full_space', **kwargs
+        ds_obs=ds_obs_full_space, gcm=gcm, chunking_approach="full_space", **kwargs
     )
 
     # interpolate to fine scale again
     ds_obs_interpolated = regrid_ds(
         ds=ds_obs_coarse,
         target_grid_ds=ds_obs_full_space.isel(time=0),
-        chunking_approach='full_space',
+        chunking_approach="full_space",
     )
 
     # rechunked to final output chunking approach if needed
     ds_obs_interpolated_rechunked = rechunk_zarr_array_with_caching(
-        zarr_array=ds_obs_interpolated, output_path=None, chunking_approach=chunking_approach
+        zarr_array=ds_obs_interpolated,
+        output_path=None,
+        chunking_approach=chunking_approach,
     )
 
     return ds_obs_interpolated_rechunked
@@ -254,7 +260,7 @@ def interpolate_gcm_task(
         train_period_end=train_period_end,
         predict_period_start=predict_period_start,
         predict_period_end=predict_period_end,
-        chunking_approach='full_space',
+        chunking_approach="full_space",
         cache_within_rechunk=False,
     )
 
@@ -272,12 +278,14 @@ def interpolate_gcm_task(
     ds_gcm_interpolated = regrid_ds(
         ds=ds_gcm_full_space,
         target_grid_ds=ds_obs_full_space.isel(time=0).load(),
-        chunking_approach='full_space',
+        chunking_approach="full_space",
     )
 
     # rechunked to final output chunking approach if needed
     ds_gcm_interpolated_rechunked = rechunk_zarr_array_with_caching(
-        zarr_array=ds_gcm_interpolated, output_path=None, chunking_approach=chunking_approach
+        zarr_array=ds_gcm_interpolated,
+        output_path=None,
+        chunking_approach=chunking_approach,
     )
 
     return ds_gcm_interpolated_rechunked
@@ -313,7 +321,7 @@ def bias_correct_obs_task(
     kws = default_none_kwargs(bc_kwargs, copy=True)
     bias_corrected = bias_correct_obs_by_method(
         da_obs=ds_obs, method=method, bc_kwargs=kws
-    ).to_dataset(dim='variable')
+    ).to_dataset(dim="variable")
 
     return bias_corrected
 
@@ -368,14 +376,14 @@ def bias_correct_gcm_task(
         historical_period=historical_period,
         method=method,
         bc_kwargs=kws,
-    ).to_dataset(dim='variable')
+    ).to_dataset(dim="variable")
 
     return bias_corrected
 
 
 @task
 def to_standard_calendar(obj: T_Xarray) -> T_Xarray:
-    '''Convert a Dataset's calendar to the "standard calendar"
+    """Convert a Dataset's calendar to the "standard calendar"
 
     When necessary, "missing" time points are filled in using linear interpolation.
 
@@ -395,20 +403,20 @@ def to_standard_calendar(obj: T_Xarray) -> T_Xarray:
     ------
     ValueError
         If an invalid calendar is supplied.
-    '''
+    """
 
-    orig_calendar = getattr(obj.indexes['time'], 'calendar', 'standard')
-    if orig_calendar == 'standard':
+    orig_calendar = getattr(obj.indexes["time"], "calendar", "standard")
+    if orig_calendar == "standard":
         return obj
-    if orig_calendar == '360_day':
-        raise ValueError('360_day calendar is not supported')
+    if orig_calendar == "360_day":
+        raise ValueError("360_day calendar is not supported")
 
     # reindex / interpolate
-    obj_new = xclim.core.calendar.convert_calendar(obj, 'standard', missing=np.nan).interpolate_na(
-        dim='time', method='linear'
+    obj_new = xclim.core.calendar.convert_calendar(obj, "standard", missing=np.nan).interpolate_na(
+        dim="time", method="linear"
     )
 
     # reset encoding
-    obj_new['time'].encoding['calendar'] = 'standard'
+    obj_new["time"].encoding["calendar"] = "standard"
 
     return obj_new
