@@ -8,67 +8,83 @@ from prefect.storage import Azure
 from xpersist import CacheStore
 
 # Azure --------------------------------------------------------------------
-connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
-CONNECTION_STRING = connection_string
-storage = Azure("prefect")
-intermediate_cache_path = 'az://flow-outputs/intermediate'
-intermediate_cache_store = CacheStore(intermediate_cache_path)
-results_cache_path = 'az://flow-outputs/results'
-results_cache_store = CacheStore(results_cache_path)
-serializer = 'xarray.zarr'
+def return_azure_config():
+    azure_config_dict = {
+        'connection_string':os.environ.get("AZURE_STORAGE_CONNECTION_STRING"),
+        'storage':Azure("prefect"),
+        'intermediate_cache_store':CacheStore('az://flow-outputs/intermediate'),
+        'results_cache_store':CacheStore('az://flow-outputs/results'),
+        'serializer':'xarray.zarr'
+        }
+    return azure_config_dict
 
 # Prefect --------------------------------------------------------------------
-# prefect agent ID
-agent = ["az-eu-west"]
-
-# Docker image
-image = "carbonplan/cmip6-downscaling-prefect:2021.12.06"
-
-# Kubernetes config
-kubernetes_cpu = 7
-kubernetes_memory = "16Gi"
-
-# Dask executor config
-dask_executor_memory_limit = "16Gi"
-dask_executor_memory_request = "16Gi"
-dask_executor_threads_per_worker = 2
-dask_executor_cpu_limit = 2
-dask_executor_cpu_request = 2
-dask_executor_adapt_min = 4
-dask_executor_adapt_max = 20
-
-extra_pip_packages = {
-    "EXTRA_PIP_PACKAGES": "git+https://github.com/carbonplan/cmip6-downscaling.git git+https://github.com/pangeo-data/scikit-downscale.git git+https://github.com/NCAR/xpersist.git"
-}
-env_config = {
-    "AZURE_STORAGE_CONNECTION_STRING": connection_string,
-    "EXTRA_PIP_PACKAGES": extra_pip_packages,
-    'OMP_NUM_THREADS': '1',
-    'MPI_NUM_THREADS': '1',
-    'MKL_NUM_THREADS': '1',
-    'OPENBLAS_NUM_THREADS': '1',
-}
+def return_prefect_config():
+    prefect_config_dict = {'agent':["az-eu-west"]}#  prefect agent ID
+    return prefect_config_dict
 
 
-kubernetes_run_config = KubernetesRun(
-    cpu_request=kubernetes_cpu,
-    memory_request=kubernetes_memory,
-    image=image,
-    labels=agent,
-    env=env_config,
-)
+# Docker --------------------------------------------------------------------
+def return_docker_config():
+    docker_config_dict = {'image':"carbonplan/cmip6-downscaling-prefect:2021.12.06"}
+    return docker_config_dict  
+
+
+# Kubernetes  --------------------------------------------------------------------
+def return_kubernetes_config():
+    kubernetes_config_dict = {'kubernetes_cpu':7,'kubernetes_memory':"16Gi"}
+    return kubernetes_config_dict
+
+
+# Dask Executor  --------------------------------------------------------------------
+def return_dask_config():
+    dask_config_dict = {
+        "dask_executor_memory_limit":"16Gi",
+        "dask_executor_memory_request":"16Gi",
+        "dask_executor_threads_per_worker":2,
+        "dask_executor_cpu_limit":2,
+        "dask_executor_cpu_request":2,
+        "dask_executor_adapt_min":4,
+        "dask_executor_adapt_max":20}
+    return dask_config_dict     
+
+def return_extra_pip_packages():
+    extra_pip_packages = {
+        "EXTRA_PIP_PACKAGES": "git+https://github.com/carbonplan/cmip6-downscaling.git git+https://github.com/pangeo-data/scikit-downscale.git git+https://github.com/NCAR/xpersist.git"
+    }
+    return extra_pip_packages
+
+def return_env_config():
+    env_config = {
+        "AZURE_STORAGE_CONNECTION_STRING": return_azure_config()["connection_string"],
+        "EXTRA_PIP_PACKAGES": return_extra_pip_packages()["EXTRA_PIP_PACKAGES"],
+        'OMP_NUM_THREADS': '1',
+        'MPI_NUM_THREADS': '1',
+        'MKL_NUM_THREADS': '1',
+        'OPENBLAS_NUM_THREADS': '1',
+    }
+    return env_config
+
+def return_kubernetes_run_config():
+    kubernetes_run_config = KubernetesRun(
+        cpu_request=return_kubernetes_config()["kubernetes_cpu"],
+        memory_request=return_kubernetes_config()["kubernetes_memory"],
+        image=return_docker_config()["image"],
+        labels=return_prefect_config()["agent"],
+        env=return_env_config()["env_config"],
+    )
 
 dask_executor = DaskExecutor(
     cluster_class=lambda: KubeCluster(
         make_pod_spec(
-            image=image,
-            memory_limit=dask_executor_memory_limit,
-            memory_request=dask_executor_memory_request,
-            threads_per_worker=dask_executor_threads_per_worker,
-            cpu_limit=dask_executor_cpu_limit,
-            cpu_request=dask_executor_cpu_request,
-            env=env_config,
+        image=return_docker_config()["image"],
+            memory_limit=return_dask_config()["dask_executor_memory_limit"],
+            memory_request=return_dask_config()["dask_executor_memory_request"],
+            threads_per_worker=return_dask_config()["dask_executor_threads_per_worker"],
+            cpu_limit=return_dask_config()["dask_executor_cpu_limit]"],
+            cpu_request=return_dask_config()["dask_executor_cpu_request"],
+            env=return_env_config()["env_config"]
         )
     ),
-    adapt_kwargs={"minimum": dask_executor_adapt_min, "maximum": dask_executor_adapt_max},
+    adapt_kwargs={"minimum": return_dask_config()["dask_executor_adapt_min"], "maximum": return_dask_config()["dask_executor_adapt_max"]},
 )
