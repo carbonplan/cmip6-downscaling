@@ -39,6 +39,11 @@ results_cache_store = CacheStore(
 )
 
 
+from cmip6_downscaling.analysis.analysis import (
+    monthly_summary,
+    annual_summary
+)
+
 # Transform Functions into Tasks -----------------------------------------------------------
 
 
@@ -296,4 +301,28 @@ with Flow(
 
     run_analyses_task(
         {'run_id': target_naming_str, 'var': variable, 'gcm': gcm, 'scenario': scenario}
+    )
+
+    monthly_summary_ds = monthly_summary_task(
+        postprocess_bcsd_ds,
+        spatial_anomalies_ds,
+        gcm,
+        scenario,
+        train_period_start,
+        train_period_end,
+        predict_period_start,
+        predict_period_end,
+        variable,
+    )
+
+    annual_summary_ds = annual_summary_task(
+        postprocess_bcsd_ds,
+        spatial_anomalies_ds,
+        gcm,
+        scenario,
+        train_period_start,
+        train_period_end,
+        predict_period_start,
+        predict_period_end,
+        variable,
     )
