@@ -1,12 +1,14 @@
 from .qaqc import make_qaqc_ds
-
+import pandas as pd
+import cartopy.crs as ccrs
+import matplotlib.pyplot as plt
 
 analysis_dir = f"az://cmip6/results/analysis"
 
 def qaqc_checks(ds):
     # run_qaqc_dir =  f"{analysis_dir}/qaqc/{run_id}"
     qaqc_ds = make_qaqc_ds(ds)
-    annual_qaqc_ts = qaqc_ds.groupby('time.day').sum().sum(dim=['lat', 'lon']
+    annual_qaqc_ts = qaqc_ds.groupby('time.year').sum().sum(dim=['lat', 'lon']
                                             ).to_dataframe()
     qaqc_maps = qaqc_ds.sum(dim='time')
     return annual_qaqc_ts, qaqc_maps
@@ -94,3 +96,43 @@ def run_analysis_notebook(gcm,
         f'/home/jovyan/cmip6-downscaling/notebooks/output/analyses_{run_id}.ipynb',
         parameters={'run_id': run_id}
         )
+
+
+def load_top_cities(plot=False):
+    cities = pd.read_csv('worldcities.csv')
+    top_cities = cities.sort_values('population', 
+                                ascending=False).groupby('country').first(
+                        ).sort_values('population', ascending=False)[0:100][['city', 'lat', 'lng']]
+    additional_cities = ['Seattle', 'Los Angeles', 'Denver', 'Chicago', 'Anchorage', 'Perth', 'Paramaribo', 'Fortaleza']
+    for additional_city in additional_cities:
+        top_cities = top_cities.append(cities[cities['city']==additional_city][['city', 'lat', 'lng']])
+    if plot:
+        ax = plt.axes(projection=ccrs.PlateCarree())
+        ax.stock_img()
+        for (lat, lon) in top_cities[['lat', 'lng']].values:
+            plt.plot(lon, lat, color='blue', marker='o',)
+    return top_cities
+
+def select_points(ds, top_cities):
+    return ds.sel(lat=xr.DataArray(top_cities.lat.values, dims='cities'), 
+                lon=xr.DataArray(top_cities.lng.apply(convert_to_360).values, dims='cities'), 
+                method='nearest')
+
+def grab_top_city_data(obs_ds, downscaled_ds, top_cities):
+    obs = select_points(obs_ds, top_cities).compute()
+    downscaled_ds = select_points(downscaled_ds, top_cities).compute()
+    return obs, downscaled_ds
+
+def days_temperature_threshold(ds, threshold_direction, value):
+    if threshold_direction == 'over':
+        return (ds > value).groupby('time.year').sum().mean(dim='year')
+    elif threshold_direction == 'under':
+        return (ds < value).groupby('time.year').sum().mean(dim='year')
+
+def get_seasonal(ds, aggregator='max'):
+    if aggregator=='max':
+        return ds.groupby('time.season').max()
+    elif aggregator=='mean':
+        return ds.groupby('time.season').mean()
+    elif aggregator=='stdev':
+        return ds.groupby('time.season').std()
