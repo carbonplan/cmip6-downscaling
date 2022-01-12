@@ -63,7 +63,9 @@ def plot_values_and_difference(ds1, ds2, plot_diff=True, diff_min=-10, diff_max=
         ax.coastlines()
 
 def plot_seasonal(ds1, ds2):
-    fig, axarr = plt.subplots(ncols=4, nrows=3, subplot_kw={'projection': ccrs.PlateCarree()})
+    fig, axarr = plt.subplots(ncols=4, nrows=3, 
+                subplot_kw={'projection': ccrs.PlateCarree()},
+                figsize=(10,6))
     for i, season in enumerate(['DJF', 'JJA', 'MAM', 'SON']):
         ds1.sel(season=season).plot(ax=axarr[0,i], cmap='fire_light')
     for i, season in enumerate(['DJF', 'JJA', 'MAM', 'SON']):
@@ -72,3 +74,4 @@ def plot_seasonal(ds1, ds2):
         (ds2-ds1).sel(season=season).plot(ax=axarr[2,i], cmap='orangeblue_light_r')
     for ax in axarr.reshape(-1):
         ax.coastlines()
+    plt.tight_layout()
