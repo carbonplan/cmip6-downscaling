@@ -128,4 +128,3 @@ def get_config(**kwargs):
     elif os.environ.get("TEST") == "test":
         config = TestConfig(**kwargs)
     return config
-
