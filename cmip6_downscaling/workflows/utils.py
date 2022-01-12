@@ -14,7 +14,10 @@ from rechunker import rechunk
 from xarray_schema import DataArraySchema, DatasetSchema
 from xarray_schema.base import SchemaError
 
-from cmip6_downscaling.config.config import CONNECTION_STRING, intermediate_cache_path
+import cmip6_downscaling.config.config as config
+
+intermediate_cache_path = config.return_azure_config()["intermediate_cache_path"]
+connection_string = config.return_azure_config()["serializer"]
 
 schema_maps_chunks = DataArraySchema(chunks={'lat': -1, 'lon': -1})
 
@@ -105,7 +108,7 @@ def delete_chunks_encoding(ds: Union[xr.Dataset, xr.DataArray]):
 
 
 def make_rechunker_stores(
-    connection_string: Optional[str] = CONNECTION_STRING,
+    connection_string: Optional[str] = connection_string,
     output_path: Optional[str] = None,
 ) -> Tuple[fsspec.FSMap, fsspec.FSMap, str]:
     """Initialize two stores for rechunker to use as temporary and final rechunked locations
@@ -473,7 +476,7 @@ def rechunk_zarr_array_with_caching(
     output_path: Optional[str] = None,
     max_mem: str = "200MB",
     overwrite: bool = False,
-    connection_string: Optional[str] = CONNECTION_STRING,
+    connection_string: Optional[str] = config.return_azure_config()["connection_string"],
     cache_path: Optional[str] = intermediate_cache_path,
 ) -> xr.Dataset:
     """Use `rechunker` package to adjust chunks of dataset to a form
@@ -608,7 +611,7 @@ def regrid_ds(
     ds: xr.Dataset,
     target_grid_ds: xr.Dataset,
     rechunked_ds_path: Optional[str] = None,
-    connection_string: Optional[str] = CONNECTION_STRING,
+    connection_string: Optional[str] = config.return_azure_config()["connection_string"],
     **kwargs,
 ) -> xr.Dataset:
     """Regrid a dataset to a target grid. For use in both coarsening or interpolating to finer resolution.
