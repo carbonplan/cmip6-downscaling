@@ -8,7 +8,7 @@ import xarray as xr
 import zarr
 from intake_esm.merge_util import AggregationError
 
-from cmip6_downscaling.config.config import CONNECTION_STRING
+import cmip6_downscaling.config.config as config
 from cmip6_downscaling.workflows.paths import make_rechunked_gcm_path
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching
 
@@ -357,7 +357,7 @@ def get_gcm(
         rechunked_path = None
     ds_gcm_rechunked = rechunk_zarr_array_with_caching(
         zarr_array=ds_gcm,
-        connection_string=CONNECTION_STRING,
+        connection_string=config.return_azure_config()["connection_string"],
         chunking_approach=chunking_approach,
         output_path=rechunked_path,
     )

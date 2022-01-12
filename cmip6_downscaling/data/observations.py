@@ -6,7 +6,7 @@ from typing import List, Optional, Union
 import xarray as xr
 import zarr
 
-from cmip6_downscaling.config.config import CONNECTION_STRING
+import cmip6_downscaling.config.config as config
 from cmip6_downscaling.workflows.paths import make_rechunked_obs_path
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching
 
@@ -92,7 +92,7 @@ def get_obs(
         rechunked_path = None
     ds_obs_rechunked = rechunk_zarr_array_with_caching(
         zarr_array=ds_obs,
-        connection_string=CONNECTION_STRING,
+        connection_string=config.return_azure_config()["connection_string"],
         chunking_approach=chunking_approach,
         output_path=rechunked_path,
     )
