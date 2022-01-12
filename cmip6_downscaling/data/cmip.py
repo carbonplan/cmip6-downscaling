@@ -8,7 +8,7 @@ import xarray as xr
 import zarr
 from intake_esm.merge_util import AggregationError
 
-from cmip6_downscaling.config.config import CONNECTION_STRING
+import cmip6_downscaling.config.config as config
 from cmip6_downscaling.workflows.paths import make_rechunked_gcm_path
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching
 
@@ -179,7 +179,6 @@ def load_cmip(
     return_type: str = 'zarr',
 ) -> xr.Dataset:
     """Loads CMIP6 GCM dataset based on input criteria.
-
     Parameters
     ----------
     activity_ids : list, optional
@@ -196,7 +195,6 @@ def load_cmip(
         grid_labels in CMIP6 catalog, by default ["gn"]
     variable_ids : list, optional
         variable_ids in CMIP6 catalog, by default ['tasmax']
-
     Returns
     -------
     ds : xr.Dataset or zarr group
@@ -232,6 +230,7 @@ def load_cmip(
 
         # flip the lats if necessary and drop the extra dims/vars like bnds
         ds = gcm_munge(ds)
+
         if i == 0:
             ds_out = ds
         else:
@@ -242,12 +241,10 @@ def load_cmip(
 
 def convert_to_360(lon: Union[float, int]) -> Union[float, int]:
     """Convert lons to 0-360 basis.
-
     Parameters
     ----------
     lon : float or int
         Longitude on -180 to 180 basis
-
     Returns
     -------
     lon : float or int
@@ -262,12 +259,10 @@ def convert_to_360(lon: Union[float, int]) -> Union[float, int]:
 def gcm_munge(ds: xr.Dataset) -> xr.Dataset:
     """Clean up GCM dataset by swapping lats if necessary to match ERA5 and
     deleting unnecessary variables (e.g. height).
-
     Parameters
     ----------
     ds : xr.Dataset
         GCM dataset direct from catalog (though perhaps subsetted temporally)
-
     Returns
     -------
     ds : xr.Dataset
@@ -297,7 +292,6 @@ def get_gcm(
 ) -> xr.Dataset:
     """
     Load and combine historical and future GCM into one dataset.
-
     Parameters
     ----------
     gcm: str
@@ -316,13 +310,11 @@ def get_gcm(
         End year of predict/future period
     chunking_approach: Optional[str]
         'full_space', 'full_time', or None
-
     Returns
     -------
     ds_gcm: xr.Dataset
         A dataset containing both historical and future period of GCM data
     """
-    print(gcm)
     historical_gcm = load_cmip(
         activity_ids='CMIP',
         experiment_ids='historical',
@@ -357,7 +349,7 @@ def get_gcm(
         rechunked_path = None
     ds_gcm_rechunked = rechunk_zarr_array_with_caching(
         zarr_array=ds_gcm,
-        connection_string=CONNECTION_STRING,
+        connection_string=config.return_azure_config()["connection_string"],
         chunking_approach=chunking_approach,
         output_path=rechunked_path,
     )

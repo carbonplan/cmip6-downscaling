@@ -4,15 +4,10 @@ import os
 os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "true"
 from prefect import Flow, Parameter, task
 from xpersist.prefect.result import XpersistResult
+from xpersist import CacheStore
 
-from cmip6_downscaling.config.config import (
-    dask_executor,
-    intermediate_cache_store,
-    kubernetes_run_config,
-    results_cache_store,
-    serializer,
-    storage,
-)
+
+import cmip6_downscaling.config.config as config
 from cmip6_downscaling.methods.bcsd import (
     fit_and_predict,
     get_coarse_obs,
@@ -24,6 +19,11 @@ from cmip6_downscaling.methods.bcsd import (
     return_gcm_train_full_time,
     return_obs,
 )
+
+intermediate_cache_store = CacheStore(config.return_azure_config()["intermediate_cache_path"])
+results_cache_store = CacheStore(config.return_azure_config()["results_cache_path"])
+serializer = config.return_azure_config()["serializer"]
+storage = config.return_azure_config()["storage"]
 
 # Transform Functions into Tasks -----------------------------------------------------------
 
@@ -93,8 +93,8 @@ postprocess_bcsd_task = task(
 # with Flow(
 #     name="bcsd-subset-test",
 #     storage=storage,
-#     run_config=kubernetes_run_config,
-#     executor=dask_executor,
+#     run_config=config.return_kubernetes_run_config(),
+#     executor=config.return_dask_executor(),
 # ) as flow:
 with Flow(name="subset-testing") as flow:
 
