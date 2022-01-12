@@ -129,10 +129,17 @@ def days_temperature_threshold(ds, threshold_direction, value):
     elif threshold_direction == 'under':
         return (ds < value).groupby('time.year').sum().mean(dim='year')
 
-def get_seasonal(ds, aggregator='max'):
-    if aggregator=='max':
-        return ds.groupby('time.season').max()
-    elif aggregator=='mean':
+def get_seasonal(ds, aggregator='mean'):
+    if aggregator=='mean':
         return ds.groupby('time.season').mean()
     elif aggregator=='stdev':
         return ds.groupby('time.season').std()
+    elif aggregator=='min':
+        return ds.groupby('time.season').min()
+    elif aggregator=='max':
+        return ds.groupby('time.season').max()
+    else:
+        raise NotImplementedError
+
+def mean_wet_day_amount(ds, threshold=0.05):
+    return ds.where(ds > threshold).mean(dim='time', skipna=True)
