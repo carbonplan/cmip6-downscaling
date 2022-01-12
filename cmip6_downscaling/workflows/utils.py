@@ -14,7 +14,10 @@ from rechunker import rechunk
 from xarray_schema import DataArraySchema, DatasetSchema
 from xarray_schema.base import SchemaError
 
-from cmip6_downscaling.config.config import CONNECTION_STRING, intermediate_cache_path
+import cmip6_downscaling.config.config as config
+
+intermediate_cache_path = config.return_azure_config()["intermediate_cache_path"]
+connection_string = config.return_azure_config()["serializer"]
 
 schema_maps_chunks = DataArraySchema(chunks={'lat': -1, 'lon': -1})
 
@@ -32,6 +35,55 @@ def get_store(prefix, account_key=None):
         account_key=account_key,
     )
     return store
+
+
+def generate_batches(n, batch_size, buffer_size, one_indexed=False):
+    """
+    Given the max value n, batch_size, and buffer_size, returns batches (include the buffer) and
+    cores (exclude the buffer). For the smallest numbers, the largest values would be included in the buffer, and
+    vice versa. For example, with n=10, batch_size=5, buffer_size=3, one_indexed=False. The `cores` output will contain
+    [[0, 1, 2, 3, 4], [5, 6, 7, 8, 9]], and `batches` output will contain [[7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7], [2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2]].
+
+    Parameters
+    ----------
+    n: int
+        The max value to be included.
+    batch_size: int
+        The number of core values to include in each batch.
+    buffer_size: int
+        The number of buffer values to include in each batch in both directions.
+    one_indexed: bool
+        Whether we should consider n to be one indexed or not. With n = 2, one_indexed=False would generate cores containing [0, 1].
+        One_indexed=True would generate cores containing [1, 2].
+
+    Returns
+    -------
+    batches: List
+        List of batches including buffer values.
+    cores: List
+        List of core values in each batch excluding buffer values.
+    """
+    cores = []
+    batches = []
+    if one_indexed:
+        xmin = 1
+        xmax = n + 1
+    else:
+        xmin = 0
+        xmax = n
+    for start in range(xmin, xmax, batch_size):
+        end = min(start + batch_size, xmax)
+        cores.append(np.arange(start, end))
+
+        # add buffer
+        end = end + buffer_size
+        start = start - buffer_size
+        batch = np.arange(start, end)
+        batch[batch < xmin] += n
+        batch[batch > xmax - 1] -= n
+        batches.append(batch)
+
+    return batches, cores
 
 
 def load_paths(
@@ -86,7 +138,7 @@ def lon_to_180(ds):
 
 
 def make_rechunker_stores(
-    connection_string: Optional[str] = CONNECTION_STRING,
+    connection_string: Optional[str] = connection_string,
     output_path: Optional[str] = None,
 ) -> Tuple[fsspec.FSMap, fsspec.FSMap, str]:
     """Initialize two stores for rechunker to use as temporary and final rechunked locations
@@ -260,7 +312,7 @@ def calc_auspicious_chunks_dict(
     # then make reasonable chunk size by rounding up (avoids corner case of it rounding down to 0...)
     perfect_chunk_length = int(np.ceil(perfect_chunk ** (1 / len(chunk_dims))))
     for dim in chunk_dims:
-        chunks_dict[dim] = perfect_chunk_length
+        chunks_dict[dim] = min(perfect_chunk_length, array_dims[dim])
 
     return chunks_dict
 
@@ -454,7 +506,7 @@ def rechunk_zarr_array_with_caching(
     output_path: Optional[str] = None,
     max_mem: str = "200MB",
     overwrite: bool = False,
-    connection_string: Optional[str] = CONNECTION_STRING,
+    connection_string: Optional[str] = config.return_azure_config()["connection_string"],
     cache_path: Optional[str] = intermediate_cache_path,
 ) -> xr.Dataset:
     """Use `rechunker` package to adjust chunks of dataset to a form
@@ -497,9 +549,9 @@ def rechunk_zarr_array_with_caching(
         chunk_def = calc_auspicious_chunks_dict(zarr_array[example_var], chunk_dims=chunk_dims)
     else:
         chunk_def = {
-            'time': template_chunk_array.chunks['time'][0],
-            'lat': template_chunk_array.chunks['lat'][0],
-            'lon': template_chunk_array.chunks['lon'][0],
+            'time': min(template_chunk_array.chunks['time'][0], len(zarr_array.time)),
+            'lat': min(template_chunk_array.chunks['lat'][0], len(zarr_array.lat)),
+            'lon': min(template_chunk_array.chunks['lon'][0], len(zarr_array.lon)),
         }
     chunks_dict = {
         'time': None,  # write None here because you don't want to rechunk this array
@@ -589,7 +641,7 @@ def regrid_ds(
     ds: xr.Dataset,
     target_grid_ds: xr.Dataset,
     rechunked_ds_path: Optional[str] = None,
-    connection_string: Optional[str] = CONNECTION_STRING,
+    connection_string: Optional[str] = config.return_azure_config()["connection_string"],
     **kwargs,
 ) -> xr.Dataset:
     """Regrid a dataset to a target grid. For use in both coarsening or interpolating to finer resolution.
@@ -624,6 +676,7 @@ def regrid_ds(
             chunking_approach='full_space',
             max_mem='1GB',
             connection_string=connection_string,
+            output_path=rechunked_ds_path,
         )
 
     regridder = xe.Regridder(ds_rechunked, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
