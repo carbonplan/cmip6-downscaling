@@ -2,13 +2,10 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import xarray as xr
 from prefect import Flow, Parameter, task
+from xpersist import CacheStore
 from xpersist.prefect.result import XpersistResult
 
-from cmip6_downscaling.config.config import (
-    intermediate_cache_store,
-    results_cache_store,
-    serializer,
-)
+import cmip6_downscaling.config.config as config
 from cmip6_downscaling.methods.detrend import calc_epoch_trend, remove_epoch_trend
 from cmip6_downscaling.methods.maca import maca_bias_correction, maca_construct_analogs
 from cmip6_downscaling.methods.regions import combine_outputs, generate_subdomains
@@ -28,6 +25,10 @@ from cmip6_downscaling.workflows.paths import (
     make_maca_output_path,
 )
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching, regrid_ds
+
+intermediate_cache_store = CacheStore(config.return_azure_config()["intermediate_cache_path"])
+results_cache_store = CacheStore(config.return_azure_config()["results_cache_path"])
+serializer = config.return_azure_config()["serializer"]
 
 
 @task(
