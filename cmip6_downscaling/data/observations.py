@@ -56,6 +56,9 @@ def open_era5(variables: Union[str, List[str]], start_year: str, end_year: str) 
         for y in range(int(start_year), int(end_year) + 1)
     ]
     ds = xr.open_mfdataset(stores, engine='zarr', consolidated=True)
+    if 'pr' in variables:
+        # convert to mm/day - helpful to prevent rounding errors from very tiny numbers
+        ds['pr'] *= 86400
     return ds[variables]
 
 
