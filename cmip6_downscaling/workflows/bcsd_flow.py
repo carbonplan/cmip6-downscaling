@@ -7,6 +7,8 @@ from xpersist import CacheStore
 from xpersist.prefect.result import XpersistResult
 
 import cmip6_downscaling.config.config as config
+
+cfg = config.get_config()
 from cmip6_downscaling.methods.bcsd import (
     fit_and_predict,
     get_coarse_obs,
@@ -72,6 +74,8 @@ postprocess_bcsd_task = task(
 )
 
 # Main Flow -----------------------------------------------------------
+
+# with Flow(storage=config.storage, run_config=config.run_config, executor=executor):
 
 # with Flow(name="bcsd-testing", storage=storage, run_config=run_config) as flow:
 # with Flow(name="bcsd-testing", storage=storage, run_config=kubernetes_run_config, executor=dask_executor) as flow:
