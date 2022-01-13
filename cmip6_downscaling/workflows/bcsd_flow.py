@@ -3,9 +3,8 @@ import os
 
 os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "true"
 from prefect import Flow, Parameter, task
-from xpersist.prefect.result import XpersistResult
 from xpersist import CacheStore
-
+from xpersist.prefect.result import XpersistResult
 
 import cmip6_downscaling.config.config as config
 from cmip6_downscaling.methods.bcsd import (
@@ -20,10 +19,11 @@ from cmip6_downscaling.methods.bcsd import (
     return_obs,
 )
 
-intermediate_cache_store = CacheStore(config.return_azure_config()["intermediate_cache_path"])
-results_cache_store = CacheStore(config.return_azure_config()["results_cache_path"])
-serializer = config.return_azure_config()["serializer"]
-storage = config.return_azure_config()["storage"]
+ccfg = config.CloudConfig()
+intermediate_cache_store = CacheStore(ccfg.intermediate_cache_path)
+results_cache_store = CacheStore(ccfg.results_cache_path)
+serializer = ccfg.serializer
+storage = ccfg.storage
 
 # Transform Functions into Tasks -----------------------------------------------------------
 
@@ -90,14 +90,13 @@ postprocess_bcsd_task = task(
 
 # Main Flow -----------------------------------------------------------
 # with Flow(name="bcsd-testing", storage=storage, run_config=run_config) as flow:
-# with Flow(
-#     name="bcsd-subset-test",
-#     storage=storage,
-#     run_config=config.return_kubernetes_run_config(),
-#     executor=config.return_dask_executor(),
-# ) as flow:
-with Flow(name="subset-testing") as flow:
-
+# with Flow(name="subset-testing") as flow:
+with Flow(
+    name="bcsd-subset-test",
+    storage=ccfg.storage,
+    run_config=ccfg.kubernetes_run_config(),
+    executor=ccfg.dask_executor(),
+) as flow:
 
     gcm = Parameter("GCM")
     scenario = Parameter("SCENARIO")
