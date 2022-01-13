@@ -15,7 +15,7 @@ class AbstractConfig:
     # fsspec_fs
     def __init__(self):
         self.connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
-        self.agent = "az-eu-west"
+        self.agent = ["az-eu-west"]
         self.storage = Azure("prefect")
         self.extra_pip_packages = "git+https://github.com/carbonplan/cmip6-downscaling.git?esmf_threading git+https://github.com/pangeo-data/scikit-downscale.git git+https://github.com/NCAR/xpersist.git"
         self.intermediate_cache_path = "az://flow-outputs/intermediate"
@@ -82,8 +82,8 @@ class CloudConfig(AbstractConfig):
         kube_run_config = KubernetesRun(
             cpu_request=self.kubernetes_cpu,
             memory_request=self.kubernetes_memory,
-            image=self.image,
             labels=self.agent,
+            image=self.image,
             env=self.generate_env(),
         )
         return kube_run_config
