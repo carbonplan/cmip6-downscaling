@@ -1,7 +1,7 @@
 import numpy as np
 import xarray as xr
 from esda.moran import Moran
-
+import xarray as xr
 
 def weighted_mean(ds, *args, **kwargs):
     weights = ds.time.dt.days_in_month
