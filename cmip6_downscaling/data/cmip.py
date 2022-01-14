@@ -13,7 +13,7 @@ from cmip6_downscaling.workflows.paths import make_rechunked_gcm_path
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching
 
 variable_ids = ['pr', 'tasmin', 'tasmax', 'rsds', 'hurs', 'ps']
-cfg = config.AbstractConfig()
+cfg = config.CloudConfig()
 
 
 def check_variable_ids_in_df(df):

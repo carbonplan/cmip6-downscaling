@@ -10,7 +10,7 @@ import cmip6_downscaling.config.config as config
 from cmip6_downscaling.workflows.paths import make_rechunked_obs_path
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching
 
-cfg = config.AbstractConfig()
+cfg = config.CloudConfig()
 
 variable_name_dict = {
     "tasmax": "air_temperature_at_2_metres_1hour_Maximum",

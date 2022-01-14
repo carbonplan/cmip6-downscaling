@@ -15,7 +15,7 @@ from xpersist.prefect.result import XpersistResult
 
 import cmip6_downscaling.config.config as config
 
-cfg = config.AbstractConfig()
+cfg = config.CloudConfig()
 
 intermediate_cache_store = CacheStore(cfg.intermediate_cache_path)
 serializer = cfg.serializer

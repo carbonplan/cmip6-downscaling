@@ -15,7 +15,7 @@ from xarray_schema.base import SchemaError
 
 import cmip6_downscaling.config.config as config
 
-cfg = config.AbstractConfig()
+cfg = config.CloudConfig()
 
 intermediate_cache_path = cfg.intermediate_cache_path
 connection_string = cfg.connection_string

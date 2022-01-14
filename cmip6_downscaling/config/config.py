@@ -1,38 +1,64 @@
 import os
 
 os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "true"
+from abc import abstractmethod
+from typing import Any
+
 from dask_kubernetes import KubeCluster, make_pod_spec
-from prefect.executors import DaskExecutor
+from prefect.executors import DaskExecutor, LocalDaskExecutor, LocalExecutor
 from prefect.run_configs import KubernetesRun, LocalRun
-from prefect.storage import Azure
+from prefect.storage import Azure, Local
+
+# todo:
 
 
-class AbstractConfig:
-    # attributes
-    # prefect_storage
-    # prefect_run_config
-    # prefect_executor
-    # fsspec_fs
-    def __init__(self):
+# prefect-cloud config has @property decs to repeat for other config subclasses.
+# connection_string should only live in prefect-cloud and pangeo and hybrid. The other ones we won't write data, so we don't need write permissions.
+# Add new config that is hybrid or local compute, but has prefect storage access (ie. what I've been using to debug. Local is now non-write permissions.)
+
+
+class BaseConfig:
+    """Base configuration class that defines abstract methods (storage, run_config and executor) for subclasses.
+
+    Attributes
+    ----------
+
+    Methods
+    -------
+    storage()
+        abstract definition for storage method
+    run_config()
+        abstract definition for run_config method
+    executor()
+        abstract definition for executor method
+    """
+
+    @property
+    @abstractmethod
+    def storage(self) -> Any:  # pragma: no cover
+        pass
+
+    @property
+    @abstractmethod
+    def run_config(self) -> Any:  # pragma: no cover
+        pass
+
+    @property
+    @abstractmethod
+    def executor(self) -> Any:  # pragma: no cover
+        pass
+
+class CloudConfig(BaseConfig):
+    def __init__(self, **kwargs):
         self.connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
-        self.agent = ["az-eu-west"]
-        self.storage = Azure("prefect")
-        self.extra_pip_packages = "git+https://github.com/carbonplan/cmip6-downscaling.git?esmf_threading git+https://github.com/pangeo-data/scikit-downscale.git git+https://github.com/NCAR/xpersist.git"
         self.intermediate_cache_path = "az://flow-outputs/intermediate"
         self.results_cache_path = "az://flow-outputs/results"
+        self.agent = ["az-eu-west"]
+        self.extra_pip_packages = "git+https://github.com/carbonplan/cmip6-downscaling.git?esmf_threading git+https://github.com/pangeo-data/scikit-downscale.git"
         self.serializer = "xarray.zarr"
-
-
-class CloudConfig(AbstractConfig):
-    def __init__(self):
-        super().__init__()
         self.kubernetes_cpu = 7
         self.kubernetes_memory = "16Gi"
-        self.image = "carbonplan/cmip6-downscaling-prefect:2021.12.06"
-        self.OMP_NUM_THREADS = "1"
-        self.MPI_NUM_THREADS = "1"
-        self.MKL_NUM_THREADS = "1"
-        self.OPENBLAS_NUM_THREADS = "1"
+        self.image = "carbonplan/cmip6-downscaling-prefect:2022.01.05"
         self.pod_memory_limit = "4Gi"
         self.pod_memory_request = "4Gi"
         self.pod_threads_per_worker = 2
@@ -47,16 +73,31 @@ class CloudConfig(AbstractConfig):
         env = {
             "AZURE_STORAGE_CONNECTION_STRING": self.connection_string,
             "EXTRA_PIP_PACKAGES": self.extra_pip_packages,
-            "OMP_NUM_THREADS": self.OMP_NUM_THREADS,
-            "MPI_NUM_THREADS": self.MPI_NUM_THREADS,
-            "MKL_NUM_THREADS": self.MKL_NUM_THREADS,
-            "OPENBLAS_NUM_THREADS": self.OPENBLAS_NUM_THREADS,
+            "OMP_NUM_THREADS": "1",
+            "MPI_NUM_THREADS": "1",
+            "MKL_NUM_THREADS": "1",
+            "OPENBLAS_NUM_THREADS": "1",
             "DASK_DISTRIBUTED__WORKER__RESOURCES__TASKSLOTS": self.dask_distributed_worker_resources_taskslots,
         }
         return env
 
-    def dask_executor(self):
+    @property
+    def storage(self) -> Any:  # pragma: no cover
+        return Azure("prefect")
 
+    @property
+    def run_config(self) -> Any:  # pragma: no cover
+        kube_run_config = KubernetesRun(
+            cpu_request=self.kubernetes_cpu,
+            memory_request=self.kubernetes_memory,
+            image=self.image,
+            labels=self.agent,
+            env=self.generate_env(),
+        )
+        return kube_run_config
+
+    @property
+    def executor(self) -> Any:  # pragma: no cover
         pod_spec = make_pod_spec(
             image=self.image,
             memory_limit=self.pod_memory_limit,
@@ -78,53 +119,80 @@ class CloudConfig(AbstractConfig):
         )
         return daskExecutor
 
-    def kubernetes_run_config(self):
-        kube_run_config = KubernetesRun(
-            cpu_request=self.kubernetes_cpu,
-            memory_request=self.kubernetes_memory,
-            labels=self.agent,
-            image=self.image,
-            env=self.generate_env(),
-        )
-        return kube_run_config
 
+class LocalConfig(BaseConfig):
+    def __init__(self, **kwargs):
+        pass
 
-class PangeoConfig(AbstractConfig):
-    # with Flow(name="bcsd-testing", storage=storage, run_config=run_config) as flow:
-    # Which run_config? Does this need a dask executor?
-    def __init__(self):
-        super().__init__()
+    @property
+    def storage(self) -> Any:  # pragma: no cover
+        return Local()
 
+    @property
+    def run_config(self) -> Any:  # pragma: no cover
+        return LocalRun()
 
-class LocalConfig(AbstractConfig):
-    # what additional args to add?
-    def __init__(self):
-        super().__init__()
-
-    def local_run_config(self):
-        local_run = LocalRun()
-        return local_run
+    @property
+    def executor(self) -> Any:  # pragma: no cover
+        return LocalExecutor()
 
 
 class TestConfig(LocalConfig):
-    # for use in GitHub Actions
-    # what additional args to add for testconfig? additional pip packages?
-    def __init__(self):
-        super().__init__()
+    def __init__(self, **kwargs):
+        pass
 
-    def local_run_config(self):
-        local_run = LocalRun(env={"EXTRA_PIP_PACKAGES": self.extra_pip_packages})
-        return local_run
+    @property
+    def storage(self) -> Any:  # pragma: no cover
+        return Local()
+
+    @property
+    def run_config(self) -> Any:  # pragma: no cover
+        return LocalRun()
+
+    @property
+    def executor(self) -> Any:  # pragma: no cover
+        return LocalExecutor()
 
 
-def get_config(**kwargs):
+class PangeoConfig(BaseConfig):
+    def __init__(self, **kwargs):
+        self.connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
+        self.intermediate_cache_path = "az://flow-outputs/intermediate"
+        self.results_cache_path = "az://flow-outputs/results"
 
-    if os.environ.get("CI") == "true":
+    @property
+    def storage(self) -> Any:  # pragma: no cover
+        return Local()
+
+    @property
+    def run_config(self) -> Any:  # pragma: no cover
+        config = LocalRun(env={"dask opts?": "1"})
+        return config
+
+    @property
+    def executor(self) -> Any:  # pragma: no cover
+        executor = LocalDaskExecutor(scheduler="threads")
+        return executor
+
+
+def get_config(name=None, **kwargs):
+    if name == 'test':
+        config = TestConfig(**kwargs)
+    elif name == 'local':
         config = LocalConfig(**kwargs)
+    elif name == 'prefect-cloud':
+        config = CloudConfig(**kwargs)
+    elif name == 'pangeo':
+        config = PangeoConfig(**kwargs)
+    elif os.environ.get("CI") == "true":
+        config = TestConfig(**kwargs)
     elif os.environ.get("PREFECT__BACKEND") == "cloud":
         config = CloudConfig(**kwargs)
-    elif os.environ.get("PANGEO__BACKEND") == "pangeo":
+    elif 'JUPYTER_IMAGE' in os.environ:
         config = PangeoConfig(**kwargs)
-    elif os.environ.get("TEST") == "test":
-        config = TestConfig(**kwargs)
+    else:
+        ValueError(
+            "Name not in ['test', 'local', 'prefect-cloud', 'pangeo'] and environment variable not found for: [CI, PREFECT__BACKEND, PANGEO__BACKEND or TEST]"
+        )
+
     return config

@@ -19,11 +19,12 @@ from cmip6_downscaling.methods.bcsd import (
     return_obs,
 )
 
-ccfg = config.CloudConfig()
-intermediate_cache_store = CacheStore(ccfg.intermediate_cache_path)
-results_cache_store = CacheStore(ccfg.results_cache_path)
-serializer = ccfg.serializer
-storage = ccfg.storage
+cfg = config.CloudConfig()
+run_config = config.CloudConfig()
+
+intermediate_cache_store = CacheStore(cfg.intermediate_cache_path)
+results_cache_store = CacheStore(cfg.results_cache_path)
+serializer = cfg.serializer
 
 # Transform Functions into Tasks -----------------------------------------------------------
 
@@ -88,14 +89,12 @@ postprocess_bcsd_task = task(
 )
 
 
-# Main Flow -----------------------------------------------------------
-# with Flow(name="bcsd-testing", storage=storage, run_config=run_config) as flow:
-# with Flow(name="subset-testing") as flow:
+
 with Flow(
     name="bcsd-subset-test",
-    storage=ccfg.storage,
-    run_config=ccfg.kubernetes_run_config(),
-    executor=ccfg.dask_executor(),
+    storage=cfg.storage,
+    run_config=cfg.run_config,
+    executor=cfg.executor,
 ) as flow:
 
     gcm = Parameter("GCM")
