@@ -20,11 +20,13 @@ from cmip6_downscaling.methods.bcsd import (
 )
 
 cfg = config.CloudConfig()
-run_config = config.CloudConfig()
+# run_config = config.get_config(name='prefect-cloud')
+run_config = config.get_config(name='local')
 
 intermediate_cache_store = CacheStore(cfg.intermediate_cache_path)
 results_cache_store = CacheStore(cfg.results_cache_path)
 serializer = cfg.serializer
+print(intermediate_cache_store)
 
 # Transform Functions into Tasks -----------------------------------------------------------
 
@@ -90,12 +92,13 @@ postprocess_bcsd_task = task(
 
 
 
-with Flow(
-    name="bcsd-subset-test",
-    storage=cfg.storage,
-    run_config=cfg.run_config,
-    executor=cfg.executor,
-) as flow:
+# with Flow(
+#     name="bcsd-subset-test",
+#     storage=run_config.storage,
+#     run_config=run_config.run_config,
+#     executor=run_config.executor,
+# ) as flow:
+with Flow(name="bcsd-subset-test") as flow:
 
     gcm = Parameter("GCM")
     scenario = Parameter("SCENARIO")
@@ -141,108 +144,108 @@ with Flow(
         lonmin,
         lonmax,
     )
-    coarse_obs_ds = get_coarse_obs_task(
-        obs_ds,
-        gcm,
-        scenario,
-        train_period_start,
-        train_period_end,
-        predict_period_start,
-        predict_period_end,
-        variable,
-        latmin,
-        latmax,
-        lonmin,
-        lonmax,
-    )
-    spatial_anomalies_ds = get_spatial_anomalies_task(
-        coarse_obs_ds,
-        obs_ds,
-        gcm,
-        scenario,
-        train_period_start,
-        train_period_end,
-        predict_period_start,
-        predict_period_end,
-        variable,
-        latmin,
-        latmax,
-        lonmin,
-        lonmax,
-    )
-    # prep_bcsd_inputs_task(s):
-    coarse_obs_full_time_ds = return_coarse_obs_full_time_task(
-        coarse_obs_ds,
-        gcm,
-        scenario,
-        train_period_start,
-        train_period_end,
-        predict_period_start,
-        predict_period_end,
-        variable,
-        latmin,
-        latmax,
-        lonmin,
-        lonmax,
-    )
-    gcm_train_subset_full_time_ds = return_gcm_train_full_time_task(
-        coarse_obs_full_time_ds,
-        gcm,
-        scenario,
-        train_period_start,
-        train_period_end,
-        predict_period_start,
-        predict_period_end,
-        variable,
-        latmin,
-        latmax,
-        lonmin,
-        lonmax,
-    )
-    gcm_predict_rechunked_ds = return_gcm_predict_rechunked_task(
-        gcm_train_subset_full_time_ds,
-        gcm,
-        scenario,
-        train_period_start,
-        train_period_end,
-        predict_period_start,
-        predict_period_end,
-        variable,
-        latmin,
-        latmax,
-        lonmin,
-        lonmax,
-    )
-    # fit and predict tasks(s):
-    bias_corrected_ds = fit_and_predict_task(
-        gcm_train_subset_full_time_ds,
-        coarse_obs_full_time_ds,
-        gcm_predict_rechunked_ds,
-        gcm,
-        scenario,
-        train_period_start,
-        train_period_end,
-        predict_period_start,
-        predict_period_end,
-        variable,
-        latmin,
-        latmax,
-        lonmin,
-        lonmax,
-    )
+    # coarse_obs_ds = get_coarse_obs_task(
+    #     obs_ds,
+    #     gcm,
+    #     scenario,
+    #     train_period_start,
+    #     train_period_end,
+    #     predict_period_start,
+    #     predict_period_end,
+    #     variable,
+    #     latmin,
+    #     latmax,
+    #     lonmin,
+    #     lonmax,
+    # )
+    # spatial_anomalies_ds = get_spatial_anomalies_task(
+    #     coarse_obs_ds,
+    #     obs_ds,
+    #     gcm,
+    #     scenario,
+    #     train_period_start,
+    #     train_period_end,
+    #     predict_period_start,
+    #     predict_period_end,
+    #     variable,
+    #     latmin,
+    #     latmax,
+    #     lonmin,
+    #     lonmax,
+    # )
+    # # prep_bcsd_inputs_task(s):
+    # coarse_obs_full_time_ds = return_coarse_obs_full_time_task(
+    #     coarse_obs_ds,
+    #     gcm,
+    #     scenario,
+    #     train_period_start,
+    #     train_period_end,
+    #     predict_period_start,
+    #     predict_period_end,
+    #     variable,
+    #     latmin,
+    #     latmax,
+    #     lonmin,
+    #     lonmax,
+    # )
+    # gcm_train_subset_full_time_ds = return_gcm_train_full_time_task(
+    #     coarse_obs_full_time_ds,
+    #     gcm,
+    #     scenario,
+    #     train_period_start,
+    #     train_period_end,
+    #     predict_period_start,
+    #     predict_period_end,
+    #     variable,
+    #     latmin,
+    #     latmax,
+    #     lonmin,
+    #     lonmax,
+    # )
+    # gcm_predict_rechunked_ds = return_gcm_predict_rechunked_task(
+    #     gcm_train_subset_full_time_ds,
+    #     gcm,
+    #     scenario,
+    #     train_period_start,
+    #     train_period_end,
+    #     predict_period_start,
+    #     predict_period_end,
+    #     variable,
+    #     latmin,
+    #     latmax,
+    #     lonmin,
+    #     lonmax,
+    # )
+    # # fit and predict tasks(s):
+    # bias_corrected_ds = fit_and_predict_task(
+    #     gcm_train_subset_full_time_ds,
+    #     coarse_obs_full_time_ds,
+    #     gcm_predict_rechunked_ds,
+    #     gcm,
+    #     scenario,
+    #     train_period_start,
+    #     train_period_end,
+    #     predict_period_start,
+    #     predict_period_end,
+    #     variable,
+    #     latmin,
+    #     latmax,
+    #     lonmin,
+    #     lonmax,
+    # )
     # postprocess_bcsd_task(s):
-    postprocess_bcsd_ds = postprocess_bcsd_task(
-        bias_corrected_ds,
-        spatial_anomalies_ds,
-        gcm,
-        scenario,
-        train_period_start,
-        train_period_end,
-        predict_period_start,
-        predict_period_end,
-        variable,
-        latmin,
-        latmax,
-        lonmin,
-        lonmax,
-    )
+    # postprocess_bcsd_ds = postprocess_bcsd_task(
+    #     bias_corrected_ds,
+    #     spatial_anomalies_ds,
+    #     gcm,
+    #     scenario,
+    #     train_period_start,
+    #     train_period_end,
+    #     predict_period_start,
+    #     predict_period_end,
+    #     variable,
+    #     latmin,
+    #     latmax,
+    #     lonmin,
+    #     lonmax,
+    # )

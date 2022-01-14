@@ -6,8 +6,8 @@
   "PREDICT_PERIOD_START": "2015",
   "PREDICT_PERIOD_END": "2015",
   "VARIABLE": "pr",
-  "LATMIN": "55",
-  "LATMAX": "60",
-  "LONMIN": "80",
-  "LONMAX": "85"
+  "LATMIN": "0",
+  "LATMAX": "10",
+  "LONMIN": "0",
+  "LONMAX": "10"
 }

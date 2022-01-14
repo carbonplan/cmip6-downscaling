@@ -16,6 +16,9 @@ from cmip6_downscaling.workflows.utils import (
     regrid_dataset,
     subset_dataset,
 )
+from carbonplan_data.metadata import get_cf_global_attrs
+from carbonplan_data.utils import set_zarr_encoding
+import pdb 
 
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 fs = fsspec.filesystem('az')
@@ -625,7 +628,7 @@ def postprocess_bcsd(
     bcsd_results_ds : xr.Dataset
         Final BCSD dataset
     """
-
+    pdb.set_trace()
     y_predict_fine, _ = regrid_dataset(
         ds=bias_corrected_ds,
         ds_path=None,

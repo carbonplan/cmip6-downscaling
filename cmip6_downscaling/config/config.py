@@ -51,10 +51,10 @@ class BaseConfig:
 class CloudConfig(BaseConfig):
     def __init__(self, **kwargs):
         self.connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
-        self.intermediate_cache_path = "az://flow-outputs/intermediate"
+        self.intermediate_cache_path = "az://flow-outputs/intermediates"
         self.results_cache_path = "az://flow-outputs/results"
         self.agent = ["az-eu-west"]
-        self.extra_pip_packages = "git+https://github.com/carbonplan/cmip6-downscaling.git?esmf_threading git+https://github.com/pangeo-data/scikit-downscale.git"
+        self.extra_pip_packages = "git+https://github.com/carbonplan/cmip6-downscaling.git@esmf_threading git+https://github.com/pangeo-data/scikit-downscale.git"
         self.serializer = "xarray.zarr"
         self.kubernetes_cpu = 7
         self.kubernetes_memory = "16Gi"
@@ -98,26 +98,43 @@ class CloudConfig(BaseConfig):
 
     @property
     def executor(self) -> Any:  # pragma: no cover
+        # pod_spec = make_pod_spec(
+        #     image=self.image,
+        #     memory_limit=self.pod_memory_limit,
+        #     memory_request=self.pod_memory_request,
+        #     threads_per_worker=self.pod_threads_per_worker,
+        #     cpu_limit=self.pod_cpu_limit,
+        #     cpu_request=self.pod_cpu_request,
+        #     env=self.generate_env(),
+        # )
+
+        # pod_spec.spec.containers[0].args.extend(["--resources", "TASKSLOTS=1"])
+        # daskExecutor = DaskExecutor(
+        #     cluster_class=lambda: KubeCluster(
+        #         pod_spec,
+        #         deploy_mode=self.deploy_mode,
+        #         adapt_kwargs={"minimum": self.adapt_min, "maximum": self.adapt_max},
+        #     )
+        # )
+
         pod_spec = make_pod_spec(
             image=self.image,
-            memory_limit=self.pod_memory_limit,
-            memory_request=self.pod_memory_request,
-            threads_per_worker=self.pod_threads_per_worker,
-            cpu_limit=self.pod_cpu_limit,
-            cpu_request=self.pod_cpu_request,
+            memory_limit="4Gi",
+            memory_request="4Gi",
+            threads_per_worker=2,
+            cpu_limit=2,
+            cpu_request=2,
             env=self.generate_env(),
         )
+        pod_spec.spec.containers[0].args.extend(['--resources', 'TASKSLOTS=1'])
 
-        pod_spec.spec.containers[0].args.extend(["--resources", "TASKSLOTS=1"])
-
-        daskExecutor = DaskExecutor(
-            cluster_class=lambda: KubeCluster(
-                pod_spec,
-                deploy_mode=self.deploy_mode,
-                adapt_kwargs={"minimum": self.adapt_min, "maximum": self.adapt_max},
-            )
+        executor = DaskExecutor(
+            cluster_class=lambda: KubeCluster(pod_spec, deploy_mode='remote'),
+            adapt_kwargs={"minimum": 2, "maximum": 2},
         )
-        return daskExecutor
+
+
+        return executor
 
 
 class LocalConfig(BaseConfig):
@@ -157,7 +174,7 @@ class TestConfig(LocalConfig):
 class PangeoConfig(BaseConfig):
     def __init__(self, **kwargs):
         self.connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
-        self.intermediate_cache_path = "az://flow-outputs/intermediate"
+        self.intermediate_cache_path = "az://flow-outputs/intermediates"
         self.results_cache_path = "az://flow-outputs/results"
 
     @property
