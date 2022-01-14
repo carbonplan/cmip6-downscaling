@@ -27,10 +27,13 @@ from cmip6_downscaling.workflows.paths import (
     make_scrf_path,
 )
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching
+run_config = config.get_config()
+cfg = config.CloudConfig()
 
-intermediate_cache_store = CacheStore(config.return_azure_config()["intermediate_cache_path"])
-results_cache_store = CacheStore(config.return_azure_config()["results_cache_path"])
-serializer = config.return_azure_config()["serializer"]
+intermediate_cache_store = CacheStore(cfg.intermediate_cache_path)
+results_cache_store = CacheStore(cfg.results_cache_path)
+serializer = cfg.serializer
+
 
 fit_and_predict_task = task(
     gard_fit_and_predict,
@@ -99,7 +102,7 @@ def prep_gard_input_task(
     return X_train, y_train_rechunked, X_pred_rechunked.sel(time=predict_period)
 
 
-with Flow(name='gard-flow') as gard_flow:
+with Flow(name='gard-flow',storage=run_config.storage, run_config=run_config.run_config, executor=run_config.executor) as gard_flow:
     obs = Parameter("OBS")
     gcm = Parameter("GCM")
     scenario = Parameter("SCENARIO")
