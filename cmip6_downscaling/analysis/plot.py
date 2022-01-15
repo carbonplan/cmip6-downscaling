@@ -5,6 +5,10 @@ import xarray as xr
 from carbonplan import styles
 import xarray as xr
 import seaborn as sns
+import xarray as xr
+from carbonplan import styles
+
+styles.mpl.set_theme(style='carbonplan_light')
 
 styles.mpl.set_theme(style='carbonplan_light')
 

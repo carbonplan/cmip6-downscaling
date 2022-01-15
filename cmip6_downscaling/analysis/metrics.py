@@ -2,6 +2,8 @@ import numpy as np
 import xarray as xr
 from esda.moran import Moran
 import xarray as xr
+from esda.moran import Moran
+
 
 def weighted_mean(ds, *args, **kwargs):
     weights = ds.time.dt.days_in_month
@@ -98,15 +100,15 @@ def metric_calc(ds, metric, dim='time', skipna=False):
         raise NotImplementedError
 
 def metric_calc(ds, metric, dim='time', skipna=False):
-    if metric=='mean':
+    if metric == 'mean':
         return ds.mean(dim='time', skipna=skipna)
-    elif metric=='median':
+    elif metric == 'median':
         return ds.median(dim='time', skipna=skipna)
-    elif metric=='std':
+    elif metric == 'std':
         return ds.std(dim='time', skipna=skipna)
     elif 'percentile' in metric:
         # parse the percentile
-        percentile = float(metric.split('percentile')[1])/100
+        percentile = float(metric.split('percentile')[1]) / 100
         ds = ds.chunk({'time': -1})
         return ds.quantile(percentile, dim='time', skipna=skipna)
     else:
@@ -225,5 +227,3 @@ def monthly_variability(ds, method='sum'):
         return ds.groupby('time.month').sum().std(dim='time')
     elif method == 'mean':
         return ds.groupby('time.month').sum().std(dim='time')
-
-
