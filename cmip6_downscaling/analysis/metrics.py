@@ -97,6 +97,20 @@ def metric_calc(ds, metric, dim='time', skipna=False):
     else:
         raise NotImplementedError
 
+def metric_calc(ds, metric, dim='time', skipna=False):
+    if metric=='mean':
+        return ds.mean(dim='time', skipna=skipna)
+    elif metric=='median':
+        return ds.median(dim='time', skipna=skipna)
+    elif metric=='std':
+        return ds.std(dim='time', skipna=skipna)
+    elif 'percentile' in metric:
+        # parse the percentile
+        percentile = float(metric.split('percentile')[1])/100
+        ds = ds.chunk({'time': -1})
+        return ds.quantile(percentile, dim='time', skipna=skipna)
+    else:
+        raise NotImplementedError
 
 def wet_day_amount(ds: xr.Dataset, method: str = 'mean', threshold: float = 0.01):
     """Extract days that received precipitation above a given threshold
@@ -211,3 +225,5 @@ def monthly_variability(ds, method='sum'):
         return ds.groupby('time.month').sum().std(dim='time')
     elif method == 'mean':
         return ds.groupby('time.month').sum().std(dim='time')
+
+

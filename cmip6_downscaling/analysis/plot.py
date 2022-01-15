@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import xarray as xr
 from carbonplan import styles
+import xarray as xr
+import seaborn as sns
 
 styles.mpl.set_theme(style='carbonplan_light')
 
