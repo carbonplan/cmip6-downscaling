@@ -5,6 +5,7 @@ os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "true"
 from prefect import Flow, Parameter, task
 from xpersist.prefect.result import XpersistResult
 
+from cmip6_downscaling.analysis.analysis import annual_summary, monthly_summary, run_analyses
 from cmip6_downscaling.config.config import (  # dask_executor,; kubernetes_run_config,; storage,
     intermediate_cache_store,
     results_cache_store,
@@ -20,12 +21,6 @@ from cmip6_downscaling.methods.bcsd import (
     return_x_predict_rechunked,
     return_x_train_full_time,
     return_y_full_time,
-)
-
-from cmip6_downscaling.analysis.analysis import (
-    monthly_summary,
-    annual_summary,
-    run_analyses
 )
 
 # Transform Functions into Tasks -----------------------------------------------------------
@@ -92,9 +87,9 @@ annual_summary_task = task(
 
 run_analyses_task = task(
     run_analyses,
-    log_stdout=True, 
-    # TODO: Force a dependency on whether postprocess_bcsd_task has 
-    # re-run. If it hasn't, then this task doesn't need to run again. 
+    log_stdout=True,
+    # TODO: Force a dependency on whether postprocess_bcsd_task has
+    # re-run. If it hasn't, then this task doesn't need to run again.
     # However, this step doesn't take `postprocess_bcsd_task` as an input
     # so it needs to have an explicit dependency.
 )
@@ -200,14 +195,8 @@ with Flow(name="bcsd-testing") as flow:
         postprocess_bcsd_ds,
     )
 
-    annual_summary_ds = annual_summary_task(
-        postprocess_bcsd_ds
-    )
+    annual_summary_ds = annual_summary_task(postprocess_bcsd_ds)
 
     run_analyses_task(
-        {'run_id': target_naming_string,
-        'var': variable,
-        'gcm': gcm,
-        'scenario': scenario}
+        {'run_id': target_naming_str, 'var': variable, 'gcm': gcm, 'scenario': scenario}
     )
-

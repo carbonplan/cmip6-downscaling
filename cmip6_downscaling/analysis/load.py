@@ -29,13 +29,16 @@ def load_obs():
 
     return ds
 
-def load_downscaled_ds(VARIABLE: str = 'tasmax',
-                        GCM: str = "MIROC6",
-                        TRAIN_PERIOD_START: str = "1990",
-                        TRAIN_PERIOD_END: str = "1990",
-                        PREDICT_PERIOD_START:str ='2079',
-                        PREDICT_PERIOD_END:str ='2079',
-                        DOWNSCALE_METHOD:str ='bcsd',
-                        SCENARIO:str ='ssp370') -> xr.Dataset:
+
+def load_downscaled_ds(
+    VARIABLE: str = 'tasmax',
+    GCM: str = "MIROC6",
+    TRAIN_PERIOD_START: str = "1990",
+    TRAIN_PERIOD_END: str = "1990",
+    PREDICT_PERIOD_START: str = '2079',
+    PREDICT_PERIOD_END: str = '2079',
+    DOWNSCALE_METHOD: str = 'bcsd',
+    SCENARIO: str = 'ssp370',
+) -> xr.Dataset:
     path = f"az://cmip6/results/{DOWNSCALE_METHOD}_{SCENARIO}_{GCM}_{PREDICT_PERIOD_START}_{PREDICT_PERIOD_END}_{VARIABLE}.zarr"
     return xr.open_zarr(path)
