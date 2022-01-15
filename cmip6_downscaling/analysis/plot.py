@@ -55,7 +55,7 @@ def plot_cdfs(obs_ds,
     fig, axarr = plt.subplots(ncols=ncols, nrows=(int(len(obs_ds.cities)/ncols))+1, figsize=(15,60), sharey=True, sharex=sharex)
     for i, city in enumerate(top_cities.city.values):
         ax = axarr.reshape(-1)[i]
-        sns.ecdfplot(data=obs_ds.isel(cities=city), label=f'ERA5 ({training_period.start}-{training_period.stop})', ax=ax, color='#1b1e23')
+        sns.ecdfplot(data=obs_ds.isel(cities=i), label=f'ERA5 ({training_period.start}-{training_period.stop})', ax=ax, color='#1b1e23')
         sns.ecdfplot(data=historical_downscaled.isel(cities=i), 
                     label=f'Downscaled GCM ({training_period.start}-{training_period.stop})', 
                     color='#8b9fd1',
