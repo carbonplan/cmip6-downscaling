@@ -1,6 +1,7 @@
 import numpy as np
-from esda.moran import Moran
 import xarray as xr
+from esda.moran import Moran
+
 
 def weighted_mean(ds, *args, **kwargs):
     weights = ds.time.dt.days_in_month
@@ -60,13 +61,15 @@ def calc(obj, compute=False):
 
     return metrics
 
+
 def days_temperature_threshold(ds, threshold_direction, value):
     if threshold_direction == 'over':
         return (ds > value).groupby('time.year').sum().mean(dim='year')
     elif threshold_direction == 'under':
         return (ds < value).groupby('time.year').sum().mean(dim='year')
 
-def is_wet_day(ds : xr.Dataset, threshold : float = 0.01):
+
+def is_wet_day(ds: xr.Dataset, threshold: float = 0.01):
     """[summary]
 
     Parameters
@@ -76,25 +79,26 @@ def is_wet_day(ds : xr.Dataset, threshold : float = 0.01):
     threshold : float, optional
         the threshold for precipitation (mm/day) above which a day is consisdered wet, by default 0.01
     """
-    return  ds > threshold
+    return ds > threshold
+
 
 def metric_calc(ds, metric, dim='time', skipna=False):
-    if metric=='mean':
+    if metric == 'mean':
         return ds.mean(dim='time', skipna=skipna)
-    elif metric=='median':
+    elif metric == 'median':
         return ds.median(dim='time', skipna=skipna)
-    elif metric=='std':
+    elif metric == 'std':
         return ds.std(dim='time', skipna=skipna)
     elif 'percentile' in metric:
         # parse the percentile
-        percentile = float(metric.split('percentile')[1])/100
+        percentile = float(metric.split('percentile')[1]) / 100
         ds = ds.chunk({'time': -1})
         return ds.quantile(percentile, dim='time', skipna=skipna)
     else:
         raise NotImplementedError
 
 
-def wet_day_amount(ds : xr.Dataset, method : str = 'mean', threshold : float = 0.01):
+def wet_day_amount(ds: xr.Dataset, method: str = 'mean', threshold: float = 0.01):
     """Extract days that received precipitation above a given threshold
     and then do statistics on them.
 
@@ -110,18 +114,21 @@ def wet_day_amount(ds : xr.Dataset, method : str = 'mean', threshold : float = 0
     Returns
     -------
     xr.Dataset
-        
+
 
     Raises
     ------
     NotImplementedError
         [description]
     """
-    assert 'pr' in ds,'Precipitation not in dataset'
+    assert 'pr' in ds, 'Precipitation not in dataset'
     wet_day = ds.where(is_wet_day(ds, threshold=threshold))
-    return metric_calc(wet_day, metric, skipna=True)
+    return metric_calc(wet_day, method, skipna=True)
 
-def probability_two_consecutive_days(ds : xr.Dataset, kind_of_day : str = 'wet', threshold : float = 0.01):
+
+def probability_two_consecutive_days(
+    ds: xr.Dataset, kind_of_day: str = 'wet', threshold: float = 0.01
+):
     """Contitional probability of a day being the same as the day before.
     So, given the fact that it was wet yesterday, what is the probability it will be wet today.
     Or, if it was dry yesterday, what is probability it will be dry today.
@@ -143,11 +150,12 @@ def probability_two_consecutive_days(ds : xr.Dataset, kind_of_day : str = 'wet',
     if kind_of_day == 'wet':
         valid_days = is_wet_day(ds, threshold=threshold)
     elif kind_of_day == 'dry':
-         valid_days = ~is_wet_day(ds, threshold=threshold)
+        valid_days = ~is_wet_day(ds, threshold=threshold)
     yesterday_valid = valid_days.roll({'time': 1})
     return valid_days.where(yesterday_valid).mean(dim='time', skipna=True)
-    
-def probability_wet(ds : xr.Dataset, threshold: float = 0.01):
+
+
+def probability_wet(ds: xr.Dataset, threshold: float = 0.01):
     """
     Unconditional probability of a day being wet
 
@@ -160,6 +168,7 @@ def probability_wet(ds : xr.Dataset, threshold: float = 0.01):
     """
     return is_wet_day(ds, threshold=threshold).mean(dim='time')
 
+
 def spell_length_stat(timeseries: np.array, method: str = 'mean') -> float:
     """
     Statistic about length of a spell of boolean values.
@@ -171,36 +180,34 @@ def spell_length_stat(timeseries: np.array, method: str = 'mean') -> float:
     method : str
         String corresponding to the final statistic you want (mean, std, or percentile)
     """
-    # add a 0 to help with spells at beginning or end of series 
+    # add a 0 to help with spells at beginning or end of series
     timeseries = np.append(timeseries, [0])
     yesterday = np.roll(timeseries, 1)
     changes = timeseries - yesterday
-    spell_starts = np.argwhere(changes==1)
-    spell_ends = np.argwhere(changes==-1)
-    spells=(spell_ends-spell_starts)
-    if method=='mean':
+    spell_starts = np.argwhere(changes == 1)
+    spell_ends = np.argwhere(changes == -1)
+    spells = spell_ends - spell_starts
+    if method == 'mean':
         return np.mean(spells)
-    elif method=='std':
+    elif method == 'std':
         return np.std(spells)
     elif 'percentile' in method:
         # parse the percentile
-        percentile = float(method.split('percentile')[1])/100
+        percentile = float(method.split('percentile')[1]) / 100
         return np.quantile(spells, percentile)
     else:
         raise NotImplementedError
 
+
 def apply_spell_length(wet_days: xr.Dataset, metric: str = 'mean'):
-    wet_spell_length = xr.apply_ufunc(metrics.spell_length_stat, 
-                                      wet_days, 
-                                      metric,
-                                      input_core_dims=[['time'], []],
-                                      vectorize=True)
+    wet_spell_length = xr.apply_ufunc(
+        spell_length_stat, wet_days, metric, input_core_dims=[['time'], []], vectorize=True
+    )
     return wet_spell_length
 
+
 def monthly_variability(ds, method='sum'):
-    if method=='sum':
+    if method == 'sum':
         return ds.groupby('time.month').sum().std(dim='time')
-    elif method=='mean':
+    elif method == 'mean':
         return ds.groupby('time.month').sum().std(dim='time')
-
-
