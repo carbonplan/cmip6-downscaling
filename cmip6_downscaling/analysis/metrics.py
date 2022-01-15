@@ -78,8 +78,23 @@ def is_wet_day(ds : xr.Dataset, threshold : float = 0.01):
     """
     return  ds > threshold
 
+def metric_calc(ds, metric, dim='time', skipna=False):
+    if metric=='mean':
+        return ds.mean(dim='time', skipna=skipna)
+    elif metric=='median':
+        return ds.median(dim='time', skipna=skipna)
+    elif metric=='std':
+        return ds.std(dim='time', skipna=skipna)
+    elif 'percentile' in metric:
+        # parse the percentile
+        percentile = float(metric.split('percentile')[1])/100
+        ds = ds.chunk({'time': -1})
+        return ds.quantile(percentile, dim='time', skipna=skipna)
+    else:
+        raise NotImplementedError
 
-def wet_day_stat(ds : xr.Dataset, method : str = 'mean', threshold : float = 0.01):
+
+def wet_day_amount(ds : xr.Dataset, method : str = 'mean', threshold : float = 0.01):
     """Extract days that received precipitation above a given threshold
     and then do statistics on them.
 
@@ -104,20 +119,7 @@ def wet_day_stat(ds : xr.Dataset, method : str = 'mean', threshold : float = 0.0
     """
     assert 'pr' in ds,'Precipitation not in dataset'
     wet_day = ds.where(is_wet_day(ds, threshold=threshold))
-    skipna = True
-    if method=='mean':
-        return wet_day.mean(dim='time', skipna=skipna)
-    elif method=='median':
-        return wet_day.median(dim='time', skipna=skipna)
-    elif method=='std':
-        return wet_day.std(dim='time', skipna=skipna)
-    elif 'percentile' in method:
-        # parse the percentile
-        percentile = float(method.split('percentile')[1])/100
-        wet_day = wet_day.chunk({'time': -1})
-        return wet_day.quantile(percentile, dim='time', skipna=skipna)
-    else:
-        raise NotImplementedError
+    return metric_calc(wet_day, metric, skipna=True)
 
 def probability_two_consecutive_days(ds : xr.Dataset, kind_of_day : str = 'wet', threshold : float = 0.01):
     """Contitional probability of a day being the same as the day before.
@@ -158,10 +160,24 @@ def probability_wet(ds : xr.Dataset, threshold: float = 0.01):
     """
     return is_wet_day(ds, threshold=threshold).mean(dim='time')
 
-def spell_length_stat(arr, method='mean'):
-    s = ''.join( [str(int(i)) for i in arr] )
-    parts = s.split('0')
-    spells = [len(p) for p in parts if len(p) > 0]
+def spell_length_stat(timeseries: np.array, method: str = 'mean') -> float:
+    """
+    Statistic about length of a spell of boolean values.
+
+    Parameters
+    ----------
+    timeseries : numpy array
+        Array of booleans denoting a day being (for example) wet or dry.
+    method : str
+        String corresponding to the final statistic you want (mean, std, or percentile)
+    """
+    # add a 0 to help with spells at beginning or end of series 
+    timeseries = np.append(timeseries, [0])
+    yesterday = np.roll(timeseries, 1)
+    changes = timeseries - yesterday
+    spell_starts = np.argwhere(changes==1)
+    spell_ends = np.argwhere(changes==-1)
+    spells=(spell_ends-spell_starts)
     if method=='mean':
         return np.mean(spells)
     elif method=='std':
@@ -170,9 +186,21 @@ def spell_length_stat(arr, method='mean'):
         # parse the percentile
         percentile = float(method.split('percentile')[1])/100
         return np.quantile(spells, percentile)
+    else:
+        raise NotImplementedError
+
+def apply_spell_length(wet_days: xr.Dataset, metric: str = 'mean'):
+    wet_spell_length = xr.apply_ufunc(metrics.spell_length_stat, 
+                                      wet_days, 
+                                      metric,
+                                      input_core_dims=[['time'], []],
+                                      vectorize=True)
+    return wet_spell_length
 
 def monthly_variability(ds, method='sum'):
     if method=='sum':
         return ds.groupby('time.month').sum().std(dim='time')
     elif method=='mean':
         return ds.groupby('time.month').sum().std(dim='time')
+
+
