@@ -2,6 +2,8 @@ from .qaqc import make_qaqc_ds
 import pandas as pd
 import cartopy.crs as ccrs
 import matplotlib.pyplot as plt
+import xarray as xr
+from cmip6_downscaling.data.cmip import convert_to_360
 
 analysis_dir = f"az://cmip6/results/analysis"
 
@@ -114,14 +116,17 @@ def load_top_cities(plot=False):
     return top_cities
 
 def select_points(ds, top_cities):
-    return ds.sel(lat=xr.DataArray(top_cities.lat.values, dims='cities'), 
+    cities = ds.sel(lat=xr.DataArray(top_cities.lat.values, dims='cities'), 
                 lon=xr.DataArray(top_cities.lng.apply(convert_to_360).values, dims='cities'), 
                 method='nearest')
+    cities = cities.assign_coords({'cities': top_cities.city.values})
+    return cities
 
-def grab_top_city_data(obs_ds, downscaled_ds, top_cities):
-    obs = select_points(obs_ds, top_cities).compute()
-    downscaled_ds = select_points(downscaled_ds, top_cities).compute()
-    return obs, downscaled_ds
+def grab_top_city_data(ds_list, top_cities):
+    city_ds_list = []
+    for ds in ds_list:
+        city_ds_list.append(select_points(ds, top_cities).compute())
+    return city_ds_list
 
 def get_seasonal(ds, aggregator='mean'):
     if aggregator=='mean':
@@ -135,3 +140,23 @@ def get_seasonal(ds, aggregator='mean'):
     else:
         raise NotImplementedError
 
+def change_ds(ds_historic, 
+              ds_future, 
+              metrics=['mean', 'std', 'percentile1', 'percentile5', 'percentile95', 'percentile99']):
+    ds = xr.Dataset()
+    for metric in metrics:
+        if metric=='mean':
+            change = ds_future.mean(dim='time') - ds_historic.mean(dim='time')
+        elif metric=='median':
+            change = ds_future.median(dim='time') - ds_historic.median(dim='time')
+        elif metric=='std':
+            change = ds_future.std(dim='time') - ds_historic.std(dim='time')
+        elif 'percentile' in metric:
+            # parse the percentile
+            percentile = float(metric.split('percentile')[1])/100
+            # wet_day = wet_day.chunk({'time': -1})
+            change = ds_future.quantile(percentile, dim='time') - ds_historic.quantile(percentile, dim='time')
+        ds[metric] = change
+    return ds
+    
+    
