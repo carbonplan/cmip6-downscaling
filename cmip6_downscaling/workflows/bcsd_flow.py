@@ -40,7 +40,8 @@ results_cache_store = CacheStore(
 
 from cmip6_downscaling.analysis.analysis import (
     monthly_summary,
-    annual_summary
+    annual_summary,
+    run_analyses
 )
 
 # Transform Functions into Tasks -----------------------------------------------------------
@@ -116,6 +117,15 @@ annual_summary_task = task(
     log_stdout=True,
     result=XpersistResult(results_cache_store, serializer=serializer),
     target="annual-summary-" + target_naming_str,
+)
+
+run_analyses_task = task(
+    run_analyses,
+    log_stdout=True, 
+    # TODO: Force a dependency on whether postprocess_bcsd_task has 
+    # re-run. If it hasn't, then this task doesn't need to run again. 
+    # However, this step doesn't take `postprocess_bcsd_task` as an input
+    # so it needs to have an explicit dependency.
 )
 
 # Main Flow -----------------------------------------------------------
@@ -290,3 +300,11 @@ with Flow(
     annual_summary_ds = annual_summary_task(
         postprocess_bcsd_ds
     )
+
+    run_analyses_task(
+        {'run_id': target_naming_string,
+        'var': variable,
+        'gcm': gcm,
+        'scenario': scenario}
+    )
+
