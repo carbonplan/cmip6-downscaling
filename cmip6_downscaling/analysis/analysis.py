@@ -62,7 +62,6 @@ def run_analyses(parameters):
         'analyses.ipynb', 'analyses_{}.ipynb'.format(parameters['run_id']), parameters=parameters
     )
 
-
 def load_top_cities(plot=False):
     cities = pd.read_csv('worldcities.csv')
     top_cities = (
