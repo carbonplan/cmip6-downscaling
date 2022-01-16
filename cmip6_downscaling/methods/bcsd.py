@@ -1,14 +1,16 @@
 import os
+os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "true"
 from typing import Tuple
-
+import pdb
 import fsspec
 import xarray as xr
 from skdownscale.pointwise_models import PointWiseDownscaler
 from skdownscale.pointwise_models.bcsd import BcsdPrecipitation, BcsdTemperature
-
+import pdb
 from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
 from cmip6_downscaling.data.cmip import load_cmip
 from cmip6_downscaling.data.observations import open_era5
+import cmip6_downscaling.config.config as config
 from cmip6_downscaling.workflows.utils import (
     delete_chunks_encoding,
     rechunk_zarr_array,
@@ -16,11 +18,10 @@ from cmip6_downscaling.workflows.utils import (
     regrid_dataset,
     subset_dataset,
 )
-from carbonplan_data.metadata import get_cf_global_attrs
-from carbonplan_data.utils import set_zarr_encoding
-import pdb 
 
-connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
+# connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
+cfg = config.CloudConfig()
+connection_string = cfg.connection_string
 fs = fsspec.filesystem('az')
 
 
@@ -562,17 +563,34 @@ def fit_and_predict(
     elif variable in RELATIVE_VARS:
         bcsd_model = BcsdPrecipitation(return_anoms=False)
         print('bcsd_precip chosen')
+
+
     pointwise_model = PointWiseDownscaler(model=bcsd_model, dim=dim)
 
     coarse_obs_rechunked_validated_ds = rechunk_zarr_array_with_caching(
         coarse_obs_full_time_ds, template_chunk_array=gcm_train_subset_full_time_ds
     )
-
     pointwise_model.fit(
         gcm_train_subset_full_time_ds[variable], coarse_obs_rechunked_validated_ds[variable]
     )
     bias_corrected_da = pointwise_model.predict(gcm_predict_rechunked_ds[variable])
+
     bias_corrected_ds = bias_corrected_da.to_dataset(name=variable)
+
+    # #clearing attrs
+    # for atr in ['time','lat','lon']:
+    #     bias_corrected_ds[atr].attrs.clear()
+    #     bias_corrected_ds[atr].encoding.clear()
+
+    # for val in ['time','lat','lon','tasmax']:
+    #     print(val)
+    #     print(bias_corrected_ds[atr].attrs)
+    #     print(bias_corrected_ds[atr].encoding)
+    # print(bias_corrected_ds.attrs)
+    # print(bias_corrected_ds.encoding)
+
+    # pdb.set_trace()
+    bias_corrected_ds = bias_corrected_ds.load()
     return bias_corrected_ds
 
 
@@ -628,7 +646,6 @@ def postprocess_bcsd(
     bcsd_results_ds : xr.Dataset
         Final BCSD dataset
     """
-    pdb.set_trace()
     y_predict_fine, _ = regrid_dataset(
         ds=bias_corrected_ds,
         ds_path=None,
@@ -636,7 +653,6 @@ def postprocess_bcsd(
         variable=variable,
         connection_string=connection_string,
     )
-    print(y_predict_fine)
     bcsd_results_ds = y_predict_fine.groupby("time.month") + spatial_anomalies_ds
     delete_chunks_encoding(bcsd_results_ds)
     bcsd_results_ds = bcsd_results_ds.chunk({'time': 30})

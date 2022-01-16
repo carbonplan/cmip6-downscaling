@@ -50,7 +50,9 @@ class BaseConfig:
 
 class CloudConfig(BaseConfig):
     def __init__(self, **kwargs):
-        self.connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
+        # self.connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
+        self.connection_string = "DefaultEndpointsProtocol=https;AccountName=cmip6downscaling;AccountKey=q2TSTCMWAAf0IRwwZc3Yhhi8vrvYkRynAvS5FPl0amcqZ/gXpbB1BCfYmUYBwasJPYb9VrPjlBHgEwY3M84nSA==;EndpointSuffix=core.windows.net"
+
         self.intermediate_cache_path = "az://flow-outputs/intermediates"
         self.results_cache_path = "az://flow-outputs/results"
         self.agent = ["az-eu-west"]
@@ -174,6 +176,7 @@ class TestConfig(LocalConfig):
 class PangeoConfig(BaseConfig):
     def __init__(self, **kwargs):
         self.connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
+        self.connection_string = "DefaultEndpointsProtocol=https;AccountName=cmip6downscaling;AccountKey=q2TSTCMWAAf0IRwwZc3Yhhi8vrvYkRynAvS5FPl0amcqZ/gXpbB1BCfYmUYBwasJPYb9VrPjlBHgEwY3M84nSA==;EndpointSuffix=core.windows.net"
         self.intermediate_cache_path = "az://flow-outputs/intermediates"
         self.results_cache_path = "az://flow-outputs/results"
 
@@ -183,12 +186,13 @@ class PangeoConfig(BaseConfig):
 
     @property
     def run_config(self) -> Any:  # pragma: no cover
-        config = LocalRun(env={"dask opts?": "1"})
+        config = LocalRun()
         return config
 
     @property
     def executor(self) -> Any:  # pragma: no cover
-        executor = LocalDaskExecutor(scheduler="threads")
+        executor =  LocalExecutor()
+        # executor = LocalDaskExecutor(scheduler="threads")
         return executor
 
 

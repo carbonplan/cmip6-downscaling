@@ -5,9 +5,9 @@
   "TRAIN_PERIOD_END": "1990",
   "PREDICT_PERIOD_START": "2015",
   "PREDICT_PERIOD_END": "2015",
-  "VARIABLE": "pr",
-  "LATMIN": "0",
-  "LATMAX": "10",
-  "LONMIN": "0",
-  "LONMAX": "10"
+  "VARIABLE": "tasmax",
+  "LATMIN": "45",
+  "LATMAX": "50",
+  "LONMIN": "100",
+  "LONMAX": "110"
 }
