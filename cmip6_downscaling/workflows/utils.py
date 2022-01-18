@@ -3,7 +3,7 @@ import random
 import re
 import string
 from typing import Optional, Tuple, Union
-import pdb
+
 import fsspec
 import numpy as np
 import xarray as xr
@@ -14,6 +14,7 @@ from xarray_schema import DataArraySchema, DatasetSchema
 from xarray_schema.base import SchemaError
 
 import cmip6_downscaling.config.config as config
+
 cfg = config.CloudConfig()
 
 intermediate_cache_path = cfg.intermediate_cache_path
@@ -290,7 +291,7 @@ def calc_auspicious_chunks_dict(
     # calculate the bytesize given the dtype
     print(da)
     print(da.dtype)
-    print(da.tasmax.isel(lat=30,lon=30,time=0).values())
+    print(da.tasmax.isel(lat=30, lon=30, time=0).values())
     data_bytesize = int(re.findall(r"\d+", str(da.dtype))[0])
     # calculate single non_chunked_size based upon dtype
     smallest_size_one_chunk = data_bytesize * np.prod(

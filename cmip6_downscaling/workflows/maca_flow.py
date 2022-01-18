@@ -33,6 +33,7 @@ intermediate_cache_store = CacheStore(cfg.intermediate_cache_path)
 results_cache_store = CacheStore(cfg.results_cache_path)
 serializer = cfg.serializer
 
+
 @task(
     checkpoint=True,
     result=XpersistResult(intermediate_cache_store, serializer=serializer),
@@ -411,7 +412,12 @@ def maca_fine_bias_correction_task(
     return bias_corrected
 
 
-with Flow(name='maca-flow',storage=run_config.storage, run_config=run_config.run_config, executor=run_config.executor) as maca_flow:
+with Flow(
+    name='maca-flow',
+    storage=run_config.storage,
+    run_config=run_config.run_config,
+    executor=run_config.executor,
+) as maca_flow:
     # following https://climate.northwestknowledge.net/MACA/MACAmethod.php
 
     obs = Parameter("OBS")

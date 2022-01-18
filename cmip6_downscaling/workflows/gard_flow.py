@@ -27,6 +27,7 @@ from cmip6_downscaling.workflows.paths import (
     make_scrf_path,
 )
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching
+
 run_config = config.get_config()
 cfg = config.CloudConfig()
 
@@ -102,7 +103,12 @@ def prep_gard_input_task(
     return X_train, y_train_rechunked, X_pred_rechunked.sel(time=predict_period)
 
 
-with Flow(name='gard-flow',storage=run_config.storage, run_config=run_config.run_config, executor=run_config.executor) as gard_flow:
+with Flow(
+    name='gard-flow',
+    storage=run_config.storage,
+    run_config=run_config.run_config,
+    executor=run_config.executor,
+) as gard_flow:
     obs = Parameter("OBS")
     gcm = Parameter("GCM")
     scenario = Parameter("SCENARIO")

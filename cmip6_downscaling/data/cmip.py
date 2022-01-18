@@ -15,6 +15,8 @@ from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching
 variable_ids = ['pr', 'tasmin', 'tasmax', 'rsds', 'hurs', 'ps']
 
 cfg = config.CloudConfig()
+
+
 def check_variable_ids_in_df(df):
     unique_vars = df['variable_id'].unique()
     return all(v in unique_vars for v in variable_ids)

@@ -13,6 +13,7 @@ from xarray.core.types import T_Xarray
 from xpersist import CacheStore
 from xpersist.prefect.result import XpersistResult
 
+import cmip6_downscaling.config.config as config
 from cmip6_downscaling.data.cmip import get_gcm, get_gcm_grid_spec, load_cmip
 from cmip6_downscaling.data.observations import get_obs
 from cmip6_downscaling.methods.bias_correction import (
@@ -29,7 +30,7 @@ from cmip6_downscaling.workflows.paths import (
     make_interpolated_obs_path,
 )
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching, regrid_ds
-import cmip6_downscaling.config.config as config
+
 cfg = config.CloudConfig()
 
 intermediate_cache_store = CacheStore(cfg.intermediate_cache_path)

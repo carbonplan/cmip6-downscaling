@@ -5,11 +5,12 @@ from abc import abstractmethod
 from typing import Any
 
 from dask_kubernetes import KubeCluster, make_pod_spec
-from prefect.executors import DaskExecutor, LocalDaskExecutor, LocalExecutor
+from prefect.executors import DaskExecutor, LocalDaskExecutor, LocalExecutor  # noqa: F401
 from prefect.run_configs import KubernetesRun, LocalRun
 from prefect.storage import Azure, Local
 
 # Add new config that is hybrid or local compute, but has prefect storage access (ie. what I've been using to debug. Local is now non-write permissions.)
+
 
 class BaseConfig:
     """Base configuration class that defines abstract methods (storage, run_config and executor) for subclasses.
@@ -41,6 +42,7 @@ class BaseConfig:
     @abstractmethod
     def executor(self) -> Any:  # pragma: no cover
         pass
+
 
 class CloudConfig(BaseConfig):
     def __init__(self, **kwargs):
@@ -110,7 +112,6 @@ class CloudConfig(BaseConfig):
             adapt_kwargs={"minimum": 2, "maximum": 2},
         )
 
-
         return executor
 
 
@@ -165,7 +166,7 @@ class PangeoConfig(BaseConfig):
 
     @property
     def executor(self) -> Any:  # pragma: no cover
-        executor =  LocalExecutor()
+        executor = LocalExecutor()
         # executor = LocalDaskExecutor(scheduler="threads")
         return executor
 
