@@ -20,6 +20,7 @@ cfg = config.CloudConfig()
 intermediate_cache_store = CacheStore(cfg.intermediate_cache_path)
 serializer = cfg.serializer
 
+
 from cmip6_downscaling.data.cmip import get_gcm, get_gcm_grid_spec, load_cmip
 from cmip6_downscaling.data.observations import get_obs
 from cmip6_downscaling.methods.bias_correction import (
@@ -38,6 +39,7 @@ from cmip6_downscaling.workflows.paths import (
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching, regrid_ds
 
 get_obs_task = task(get_obs)
+
 get_gcm_task = task(get_gcm)
 
 
@@ -51,6 +53,7 @@ def rechunker_task(
 ):
     """
     Task to rechunk a dataset
+
     Parameters
     ----------
     zarr_array : zarr or xarray dataset
@@ -64,6 +67,7 @@ def rechunker_task(
     naming_func: callable, optional
         A function that returns a string that represents the output caching location that the rechunk task should save to.
         The input arguments of this naming func must be provided as kwargs to this method
+
     Returns
     -------
     rechunked_ds : xr.Dataset
@@ -179,6 +183,7 @@ def get_coarse_obs_task(
         ds=ds_obs,
         target_grid_ds=gcm_grid,
         connection_string=cfg.connection_string,
+
     )
 
     if chunking_approach != 'full_space':
@@ -431,14 +436,17 @@ def to_standard_calendar(obj: T_Xarray) -> T_Xarray:
     """Convert a Dataset's calendar to the "standard calendar"
     When necessary, "missing" time points are filled in using linear interpolation.
     Valid input dataset calendars include: `noleap`, `365_day`, `366_day`, and `all_leap`.
+
     Parameters
     ----------
     obj : xr.Dataset or xr.DataArray
         Xarray object with a `CFTimeIndex`.
+
     Returns
     -------
     obj_new : xr.Dataset or xr.DataArray
         Xarray object with standard calendar.
+
     Raises
     ------
     ValueError

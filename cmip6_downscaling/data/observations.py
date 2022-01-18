@@ -95,6 +95,7 @@ def get_obs(
     ds_obs_rechunked = rechunk_zarr_array_with_caching(
         zarr_array=ds_obs,
         connection_string=cfg.connection_string,
+
         chunking_approach=chunking_approach,
         output_path=rechunked_path,
     )

@@ -30,6 +30,10 @@ serializer = cfg.serializer
 
 target_naming_str = "{gcm}-{scenario}-{train_period_start}-{train_period_end}-{predict_period_start}-{predict_period_end}-{latmin}-{latmax}-{lonmin}-{lonmax}-{variable}.zarr"
 
+intermediate_cache_store = CacheStore(config.return_azure_config()["intermediate_cache_path"])
+results_cache_store = CacheStore(config.return_azure_config()["results_cache_path"])
+serializer = config.return_azure_config()["serializer"]
+
 make_flow_paths_task = task(make_flow_paths, log_stdout=True, nout=4)
 
 return_obs_task = task(
@@ -244,3 +248,4 @@ with Flow(
         lonmin,
         lonmax,
     )
+
