@@ -9,13 +9,7 @@ from prefect.executors import DaskExecutor, LocalDaskExecutor, LocalExecutor
 from prefect.run_configs import KubernetesRun, LocalRun
 from prefect.storage import Azure, Local
 
-# todo:
-
-
-# prefect-cloud config has @property decs to repeat for other config subclasses.
-# connection_string should only live in prefect-cloud and pangeo and hybrid. The other ones we won't write data, so we don't need write permissions.
 # Add new config that is hybrid or local compute, but has prefect storage access (ie. what I've been using to debug. Local is now non-write permissions.)
-
 
 class BaseConfig:
     """Base configuration class that defines abstract methods (storage, run_config and executor) for subclasses.
@@ -48,21 +42,14 @@ class BaseConfig:
     def executor(self) -> Any:  # pragma: no cover
         pass
 
-    # def __init__(self, **kwargs):
-    #     self.connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
-    #     #intermediate and results don't belong here
-    #     self.intermediate_cache_path = "az://flow-outputs/intermediate"
-    #     self.results_cache_path = "az://flow-outputs/results"
-    #     self.__dict__.update(kwargs)
-
-
 class CloudConfig(BaseConfig):
     def __init__(self, **kwargs):
         self.connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
-        self.intermediate_cache_path = "az://flow-outputs/intermediate"
+
+        self.intermediate_cache_path = "az://flow-outputs/intermediates"
         self.results_cache_path = "az://flow-outputs/results"
         self.agent = ["az-eu-west"]
-        self.extra_pip_packages = "git+https://github.com/carbonplan/cmip6-downscaling.git?esmf_threading git+https://github.com/pangeo-data/scikit-downscale.git"
+        self.extra_pip_packages = "git+https://github.com/carbonplan/cmip6-downscaling.git@esmf_threading git+https://github.com/pangeo-data/scikit-downscale.git"
         self.serializer = "xarray.zarr"
         self.kubernetes_cpu = 7
         self.kubernetes_memory = "16Gi"
@@ -106,26 +93,25 @@ class CloudConfig(BaseConfig):
 
     @property
     def executor(self) -> Any:  # pragma: no cover
+
         pod_spec = make_pod_spec(
             image=self.image,
-            memory_limit=self.pod_memory_limit,
-            memory_request=self.pod_memory_request,
-            threads_per_worker=self.pod_threads_per_worker,
-            cpu_limit=self.pod_cpu_limit,
-            cpu_request=self.pod_cpu_request,
+            memory_limit="4Gi",
+            memory_request="4Gi",
+            threads_per_worker=2,
+            cpu_limit=2,
+            cpu_request=2,
             env=self.generate_env(),
         )
+        pod_spec.spec.containers[0].args.extend(['--resources', 'TASKSLOTS=1'])
 
-        pod_spec.spec.containers[0].args.extend(["--resources", "TASKSLOTS=1"])
-
-        daskExecutor = DaskExecutor(
-            cluster_class=lambda: KubeCluster(
-                pod_spec,
-                deploy_mode=self.deploy_mode,
-                adapt_kwargs={"minimum": self.adapt_min, "maximum": self.adapt_max},
-            )
+        executor = DaskExecutor(
+            cluster_class=lambda: KubeCluster(pod_spec, deploy_mode='remote'),
+            adapt_kwargs={"minimum": 2, "maximum": 2},
         )
-        return daskExecutor
+
+
+        return executor
 
 
 class LocalConfig(BaseConfig):
@@ -165,7 +151,7 @@ class TestConfig(LocalConfig):
 class PangeoConfig(BaseConfig):
     def __init__(self, **kwargs):
         self.connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
-        self.intermediate_cache_path = "az://flow-outputs/intermediate"
+        self.intermediate_cache_path = "az://flow-outputs/intermediates"
         self.results_cache_path = "az://flow-outputs/results"
 
     @property
@@ -174,12 +160,13 @@ class PangeoConfig(BaseConfig):
 
     @property
     def run_config(self) -> Any:  # pragma: no cover
-        config = LocalRun(env={"dask opts?": "1"})
+        config = LocalRun()
         return config
 
     @property
     def executor(self) -> Any:  # pragma: no cover
-        executor = LocalDaskExecutor(scheduler="threads")
+        executor =  LocalExecutor()
+        # executor = LocalDaskExecutor(scheduler="threads")
         return executor
 
 
@@ -194,10 +181,13 @@ def get_config(name=None, **kwargs):
         config = PangeoConfig(**kwargs)
     elif os.environ.get("CI") == "true":
         config = TestConfig(**kwargs)
+        print('TestConfig selected from os.environ')
     elif os.environ.get("PREFECT__BACKEND") == "cloud":
         config = CloudConfig(**kwargs)
+        print('PrefectCloudConfig selected from os.environ')
     elif 'JUPYTER_IMAGE' in os.environ:
         config = PangeoConfig(**kwargs)
+        print('PangeoConfig selected from os.environ')
     else:
         ValueError(
             "Name not in ['test', 'local', 'prefect-cloud', 'pangeo'] and environment variable not found for: [CI, PREFECT__BACKEND, PANGEO__BACKEND or TEST]"
