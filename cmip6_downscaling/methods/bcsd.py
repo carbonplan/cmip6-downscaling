@@ -19,7 +19,6 @@ from cmip6_downscaling.workflows.utils import (
     subset_dataset,
 )
 
-# connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 cfg = config.CloudConfig()
 connection_string = cfg.connection_string
 fs = fsspec.filesystem('az')
@@ -269,7 +268,6 @@ def get_spatial_anomalies(
         variable=variable,
         connection_string=connection_string,
     )
-    print('obs interpolated ', obs_interpolated)
     obs_rechunked, _ = rechunk_zarr_array(
         obs_ds,
         None,
@@ -278,13 +276,9 @@ def get_spatial_anomalies(
         connection_string=connection_string,
         max_mem='1GB',
     )
-    print('obs rechunked ', obs_rechunked)
 
     spatial_anomalies = obs_interpolated - obs_rechunked
-    print('spatial_anomalies ', obs_rechunked)
-
     seasonal_cycle_spatial_anomalies = spatial_anomalies.groupby("time.month").mean()
-    print('seasonal_cycle_spatial_anomalies ', seasonal_cycle_spatial_anomalies)
 
     return seasonal_cycle_spatial_anomalies
 
@@ -398,16 +392,13 @@ def return_gcm_train_full_time(
         x_train rechunked dataset in full time.
     """
     gcm_train_ds = load_cmip(source_ids=gcm, variable_ids=[variable], return_type='xr')
-    print(gcm_train_ds)
     gcm_train_ds_subset = subset_dataset(
         gcm_train_ds, train_period_start, train_period_end, latmin, latmax, lonmin, lonmax
     )
-    print(gcm_train_ds_subset)
 
     # Q: Ask Ori why this exists
     gcm_train_ds_subset['time'] = coarse_obs_full_time_ds.time.values
 
-    print(gcm_train_ds_subset)
     gcm_train_subset_full_time_ds = rechunk_zarr_array_with_caching(
         gcm_train_ds_subset,
         chunking_approach='full_time',
@@ -465,7 +456,6 @@ def return_gcm_predict_rechunked(
     xr.Dataset
         gcm predict rechunked dataset
     """
-    print('gcm_predict_ds')
     gcm_predict_ds = load_cmip(
         source_ids=gcm,
         activity_ids='ScenarioMIP',
@@ -559,12 +549,9 @@ def fit_and_predict(
     """
     if variable in ABSOLUTE_VARS:
         bcsd_model = BcsdTemperature(return_anoms=False)
-        print('bcsd_temp chosen')
     elif variable in RELATIVE_VARS:
         bcsd_model = BcsdPrecipitation(return_anoms=False)
-        print('bcsd_precip chosen')
 
-    # pdb.set_trace()
 
     pointwise_model = PointWiseDownscaler(model=bcsd_model, dim=dim)
 
@@ -578,20 +565,6 @@ def fit_and_predict(
 
     bias_corrected_ds = bias_corrected_da.astype('float32').to_dataset(name=variable)
 
-    #clearing attrs
-    # for atr in ['time','lat','lon']:
-    #     bias_corrected_ds[atr].attrs.clear()
-    #     bias_corrected_ds[atr].encoding.clear()
-
-    # for val in ['time','lat','lon','tasmax']:
-    #     print(val)
-    #     print(bias_corrected_ds[atr].attrs)
-    #     print(bias_corrected_ds[atr].encoding)
-    # print(bias_corrected_ds.attrs)
-    # print(bias_corrected_ds.encoding)
-    # print(bias_corrected_ds)
-    # bias_corrected_ds = bias_corrected_ds.load()
-    # pdb.set_trace()
     return bias_corrected_ds
 
 

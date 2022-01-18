@@ -234,9 +234,7 @@ def rechunk_zarr_array(
             # make new stores in case it failed mid-write. alternatively could clean up that store but
             # we don't have delete permission currently
             temp_store, target_store, path_tgt = make_rechunker_stores(connection_string)
-            print(chunks_dict[variable])
             delete_chunks_encoding(zarr_array)
-            print(zarr_array.chunk(chunks_dict[variable]))
             # TODO: will always work but need to double check the result and if it's taking a long time
             rechunk_plan = rechunk(
                 zarr_array.chunk(chunks_dict[variable]),
