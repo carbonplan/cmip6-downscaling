@@ -19,8 +19,8 @@ from cmip6_downscaling.methods.bcsd import (
     return_obs,
 )
 
-run_config = config.get_config('local')
-# run_config = config.get_config()
+# run_config = config.get_config('local')
+run_config = config.get_config()
 
 cfg = config.CloudConfig()
 intermediate_cache_store = CacheStore(cfg.intermediate_cache_path)
@@ -231,18 +231,18 @@ with Flow(
         lonmax,
     )
     # postprocess_bcsd_task(s):
-    # postprocess_bcsd_ds = postprocess_bcsd_task(
-    #     bias_corrected_ds,
-    #     spatial_anomalies_ds,
-    #     gcm,
-    #     scenario,
-    #     train_period_start,
-    #     train_period_end,
-    #     predict_period_start,
-    #     predict_period_end,
-    #     variable,
-    #     latmin,
-    #     latmax,
-    #     lonmin,
-    #     lonmax,
-    # )
+    postprocess_bcsd_ds = postprocess_bcsd_task(
+        bias_corrected_ds,
+        spatial_anomalies_ds,
+        gcm,
+        scenario,
+        train_period_start,
+        train_period_end,
+        predict_period_start,
+        predict_period_end,
+        variable,
+        latmin,
+        latmax,
+        lonmin,
+        lonmax,
+    )

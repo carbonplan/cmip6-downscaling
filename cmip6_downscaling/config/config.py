@@ -50,8 +50,7 @@ class BaseConfig:
 
 class CloudConfig(BaseConfig):
     def __init__(self, **kwargs):
-        # self.connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
-        self.connection_string = "DefaultEndpointsProtocol=https;AccountName=cmip6downscaling;AccountKey=q2TSTCMWAAf0IRwwZc3Yhhi8vrvYkRynAvS5FPl0amcqZ/gXpbB1BCfYmUYBwasJPYb9VrPjlBHgEwY3M84nSA==;EndpointSuffix=core.windows.net"
+        self.connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 
         self.intermediate_cache_path = "az://flow-outputs/intermediates"
         self.results_cache_path = "az://flow-outputs/results"
@@ -100,24 +99,6 @@ class CloudConfig(BaseConfig):
 
     @property
     def executor(self) -> Any:  # pragma: no cover
-        # pod_spec = make_pod_spec(
-        #     image=self.image,
-        #     memory_limit=self.pod_memory_limit,
-        #     memory_request=self.pod_memory_request,
-        #     threads_per_worker=self.pod_threads_per_worker,
-        #     cpu_limit=self.pod_cpu_limit,
-        #     cpu_request=self.pod_cpu_request,
-        #     env=self.generate_env(),
-        # )
-
-        # pod_spec.spec.containers[0].args.extend(["--resources", "TASKSLOTS=1"])
-        # daskExecutor = DaskExecutor(
-        #     cluster_class=lambda: KubeCluster(
-        #         pod_spec,
-        #         deploy_mode=self.deploy_mode,
-        #         adapt_kwargs={"minimum": self.adapt_min, "maximum": self.adapt_max},
-        #     )
-        # )
 
         pod_spec = make_pod_spec(
             image=self.image,
@@ -176,7 +157,6 @@ class TestConfig(LocalConfig):
 class PangeoConfig(BaseConfig):
     def __init__(self, **kwargs):
         self.connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
-        self.connection_string = "DefaultEndpointsProtocol=https;AccountName=cmip6downscaling;AccountKey=q2TSTCMWAAf0IRwwZc3Yhhi8vrvYkRynAvS5FPl0amcqZ/gXpbB1BCfYmUYBwasJPYb9VrPjlBHgEwY3M84nSA==;EndpointSuffix=core.windows.net"
         self.intermediate_cache_path = "az://flow-outputs/intermediates"
         self.results_cache_path = "az://flow-outputs/results"
 
@@ -207,10 +187,13 @@ def get_config(name=None, **kwargs):
         config = PangeoConfig(**kwargs)
     elif os.environ.get("CI") == "true":
         config = TestConfig(**kwargs)
+        print('TestConfig selected from os.environ')
     elif os.environ.get("PREFECT__BACKEND") == "cloud":
         config = CloudConfig(**kwargs)
+        print('PrefectCloudConfig selected from os.environ')
     elif 'JUPYTER_IMAGE' in os.environ:
         config = PangeoConfig(**kwargs)
+        print('PangeoConfig selected from os.environ')
     else:
         ValueError(
             "Name not in ['test', 'local', 'prefect-cloud', 'pangeo'] and environment variable not found for: [CI, PREFECT__BACKEND, PANGEO__BACKEND or TEST]"

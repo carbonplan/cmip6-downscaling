@@ -5,7 +5,7 @@
   "TRAIN_PERIOD_END": "1990",
   "PREDICT_PERIOD_START": "2020",
   "PREDICT_PERIOD_END": "2020",
-  "VARIABLE": "tasmax",
+  "VARIABLE": "pr",
   "LATMIN": "40",
   "LATMAX": "50",
   "LONMIN": "80",
