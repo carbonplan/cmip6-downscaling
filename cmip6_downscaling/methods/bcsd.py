@@ -1,16 +1,17 @@
 import os
+
 os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "true"
 from typing import Tuple
-import pdb
+
 import fsspec
 import xarray as xr
 from skdownscale.pointwise_models import PointWiseDownscaler
 from skdownscale.pointwise_models.bcsd import BcsdPrecipitation, BcsdTemperature
-import pdb
+
+import cmip6_downscaling.config.config as config
 from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
 from cmip6_downscaling.data.cmip import load_cmip
 from cmip6_downscaling.data.observations import open_era5
-import cmip6_downscaling.config.config as config
 from cmip6_downscaling.workflows.utils import (
     delete_chunks_encoding,
     rechunk_zarr_array,
@@ -551,7 +552,6 @@ def fit_and_predict(
         bcsd_model = BcsdTemperature(return_anoms=False)
     elif variable in RELATIVE_VARS:
         bcsd_model = BcsdPrecipitation(return_anoms=False)
-
 
     pointwise_model = PointWiseDownscaler(model=bcsd_model, dim=dim)
 

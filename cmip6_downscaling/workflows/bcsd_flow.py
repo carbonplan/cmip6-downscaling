@@ -95,8 +95,6 @@ with Flow(
     executor=run_config.executor,
 ) as flow:
 
-
-
     gcm = Parameter("GCM")
     scenario = Parameter("SCENARIO")
     train_period_start = Parameter("TRAIN_PERIOD_START")
