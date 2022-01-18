@@ -564,6 +564,7 @@ def fit_and_predict(
         bcsd_model = BcsdPrecipitation(return_anoms=False)
         print('bcsd_precip chosen')
 
+    # pdb.set_trace()
 
     pointwise_model = PointWiseDownscaler(model=bcsd_model, dim=dim)
 
@@ -575,21 +576,20 @@ def fit_and_predict(
     )
     bias_corrected_da = pointwise_model.predict(gcm_predict_rechunked_ds[variable])
 
-    bias_corrected_ds = bias_corrected_da.to_dataset(name=variable)
+    bias_corrected_ds = bias_corrected_da.astype('float32').to_dataset(name=variable)
 
     #clearing attrs
-    for atr in ['time','lat','lon']:
-        bias_corrected_ds[atr].attrs.clear()
-        bias_corrected_ds[atr].encoding.clear()
+    # for atr in ['time','lat','lon']:
+    #     bias_corrected_ds[atr].attrs.clear()
+    #     bias_corrected_ds[atr].encoding.clear()
 
-    for val in ['time','lat','lon','tasmax']:
-        print(val)
-        print(bias_corrected_ds[atr].attrs)
-        print(bias_corrected_ds[atr].encoding)
-    print(bias_corrected_ds.attrs)
-    print(bias_corrected_ds.encoding)
+    # for val in ['time','lat','lon','tasmax']:
+    #     print(val)
+    #     print(bias_corrected_ds[atr].attrs)
+    #     print(bias_corrected_ds[atr].encoding)
+    # print(bias_corrected_ds.attrs)
+    # print(bias_corrected_ds.encoding)
     # print(bias_corrected_ds)
-    pdb.set_trace()
     # bias_corrected_ds = bias_corrected_ds.load()
     return bias_corrected_ds
 
