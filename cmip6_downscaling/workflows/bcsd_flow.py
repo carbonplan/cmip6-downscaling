@@ -172,7 +172,7 @@ with Flow(
         lonmin,
         lonmax,
     )
-    # prep_bcsd_inputs_task(s):
+    # the next three tasks prepare the inputs required by bcsd
     coarse_obs_full_time_ds = return_coarse_obs_full_time_task(
         coarse_obs_ds,
         gcm,

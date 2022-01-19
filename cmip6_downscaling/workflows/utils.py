@@ -48,6 +48,7 @@ def subset_dataset(
     latmax: str,
     lonmin: str,
     lonmax: str,
+    chunking_schema: dict,
 ) -> xr.Dataset:
     """Uses Xarray slicing to spatially subset a dataset based on input params.
 
@@ -67,6 +68,8 @@ def subset_dataset(
         Longitude Minimum
     lonmax : str
         Longitude Maximum
+    chunking_schema : dict
+        Desired chunking schema. 
 
     Returns
     -------
@@ -78,7 +81,11 @@ def subset_dataset(
         lon=slice(float(lonmin), float(lonmax)),
         lat=slice(float(latmax), float(latmin)),
     )
+    target_schema = DataArraySchema(chunking_schema)
+    target_schema.validate(subset_ds)
+
     return subset_ds
+    
 
 
 def generate_batches(n, batch_size, buffer_size, one_indexed=False):

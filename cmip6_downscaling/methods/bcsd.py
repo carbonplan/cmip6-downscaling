@@ -491,9 +491,9 @@ def return_gcm_predict_rechunked(
 
 
 def fit_and_predict(
-    gcm_train_subset_full_time_ds: xr.Dataset,  # x_train_rechunked_ds: xr.Dataset,
-    coarse_obs_full_time_ds: xr.Dataset,  # y_rechunked_ds: xr.Dataset,
-    gcm_predict_rechunked_ds: xr.Dataset,  # x_predict_rechunked_ds: xr.Dataset,
+    gcm_train_subset_full_time_ds: xr.Dataset, 
+    coarse_obs_full_time_ds: xr.Dataset,  
+    gcm_predict_rechunked_ds: xr.Dataset, 
     gcm: str,
     scenario: str,
     train_period_start: str,
