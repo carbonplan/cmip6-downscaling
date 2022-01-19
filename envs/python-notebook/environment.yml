@@ -3,7 +3,7 @@ channels:
   - conda-forge
 dependencies:
   - adlfs
-  - dask[complete]
+  - dask
   - dask-kubernetes
   - fsspec
   - google-cloud-storage
@@ -13,6 +13,9 @@ dependencies:
   - intake-esm
   - intake-xarray
   - prefect
+  - pytest
+  - pytest-sugar
+  - pytest-cov
   - regionmask
   - scikit-downscale
   - scikit-learn
@@ -22,3 +25,6 @@ dependencies:
   - xpersist
   - xclim
   - zarr
+  - pip
+  - pip:
+      - git+https://github.com/pangeo-data/scikit-downscale@84cd5f45de4aa61445ca74b85505b035f84fbb80
