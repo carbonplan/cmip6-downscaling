@@ -133,7 +133,7 @@ def return_obs(
         obs_load, train_period_start, train_period_end, latmin, latmax, lonmin, lonmax
     )
     # Chunking the observation dataset by 'time':365 fixes irregular zarr chunking issues caused by leap-years.
-    obs_ds = obs_ds.chunk({'time': 365})
+    obs_ds = obs_ds.chunk({'time': 365, 'lat': 150, 'lon': 150})
     return obs_ds
 
 
