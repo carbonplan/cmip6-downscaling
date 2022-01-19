@@ -183,7 +183,6 @@ def get_coarse_obs_task(
         ds=ds_obs,
         target_grid_ds=gcm_grid,
         connection_string=cfg.connection_string,
-
     )
 
     if chunking_approach != 'full_space':

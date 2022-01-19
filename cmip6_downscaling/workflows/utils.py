@@ -21,7 +21,6 @@ intermediate_cache_path = cfg.intermediate_cache_path
 connection_string = cfg.connection_string
 
 
-
 schema_maps_chunks = DataArraySchema(chunks={'lat': -1, 'lon': -1})
 
 
@@ -48,7 +47,7 @@ def subset_dataset(
     latmax: str,
     lonmin: str,
     lonmax: str,
-    chunking_schema: dict,
+    chunking_schema: Optional[dict] = None,
 ) -> xr.Dataset:
     """Uses Xarray slicing to spatially subset a dataset based on input params.
 
@@ -68,8 +67,8 @@ def subset_dataset(
         Longitude Minimum
     lonmax : str
         Longitude Maximum
-    chunking_schema : dict
-        Desired chunking schema. 
+    chunking_schema : str, optional
+        Desired chunking schema. ex: {'time': 365, 'lat': 150, 'lon': 150}
 
     Returns
     -------
@@ -81,11 +80,15 @@ def subset_dataset(
         lon=slice(float(lonmin), float(lonmax)),
         lat=slice(float(latmax), float(latmin)),
     )
-    target_schema = DataArraySchema(chunking_schema)
-    target_schema.validate(subset_ds)
+
+    if chunking_schema is not None:
+        target_schema = DataArraySchema(chunking_schema)
+        try:
+            target_schema.validate(subset_ds)
+        except SchemaError:
+            subset_ds = subset_ds.chunk(target_schema)
 
     return subset_ds
-    
 
 
 def generate_batches(n, batch_size, buffer_size, one_indexed=False):

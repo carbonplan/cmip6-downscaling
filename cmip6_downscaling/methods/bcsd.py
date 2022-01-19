@@ -130,10 +130,15 @@ def return_obs(
     """
     obs_load = open_era5(variable, start_year=train_period_start, end_year=train_period_end)
     obs_ds = subset_dataset(
-        obs_load, train_period_start, train_period_end, latmin, latmax, lonmin, lonmax
+        obs_load,
+        train_period_start,
+        train_period_end,
+        latmin,
+        latmax,
+        lonmin,
+        lonmax,
+        chunking_schema={'time': 365, 'lat': 150, 'lon': 150},
     )
-    # Chunking the observation dataset by 'time':365 fixes irregular zarr chunking issues caused by leap-years.
-    obs_ds = obs_ds.chunk({'time': 365, 'lat': 150, 'lon': 150})
     return obs_ds
 
 
@@ -394,10 +399,17 @@ def return_gcm_train_full_time(
     """
     gcm_train_ds = load_cmip(source_ids=gcm, variable_ids=[variable], return_type='xr')
     gcm_train_ds_subset = subset_dataset(
-        gcm_train_ds, train_period_start, train_period_end, latmin, latmax, lonmin, lonmax
+        gcm_train_ds,
+        train_period_start,
+        train_period_end,
+        latmin,
+        latmax,
+        lonmin,
+        lonmax,
+        chunking_schema={'time': 365, 'lat': 150, 'lon': 150},
     )
 
-    # Q: Ask Ori why this exists
+    # this call was to force the timestamps for the cmip data to use the friendlier era5 timestamps. (i forget which dataset used which time formats). i could picture this introducing a tricky bug though (for instance if gcm timestamp didn't align for some reason) so we could use another conversion system if that is better. Perhaps datetime equivilence test.
     gcm_train_ds_subset['time'] = coarse_obs_full_time_ds.time.values
 
     gcm_train_subset_full_time_ds = rechunk_zarr_array_with_caching(
@@ -491,9 +503,9 @@ def return_gcm_predict_rechunked(
 
 
 def fit_and_predict(
-    gcm_train_subset_full_time_ds: xr.Dataset, 
-    coarse_obs_full_time_ds: xr.Dataset,  
-    gcm_predict_rechunked_ds: xr.Dataset, 
+    gcm_train_subset_full_time_ds: xr.Dataset,
+    coarse_obs_full_time_ds: xr.Dataset,
+    gcm_predict_rechunked_ds: xr.Dataset,
     gcm: str,
     scenario: str,
     train_period_start: str,
