@@ -31,7 +31,6 @@ from cmip6_downscaling.workflows.paths import (
 )
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching, regrid_ds
 
-
 get_obs_task = task(get_obs)
 get_gcm_task = task(get_gcm)
 
@@ -146,7 +145,10 @@ def path_builder_task(
 
 @task(
     checkpoint=True,
-    result=XpersistResult(CacheStore(config.CloudConfig().intermediate_cache_path), serializer=config.CloudConfig().serializer),
+    result=XpersistResult(
+        CacheStore(config.CloudConfig().intermediate_cache_path),
+        serializer=config.CloudConfig().serializer,
+    ),
     target=make_coarse_obs_path,
 )
 def get_coarse_obs_task(
@@ -179,7 +181,7 @@ def get_coarse_obs_task(
     ds_obs_coarse = regrid_ds(
         ds=ds_obs,
         target_grid_ds=gcm_grid,
-        connection_string=cfg.connection_string,
+        connection_string=config.CloudConfig().connection_string,
     )
 
     if chunking_approach != 'full_space':
@@ -192,7 +194,10 @@ def get_coarse_obs_task(
 
 @task(
     checkpoint=True,
-    result=XpersistResult(CacheStore(config.CloudConfig().intermediate_cache_path), serializer=config.CloudConfig().serializer),
+    result=XpersistResult(
+        CacheStore(config.CloudConfig().intermediate_cache_path),
+        serializer=config.CloudConfig().serializer,
+    ),
     target=make_interpolated_obs_path,
 )
 def coarsen_and_interpolate_obs_task(
@@ -258,7 +263,10 @@ def coarsen_and_interpolate_obs_task(
 
 @task(
     checkpoint=True,
-    result=XpersistResult(CacheStore(config.CloudConfig().intermediate_cache_path), serializer=config.CloudConfig().serializer),
+    result=XpersistResult(
+        CacheStore(config.CloudConfig().intermediate_cache_path),
+        serializer=config.CloudConfig().serializer,
+    ),
     target=make_interpolated_gcm_path,
 )
 def interpolate_gcm_task(
@@ -347,7 +355,10 @@ def interpolate_gcm_task(
 
 @task(
     log_stdout=True,
-    result=XpersistResult(CacheStore(config.CloudConfig().intermediate_cache_path), serializer=config.CloudConfig().serializer),
+    result=XpersistResult(
+        CacheStore(config.CloudConfig().intermediate_cache_path),
+        serializer=config.CloudConfig().serializer,
+    ),
     target=make_bias_corrected_obs_path,
 )
 def bias_correct_obs_task(
@@ -381,7 +392,10 @@ def bias_correct_obs_task(
 
 
 @task(
-    result=XpersistResult(CacheStore(config.CloudConfig().intermediate_cache_path), serializer=config.CloudConfig().serializer),
+    result=XpersistResult(
+        CacheStore(config.CloudConfig().intermediate_cache_path),
+        serializer=config.CloudConfig().serializer,
+    ),
     target=make_bias_corrected_gcm_path,
 )
 def bias_correct_gcm_task(

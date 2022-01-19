@@ -47,7 +47,6 @@ class BaseConfig:
 class CloudConfig(BaseConfig):
     def __init__(self, **kwargs):
         self.connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
-
         self.intermediate_cache_path = "az://flow-outputs/intermediates"
         self.results_cache_path = "az://flow-outputs/results"
         self.agent = ["az-eu-west"]
@@ -210,5 +209,5 @@ def get_config(name=None, **kwargs):
             )
         )
         config = None
-
+    print(config)
     return config
