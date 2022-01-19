@@ -1,0 +1,24 @@
+name: carbonplan
+channels:
+  - conda-forge
+dependencies:
+  - adlfs
+  - dask[complete]
+  - dask-kubernetes
+  - fsspec
+  - google-cloud-storage
+  - gcsfs
+  - gstools
+  - intake
+  - intake-esm
+  - intake-xarray
+  - prefect
+  - regionmask
+  - scikit-downscale
+  - scikit-learn
+  - tenacity
+  - xarray
+  - xesmf
+  - xpersist
+  - xclim
+  - zarr
