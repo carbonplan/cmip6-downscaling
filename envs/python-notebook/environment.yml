@@ -28,4 +28,5 @@ dependencies:
   - zarr
   - pip
   - pip:
+      - git+https://github.com/carbonplan/xarray-schema
       - git+https://github.com/pangeo-data/scikit-downscale@84cd5f45de4aa61445ca74b85505b035f84fbb80
