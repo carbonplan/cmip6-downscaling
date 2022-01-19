@@ -14,6 +14,8 @@ from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching
 
 variable_ids = ['pr', 'tasmin', 'tasmax', 'rsds', 'hurs', 'ps']
 
+cfg = config.CloudConfig()
+
 
 def check_variable_ids_in_df(df):
     unique_vars = df['variable_id'].unique()
@@ -357,7 +359,7 @@ def get_gcm(
         rechunked_path = None
     ds_gcm_rechunked = rechunk_zarr_array_with_caching(
         zarr_array=ds_gcm,
-        connection_string=config.return_azure_config()["connection_string"],
+        connection_string=cfg.connection_string,
         chunking_approach=chunking_approach,
         output_path=rechunked_path,
     )

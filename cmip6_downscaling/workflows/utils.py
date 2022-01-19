@@ -4,7 +4,6 @@ import re
 import string
 from typing import Optional, Tuple, Union
 
-import dask
 import fsspec
 import numpy as np
 import xarray as xr
@@ -16,8 +15,9 @@ from xarray_schema.base import SchemaError
 
 import cmip6_downscaling.config.config as config
 
-intermediate_cache_path = config.return_azure_config()["intermediate_cache_path"]
-connection_string = config.return_azure_config()["serializer"]
+cfg = config.CloudConfig()
+
+connection_string = cfg.connection_string
 
 schema_maps_chunks = DataArraySchema(chunks={'lat': -1, 'lon': -1})
 
@@ -37,32 +37,54 @@ def get_store(prefix, account_key=None):
     return store
 
 
-def generate_batches(n, batch_size, buffer_size, one_indexed=False):
-    """
-    Given the max value n, batch_size, and buffer_size, returns batches (include the buffer) and
-    cores (exclude the buffer). For the smallest numbers, the largest values would be included in the buffer, and
-    vice versa. For example, with n=10, batch_size=5, buffer_size=3, one_indexed=False. The `cores` output will contain
-    [[0, 1, 2, 3, 4], [5, 6, 7, 8, 9]], and `batches` output will contain [[7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7], [2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2]].
+def subset_dataset(
+    ds: xr.Dataset,
+    start_time: str,
+    end_time: str,
+    latmin: str,
+    latmax: str,
+    lonmin: str,
+    lonmax: str,
+) -> xr.Dataset:
+    """Uses Xarray slicing to spatially subset a dataset based on input params.
 
     Parameters
     ----------
-    n: int
-        The max value to be included.
-    batch_size: int
-        The number of core values to include in each batch.
-    buffer_size: int
-        The number of buffer values to include in each batch in both directions.
-    one_indexed: bool
-        Whether we should consider n to be one indexed or not. With n = 2, one_indexed=False would generate cores containing [0, 1].
-        One_indexed=True would generate cores containing [1, 2].
+    ds : xarray.Dataset
+         Input Xarray dataset
+    start_time : str
+        Starting Time
+    end_time : str
+        Ending Time
+    latmin : str
+        Latitude Minimum
+    latmax : str
+        Latitude Maximum
+    lonmin : str
+        Longitude Minimum
+    lonmax : str
+        Longitude Maximum
 
     Returns
     -------
-    batches: List
-        List of batches including buffer values.
-    cores: List
-        List of core values in each batch excluding buffer values.
+    Xarray Dataset
+        Spatially subsetted Xarray dataset.
     """
+    subset_ds = ds.sel(
+        time=slice(start_time, end_time),
+        lon=slice(float(lonmin), float(lonmax)),
+        lat=slice(float(latmax), float(latmin)),
+    )
+    return subset_ds
+
+
+def generate_batches(n, batch_size, buffer_size, one_indexed=False):
+    """
+    ds must have a dimension called time that is a valid datetime index
+    """
+    # TODO: add tests. if buffer_size == 0, batches == cores
+    # construct 2 test cases
+
     cores = []
     batches = []
     if one_indexed:
@@ -142,12 +164,10 @@ def make_rechunker_stores(
     output_path: Optional[str] = None,
 ) -> Tuple[fsspec.FSMap, fsspec.FSMap, str]:
     """Initialize two stores for rechunker to use as temporary and final rechunked locations
-
     Parameters
     ----------
     connection_string : str
         Connection string to give you write access to the stores
-
     Returns
     -------
     temp_store, target_store, path_tgt : tuple[fsspec.mapping.FSmap, fsspec.mapping.FSmap, string]
@@ -172,7 +192,6 @@ def rechunk_zarr_array(
 ):
     """Use `rechunker` package to adjust chunks of dataset to a form
     conducive for your processing.
-
     Parameters
     ----------
     zarr_array : zarr or xarray dataset
@@ -193,7 +212,6 @@ def rechunk_zarr_array(
     max_mem : str
         The max memory you want to allow for a chunk. Probably want it to be around 100 MB, but that
         is also controlled by the `calc_auspicious_chunk_sizes` calls.
-
     Returns
     -------
     rechunked_ds, path_tgt : Tuple[xr.Dataset, str]
@@ -271,7 +289,6 @@ def calc_auspicious_chunks_dict(
     """Figure out a chunk size that, given the size of the dataset, the dimension(s) you want to chunk on
     and the data type, will fit under the target_size. Currently only works for 100mb which
     is the recommended chunk size for dask processing.
-
     Parameters
     ----------
     da : Union[xr.DataArray, xr.Dataset]
@@ -280,7 +297,6 @@ def calc_auspicious_chunks_dict(
         Target size for chunk- dask recommends 100mb, by default '100mb'
     chunk_dims : tuple, optional
         Dimension(s) you want to chunk along, by default ('lat', 'lon')
-
     Returns
     -------
     chunks_dict : dict
@@ -327,7 +343,6 @@ def regrid_dataset(
     """Regrid a dataset to a target grid. For use in both coarsening or interpolating to finer resolution.
     The function will check whether the dataset is chunked along time (into spatially-contiguous maps)
     and if not it will rechunk it.
-
     Parameters
     ----------
     ds : xr.Dataset
@@ -340,7 +355,6 @@ def regrid_dataset(
         variable you're working with
     connection_string : str
         Connection string to give you write access to the stores
-
     Returns
     -------
     ds_regridded : xr.Dataset
@@ -367,11 +381,8 @@ def regrid_dataset(
             max_mem="1GB",
         )
 
-    with dask.config.set(scheduler="single-threaded"):
-        regridder = xe.Regridder(
-            ds_rechunked, target_grid_ds, "bilinear", extrap_method="nearest_s2d"
-        )
-        ds_regridded = regridder(ds_rechunked)
+    regridder = xe.Regridder(ds_rechunked, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
+    ds_regridded = regridder(ds_rechunked)
 
     return ds_regridded, ds_rechunked_path
 
@@ -386,7 +397,6 @@ def get_spatial_anomalies(
     * a grid (as opposed to a specific GCM since some GCMs run on the same grid)
     * the time period which fine_obs (and by construct coarse_obs) cover
     * the variable
-
     Parameters
     ----------
     coarse_obs : xr.Dataset
@@ -395,7 +405,6 @@ def get_spatial_anomalies(
         Original observation spatial resolution. Chunked along time.
     variable: str
         The variable included in the dataset.
-
     Returns
     -------
     seasonal_cycle_spatial_anomalies : xr.Dataset
@@ -424,57 +433,8 @@ def get_spatial_anomalies(
     return seasonal_cycle_spatial_anomalies
 
 
-# def get_spatial_anomalies(
-#     coarse_obs_path, fine_obs_rechunked_path, variable, connection_string
-# ) -> xr.Dataset:
-#     """Calculate the seasonal cycle (12 timesteps) spatial anomaly associated
-#     with aggregating the fine_obs to a given coarsened scale and then reinterpolating
-#     it back to the original spatial resolution. The outputs of this function are
-#     dependent on three parameters:
-#     * a grid (as opposed to a specific GCM since some GCMs run on the same grid)
-#     * the time period which fine_obs (and by construct coarse_obs) cover
-#     * the variable
-
-#     Parameters
-#     ----------
-#     coarse_obs : xr.Dataset
-#         Coarsened to a GCM resolution. Chunked along time.
-#     fine_obs_rechunked_path : xr.Dataset
-#         Original observation spatial resolution. Chunked along time.
-#     variable: str
-#         The variable included in the dataset.
-
-#     Returns
-#     -------
-#     seasonal_cycle_spatial_anomalies : xr.Dataset
-#         Spatial anomaly for each month (i.e. of shape (nlat, nlon, 12))
-#     """
-#     # interpolate coarse_obs back to the original scale
-#     [coarse_obs, fine_obs_rechunked] = load_paths([coarse_obs_path, fine_obs_rechunked_path])
-
-#     obs_interpolated, _ = regrid_dataset(
-#         ds=coarse_obs,
-#         ds_path=coarse_obs_path,
-#         target_grid_ds=fine_obs_rechunked.isel(time=0),
-#         variable=variable,
-#         connection_string=connection_string,
-#     )
-#     # use rechunked fine_obs from coarsening step above because that is in map chunks so it
-#     # will play nice with the interpolated obs
-
-#     schema_maps_chunks.validate(fine_obs_rechunked[variable])
-
-#     # calculate difference between interpolated obs and the original obs
-#     spatial_anomalies = obs_interpolated - fine_obs_rechunked
-
-#     # calculate seasonal cycle (12 time points)
-#     seasonal_cycle_spatial_anomalies = spatial_anomalies.groupby("time.month").mean()
-#     return seasonal_cycle_spatial_anomalies
-
-
 def write_dataset(ds: xr.Dataset, path: str, chunks_dims: Tuple = ("time",)) -> None:
     """Write out a dataset.
-
     Parameters
     ----------
     ds : xr.Dataset
@@ -506,12 +466,11 @@ def rechunk_zarr_array_with_caching(
     output_path: Optional[str] = None,
     max_mem: str = "200MB",
     overwrite: bool = False,
-    connection_string: Optional[str] = config.return_azure_config()["connection_string"],
-    cache_path: Optional[str] = intermediate_cache_path,
+    connection_string: Optional[str] = connection_string,
+    cache_path: Optional[str] = cfg.intermediate_cache_path,
 ) -> xr.Dataset:
     """Use `rechunker` package to adjust chunks of dataset to a form
     conducive for your processing.
-
     Parameters
     ----------
     zarr_array : zarr or xarray dataset
@@ -528,7 +487,6 @@ def rechunk_zarr_array_with_caching(
         is also controlled by the `calc_auspicious_chunk_sizes` calls.
     overwrite : bool
         Whether to overwrite the content saved at output_path if the content did not pass schema check.
-
     Returns
     -------
     rechunked_ds : xr.Dataset
@@ -641,20 +599,18 @@ def regrid_ds(
     ds: xr.Dataset,
     target_grid_ds: xr.Dataset,
     rechunked_ds_path: Optional[str] = None,
-    connection_string: Optional[str] = config.return_azure_config()["connection_string"],
+    connection_string: Optional[str] = connection_string,
     **kwargs,
 ) -> xr.Dataset:
     """Regrid a dataset to a target grid. For use in both coarsening or interpolating to finer resolution.
     The function will check whether the dataset is chunked along time (into spatially-contiguous maps)
     and if not it will rechunk it. **kwargs are used to construct target path
-
     Parameters
     ----------
     ds : xr.Dataset
         Dataset you want to regrid
     target_grid_ds : xr.Dataset
         Template dataset whose grid you'll match
-
     Returns
     -------
     ds_regridded : xr.Dataset

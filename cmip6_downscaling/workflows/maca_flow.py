@@ -26,9 +26,12 @@ from cmip6_downscaling.workflows.paths import (
 )
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching, regrid_ds
 
-intermediate_cache_store = CacheStore(config.return_azure_config()["intermediate_cache_path"])
-results_cache_store = CacheStore(config.return_azure_config()["results_cache_path"])
-serializer = config.return_azure_config()["serializer"]
+run_config = config.get_config()
+cfg = config.CloudConfig()
+
+intermediate_cache_store = CacheStore(cfg.intermediate_cache_path)
+results_cache_store = CacheStore(cfg.results_cache_path)
+serializer = cfg.serializer
 
 
 @task(
@@ -409,7 +412,12 @@ def maca_fine_bias_correction_task(
     return bias_corrected
 
 
-with Flow(name='maca-flow') as maca_flow:
+with Flow(
+    name='maca-flow',
+    storage=run_config.storage,
+    run_config=run_config.run_config,
+    executor=run_config.executor,
+) as maca_flow:
     # following https://climate.northwestknowledge.net/MACA/MACAmethod.php
 
     obs = Parameter("OBS")

@@ -14,10 +14,6 @@ from xpersist import CacheStore
 from xpersist.prefect.result import XpersistResult
 
 import cmip6_downscaling.config.config as config
-
-intermediate_cache_store = CacheStore(config.return_azure_config()["intermediate_cache_path"])
-serializer = config.return_azure_config()["serializer"]
-
 from cmip6_downscaling.data.cmip import get_gcm, get_gcm_grid_spec, load_cmip
 from cmip6_downscaling.data.observations import get_obs
 from cmip6_downscaling.methods.bias_correction import (
@@ -34,6 +30,12 @@ from cmip6_downscaling.workflows.paths import (
     make_interpolated_obs_path,
 )
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching, regrid_ds
+
+cfg = config.CloudConfig()
+
+intermediate_cache_store = CacheStore(cfg.intermediate_cache_path)
+serializer = cfg.serializer
+
 
 get_obs_task = task(get_obs)
 
@@ -184,7 +186,7 @@ def get_coarse_obs_task(
     ds_obs_coarse = regrid_ds(
         ds=ds_obs,
         target_grid_ds=gcm_grid,
-        connection_string=config.return_azure_config()["connection_string"],
+        connection_string=cfg.connection_string,
     )
 
     if chunking_approach != 'full_space':
