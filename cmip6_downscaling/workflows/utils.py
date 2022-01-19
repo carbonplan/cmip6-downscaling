@@ -17,7 +17,6 @@ import cmip6_downscaling.config.config as config
 
 cfg = config.CloudConfig()
 
-intermediate_cache_path = cfg.intermediate_cache_path
 connection_string = cfg.connection_string
 
 schema_maps_chunks = DataArraySchema(chunks={'lat': -1, 'lon': -1})
@@ -289,9 +288,6 @@ def calc_auspicious_chunks_dict(
             #  so we'll always just give it the full length of the dimension
             chunks_dict[dim] = array_dims[dim]
     # calculate the bytesize given the dtype
-    print(da)
-    print(da.dtype)
-    print(da.tasmax.isel(lat=30, lon=30, time=0).values())
     data_bytesize = int(re.findall(r"\d+", str(da.dtype))[0])
     # calculate single non_chunked_size based upon dtype
     smallest_size_one_chunk = data_bytesize * np.prod(
@@ -441,7 +437,7 @@ def rechunk_zarr_array_with_caching(
     max_mem: str = "200MB",
     overwrite: bool = False,
     connection_string: Optional[str] = connection_string,
-    cache_path: Optional[str] = intermediate_cache_path,
+    cache_path: Optional[str] = cfg.intermediate_cache_path,
 ) -> xr.Dataset:
     """Use `rechunker` package to adjust chunks of dataset to a form
     conducive for your processing.

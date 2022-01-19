@@ -9,7 +9,7 @@ from prefect.executors import DaskExecutor, LocalDaskExecutor, LocalExecutor  # 
 from prefect.run_configs import KubernetesRun, LocalRun
 from prefect.storage import Azure, Local
 
-# Add new config that is hybrid or local compute, but has prefect storage access (ie. what I've been using to debug. Local is now non-write permissions.)
+# TODO: Add new config that is hybrid or local compute, but has prefect storage access (ie. what I've been using to debug. Local is now non-write permissions.)
 
 
 class BaseConfig:
@@ -66,6 +66,9 @@ class CloudConfig(BaseConfig):
         self.adapt_max = 2
         self.dask_distributed_worker_resources_taskslots = "1"
 
+    def __repr__(self):
+        return """CloudConfig configuration for running on prefect-cloud.  storage is `Azure("prefect")`, run_config is `KubernetesRun() and executor is ` DaskExecutor(KubeCluster())`"""
+
     def generate_env(self):
         env = {
             "AZURE_STORAGE_CONNECTION_STRING": self.connection_string,
@@ -119,6 +122,9 @@ class LocalConfig(BaseConfig):
     def __init__(self, **kwargs):
         pass
 
+    def __repr__(self):
+        return "LocalConfig configuration is for running on local machines. storage is `Local()`, run_config is `LocalRun() and executor is `LocalExecutor()` "
+
     @property
     def storage(self) -> Any:  # pragma: no cover
         return Local()
@@ -135,6 +141,9 @@ class LocalConfig(BaseConfig):
 class TestConfig(LocalConfig):
     def __init__(self, **kwargs):
         pass
+
+    def __repr__(self):
+        return "TestConfig configuration is for running on CI machines. storage is `Local()`, run_config is `LocalRun() and executor is `LocalExecutor()` "
 
     @property
     def storage(self) -> Any:  # pragma: no cover
@@ -155,6 +164,9 @@ class PangeoConfig(BaseConfig):
         self.intermediate_cache_path = "az://flow-outputs/intermediates"
         self.results_cache_path = "az://flow-outputs/results"
 
+    def __repr__(self):
+        return "PangeoConfig configuration is for running on jupyter-hubs. storage is `Local()`, run_config is `LocalRun() and executor is `LocalExecutor()` "
+
     @property
     def storage(self) -> Any:  # pragma: no cover
         return Local()
@@ -172,13 +184,13 @@ class PangeoConfig(BaseConfig):
 
 
 def get_config(name=None, **kwargs):
-    if name == 'test':
+    if name.lower() == 'test':
         config = TestConfig(**kwargs)
-    elif name == 'local':
+    elif name.lower() == 'local':
         config = LocalConfig(**kwargs)
-    elif name == 'prefect-cloud':
+    elif name.lower() == 'prefect-cloud':
         config = CloudConfig(**kwargs)
-    elif name == 'pangeo':
+    elif name.lower() == 'pangeo':
         config = PangeoConfig(**kwargs)
     elif os.environ.get("CI") == "true":
         config = TestConfig(**kwargs)
@@ -190,8 +202,13 @@ def get_config(name=None, **kwargs):
         config = PangeoConfig(**kwargs)
         print('PangeoConfig selected from os.environ')
     else:
-        ValueError(
-            "Name not in ['test', 'local', 'prefect-cloud', 'pangeo'] and environment variable not found for: [CI, PREFECT__BACKEND, PANGEO__BACKEND or TEST]"
+        print(
+            str(
+                ValueError(
+                    "Name not in ['test', 'local', 'prefect-cloud', 'pangeo'] and environment variable not found for: [CI, PREFECT__BACKEND, PANGEO__BACKEND or TEST]"
+                )
+            )
         )
+        config = None
 
     return config
