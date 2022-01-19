@@ -184,7 +184,6 @@ def to_standard_calendar(obj: T_Xarray) -> T_Xarray:
     return obj_new
 
 
-
 @task(
     checkpoint=True,
     result=XpersistResult(
@@ -489,4 +488,3 @@ def bias_correct_gcm_task(
     ).to_dataset(dim="variable")
 
     return bias_corrected
-

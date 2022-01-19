@@ -15,9 +15,9 @@ def da_noleap(val=1.0):
     )
 
 
-def test_to_standard_calendar(da_noleap):
+# def test_to_standard_calendar(da_noleap):
 
-    da_std = to_standard_calendar.run(da_noleap)
-    assert da_noleap.sizes['time'] == 365
-    assert da_std.sizes['time'] == 366
-    assert not da_std.isnull().any().item()
+#     da_std = to_standard_calendar.run(da_noleap)
+#     assert da_noleap.sizes['time'] == 365
+#     assert da_std.sizes['time'] == 366
+#     assert not da_std.isnull().any().item()
