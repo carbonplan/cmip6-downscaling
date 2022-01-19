@@ -10,8 +10,6 @@ import cmip6_downscaling.config.config as config
 from cmip6_downscaling.workflows.paths import make_rechunked_obs_path
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching
 
-cfg = config.CloudConfig()
-
 variable_name_dict = {
     "tasmax": "air_temperature_at_2_metres_1hour_Maximum",
     "tasmin": "air_temperature_at_2_metres_1hour_Minimum",
@@ -94,7 +92,7 @@ def get_obs(
         rechunked_path = None
     ds_obs_rechunked = rechunk_zarr_array_with_caching(
         zarr_array=ds_obs,
-        connection_string=cfg.connection_string,
+        connection_string=config.CloudConfig().connection_string,
         chunking_approach=chunking_approach,
         output_path=rechunked_path,
     )
