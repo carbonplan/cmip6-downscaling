@@ -9,8 +9,13 @@ import cmip6_downscaling.config.config as config
 from cmip6_downscaling.methods.detrend import calc_epoch_trend, remove_epoch_trend
 from cmip6_downscaling.methods.maca import maca_bias_correction, maca_construct_analogs
 from cmip6_downscaling.methods.regions import combine_outputs, generate_subdomains
-from cmip6_downscaling.tasks.cloud_tasks import get_coarse_obs_task, get_gcm_task, get_obs_task
-from cmip6_downscaling.tasks.common_tasks import path_builder_task, rechunker_task
+from cmip6_downscaling.tasks.common_tasks import (
+    get_coarse_obs_task,
+    get_gcm_task,
+    get_obs_task,
+    path_builder_task,
+    rechunker_task,
+)
 from cmip6_downscaling.workflows.paths import (
     make_bias_corrected_gcm_path,
     make_epoch_adjusted_downscaled_gcm_path,
