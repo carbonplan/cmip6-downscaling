@@ -141,8 +141,7 @@ class TestConfig(LocalConfig):
     def __init__(self, **kwargs):
         self.connection_string = None
         self.intermediate_cache_path = "./"
-        self.serializer = None
-
+        self.serializer = "xarray.zarr"
     def __repr__(self):
         return "TestConfig configuration is for running on CI machines. storage is `Local()`, run_config is `LocalRun() and executor is `LocalExecutor()` "
 
