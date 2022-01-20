@@ -15,12 +15,6 @@ from xarray_schema.base import SchemaError
 
 import cmip6_downscaling.config.config as config
 
-cfg = config.CloudConfig()
-
-intermediate_cache_path = cfg.intermediate_cache_path
-connection_string = cfg.connection_string
-
-
 schema_maps_chunks = DataArraySchema(chunks={'lat': -1, 'lon': -1})
 
 
@@ -100,22 +94,25 @@ def generate_batches(n, batch_size, buffer_size, one_indexed=False):
 
     Parameters
     ----------
-    n: int
-        The max value to be included.
-    batch_size: int
-        The number of core values to include in each batch.
-    buffer_size: int
-        The number of buffer values to include in each batch in both directions.
-    one_indexed: bool
-        Whether we should consider n to be one indexed or not. With n = 2, one_indexed=False would generate cores containing [0, 1].
-        One_indexed=True would generate cores containing [1, 2].
+    ds : xarray.Dataset
+         Input Xarray dataset
+    start_time : str
+        Starting Time
+    end_time : str
+        Ending Time
+    latmin : str
+        Latitude Minimum
+    latmax : str
+        Latitude Maximum
+    lonmin : str
+        Longitude Minimum
+    lonmax : str
+        Longitude Maximum
 
     Returns
     -------
-    batches: List
-        List of batches including buffer values.
-    cores: List
-        List of core values in each batch excluding buffer values.
+    Xarray Dataset
+        Spatially subsetted Xarray dataset.
     """
 
     cores = []
@@ -193,7 +190,7 @@ def lon_to_180(ds):
 
 
 def make_rechunker_stores(
-    connection_string: Optional[str] = connection_string,
+    connection_string: Optional[str] = config.CloudConfig().connection_string,
     output_path: Optional[str] = None,
 ) -> Tuple[fsspec.FSMap, fsspec.FSMap, str]:
     """Initialize two stores for rechunker to use as temporary and final rechunked locations
@@ -218,8 +215,8 @@ def make_rechunker_stores(
 def rechunk_zarr_array(
     zarr_array: xr.Dataset,
     zarr_array_location: str,
-    connection_string: str,
     variable: str,
+    connection_string: Optional[str] = config.CloudConfig().connection_string,
     chunk_dims: Union[Tuple, dict] = ("time",),
     max_mem: str = "200MB",
 ):
@@ -369,7 +366,7 @@ def regrid_dataset(
     ds_path: Union[str, None],
     target_grid_ds: xr.Dataset,
     variable: str,
-    connection_string: str,
+    connection_string: Optional[str] = config.CloudConfig().connection_string,
 ) -> Tuple[xr.Dataset, str]:
     """Regrid a dataset to a target grid. For use in both coarsening or interpolating to finer resolution.
     The function will check whether the dataset is chunked along time (into spatially-contiguous maps)
@@ -419,7 +416,10 @@ def regrid_dataset(
 
 
 def get_spatial_anomalies(
-    coarse_obs_path, fine_obs_rechunked_path, variable, connection_string
+    coarse_obs_path: str,
+    fine_obs_rechunked_path: str,
+    variable: str,
+    connection_string: Optional[str] = config.CloudConfig().connection_string,
 ) -> xr.Dataset:
     """Calculate the seasonal cycle (12 timesteps) spatial anomaly associated
     with aggregating the fine_obs to a given coarsened scale and then reinterpolating
@@ -497,8 +497,8 @@ def rechunk_zarr_array_with_caching(
     output_path: Optional[str] = None,
     max_mem: str = "200MB",
     overwrite: bool = False,
-    connection_string: Optional[str] = connection_string,
-    cache_path: Optional[str] = intermediate_cache_path,
+    connection_string: Optional[str] = config.CloudConfig().connection_string,
+    cache_path: Optional[str] = config.CloudConfig().intermediate_cache_path,
 ) -> xr.Dataset:
     """Use `rechunker` package to adjust chunks of dataset to a form
     conducive for your processing.
@@ -630,7 +630,7 @@ def regrid_ds(
     ds: xr.Dataset,
     target_grid_ds: xr.Dataset,
     rechunked_ds_path: Optional[str] = None,
-    connection_string: Optional[str] = connection_string,
+    connection_string: Optional[str] = config.CloudConfig().connection_string,
     **kwargs,
 ) -> xr.Dataset:
     """Regrid a dataset to a target grid. For use in both coarsening or interpolating to finer resolution.
