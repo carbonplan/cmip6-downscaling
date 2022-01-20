@@ -56,7 +56,7 @@ def open_era5(variables: Union[str, List[str]], start_year: str, end_year: str) 
         for y in range(int(start_year), int(end_year) + 1)
     ]
     ds = xr.open_mfdataset(stores, engine='zarr', consolidated=True)
-    return ds[variables]
+    return ds[variables].chunk({'time': 365})
 
 
 def get_obs(
