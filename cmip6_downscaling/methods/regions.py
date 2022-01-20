@@ -64,9 +64,9 @@ def generate_subdomains(
             # convert the bounds into 0-360 longitude, capturing the special case spanning entire globe
             if min_lon == -180 and max_lon == 180:
                 min_lon, max_lon = 0, 360
-            else:
-                min_lon = convert_to_360(min_lon)
-                max_lon = convert_to_360(max_lon)
+            # else:
+            #     min_lon = convert_to_360(min_lon)
+            #     max_lon = convert_to_360(max_lon)
             subdomains[n] = (min(min_lon, max_lon), min_lat, max(min_lon, max_lon), max_lat)
     return subdomains, mask
 
