@@ -14,10 +14,6 @@ from xpersist import CacheStore
 from xpersist.prefect.result import XpersistResult
 
 import cmip6_downscaling.config.config as config
-
-intermediate_cache_store = CacheStore(config.return_azure_config()["intermediate_cache_path"])
-serializer = config.return_azure_config()["serializer"]
-
 from cmip6_downscaling.data.cmip import get_gcm, get_gcm_grid_spec, load_cmip
 from cmip6_downscaling.data.observations import get_obs
 from cmip6_downscaling.methods.bias_correction import (
@@ -36,9 +32,48 @@ from cmip6_downscaling.workflows.paths import (
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching, regrid_ds
 
 get_obs_task = task(get_obs)
-
-
 get_gcm_task = task(get_gcm)
+
+
+@task
+def to_standard_calendar(obj: T_Xarray) -> T_Xarray:
+    """Convert a Dataset's calendar to the "standard calendar"
+
+    When necessary, "missing" time points are filled in using linear interpolation.
+
+    Valid input dataset calendars include: `noleap`, `365_day`, `366_day`, and `all_leap`.
+
+    Parameters
+    ----------
+    obj : xr.Dataset or xr.DataArray
+        Xarray object with a `CFTimeIndex`.
+
+    Returns
+    -------
+    obj_new : xr.Dataset or xr.DataArray
+        Xarray object with standard calendar.
+
+    Raises
+    ------
+    ValueError
+        If an invalid calendar is supplied.
+    """
+
+    orig_calendar = getattr(obj.indexes["time"], "calendar", "standard")
+    if orig_calendar == "standard":
+        return obj
+    if orig_calendar == "360_day":
+        raise ValueError("360_day calendar is not supported")
+
+    # reindex / interpolate
+    obj_new = xclim.core.calendar.convert_calendar(obj, "standard", missing=np.nan).interpolate_na(
+        dim="time", method="linear"
+    )
+
+    # reset encoding
+    obj_new["time"].encoding["calendar"] = "standard"
+
+    return obj_new
 
 
 @task
@@ -151,7 +186,10 @@ def path_builder_task(
 
 @task(
     checkpoint=True,
-    result=XpersistResult(intermediate_cache_store, serializer=serializer),
+    result=XpersistResult(
+        CacheStore(config.get_config().intermediate_cache_path),
+        serializer=config.get_config().serializer,
+    ),
     target=make_coarse_obs_path,
 )
 def get_coarse_obs_task(
@@ -184,7 +222,7 @@ def get_coarse_obs_task(
     ds_obs_coarse = regrid_ds(
         ds=ds_obs,
         target_grid_ds=gcm_grid,
-        connection_string=config.return_azure_config()["connection_string"],
+        connection_string=config.get_config().connection_string,
     )
 
     if chunking_approach != 'full_space':
@@ -197,7 +235,10 @@ def get_coarse_obs_task(
 
 @task(
     checkpoint=True,
-    result=XpersistResult(intermediate_cache_store, serializer=serializer),
+    result=XpersistResult(
+        CacheStore(config.get_config().intermediate_cache_path),
+        serializer=config.get_config().serializer,
+    ),
     target=make_interpolated_obs_path,
 )
 def coarsen_and_interpolate_obs_task(
@@ -263,7 +304,10 @@ def coarsen_and_interpolate_obs_task(
 
 @task(
     checkpoint=True,
-    result=XpersistResult(intermediate_cache_store, serializer=serializer),
+    result=XpersistResult(
+        CacheStore(config.get_config().intermediate_cache_path),
+        serializer=config.get_config().serializer,
+    ),
     target=make_interpolated_gcm_path,
 )
 def interpolate_gcm_task(
@@ -352,7 +396,10 @@ def interpolate_gcm_task(
 
 @task(
     log_stdout=True,
-    result=XpersistResult(intermediate_cache_store, serializer=serializer),
+    result=XpersistResult(
+        CacheStore(config.get_config().intermediate_cache_path),
+        serializer=config.get_config().serializer,
+    ),
     target=make_bias_corrected_obs_path,
 )
 def bias_correct_obs_task(
@@ -386,7 +433,10 @@ def bias_correct_obs_task(
 
 
 @task(
-    result=XpersistResult(intermediate_cache_store, serializer=serializer),
+    result=XpersistResult(
+        CacheStore(config.get_config().intermediate_cache_path),
+        serializer=config.get_config().serializer,
+    ),
     target=make_bias_corrected_gcm_path,
 )
 def bias_correct_gcm_task(
@@ -438,44 +488,3 @@ def bias_correct_gcm_task(
     ).to_dataset(dim="variable")
 
     return bias_corrected
-
-
-@task
-def to_standard_calendar(obj: T_Xarray) -> T_Xarray:
-    """Convert a Dataset's calendar to the "standard calendar"
-
-    When necessary, "missing" time points are filled in using linear interpolation.
-
-    Valid input dataset calendars include: `noleap`, `365_day`, `366_day`, and `all_leap`.
-
-    Parameters
-    ----------
-    obj : xr.Dataset or xr.DataArray
-        Xarray object with a `CFTimeIndex`.
-
-    Returns
-    -------
-    obj_new : xr.Dataset or xr.DataArray
-        Xarray object with standard calendar.
-
-    Raises
-    ------
-    ValueError
-        If an invalid calendar is supplied.
-    """
-
-    orig_calendar = getattr(obj.indexes["time"], "calendar", "standard")
-    if orig_calendar == "standard":
-        return obj
-    if orig_calendar == "360_day":
-        raise ValueError("360_day calendar is not supported")
-
-    # reindex / interpolate
-    obj_new = xclim.core.calendar.convert_calendar(obj, "standard", missing=np.nan).interpolate_na(
-        dim="time", method="linear"
-    )
-
-    # reset encoding
-    obj_new["time"].encoding["calendar"] = "standard"
-
-    return obj_new

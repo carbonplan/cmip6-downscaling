@@ -19,13 +19,17 @@ from cmip6_downscaling.methods.bcsd import (
     return_y_full_time,
 )
 
+run_config = config.get_config(name='local')
+cfg = config.CloudConfig()
+
+
 # Transform Functions into Tasks -----------------------------------------------------------
 
 target_naming_str = "{gcm}-{scenario}-{train_period_start}-{train_period_end}-{predict_period_start}-{predict_period_end}-{variable}.zarr"
 
-intermediate_cache_store = CacheStore(config.return_azure_config()["intermediate_cache_path"])
-results_cache_store = CacheStore(config.return_azure_config()["results_cache_path"])
-serializer = config.return_azure_config()["serializer"]
+intermediate_cache_store = CacheStore(cfg.intermediate_cache_path)
+results_cache_store = CacheStore(cfg.results_cache_path)
+serializer = cfg.serializer
 
 make_flow_paths_task = task(make_flow_paths, log_stdout=True, nout=4)
 
@@ -73,9 +77,13 @@ postprocess_bcsd_task = task(
 
 # Main Flow -----------------------------------------------------------
 
-# with Flow(name="bcsd-testing", storage=storage, run_config=run_config) as flow:
-# with Flow(name="bcsd-testing", storage=storage, run_config=kubernetes_run_config, executor=dask_executor) as flow:
-with Flow(name="bcsd-testing") as flow:
+
+with Flow(
+    name='bcsd_config_test',
+    storage=run_config.storage,
+    run_config=run_config.run_config,
+    executor=run_config.executor,
+) as bcsd_flow:
     gcm = Parameter("GCM")
     scenario = Parameter("SCENARIO")
     train_period_start = Parameter("TRAIN_PERIOD_START")
@@ -98,72 +106,72 @@ with Flow(name="bcsd-testing") as flow:
         VARIABLE=variable,
     )
     # preprocess_bcsd_tasks(s):
-    # obs_ds = return_obs_task(train_period_start, train_period_end, variable)
-    # coarse_obs_ds = get_coarse_obs_task(obs_ds, variable)
-    # spatial_anomalies_ds = get_spatial_anomalies_task(
-    #     coarse_obs_ds,
-    #     obs_ds,
-    #     gcm,
-    #     scenario,
-    #     train_period_start,
-    #     train_period_end,
-    #     predict_period_start,
-    #     predict_period_end,
-    #     variable,
-    # )
-    # # prep_bcsd_inputs_task(s):
-    # y_full_time_ds = return_y_full_time_task(
-    #     coarse_obs_ds,
-    #     gcm,
-    #     scenario,
-    #     train_period_start,
-    #     train_period_end,
-    #     predict_period_start,
-    #     predict_period_end,
-    #     variable,
-    # )
-    # x_train_full_time_ds = return_x_train_full_time_task(
-    #     y_full_time_ds,
-    #     gcm,
-    #     scenario,
-    #     train_period_start,
-    #     train_period_end,
-    #     predict_period_start,
-    #     predict_period_end,
-    #     variable,
-    # )
-    # x_predict_rechunked_ds = return_x_predict_rechunked_task(
-    #     x_train_full_time_ds,
-    #     gcm,
-    #     scenario,
-    #     train_period_start,
-    #     train_period_end,
-    #     predict_period_start,
-    #     predict_period_end,
-    #     variable,
-    # )
-    # # fit and predict tasks(s):
-    # bias_corrected_ds = fit_and_predict_task(
-    #     x_train_full_time_ds,
-    #     y_full_time_ds,
-    #     x_predict_rechunked_ds,
-    #     gcm,
-    #     scenario,
-    #     train_period_start,
-    #     train_period_end,
-    #     predict_period_start,
-    #     predict_period_end,
-    #     variable,
-    # )
-    # # postprocess_bcsd_task(s):
-    # postprocess_bcsd_ds = postprocess_bcsd_task(
-    #     bias_corrected_ds,
-    #     spatial_anomalies_ds,
-    #     gcm,
-    #     scenario,
-    #     train_period_start,
-    #     train_period_end,
-    #     predict_period_start,
-    #     predict_period_end,
-    #     variable,
-    # )
+    obs_ds = return_obs_task(train_period_start, train_period_end, variable)
+    coarse_obs_ds = get_coarse_obs_task(obs_ds, variable)
+    spatial_anomalies_ds = get_spatial_anomalies_task(
+        coarse_obs_ds,
+        obs_ds,
+        gcm,
+        scenario,
+        train_period_start,
+        train_period_end,
+        predict_period_start,
+        predict_period_end,
+        variable,
+    )
+    # prep_bcsd_inputs_task(s):
+    y_full_time_ds = return_y_full_time_task(
+        coarse_obs_ds,
+        gcm,
+        scenario,
+        train_period_start,
+        train_period_end,
+        predict_period_start,
+        predict_period_end,
+        variable,
+    )
+    x_train_full_time_ds = return_x_train_full_time_task(
+        y_full_time_ds,
+        gcm,
+        scenario,
+        train_period_start,
+        train_period_end,
+        predict_period_start,
+        predict_period_end,
+        variable,
+    )
+    x_predict_rechunked_ds = return_x_predict_rechunked_task(
+        x_train_full_time_ds,
+        gcm,
+        scenario,
+        train_period_start,
+        train_period_end,
+        predict_period_start,
+        predict_period_end,
+        variable,
+    )
+    # fit and predict tasks(s):
+    bias_corrected_ds = fit_and_predict_task(
+        x_train_full_time_ds,
+        y_full_time_ds,
+        x_predict_rechunked_ds,
+        gcm,
+        scenario,
+        train_period_start,
+        train_period_end,
+        predict_period_start,
+        predict_period_end,
+        variable,
+    )
+    # postprocess_bcsd_task(s):
+    postprocess_bcsd_ds = postprocess_bcsd_task(
+        bias_corrected_ds,
+        spatial_anomalies_ds,
+        gcm,
+        scenario,
+        train_period_start,
+        train_period_end,
+        predict_period_start,
+        predict_period_end,
+        variable,
+    )

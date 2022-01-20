@@ -92,7 +92,7 @@ def get_obs(
         rechunked_path = None
     ds_obs_rechunked = rechunk_zarr_array_with_caching(
         zarr_array=ds_obs,
-        connection_string=config.return_azure_config()["connection_string"],
+        connection_string=config.CloudConfig().connection_string,
         chunking_approach=chunking_approach,
         output_path=rechunked_path,
     )
