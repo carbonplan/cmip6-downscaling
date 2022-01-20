@@ -14,16 +14,6 @@ from xpersist import CacheStore
 from xpersist.prefect.result import XpersistResult
 
 import cmip6_downscaling.config.config as config
-<<<<<<< HEAD
-
-cfg = config.CloudConfig()
-
-intermediate_cache_store = CacheStore(cfg.intermediate_cache_path)
-serializer = cfg.serializer
-
-
-=======
->>>>>>> CI_fix
 from cmip6_downscaling.data.cmip import get_gcm, get_gcm_grid_spec, load_cmip
 from cmip6_downscaling.data.observations import get_obs
 from cmip6_downscaling.methods.bias_correction import (
@@ -42,10 +32,6 @@ from cmip6_downscaling.workflows.paths import (
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching, regrid_ds
 
 get_obs_task = task(get_obs)
-<<<<<<< HEAD
-
-=======
->>>>>>> CI_fix
 get_gcm_task = task(get_gcm)
 
 
@@ -232,11 +218,7 @@ def get_coarse_obs_task(
     ds_obs_coarse = regrid_ds(
         ds=ds_obs,
         target_grid_ds=gcm_grid,
-<<<<<<< HEAD
-        connection_string=cfg.connection_string,
-=======
         connection_string=config.get_config().connection_string,
->>>>>>> CI_fix
     )
 
     if chunking_approach != 'full_space':
@@ -494,45 +476,3 @@ def bias_correct_gcm_task(
     ).to_dataset(dim="variable")
 
     return bias_corrected
-<<<<<<< HEAD
-
-
-@task
-def to_standard_calendar(obj: T_Xarray) -> T_Xarray:
-    """Convert a Dataset's calendar to the "standard calendar"
-    When necessary, "missing" time points are filled in using linear interpolation.
-    Valid input dataset calendars include: `noleap`, `365_day`, `366_day`, and `all_leap`.
-
-    Parameters
-    ----------
-    obj : xr.Dataset or xr.DataArray
-        Xarray object with a `CFTimeIndex`.
-
-    Returns
-    -------
-    obj_new : xr.Dataset or xr.DataArray
-        Xarray object with standard calendar.
-
-    Raises
-    ------
-    ValueError
-        If an invalid calendar is supplied.
-    """
-
-    orig_calendar = getattr(obj.indexes["time"], "calendar", "standard")
-    if orig_calendar == "standard":
-        return obj
-    if orig_calendar == "360_day":
-        raise ValueError("360_day calendar is not supported")
-
-    # reindex / interpolate
-    obj_new = xclim.core.calendar.convert_calendar(obj, "standard", missing=np.nan).interpolate_na(
-        dim="time", method="linear"
-    )
-
-    # reset encoding
-    obj_new["time"].encoding["calendar"] = "standard"
-
-    return obj_new
-=======
->>>>>>> CI_fix

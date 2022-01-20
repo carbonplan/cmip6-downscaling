@@ -94,11 +94,7 @@ def get_obs(
         rechunked_path = None
     ds_obs_rechunked = rechunk_zarr_array_with_caching(
         zarr_array=ds_obs,
-<<<<<<< HEAD
-        connection_string=cfg.connection_string,
-=======
         connection_string=config.CloudConfig().connection_string,
->>>>>>> CI_fix
         chunking_approach=chunking_approach,
         output_path=rechunked_path,
     )

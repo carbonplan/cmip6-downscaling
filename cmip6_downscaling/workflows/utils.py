@@ -69,6 +69,8 @@ def subset_dataset(
     Xarray Dataset
         Spatially subsetted Xarray dataset.
     """
+    assert lonmax > lonmin
+    assert latmax > latmin
     subset_ds = ds.sel(
         time=slice(start_time, end_time),
         lon=slice(float(lonmin), float(lonmax)),
