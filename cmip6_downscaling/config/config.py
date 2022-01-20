@@ -9,7 +9,8 @@ from prefect.executors import DaskExecutor, LocalDaskExecutor, LocalExecutor  # 
 from prefect.run_configs import KubernetesRun, LocalRun
 from prefect.storage import Azure, Local
 
-# TODO: Add new confi g that is hybrid or local compute, but has prefect storage access (ie. what I've been using to debug. Local is now non-write permissions.)
+
+# TODO: Add new config that is hybrid or local compute, but has prefect storage access (ie. what I've been using to debug. Local is now non-write permissions.)
 
 
 class BaseConfig:

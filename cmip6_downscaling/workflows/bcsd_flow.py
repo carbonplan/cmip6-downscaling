@@ -20,6 +20,7 @@ from cmip6_downscaling.methods.bcsd import (
 )
 
 run_config = config.get_config(name='prefect-cloud')
+
 cfg = config.CloudConfig()
 
 
@@ -89,13 +90,13 @@ postprocess_bcsd_task = task(
     target="postprocess-results-" + target_naming_str,
 )
 
+
 with Flow(
-    name="bcsd-tasmax",
+    name='bcsd_config_test',
     storage=run_config.storage,
     run_config=run_config.run_config,
     executor=run_config.executor,
-) as flow:
-
+) as bcsd_flow:
     gcm = Parameter("GCM")
     scenario = Parameter("SCENARIO")
     train_period_start = Parameter("TRAIN_PERIOD_START")
@@ -154,6 +155,7 @@ with Flow(
         lonmin,
         lonmax,
     )
+
     spatial_anomalies_ds = get_spatial_anomalies_task(
         coarse_obs_ds,
         obs_ds,
@@ -182,10 +184,10 @@ with Flow(
         latmin,
         latmax,
         lonmin,
-        lonmax,
-    )
+        lonmax,)
+      
     gcm_train_subset_full_time_ds = return_gcm_train_full_time_task(
-        coarse_obs_full_time_ds,
+        coarse_obs_full_time_ds
         gcm,
         scenario,
         train_period_start,
@@ -228,6 +230,7 @@ with Flow(
         latmax,
         lonmin,
         lonmax,
+
     )
     # postprocess_bcsd_task(s):
     postprocess_bcsd_ds = postprocess_bcsd_task(

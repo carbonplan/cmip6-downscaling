@@ -117,6 +117,7 @@ def generate_batches(n, batch_size, buffer_size, one_indexed=False):
         Spatially subsetted Xarray dataset.
     """
 
+
     cores = []
     batches = []
     if one_indexed:
