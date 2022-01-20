@@ -2,37 +2,17 @@ import os
 
 os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "true"
 
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Callable, List, Optional, Tuple
 
 import numpy as np
 import xarray as xr
 import xclim
 from prefect import task
-from skdownscale.pointwise_models.utils import default_none_kwargs
 from xarray.core.types import T_Xarray
-from xpersist import CacheStore
-from xpersist.prefect.result import XpersistResult
 
-import cmip6_downscaling.config.config as config
-from cmip6_downscaling.data.cmip import get_gcm, get_gcm_grid_spec, load_cmip
-from cmip6_downscaling.data.observations import get_obs
-from cmip6_downscaling.methods.bias_correction import (
-    bias_correct_gcm_by_method,
-    bias_correct_obs_by_method,
-)
-from cmip6_downscaling.workflows.paths import (
-    build_gcm_identifier,
-    build_obs_identifier,
-    make_bias_corrected_gcm_path,
-    make_bias_corrected_obs_path,
-    make_coarse_obs_path,
-    make_interpolated_gcm_path,
-    make_interpolated_obs_path,
-)
-from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching, regrid_ds
-
-# get_obs_task = task(get_obs)
-# get_gcm_task = task(get_gcm)
+from cmip6_downscaling.data.cmip import get_gcm_grid_spec
+from cmip6_downscaling.workflows.paths import build_gcm_identifier, build_obs_identifier
+from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching
 
 
 @task

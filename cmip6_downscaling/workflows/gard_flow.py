@@ -12,13 +12,13 @@ from xpersist.prefect.result import XpersistResult
 import cmip6_downscaling.config.config as config
 from cmip6_downscaling.data.observations import get_obs
 from cmip6_downscaling.methods.gard import gard_fit_and_predict, gard_postprocess, generate_scrf
-from cmip6_downscaling.tasks.common_tasks import (
+from cmip6_downscaling.tasks.cloud_tasks import (
     bias_correct_gcm_task,
     bias_correct_obs_task,
     coarsen_and_interpolate_obs_task,
     interpolate_gcm_task,
-    path_builder_task,
 )
+from cmip6_downscaling.tasks.common_tasks import path_builder_task
 from cmip6_downscaling.workflows.paths import (
     make_bias_corrected_gcm_path,
     make_gard_post_processed_output_path,
