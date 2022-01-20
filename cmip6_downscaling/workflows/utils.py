@@ -35,6 +35,7 @@ def get_store(prefix, account_key=None):
 
 def subset_dataset(
     ds: xr.Dataset,
+    variable: str,
     start_time: str,
     end_time: str,
     latmin: str,
@@ -76,13 +77,12 @@ def subset_dataset(
         lon=slice(float(lonmin), float(lonmax)),
         lat=slice(float(latmax), float(latmin)),
     )
-
     if chunking_schema is not None:
-        target_schema = DataArraySchema(chunking_schema)
+        target_schema = DataArraySchema(chunks=chunking_schema)
         try:
-            target_schema.validate(subset_ds)
+            target_schema.validate(subset_ds[variable])
         except SchemaError:
-            subset_ds = subset_ds.chunk(target_schema)
+            subset_ds = subset_ds.chunk(chunking_schema)
 
     return subset_ds
 

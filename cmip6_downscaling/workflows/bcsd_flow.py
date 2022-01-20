@@ -19,7 +19,7 @@ from cmip6_downscaling.methods.bcsd import (
     return_obs,
 )
 
-run_config = config.get_config(name='local')
+run_config = config.get_config(name='prefect-cloud')
 cfg = config.CloudConfig()
 
 
@@ -90,7 +90,7 @@ postprocess_bcsd_task = task(
 )
 
 with Flow(
-    name="bcsd-tasmax-conus_l",
+    name="bcsd-tasmax",
     storage=run_config.storage,
     run_config=run_config.run_config,
     executor=run_config.executor,
