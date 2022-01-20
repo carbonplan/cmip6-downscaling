@@ -35,14 +35,64 @@ def get_store(prefix, account_key=None):
 
 def subset_dataset(
     ds: xr.Dataset,
+    variable: str,
     start_time: str,
     end_time: str,
     latmin: str,
     latmax: str,
     lonmin: str,
     lonmax: str,
+    chunking_schema: Optional[dict] = None,
 ) -> xr.Dataset:
     """Uses Xarray slicing to spatially subset a dataset based on input params.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+         Input Xarray dataset
+    start_time : str
+        Starting Time
+    end_time : str
+        Ending Time
+    latmin : str
+        Latitude Minimum
+    latmax : str
+        Latitude Maximum
+    lonmin : str
+        Longitude Minimum
+    lonmax : str
+        Longitude Maximum
+    chunking_schema : str, optional
+        Desired chunking schema. ex: {'time': 365, 'lat': 150, 'lon': 150}
+
+    Returns
+    -------
+    Xarray Dataset
+        Spatially subsetted Xarray dataset.
+    """
+    assert lonmax > lonmin
+    assert latmax > latmin
+    subset_ds = ds.sel(
+        time=slice(start_time, end_time),
+        lon=slice(float(lonmin), float(lonmax)),
+        lat=slice(float(latmax), float(latmin)),
+    )
+    if chunking_schema is not None:
+        target_schema = DataArraySchema(chunks=chunking_schema)
+        try:
+            target_schema.validate(subset_ds[variable])
+        except SchemaError:
+            subset_ds = subset_ds.chunk(chunking_schema)
+
+    return subset_ds
+
+
+def generate_batches(n, batch_size, buffer_size, one_indexed=False):
+    """
+    Given the max value n, batch_size, and buffer_size, returns batches (include the buffer) and
+    cores (exclude the buffer). For the smallest numbers, the largest values would be included in the buffer, and
+    vice versa. For example, with n=10, batch_size=5, buffer_size=3, one_indexed=False. The `cores` output will contain
+    [[0, 1, 2, 3, 4], [5, 6, 7, 8, 9]], and `batches` output will contain [[7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7], [2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2]].
 
     Parameters
     ----------
@@ -66,20 +116,6 @@ def subset_dataset(
     Xarray Dataset
         Spatially subsetted Xarray dataset.
     """
-    subset_ds = ds.sel(
-        time=slice(start_time, end_time),
-        lon=slice(float(lonmin), float(lonmax)),
-        lat=slice(float(latmax), float(latmin)),
-    )
-    return subset_ds
-
-
-def generate_batches(n, batch_size, buffer_size, one_indexed=False):
-    """
-    ds must have a dimension called time that is a valid datetime index
-    """
-    # TODO: add tests. if buffer_size == 0, batches == cores
-    # construct 2 test cases
 
     cores = []
     batches = []
@@ -258,9 +294,7 @@ def rechunk_zarr_array(
             # make new stores in case it failed mid-write. alternatively could clean up that store but
             # we don't have delete permission currently
             temp_store, target_store, path_tgt = make_rechunker_stores(connection_string)
-            print(chunks_dict[variable])
             delete_chunks_encoding(zarr_array)
-            print(zarr_array.chunk(chunks_dict[variable]))
             # TODO: will always work but need to double check the result and if it's taking a long time
             rechunk_plan = rechunk(
                 zarr_array.chunk(chunks_dict[variable]),

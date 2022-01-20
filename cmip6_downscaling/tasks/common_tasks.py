@@ -135,7 +135,6 @@ def path_builder_task(
     """
     Take in input parameters and make string patterns that identifies the obs dataset, gcm dataset, and the gcm grid. These
     strings will then be used to identify cached files.
-
     Parameters
     ----------
     obs: str
@@ -154,7 +153,6 @@ def path_builder_task(
         End year of predict/future period
     variables: List[str]
         Names of the variables used in obs and gcm dataset (including features and label)
-
     Returns
     -------
     gcm_grid_spec: str
@@ -197,7 +195,6 @@ def get_coarse_obs_task(
 ) -> xr.Dataset:
     """
     Coarsen the observation dataset to the grid of the GCM model specified in inputs.
-
     Parameters
     ----------
     ds_obs: xr.Dataset
@@ -206,7 +203,6 @@ def get_coarse_obs_task(
         Name of the GCM model whose grid to coarsen to
     **kwargs: Dict
         Other arguments to be used in generating the target path
-
     Returns
     -------
     ds_obs_coarse: xr.Dataset
@@ -247,7 +243,6 @@ def coarsen_and_interpolate_obs_task(
     """
     Coarsen the observation dataset to the grid of the GCM model specified in inputs then
     interpolate back into the observation grid. Rechunk the final output according to chunking approach.
-
     Parameters
     ----------
     obs: str
@@ -264,7 +259,6 @@ def coarsen_and_interpolate_obs_task(
         'full_space', 'full_time', or None
     **kwargs: Dict
         Other arguments to be used in generating the target path
-
     Returns
     -------
     ds_obs_interpolated_rechunked: xr.Dataset
@@ -325,7 +319,6 @@ def interpolate_gcm_task(
     """
     Interpolate the GCM dataset to the grid of the observation dataset.
     Rechunk the final output according to chunking approach.
-
     Parameters
     ----------
     obs: str
@@ -348,7 +341,6 @@ def interpolate_gcm_task(
         'full_space', 'full_time', or None
     **kwargs: Dict
         Other arguments to be used in generating the target path
-
     Returns
     -------
     ds_gcm_interpolated_rechunked: xr.Dataset
@@ -407,7 +399,6 @@ def bias_correct_obs_task(
 ) -> xr.DataArray:
     """
     Bias correct observation data according to methods and kwargs.
-
     Parameters
     ----------
     ds_obs : xr.Dataset
@@ -418,7 +409,6 @@ def bias_correct_obs_task(
         Keyword arguments to be used with the bias correction method
     kwargs: dict
         Other arguments to be used in generating the target path
-
     Returns
     -------
     ds_obs_bias_corrected : xr.Dataset
@@ -450,7 +440,6 @@ def bias_correct_gcm_task(
 ) -> xr.DataArray:
     """
     Bias correct gcm data to the provided observation data according to methods and kwargs.
-
     Parameters
     ----------
     ds_gcm : xr.Dataset
@@ -467,7 +456,6 @@ def bias_correct_gcm_task(
         Keyword arguments to be used with the bias correction method
     kwargs: dict
         Other arguments to be used in generating the target path
-
     Returns
     -------
     ds_gcm_bias_corrected : xr.Dataset
