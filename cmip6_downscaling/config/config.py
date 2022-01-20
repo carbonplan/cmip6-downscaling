@@ -185,13 +185,13 @@ class PangeoConfig(BaseConfig):
 
 
 def get_config(name=None, **kwargs):
-    if name.lower() == 'test':
+    if name == 'test':
         config = TestConfig(**kwargs)
-    elif name.lower() == 'local':
+    elif name == 'local':
         config = LocalConfig(**kwargs)
-    elif name.lower() == 'prefect-cloud':
+    elif name == 'prefect-cloud':
         config = CloudConfig(**kwargs)
-    elif name.lower() == 'pangeo':
+    elif name == 'pangeo':
         config = PangeoConfig(**kwargs)
     elif os.environ.get("CI") == "true":
         config = TestConfig(**kwargs)
