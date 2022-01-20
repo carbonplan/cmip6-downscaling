@@ -1,0 +1,13 @@
+{
+    "GCM": "MIROC6",
+    "SCENARIO": "ssp370",
+    "TRAIN_PERIOD_START": "1970",
+    "TRAIN_PERIOD_END": "1970",
+    "PREDICT_PERIOD_START": "2090",
+    "PREDICT_PERIOD_END": "2090",
+    "VARIABLE": "tasmax",
+    "LATMIN":  -90,
+    "LATMAX": 90,
+    "LONMIN": -180,
+    "LONMAX": 180
+  }
