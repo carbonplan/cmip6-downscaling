@@ -184,10 +184,11 @@ with Flow(
         latmin,
         latmax,
         lonmin,
-        lonmax,)
-      
+        lonmax,
+    )
+
     gcm_train_subset_full_time_ds = return_gcm_train_full_time_task(
-        coarse_obs_full_time_ds
+        coarse_obs_full_time_ds,
         gcm,
         scenario,
         train_period_start,
@@ -230,7 +231,6 @@ with Flow(
         latmax,
         lonmin,
         lonmax,
-
     )
     # postprocess_bcsd_task(s):
     postprocess_bcsd_ds = postprocess_bcsd_task(
