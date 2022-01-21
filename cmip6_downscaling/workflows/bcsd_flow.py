@@ -6,7 +6,7 @@ from prefect import Flow, Parameter, task
 from xpersist import CacheStore
 from xpersist.prefect.result import XpersistResult
 
-import cmip6_downscaling.config.config as config
+import cmip6_downscaling.runtimes as get_runtime
 from cmip6_downscaling.methods.bcsd import (
     fit_and_predict,
     get_coarse_obs,
@@ -19,18 +19,16 @@ from cmip6_downscaling.methods.bcsd import (
     return_obs,
 )
 
-run_config = config.get_config(name='prefect-cloud')
-
-cfg = config.CloudConfig()
+runtime = get_runtime()
 
 
 # Transform Functions into Tasks -----------------------------------------------------------
 
 target_naming_str = "{gcm}-{scenario}-{train_period_start}-{train_period_end}-{predict_period_start}-{predict_period_end}-{latmin}-{latmax}-{lonmin}-{lonmax}-{variable}.zarr"
 
-intermediate_cache_store = CacheStore(cfg.intermediate_cache_path)
-results_cache_store = CacheStore(cfg.results_cache_path)
-serializer = cfg.serializer
+intermediate_cache_store = CacheStore(runtime.intermediate_cache_path)
+results_cache_store = CacheStore(runtime.results_cache_path)
+serializer = runtime.serializer
 
 make_flow_paths_task = task(make_flow_paths, log_stdout=True, nout=4)
 
@@ -93,9 +91,9 @@ postprocess_bcsd_task = task(
 
 with Flow(
     name='bcsd_config_test',
-    storage=run_config.storage,
-    run_config=run_config.run_config,
-    executor=run_config.executor,
+    storage=runtime.storage,
+    runtime=runtime.runtime,
+    executor=runtime.executor,
 ) as bcsd_flow:
     gcm = Parameter("GCM")
     scenario = Parameter("SCENARIO")
