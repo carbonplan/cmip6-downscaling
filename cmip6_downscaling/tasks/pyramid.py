@@ -17,7 +17,7 @@ def _load_coords(ds: xr.Dataset) -> xr.Dataset:
     return ds
 
 
-def _postprocess(dt: dt.DataTree, levels: int) -> dt.DataTree:
+def _postprocess(dt: dt.DataTree, levels: int, other_chunks: dict = None) -> dt.DataTree:
     '''Postprocess data pyramid
 
     Adds multiscales metadata and sets Zarr encoding
@@ -28,33 +28,41 @@ def _postprocess(dt: dt.DataTree, levels: int) -> dt.DataTree:
         Input data pyramid
     levels : int
         Number of levels in pyramid
+    other_chunks : dict
+        Chunks for non-spatial dims
 
     Returns
     -------
     dt.DataTree
         Updated data pyramid with metadata / encoding set
     '''
+    chunks = {"x": PIXELS_PER_TILE, "y": PIXELS_PER_TILE}
+    if other_chunks is not None:
+        chunks.update(other_chunks)
 
     for level in range(levels):
         slevel = str(level)
         dt.ds.attrs['multiscales'][0]['datasets'][level]['pixels_per_tile'] = PIXELS_PER_TILE
 
-        dt[slevel].ds = dt[slevel].ds.chunk(
-            {"x": PIXELS_PER_TILE, "y": PIXELS_PER_TILE, "time": 31}
-        )
-        dt[slevel].ds['date_str'] = dt[slevel].ds['date_str'].chunk(-1)
+        # set dataset chunks
+        dt[slevel].ds = dt[slevel].ds.chunk(chunks)
+        if 'date_str' in dt[slevel].ds:
+            dt[slevel].ds['date_str'] = dt[slevel].ds['date_str'].chunk(-1)
 
+        # set dataset encoding
         dt[slevel].ds = set_zarr_encoding(
             dt[slevel].ds, codec_config={"id": "zlib", "level": 1}, float_dtype="float32"
         )
         dt[slevel].ds['time'].encoding['dtype'] = 'int32'
         dt[slevel].ds['time_bnds'].encoding['dtype'] = 'int32'
+
+    # set global metadata
     dt.ds.attrs.update(**get_cf_global_attrs())
     return dt
 
 
 @task(log_stdout=True, tags=['dask-resource:TASKSLOTS=1'])
-def regrid(ds: xr.Dataset, levels: int = 2, uri: str = None) -> str:
+def regrid(ds: xr.Dataset, levels: int = 2, uri: str = None, other_chunks: dict = None) -> str:
     '''Task to create a data pyramid from an xarray Dataset
 
     Parameters
@@ -65,6 +73,8 @@ def regrid(ds: xr.Dataset, levels: int = 2, uri: str = None) -> str:
         Number of levels in pyramid, by default 2
     uri : str, optional
         Path to write output data pyamid to, by default None
+    other_chunks : dict
+        Chunks for non-spatial dims
     '''
 
     with dask.config.set(scheduler='threads'):
@@ -82,7 +92,7 @@ def regrid(ds: xr.Dataset, levels: int = 2, uri: str = None) -> str:
         dt = pyramid_regrid(ds, target_pyramid=None, levels=levels)
 
         # postprocess
-        dt = _postprocess(dt, levels)
+        dt = _postprocess(dt, levels, other_chunks=other_chunks)
 
         # write to uri
         dt.to_zarr(mapper, mode='w')

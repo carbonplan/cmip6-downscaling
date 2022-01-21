@@ -67,4 +67,4 @@ with Flow(name="cmip6_pyramids", storage=storage, run_config=run_config) as flow
             datasets.append(ds.sel(member_id=member_id))
             uris.append(f'scratch/cmip6-web-test-8/{key}/{member_id}')
 
-    regrid.map(ds=datasets, uri=uris, levels=unmapped(LEVELS))
+    regrid.map(ds=datasets, uri=uris, levels=unmapped(LEVELS), other_chunks=unmapped({'time': 31}))
