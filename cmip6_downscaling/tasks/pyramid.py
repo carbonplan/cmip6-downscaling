@@ -17,7 +17,7 @@ def _load_coords(ds: xr.Dataset) -> xr.Dataset:
     return ds
 
 
-def postprocess(dt: dt.DataTree, levels: int) -> dt.DataTree:
+def _postprocess(dt: dt.DataTree, levels: int) -> dt.DataTree:
     '''Postprocess data pyramid
 
     Adds multiscales metadata and sets Zarr encoding
@@ -53,9 +53,7 @@ def postprocess(dt: dt.DataTree, levels: int) -> dt.DataTree:
     return dt
 
 
-@task(log_stdout=True)
-# Question: How should we
-# tags=['dask-resource:TASKSLOTS=1']
+@task(log_stdout=True, tags=['dask-resource:TASKSLOTS=1'])
 def regrid(ds: xr.Dataset, levels: int = 2, uri: str = None) -> str:
     '''Task to create a data pyramid from an xarray Dataset
 
@@ -73,7 +71,7 @@ def regrid(ds: xr.Dataset, levels: int = 2, uri: str = None) -> str:
 
         ds.coords['date_str'] = ds['time'].dt.strftime('%Y-%m-%d').astype('S10')
 
-        ds = ds.pipe(_load_coords)
+        ds = _load_coords(ds)
 
         mapper = fsspec.get_mapper(uri)
         # Question: Is this needed or will prefect handle this for us?
@@ -84,7 +82,7 @@ def regrid(ds: xr.Dataset, levels: int = 2, uri: str = None) -> str:
         dt = pyramid_regrid(ds, target_pyramid=None, levels=levels)
 
         # postprocess
-        dt = postprocess(dt, levels)
+        dt = _postprocess(dt, levels)
 
         # write to uri
         dt.to_zarr(mapper, mode='w')
