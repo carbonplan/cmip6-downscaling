@@ -36,7 +36,7 @@ def test_bcsd_flow_subset(subset):
     # or just check that it doesn't fail?
 
     assert fsspec.open(
-        run_config.results_cache_path + f'postprocess-results-{target_naming_str}/' + '.zmetadata'
+        run_config.results_cache_path + f'/postprocess-results-{target_naming_str}/' + '.zmetadata'
     ).read()
 
 
