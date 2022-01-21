@@ -14,7 +14,7 @@ list_of_keys = ['full_time', 'full_space']
 
 @pytest.mark.parametrize("subset", list_of_keys)
 def test_bcsd_flow_subset(subset):
-    with open('{subset}_test_bcsd_params.json') as json_file:
+    with open(f'{subset}_test_bcsd_params.json') as json_file:
         run_hyperparameters = json.load(json_file)
 
     gcm = run_hyperparameters["GCM"]
