@@ -50,7 +50,7 @@ class CloudConfig(BaseConfig):
         self.intermediate_cache_path = "az://flow-outputs/intermediates"
         self.results_cache_path = "az://flow-outputs/results"
         self.agent = ["az-eu-west"]
-        self.extra_pip_packages = "git+https://github.com/carbonplan/cmip6-downscaling.git@esmf_threading git+https://github.com/pangeo-data/scikit-downscale.git"
+        self.extra_pip_packages = "git+https://github.com/carbonplan/cmip6-downscaling.git git+https://github.com/pangeo-data/scikit-downscale.git"
         self.serializer = "xarray.zarr"
         self.kubernetes_cpu = 7
         self.kubernetes_memory = "16Gi"
