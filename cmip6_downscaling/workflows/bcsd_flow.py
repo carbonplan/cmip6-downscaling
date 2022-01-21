@@ -19,18 +19,15 @@ from cmip6_downscaling.methods.bcsd import (
     return_obs,
 )
 
-run_config = config.get_config(name='prefect-cloud')
-
-cfg = config.CloudConfig()
-
+run_config = config.get_config()
 
 # Transform Functions into Tasks -----------------------------------------------------------
 
 target_naming_str = "{gcm}-{scenario}-{train_period_start}-{train_period_end}-{predict_period_start}-{predict_period_end}-{latmin}-{latmax}-{lonmin}-{lonmax}-{variable}.zarr"
 
-intermediate_cache_store = CacheStore(cfg.intermediate_cache_path)
-results_cache_store = CacheStore(cfg.results_cache_path)
-serializer = cfg.serializer
+intermediate_cache_store = CacheStore(run_config.intermediate_cache_path)
+results_cache_store = CacheStore(run_config.results_cache_path)
+serializer = run_config.serializer
 
 make_flow_paths_task = task(make_flow_paths, log_stdout=True, nout=4)
 
