@@ -1,4 +1,5 @@
 {
+  "OBS":"ERA5",
   "GCM": "MIROC6",
   "SCENARIO": "ssp370",
   "TRAIN_PERIOD_START": "1990",

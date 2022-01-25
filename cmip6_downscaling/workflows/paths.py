@@ -1,10 +1,13 @@
 from typing import List, Optional, Tuple, Union
 
-
 def build_obs_identifier(
     obs: str,
     train_period_start: str,
     train_period_end: str,
+    latmin: str,
+    latmax: str,
+    lonmin: str,
+    lonmax: str,
     variables: Union[str, List[str], Tuple[str]],
     **kwargs,
 ) -> str:
@@ -19,6 +22,14 @@ def build_obs_identifier(
         Start year of the training period
     train_period_end : str
         End year of the training period
+    latmin : str
+            Minimum latitude
+    latmax : str
+            Maximum latitude
+    lonmin : str
+            Minimum longitude
+    lonmax : str
+            Max longitude
     variables : str or List[str]
         Name of variable(s) to use (e.g. tasmax, pr)
 
@@ -30,7 +41,7 @@ def build_obs_identifier(
     if isinstance(variables, str):
         variables = [variables]
     var_string = '_'.join(sorted(variables))
-    return f'{obs}_{train_period_start}_{train_period_end}_{var_string}'
+    return f'{obs}_{train_period_start}_{train_period_end}_{latmin}_{latmax}_{lonmin}_{lonmax}_{var_string}'
 
 
 def build_gcm_identifier(
@@ -40,6 +51,10 @@ def build_gcm_identifier(
     train_period_end: str,
     predict_period_start: str,
     predict_period_end: str,
+    latmin: str,
+    latmax: str,
+    lonmin: str,
+    lonmax: str,
     variables: Union[str, List[str]],
     **kwargs,
 ) -> str:
@@ -60,6 +75,14 @@ def build_gcm_identifier(
         Start year of the prediction period
     predict_period_end : str
         End year of the prediction period
+    latmin : str
+            Minimum latitude
+    latmax : str
+            Maximum latitude
+    lonmin : str
+            Minimum longitude
+    lonmax : str
+            Max longitude
     variables : str or List[str]
         Name of variable(s) to use (e.g. tasmax, pr)
 
@@ -71,7 +94,7 @@ def build_gcm_identifier(
     if isinstance(variables, str):
         variables = [variables]
     var_string = '_'.join(variables)
-    return f'{gcm}_{scenario}_{train_period_start}_{train_period_end}_{predict_period_start}_{predict_period_end}_{var_string}'
+    return f'{gcm}_{scenario}_{train_period_start}_{train_period_end}_{predict_period_start}_{predict_period_end}_{latmin}_{latmax}_{lonmin}_{lonmax}_{var_string}'
 
 
 def make_rechunked_obs_path(
@@ -450,3 +473,78 @@ def make_maca_output_path(gcm_identifier: str, label: str, **kwargs):
         MACA output path
     """
     return f"maca_output/{gcm_identifier}_{label}.zarr"
+
+
+
+#---addl bcsd paths
+
+def make_spatial_anomalies_path(
+   obs_identifier: str = None, **kwargs
+) -> str:
+    """Build the path for spatial anomalies
+
+    Parameters
+    ----------
+    obs_identifier : str
+        Output from build_obs_identifier. String to identify the observation dataset used
+
+    Returns
+    -------
+    spatial_anomalies_path: str
+        Path to bcsd spatial anomalies file location
+    """
+    return f"spatial_anomalies/{obs_identifier}.zarr"
+
+
+
+def make_gcm_predict_path(
+   gcm_identifier: str = None, **kwargs
+) -> str:
+    """Build the path for the gcm predict dataset
+
+    Parameters
+    ----------
+    gcm_identifier : str
+        Output from build_gcm_identifier. String to identify the gcm dataset used
+
+    Returns
+    -------
+    gcm_predict_path: str
+        Path to gcm_predict ds file location
+    """
+    return f"gcm_predict/{gcm_identifier}.zarr"
+
+
+def make_bias_corrected_path(
+   gcm_identifier: str = None, **kwargs
+) -> str:
+    """Build the path for the bias corrected bcsd dataset
+
+    Parameters
+    ----------
+    gcm_identifier : str
+        Output from build_gcm_identifier. String to identify the gcm dataset used
+
+    Returns
+    -------
+    bias_corrected_path: str
+        Path to bcsd bias_corrected ds file location
+    """
+    return f"bias_corrected/{gcm_identifier}.zarr"
+
+def make_bcsd_output_path(
+   gcm_identifier: str = None, **kwargs
+) -> str:
+    """Build the path for the bcsd output dataset
+
+    Parameters
+    ----------
+    gcm_identifier : str
+        Output from build_gcm_identifier. String to identify the gcm dataset used
+
+    Returns
+    -------
+    bcsd_output_path: str
+        Path to bcsd output ds file location
+    """
+    return f"bcsd_output/{gcm_identifier}.zarr"

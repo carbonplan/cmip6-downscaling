@@ -19,6 +19,9 @@ from cmip6_downscaling.workflows.utils import (
 )
 
 
+
+
+
 def make_flow_paths(
     GCM: str,
     SCENARIO: str,
@@ -78,17 +81,15 @@ def make_flow_paths(
 
 
 def return_obs(
-    gcm: str,
-    scenario: str,
     train_period_start: str,
     train_period_end: str,
-    predict_period_start: str,
-    predict_period_end: str,
     variable: str,
     latmin: str,
     latmax: str,
     lonmin: str,
     lonmax: str,
+    **kwargs,
+
 ) -> xr.Dataset:
     """Loads ERA5 observation data for given time bounds and variable
 
