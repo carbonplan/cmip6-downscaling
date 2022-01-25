@@ -5,6 +5,7 @@ dependencies:
   - adlfs
   - dask
   - dask-kubernetes
+  - donfig
   - fsspec
   - google-cloud-storage
   - gcsfs
