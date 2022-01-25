@@ -2,9 +2,10 @@ from typing import List, Optional, Union
 
 import xarray as xr
 
-from . import cat
 from cmip6_downscaling.workflows.paths import make_rechunked_obs_path
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching
+
+from . import cat
 
 variable_name_dict = {
     "tasmax": "air_temperature_at_2_metres_1hour_Maximum",
@@ -35,9 +36,7 @@ def open_era5(variables: Union[str, List[str]], start_year: str, end_year: str) 
 
     years = range(int(start_year), int(end_year) + 1)
 
-    ds = xr.concat(
-        [cat.era5(year=year).to_dask()[variables] for year in years], dim='time'
-    )
+    ds = xr.concat([cat.era5(year=year).to_dask()[variables] for year in years], dim='time')
 
     return ds
 
