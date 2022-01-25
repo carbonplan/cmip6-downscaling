@@ -196,7 +196,7 @@ class PangeoRuntime(LocalRuntime):
 
     @property
     def storage(self) -> Storage:
-        return Local(**self._storage_kwargs)
+        return Local(**self._storage_options)
 
     @property
     def run_config(self) -> RunConfig:
