@@ -32,9 +32,9 @@ def make_grid(shape):
 
 with Flow(
     name="test_cloud_flow",
-    storage=get_runtime.storage,
-    run_config=get_runtime.run_config,
-    executor=get_runtime.executor,
+    storage=runtime.storage,
+    run_config=runtime.run_config,
+    executor=runtime.executor,
 ) as flow:
 
     # nums = range(4)
