@@ -5,7 +5,7 @@ from prefect import Flow, Parameter, task
 from xpersist import CacheStore
 from xpersist.prefect.result import XpersistResult
 
-import cmip6_downscaling.config.config as config
+from cmip6_downscaling import config, runtimes
 from cmip6_downscaling.methods.detrend import calc_epoch_trend, remove_epoch_trend
 from cmip6_downscaling.methods.maca import maca_bias_correction, maca_construct_analogs
 from cmip6_downscaling.methods.regions import combine_outputs, generate_subdomains
@@ -26,17 +26,21 @@ from cmip6_downscaling.workflows.paths import (
 )
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching, regrid_ds
 
-run_config = config.get_config()
-cfg = config.CloudConfig()
+runtime = runtimes.get_runtime()
 
-intermediate_cache_store = CacheStore(cfg.intermediate_cache_path)
-results_cache_store = CacheStore(cfg.results_cache_path)
-serializer = cfg.serializer
+
+intermediate_cache_store = CacheStore(
+    config.get('storage.intermediate.uri'),
+    storage_options=config.get('storage.intermediate.storage_options'),
+)
+results_cache_store = CacheStore(
+    config.get('storage.results.uri'), storage_options=config.get('storage.results.storage_options')
+)
 
 
 @task(
     checkpoint=True,
-    result=XpersistResult(intermediate_cache_store, serializer=serializer),
+    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target=make_epoch_trend_path,
 )
 def calc_epoch_trend_task(
@@ -128,14 +132,14 @@ def calc_epoch_trend_task(
 
 remove_epoch_trend_task = task(
     remove_epoch_trend,
-    result=XpersistResult(intermediate_cache_store, serializer=serializer),
+    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target=make_epoch_adjusted_gcm_path,
 )
 
 
 @task(
     checkpoint=True,
-    result=XpersistResult(intermediate_cache_store, serializer=serializer),
+    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target=make_bias_corrected_gcm_path,
 )
 def maca_coarse_bias_correction_task(
@@ -277,14 +281,14 @@ def subset_task(
 
 maca_construct_analogs_task = task(
     maca_construct_analogs,
-    result=XpersistResult(intermediate_cache_store, serializer=serializer),
+    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target=make_epoch_adjusted_downscaled_gcm_path,
 )
 
 
 @task(
     checkpoint=True,
-    result=XpersistResult(intermediate_cache_store, serializer=serializer),
+    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target=make_epoch_adjusted_downscaled_gcm_path,
 )
 def combine_outputs_task(
@@ -321,7 +325,7 @@ def combine_outputs_task(
 
 @task(
     checkpoint=True,
-    result=XpersistResult(intermediate_cache_store, serializer=serializer),
+    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target=make_epoch_replaced_downscaled_gcm_path,
 )
 def maca_epoch_replacement_task(
@@ -355,7 +359,7 @@ def maca_epoch_replacement_task(
 
 @task(
     checkpoint=True,
-    result=XpersistResult(results_cache_store, serializer=serializer),
+    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target=make_maca_output_path,
 )
 def maca_fine_bias_correction_task(
@@ -413,10 +417,10 @@ def maca_fine_bias_correction_task(
 
 
 with Flow(
-    name='maca-flow',
-    storage=run_config.storage,
-    run_config=run_config.run_config,
-    executor=run_config.executor,
+    name='maca',
+    storage=runtime.storage,
+    run_config=runtime.run_config,
+    executor=runtime.executor,
 ) as maca_flow:
     # following https://climate.northwestknowledge.net/MACA/MACAmethod.php
 

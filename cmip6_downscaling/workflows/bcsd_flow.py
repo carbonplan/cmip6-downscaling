@@ -1,12 +1,8 @@
-# Imports -----------------------------------------------------------
-import os
-
-os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "true"
 from prefect import Flow, Parameter, task
 from xpersist import CacheStore
 from xpersist.prefect.result import XpersistResult
 
-import cmip6_downscaling.config.config as config
+from cmip6_downscaling import config, runtimes
 from cmip6_downscaling.methods.bcsd import (
     fit_and_predict,
     get_coarse_obs,
@@ -19,37 +15,42 @@ from cmip6_downscaling.methods.bcsd import (
     return_obs,
 )
 
-run_config = config.get_config(name='prefect-cloud')
+runtime = runtimes.get_runtime()
 
-cfg = config.CloudConfig()
+
+target_naming_str = "{gcm}-{scenario}-{train_period_start}-{train_period_end}-{predict_period_start}-{predict_period_end}-{latmin}-{latmax}-{lonmin}-{lonmax}-{variable}.zarr"
+
+
+intermediate_cache_store = CacheStore(
+    config.get('storage.intermediate.uri'),
+    storage_options=config.get('storage.intermediate.storage_options'),
+)
+results_cache_store = CacheStore(
+    config.get('storage.results.uri'), storage_options=config.get('storage.results.storage_options')
+)
 
 
 # Transform Functions into Tasks -----------------------------------------------------------
 
-target_naming_str = "{gcm}-{scenario}-{train_period_start}-{train_period_end}-{predict_period_start}-{predict_period_end}-{latmin}-{latmax}-{lonmin}-{lonmax}-{variable}.zarr"
-
-intermediate_cache_store = CacheStore(cfg.intermediate_cache_path)
-results_cache_store = CacheStore(cfg.results_cache_path)
-serializer = cfg.serializer
 
 make_flow_paths_task = task(make_flow_paths, log_stdout=True, nout=4)
 
 return_obs_task = task(
     return_obs,
-    result=XpersistResult(intermediate_cache_store, serializer=serializer),
+    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target="obs-ds-" + target_naming_str,
 )
 get_coarse_obs_task = task(
     get_coarse_obs,
     tags=['dask-resource:TASKSLOTS=1'],
-    result=XpersistResult(intermediate_cache_store, serializer=serializer),
+    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target="coarse-obs-ds-" + target_naming_str,
 )
 get_spatial_anomalies_task = task(
     get_spatial_anomalies,
     log_stdout=True,
     tags=['dask-resource:TASKSLOTS=1'],
-    result=XpersistResult(intermediate_cache_store, serializer=serializer),
+    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target="spatial-anomalies-ds-" + target_naming_str,
 )
 
@@ -57,28 +58,28 @@ get_spatial_anomalies_task = task(
 return_coarse_obs_full_time_task = task(
     return_coarse_obs_full_time,
     tags=['dask-resource:TASKSLOTS=1'],
-    result=XpersistResult(intermediate_cache_store, serializer=serializer),
+    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target="y-full-time-" + target_naming_str,
 )
 
 return_gcm_train_full_time_task = task(
     return_gcm_train_full_time,
     tags=['dask-resource:TASKSLOTS=1'],
-    result=XpersistResult(intermediate_cache_store, serializer=serializer),
+    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target="x-train-full-time-" + target_naming_str,
 )
 
 return_gcm_predict_rechunked_task = task(
     return_gcm_predict_rechunked,
     tags=['dask-resource:TASKSLOTS=1'],
-    result=XpersistResult(intermediate_cache_store, serializer=serializer),
+    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target="x-predict-rechunked-" + target_naming_str,
 )
 
 fit_and_predict_task = task(
     fit_and_predict,
     log_stdout=True,
-    result=XpersistResult(intermediate_cache_store, serializer=serializer),
+    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target="fit-and-predict-" + target_naming_str,
 )
 
@@ -86,16 +87,16 @@ postprocess_bcsd_task = task(
     postprocess_bcsd,
     tags=['dask-resource:TASKSLOTS=1'],
     log_stdout=True,
-    result=XpersistResult(results_cache_store, serializer=serializer),
+    result=XpersistResult(results_cache_store, serializer="xarray.zarr"),
     target="postprocess-results-" + target_naming_str,
 )
 
 
 with Flow(
-    name='bcsd_config_test',
-    storage=run_config.storage,
-    run_config=run_config.run_config,
-    executor=run_config.executor,
+    name='bcsd',
+    storage=runtime.storage,
+    run_config=runtime.run_config,
+    executor=runtime.executor,
 ) as bcsd_flow:
     gcm = Parameter("GCM")
     scenario = Parameter("SCENARIO")

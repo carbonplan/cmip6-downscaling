@@ -9,9 +9,10 @@ from prefect import Flow, Parameter, task
 from xpersist import CacheStore
 from xpersist.prefect.result import XpersistResult
 
-import cmip6_downscaling.config.config as config
+import cmip6_downscaling as config
 from cmip6_downscaling.data.observations import get_obs
 from cmip6_downscaling.methods.gard import gard_fit_and_predict, gard_postprocess, generate_scrf
+from cmip6_downscaling.runtimes import get_runtime
 from cmip6_downscaling.tasks.common_tasks import (
     bias_correct_gcm_task,
     bias_correct_obs_task,
@@ -28,32 +29,35 @@ from cmip6_downscaling.workflows.paths import (
 )
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching
 
-run_config = config.get_config()
-cfg = config.CloudConfig()
+runtime = get_runtime()
 
-intermediate_cache_store = CacheStore(cfg.intermediate_cache_path)
-results_cache_store = CacheStore(cfg.results_cache_path)
-serializer = cfg.serializer
+intermediate_cache_store = CacheStore(
+    config.get('storage.intermediate.uri'),
+    storage_options=config.get('storage.intermediate.storage_options'),
+)
+results_cache_store = CacheStore(
+    config.get('storage.results.uri'), storage_options=config.get('storage.results.storage_options')
+)
 
 
 fit_and_predict_task = task(
     gard_fit_and_predict,
     checkpoint=True,
-    result=XpersistResult(intermediate_cache_store, serializer=serializer),
+    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target=make_gard_predict_output_path,
 )
 
 
 generate_scrf_task = task(
     generate_scrf,
-    result=XpersistResult(intermediate_cache_store, serializer=serializer),
+    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target=make_scrf_path,
 )
 
 
 gard_postprocess_task = task(
     gard_postprocess,
-    result=XpersistResult(results_cache_store, serializer=serializer),
+    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target=make_gard_post_processed_output_path,
 )
 
@@ -104,10 +108,10 @@ def prep_gard_input_task(
 
 
 with Flow(
-    name='gard-flow',
-    storage=run_config.storage,
-    run_config=run_config.run_config,
-    executor=run_config.executor,
+    name='gard',
+    storage=runtime.storage,
+    run_config=runtime.run_config,
+    executor=runtime.executor,
 ) as gard_flow:
     obs = Parameter("OBS")
     gcm = Parameter("GCM")
