@@ -2,13 +2,13 @@
 
 
 _defaults = {
+    'methods': {'bcsd': {}, 'gard': {}, 'maca': {}},
     "data_catalog": {
         "cmip": "https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.json",
         "era5": "https://cmip6downscaling.blob.core.windows.net/cmip6/ERA5_daily/",
     },
     "runtime": {
         "cloud": {
-            "connection_string": None,  # os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
             "storage_prefix": "az://",
             "agent": "az-eu-west",
             "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git git+https://github.com/pangeo-data/scikit-downscale.git",

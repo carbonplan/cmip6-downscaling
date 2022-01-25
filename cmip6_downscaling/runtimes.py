@@ -46,47 +46,52 @@ class CloudRuntime(BaseRuntime):
     def __init__(
         self,
         connection_string=None,
-        storage_prefix="az://",
-        agent="az-eu-west",
-        extra_pip_packages="git+https://github.com/carbonplan/cmip6-downscaling.git git+https://github.com/pangeo-data/scikit-downscale.git",
-        kubernetes_cpu=7,
-        kubernetes_memory="16Gi",
-        image="carbonplan/cmip6-downscaling-prefect:2022.01.05",
-        pod_memory_limit="4Gi",
-        pod_memory_request="4Gi",
-        pod_threads_per_worker=2,
-        pod_cpu_limit=2,
-        pod_cpu_request=2,
-        deploy_mode="remote",
-        adapt_min=2,
-        adapt_max=2,
-        dask_distributed_worker_resources_taskslots="1",
+        storage_prefix=None,
+        agent=None,
+        extra_pip_packages=None,
+        kubernetes_cpu=None,
+        kubernetes_memory=None,
+        image=None,
+        pod_memory_limit=None,
+        pod_memory_request=None,
+        pod_threads_per_worker=None,
+        pod_cpu_limit=None,
+        pod_cpu_request=None,
+        deploy_mode=None,
+        adapt_min=None,
+        adapt_max=None,
+        dask_distributed_worker_resources_taskslots=None,
         storage_kwargs: dict = None,
     ):
 
-        self.connection_string = connection_string or config.get("runtimes.cloud.connection_string")
-        self._storage_prefix = storage_prefix or config.get("runtimes.cloud.storage_prefix")
-        self._agent = agent or config.get("runtimes.cloud._agent")
-        self._extra_pip_packages = extra_pip_packages or config.get("extra_pip_packages")
-        self._kubernetes_cpu = kubernetes_cpu or config.get("kubernetes_cpu")
-        self._kubernetes_memory = kubernetes_memory or config.get("kubernetes_memory")
-        self._image = image or config.get("image")
-        self._pod_memory_limit = pod_memory_limit or config.get("pod_memory_limit")
-        self._pod_memory_request = pod_memory_request or config.get("pod_memory_request")
-        self._pod_threads_per_worker = pod_threads_per_worker or config.get(
-            "pod_threads_per_worker"
+        # note: add runtimes.cloud prefix to all
+        self._connection_string = connection_string or config.get("runtime.cloud.connection_string")
+        self._storage_prefix = storage_prefix or config.get("runtime.cloud.storage_prefix")
+        self._agent = agent or config.get("runtime.cloud.agent")
+        self._extra_pip_packages = extra_pip_packages or config.get(
+            "runtime.cloud.extra_pip_packages"
         )
-        self._pod_cpu_limit = pod_cpu_limit or config.get("pod_cpu_limit")
-        self._pod_cpu_request = pod_cpu_request or config.get("pod_cpu_request")
-        self._deploy_mode = deploy_mode or config.get("deploy_mode")
-        self._adapt_min = adapt_min or config.get("adapt_min")
-        self._adapt_max = adapt_max or config.get("adapt_max")
+        self._kubernetes_cpu = kubernetes_cpu or config.get("runtime.cloud.kubernetes_cpu")
+        self._kubernetes_memory = kubernetes_memory or config.get("runtime.cloud.kubernetes_memory")
+        self._image = image or config.get("runtime.cloud.image")
+        self._pod_memory_limit = pod_memory_limit or config.get("runtime.cloud.pod_memory_limit")
+        self._pod_memory_request = pod_memory_request or config.get(
+            "runtime.cloud.pod_memory_request"
+        )
+        self._pod_threads_per_worker = pod_threads_per_worker or config.get(
+            "runtime.cloud.pod_threads_per_worker"
+        )
+        self._pod_cpu_limit = pod_cpu_limit or config.get("runtime.cloud.pod_cpu_limit")
+        self._pod_cpu_request = pod_cpu_request or config.get("runtime.cloud.pod_cpu_request")
+        self._deploy_mode = deploy_mode or config.get("runtime.cloud.deploy_mode")
+        self._adapt_min = adapt_min or config.get("runtime.cloud.adapt_min")
+        self._adapt_max = adapt_max or config.get("runtime.cloud.adapt_max")
         self._dask_distributed_worker_resources_taskslots = (
             dask_distributed_worker_resources_taskslots
-            or config.get("dask_distributed_worker_resources_taskslots")
+            or config.get("runtime.cloud.dask_distributed_worker_resources_taskslots")
         )
         self._dask_distributed_worker_resources_taskslots = self._storage_kwargs.get(
-            "dask_distributed_worker_resources_taskslots"
+            "runtime.cloud.dask_distributed_worker_resources_taskslots"
         )
         self._storage_kwargs = storage_kwargs or {}
 
@@ -200,6 +205,7 @@ class PangeoRuntime(LocalRuntime):
     @property
     def executor(self) -> Executor:
         return LocalDaskExecutor(scheduler="threads")
+        # eventually move to dask distr instead of local
 
     def _generate_env(self):
         env = {
