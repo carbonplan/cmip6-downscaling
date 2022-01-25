@@ -14,6 +14,7 @@ from cmip6_downscaling.methods.bcsd import (
     return_gcm_train_full_time,
     return_obs,
 )
+from cmip6_downscaling.tasks import pyramid
 
 runtime = runtimes.get_runtime()
 
@@ -248,4 +249,12 @@ with Flow(
         latmax,
         lonmin,
         lonmax,
+    )
+    # regrid(ds: xr.Dataset, levels: int = 2, uri: str = None, other_chunks: dict = None)
+    pyramid_location = pyramid.regrid(
+        postprocess_bcsd_ds,
+        uri=config.get('storage.results.uri')
+        + 'pyramids/'
+        + target_naming_str.split('.zarr')[0]
+        + '.pyr',
     )
