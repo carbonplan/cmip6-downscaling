@@ -185,8 +185,8 @@ def path_builder_task(
 @task(
     checkpoint=True,
     result=XpersistResult(
-        CacheStore(config.get_config().intermediate_cache_path),
-        serializer=config.get_config().serializer,
+        CacheStore(config.get('storage.intermediate.uri')),
+        serializer='xarray.zarr',
     ),
     target=make_coarse_obs_path,
 )
