@@ -201,8 +201,7 @@ def load_cmip(
         Dataset or zarr group with CMIP data
     """
 
-    col_url = config.get('data_catalog.era5.uri')
-
+    col_url = config.get('data_catalog.cmip.uri')
     if isinstance(variable_ids, str):
         variable_ids = [variable_ids]
 
