@@ -98,12 +98,15 @@ class CloudRuntime(BaseRuntime):
 
     def _generate_env(self):
         env = {
-            "AZURE_STORAGE_CONNECTION_STRING": self._connection_string,
             "EXTRA_PIP_PACKAGES": self._extra_pip_packages,
             "DASK_DISTRIBUTED__WORKER__RESOURCES__TASKSLOTS": self._dask_distributed_worker_resources_taskslots,
             "PREFECT__FLOWS__CHECKPOINTING": "true",
             **_threadsafe_env_vars,
         }
+
+        if 'AZURE_STORAGE_CONNECTION_STRING' in os.environ:
+            env['AZURE_STORAGE_CONNECTION_STRING'] = os.environ['AZURE_STORAGE_CONNECTION_STRING']
+
         return env
 
     @property
