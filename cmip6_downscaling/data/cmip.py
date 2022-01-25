@@ -201,7 +201,7 @@ def load_cmip(
         Dataset or zarr group with CMIP data
     """
 
-    col_url = config.get('data_catalog.cmip')
+    col_url = config.get('data_catalog.era5.uri')
 
     if isinstance(variable_ids, str):
         variable_ids = [variable_ids]
@@ -222,8 +222,7 @@ def load_cmip(
             .to_list()
         )
 
-        account_name = config.get('data_catalog.account_name')
-        storage_options = {'account_name': account_name}
+        storage_options = config.get('data_catalog.era5.storage_options')
         if len(stores) > 1:
             raise ValueError('can only get 1 store at a time')
         if return_type == 'zarr':
