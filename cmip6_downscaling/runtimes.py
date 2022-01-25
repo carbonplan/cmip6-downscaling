@@ -211,7 +211,7 @@ class PangeoRuntime(LocalRuntime):
 
 
 def get_runtime(**kwargs):
-    if config.get("run_options.runtime") == "test":
+    if config.get("run_options.runtime") == "ci":
         runtime = CIRuntime(**kwargs)
     elif config.get("run_options.runtime") == "local":
         runtime = LocalRuntime(**kwargs)
