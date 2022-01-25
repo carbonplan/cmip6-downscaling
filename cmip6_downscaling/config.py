@@ -12,6 +12,7 @@ _defaults = {
         "cmip": "https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.json",
         "era5": "https://cmip6downscaling.blob.core.windows.net/cmip6/ERA5_daily/",
     },
+    'run_options': {'runtime': None},
     "runtime": {
         "cloud": {
             "storage_options": {'container': 'prefect'},
