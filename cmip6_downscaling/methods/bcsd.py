@@ -1,6 +1,3 @@
-import os
-
-os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "true"
 from typing import Tuple
 
 import xarray as xr
@@ -27,10 +24,10 @@ def make_flow_paths(
     PREDICT_PERIOD_START: str,
     PREDICT_PERIOD_END: str,
     VARIABLE: str,
-    LATMIN: str,
-    LATMAX: str,
-    LONMIN: str,
-    LONMAX: str,
+    LATMIN: str,  # Q: why is this unused
+    LATMAX: str,  # Q: why is this unused
+    LONMIN: str,  # Q: why is this unused
+    LONMAX: str,  # Q: why is this unused
     workdir: str = "az://cmip6",
     outdir: str = "az://cmip6/results",
 ) -> Tuple[str, str, str, str]:
@@ -53,13 +50,13 @@ def make_flow_paths(
     VARIABLE : str
         From run hyperparameters
     LATMIN : str
-            From run hyperparameters
+        From run hyperparameters
     LATMAX : str
-            From run hyperparameters
+        From run hyperparameters
     LONMIN : str
-            From run hyperparameters
+        From run hyperparameters
     LONMAX : str
-            From run hyperparameters
+        From run hyperparameters
     workdir : str, optional
         Intermediate files for caching (and might be used by other gcms), by default "az://cmip6"
     outdir : str, optional
@@ -78,12 +75,12 @@ def make_flow_paths(
 
 
 def return_obs(
-    gcm: str,
-    scenario: str,
+    gcm: str,  # Q: why is this unused?
+    scenario: str,  # Q: why is this unused?
     train_period_start: str,
     train_period_end: str,
-    predict_period_start: str,
-    predict_period_end: str,
+    predict_period_start: str,  # Q: why is this unused?
+    predict_period_end: str,  # Q: why is this unused?
     variable: str,
     latmin: str,
     latmax: str,
@@ -109,13 +106,13 @@ def return_obs(
     variable: str
         The variable included in the dataset.
     latmin : str
-            From run hyperparameters
+        From run hyperparameters
     latmax : str
-            From run hyperparameters
+        From run hyperparameters
     lonmin : str
-            From run hyperparameters
+        From run hyperparameters
     lonmax : str
-            From run hyperparameters
+        From run hyperparameters
 
     Returns
     -------
@@ -139,12 +136,12 @@ def return_obs(
 
 def get_coarse_obs(
     obs_ds: xr.Dataset,
-    gcm: str,
-    scenario: str,
+    gcm: str,  # Q: why is this unused?
+    scenario: str,  # Q: why is this unused?
     train_period_start: str,
     train_period_end: str,
-    predict_period_start: str,
-    predict_period_end: str,
+    predict_period_start: str,  # Q: why is this unused?
+    predict_period_end: str,  # Q: why is this unused?
     variable: str,
     latmin: str,
     latmax: str,
@@ -172,13 +169,13 @@ def get_coarse_obs(
     variable: str
         The variable included in the dataset.
     latmin : str
-            From run hyperparameters
+        From run hyperparameters
     latmax : str
-            From run hyperparameters
+        From run hyperparameters
     lonmin : str
-            From run hyperparameters
+        From run hyperparameters
     lonmax : str
-            From run hyperparameters
+        From run hyperparameters
 
     Returns
     -------
@@ -201,17 +198,17 @@ def get_coarse_obs(
 def get_spatial_anomalies(
     coarse_obs: xr.Dataset,
     obs_ds: xr.Dataset,
-    gcm: str,
-    scenario: str,
-    train_period_start: str,
-    train_period_end: str,
-    predict_period_start: str,
-    predict_period_end: str,
+    gcm: str,  # Q: why is this unused?
+    scenario: str,  # Q: why is this unused?
+    train_period_start: str,  # Q: why is this unused?
+    train_period_end: str,  # Q: why is this unused?
+    predict_period_start: str,  # Q: why is this unused?
+    predict_period_end: str,  # Q: why is this unused?
     variable: str,
-    latmin: str,
-    latmax: str,
-    lonmin: str,
-    lonmax: str,
+    latmin: str,  # Q: why is this unused?
+    latmax: str,  # Q: why is this unused?
+    lonmin: str,  # Q: why is this unused?
+    lonmax: str,  # Q: why is this unused?
 ) -> xr.Dataset:
 
     """Returns spatial anomalies
@@ -244,13 +241,13 @@ def get_spatial_anomalies(
     variable: str
         The variable included in the dataset.
     latmin : str
-            From run hyperparameters
+        From run hyperparameters
     latmax : str
-            From run hyperparameters
+        From run hyperparameters
     lonmin : str
-            From run hyperparameters
+        From run hyperparameters
     lonmax : str
-            From run hyperparameters
+        From run hyperparameters
 
     Returns
     -------
@@ -280,17 +277,17 @@ def get_spatial_anomalies(
 
 def return_coarse_obs_full_time(
     coarse_obs_ds: xr.Dataset,
-    gcm: str,
-    scenario: str,
-    train_period_start: str,
-    train_period_end: str,
-    predict_period_start: str,
-    predict_period_end: str,
-    variable: str,
-    latmin: str,
-    latmax: str,
-    lonmin: str,
-    lonmax: str,
+    gcm: str,  # Q: why is this unused?
+    scenario: str,  # Q: why is this unused?
+    train_period_start: str,  # Q: why is this unused?
+    train_period_end: str,  # Q: why is this unused?
+    predict_period_start: str,  # Q: why is this unused?
+    predict_period_end: str,  # Q: why is this unused?
+    variable: str,  # Q: why is this unused?
+    latmin: str,  # Q: why is this unused?
+    latmax: str,  # Q: why is this unused?
+    lonmin: str,  # Q: why is this unused?
+    lonmax: str,  # Q: why is this unused?
 ) -> xr.Dataset:
 
     """
@@ -316,13 +313,13 @@ def return_coarse_obs_full_time(
     variable: str
         The variable included in the dataset.
     latmin : str
-            From run hyperparameters
+        From run hyperparameters
     latmax : str
-            From run hyperparameters
+        From run hyperparameters
     lonmin : str
-            From run hyperparameters
+        From run hyperparameters
     lonmax : str
-            From run hyperparameters
+        From run hyperparameters
 
     Returns
     -------
@@ -340,11 +337,11 @@ def return_coarse_obs_full_time(
 def return_gcm_train_full_time(
     coarse_obs_full_time_ds: xr.Dataset,
     gcm: str,
-    scenario: str,
+    scenario: str,  # Q: why is this unused?
     train_period_start: str,
     train_period_end: str,
-    predict_period_start: str,
-    predict_period_end: str,
+    predict_period_start: str,  # Q: why is this unused?
+    predict_period_end: str,  # Q: why is this unused?
     variable: str,
     latmin: str,
     latmax: str,
@@ -372,13 +369,13 @@ def return_gcm_train_full_time(
     variable: str
         The variable included in the dataset.
     latmin : str
-            From run hyperparameters
+        From run hyperparameters
     latmax : str
-            From run hyperparameters
+        From run hyperparameters
     lonmin : str
-            From run hyperparameters
+        From run hyperparameters
     lonmax : str
-            From run hyperparameters
+        From run hyperparameters
 
     Returns
     -------
@@ -413,8 +410,8 @@ def return_gcm_predict_rechunked(
     gcm_train_subset_full_time_ds: xr.Dataset,
     gcm: str,
     scenario: str,
-    train_period_start: str,
-    train_period_end: str,
+    train_period_start: str,  # Q: why is this unused?
+    train_period_end: str,  # Q: why is this unused?
     predict_period_start: str,
     predict_period_end: str,
     variable: str,
@@ -444,13 +441,13 @@ def return_gcm_predict_rechunked(
     variable: str
         The variable included in the dataset.
     latmin : str
-            From run hyperparameters
+        From run hyperparameters
     latmax : str
-            From run hyperparameters
+        From run hyperparameters
     lonmin : str
-            From run hyperparameters
+        From run hyperparameters
     lonmax : str
-            From run hyperparameters
+        From run hyperparameters
 
     Returns
     -------
@@ -500,17 +497,17 @@ def fit_and_predict(
     gcm_train_subset_full_time_ds: xr.Dataset,
     coarse_obs_full_time_ds: xr.Dataset,
     gcm_predict_rechunked_ds: xr.Dataset,
-    gcm: str,
-    scenario: str,
-    train_period_start: str,
-    train_period_end: str,
-    predict_period_start: str,
-    predict_period_end: str,
+    gcm: str,  # Q: why is this unused?
+    scenario: str,  # Q: why is this unused?
+    train_period_start: str,  # Q: why is this unused?
+    train_period_end: str,  # Q: why is this unused?
+    predict_period_start: str,  # Q: why is this unused?
+    predict_period_end: str,  # Q: why is this unused?
     variable: str,
-    latmin: str,
-    latmax: str,
-    lonmin: str,
-    lonmax: str,
+    latmin: str,  # Q: why is this unused?
+    latmax: str,  # Q: why is this unused?
+    lonmin: str,  # Q: why is this unused?
+    lonmax: str,  # Q: why is this unused?
     dim: str = "time",
 ) -> xr.Dataset:
     """Fit bcsd model on prepared CMIP data with obs at corresponding spatial scale.
@@ -539,13 +536,13 @@ def fit_and_predict(
     variable: str
         The variable included in the dataset.
     latmin : str
-            From run hyperparameters
+        From run hyperparameters
     latmax : str
-            From run hyperparameters
+        From run hyperparameters
     lonmin : str
-            From run hyperparameters
+        From run hyperparameters
     lonmax : str
-            From run hyperparameters
+        From run hyperparameters
     dim : str, optional
         dimension on which you want to do the modelling, by default "time"
 
@@ -577,17 +574,17 @@ def fit_and_predict(
 def postprocess_bcsd(
     bias_corrected_ds: xr.Dataset,
     spatial_anomalies_ds: xr.Dataset,
-    gcm,
-    scenario,
-    train_period_start,
-    train_period_end,
-    predict_period_start,
-    predict_period_end,
+    gcm,  # Q: why is this unused?
+    scenario,  # Q: why is this unused?
+    train_period_start,  # Q: why is this unused?
+    train_period_end,  # Q: why is this unused?
+    predict_period_start,  # Q: why is this unused?
+    predict_period_end,  # Q: why is this unused?
     variable,
-    latmin: str,
-    latmax: str,
-    lonmin: str,
-    lonmax: str,
+    latmin: str,  # Q: why is this unused?
+    latmax: str,  # Q: why is this unused?
+    lonmin: str,  # Q: why is this unused?
+    lonmax: str,  # Q: why is this unused?
 ) -> xr.Dataset:
     """Downscale the bias-corrected data by interpolating and then
     adding the spatial anomalies back in.
@@ -613,13 +610,13 @@ def postprocess_bcsd(
     variable: str
         The variable included in the dataset.
     latmin : str
-            From run hyperparameters
+        From run hyperparameters
     latmax : str
-            From run hyperparameters
+        From run hyperparameters
     lonmin : str
-            From run hyperparameters
+        From run hyperparameters
     lonmax : str
-            From run hyperparameters
+        From run hyperparameters
 
     Returns
     -------

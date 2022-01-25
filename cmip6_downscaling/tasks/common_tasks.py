@@ -309,7 +309,6 @@ def interpolate_gcm_task(
     predict_period_end: str,
     variables: Union[str, List[str]],
     chunking_approach: str,
-    **kwargs,
 ):
     """
     Interpolate the GCM dataset to the grid of the observation dataset.
@@ -334,8 +333,7 @@ def interpolate_gcm_task(
         List of variables to get in obs dataset
     chunking_approach: str
         'full_space', 'full_time', or None
-    **kwargs: Dict
-        Other arguments to be used in generating the target path
+
     Returns
     -------
     ds_gcm_interpolated_rechunked: xr.Dataset
@@ -431,10 +429,10 @@ def bias_correct_gcm_task(
     historical_period_end: str,
     method: str,
     bc_kwargs: Optional[Dict[str, Any]] = None,
-    **kwargs,
 ) -> xr.DataArray:
     """
     Bias correct gcm data to the provided observation data according to methods and kwargs.
+
     Parameters
     ----------
     ds_gcm : xr.Dataset
@@ -449,8 +447,7 @@ def bias_correct_gcm_task(
         Bias correction method to be used.
     bc_kwargs: dict or None
         Keyword arguments to be used with the bias correction method
-    kwargs: dict
-        Other arguments to be used in generating the target path
+
     Returns
     -------
     ds_gcm_bias_corrected : xr.Dataset
