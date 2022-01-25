@@ -89,7 +89,7 @@ class CloudRuntime(BaseRuntime):
             dask_distributed_worker_resources_taskslots is not None
             or config.get("runtime.cloud.dask_distributed_worker_resources_taskslots")
         )
-        self._dask_distributed_worker_resources_taskslots = self._storage_kwargs.get(
+        self._dask_distributed_worker_resources_taskslots = self._storage_options.get(
             "runtime.cloud.dask_distributed_worker_resources_taskslots"
         )
 
