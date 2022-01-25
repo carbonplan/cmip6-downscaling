@@ -19,6 +19,7 @@ variable_name_dict = {
 def get_store(bucket, prefix, account_key=None):
     """helper function to create a zarr store"""
 
+    # TODO: update with config
     if account_key is None:
         account_key = os.environ.get("AccountKey", None)
 

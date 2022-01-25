@@ -11,6 +11,7 @@ _defaults = {
     "data_catalog": {
         "cmip": "https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.json",
         "era5": "https://cmip6downscaling.blob.core.windows.net/cmip6/ERA5_daily/",
+        "account_name": "cmip6downscaling",
     },
     "runtime": {
         "cloud": {
