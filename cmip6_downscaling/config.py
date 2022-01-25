@@ -3,9 +3,9 @@
 
 _defaults = {
     'storage': {
-        'intermediate': {'uri': 'az://flow-outputs/intermediates', 'storage_options': {}},
-        'results': {'uri': 'az://flow-outputs/results', 'storage_options': {}},
-        'temporary': {'uri': 'az://cmip6/temp/', 'storage_options': {}},
+        'intermediate': {'uri': '/tmp/flow-outputs/intermediates', 'storage_options': {}},
+        'results': {'uri': '/tmp/flow-outputs/results', 'storage_options': {}},
+        'temporary': {'uri': '/tmp/cmip6/temp/', 'storage_options': {}},
     },
     'methods': {'bcsd': {}, 'gard': {}, 'maca': {}},
     "data_catalog": {

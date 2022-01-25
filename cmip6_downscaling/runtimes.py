@@ -226,7 +226,7 @@ def get_runtime(name=None, **kwargs):
         runtime = PangeoRuntime(**kwargs)
         print("PangeoRuntime selected from os.environ")
     else:
-        ValueError(
+        raise ValueError(
             "Name not in ['test', 'local', 'prefect-cloud', 'pangeo'] and environment variable not found for: [CI, PREFECT__BACKEND, PANGEO__BACKEND or TEST]"
         )
     return runtime
