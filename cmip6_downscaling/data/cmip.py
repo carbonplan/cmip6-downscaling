@@ -8,6 +8,7 @@ import xarray as xr
 import zarr
 from intake_esm.merge_util import AggregationError
 
+from cmip6_downscaling import config
 from cmip6_downscaling.workflows.paths import make_rechunked_gcm_path
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching
 
@@ -199,7 +200,8 @@ def load_cmip(
     ds : xr.Dataset or zarr group
         Dataset or zarr group with CMIP data
     """
-    col_url = "https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.json"
+
+    col_url = config.get('data_catalog.era5.uri')
 
     if isinstance(variable_ids, str):
         variable_ids = [variable_ids]
@@ -220,12 +222,13 @@ def load_cmip(
             .to_list()
         )
 
+        storage_options = config.get('data_catalog.era5.storage_options')
         if len(stores) > 1:
             raise ValueError('can only get 1 store at a time')
         if return_type == 'zarr':
-            ds = zarr.open_consolidated(stores[0], mode='r')
+            ds = zarr.open_consolidated(stores[0], mode='r', storage_options=storage_options)
         elif return_type == 'xr':
-            ds = xr.open_zarr(stores[0], consolidated=True)
+            ds = xr.open_zarr(stores[0], consolidated=True, storage_options=storage_options)
 
         # flip the lats if necessary and drop the extra dims/vars like bnds
         ds = gcm_munge(ds)
