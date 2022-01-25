@@ -24,14 +24,19 @@ from cmip6_downscaling.methods.bcsd import (
 runtime = get_runtime()
 
 
-# Transform Functions into Tasks -----------------------------------------------------------
-
 target_naming_str = "{gcm}-{scenario}-{train_period_start}-{train_period_end}-{predict_period_start}-{predict_period_end}-{latmin}-{latmax}-{lonmin}-{lonmax}-{variable}.zarr"
 
 
-# replace these w/ storage_options
-intermediate_cache_store = CacheStore(runtime.intermediate_cache_path)
-results_cache_store = CacheStore(runtime.results_cache_path)
+intermediate_cache_store = CacheStore(
+    config.get('storage.intermediate.uri'),
+    storage_options=config.get('storage.intermediate.storage_options'),
+)
+results_cache_store = CacheStore(
+    config.get('storage.results.uri'), storage_options=config.get('storage.results.storage_options')
+)
+
+
+# Transform Functions into Tasks -----------------------------------------------------------
 
 
 make_flow_paths_task = task(make_flow_paths, log_stdout=True, nout=4)

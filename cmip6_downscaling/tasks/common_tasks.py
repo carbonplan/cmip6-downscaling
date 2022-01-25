@@ -13,7 +13,7 @@ from xarray.core.types import T_Xarray
 from xpersist import CacheStore
 from xpersist.prefect.result import XpersistResult
 
-import cmip6_downscaling.config.config as config
+from cmip6_downscaling import config
 from cmip6_downscaling.data.cmip import get_gcm, get_gcm_grid_spec, load_cmip
 from cmip6_downscaling.data.observations import get_obs
 from cmip6_downscaling.methods.bias_correction import (
@@ -218,7 +218,6 @@ def get_coarse_obs_task(
     ds_obs_coarse = regrid_ds(
         ds=ds_obs,
         target_grid_ds=gcm_grid,
-        connection_string=config.get_config().connection_string,
     )
 
     if chunking_approach != 'full_space':
@@ -232,8 +231,8 @@ def get_coarse_obs_task(
 @task(
     checkpoint=True,
     result=XpersistResult(
-        CacheStore(config.get_config().intermediate_cache_path),
-        serializer=config.get_config().serializer,
+        CacheStore(config.get('storage.intermediate.uri')),
+        serializer='xarray.zarr',
     ),
     target=make_interpolated_obs_path,
 )
@@ -299,8 +298,8 @@ def coarsen_and_interpolate_obs_task(
 @task(
     checkpoint=True,
     result=XpersistResult(
-        CacheStore(config.get_config().intermediate_cache_path),
-        serializer=config.get_config().serializer,
+        CacheStore(config.get('storage.intermediate.uri')),
+        serializer='xarray.zarr',
     ),
     target=make_interpolated_gcm_path,
 )
@@ -389,8 +388,8 @@ def interpolate_gcm_task(
 @task(
     log_stdout=True,
     result=XpersistResult(
-        CacheStore(config.get_config().intermediate_cache_path),
-        serializer=config.get_config().serializer,
+        CacheStore(config.get('storage.intermediate.uri')),
+        serializer='xarray.zarr',
     ),
     target=make_bias_corrected_obs_path,
 )
@@ -424,8 +423,8 @@ def bias_correct_obs_task(
 
 @task(
     result=XpersistResult(
-        CacheStore(config.get_config().intermediate_cache_path),
-        serializer=config.get_config().serializer,
+        CacheStore(config.get('storage.intermediate.uri')),
+        serializer='xarray.zarr',
     ),
     target=make_bias_corrected_gcm_path,
 )

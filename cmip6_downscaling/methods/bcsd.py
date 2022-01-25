@@ -3,12 +3,10 @@ import os
 os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "true"
 from typing import Tuple
 
-import fsspec
 import xarray as xr
 from skdownscale.pointwise_models import PointWiseDownscaler
 from skdownscale.pointwise_models.bcsd import BcsdPrecipitation, BcsdTemperature
 
-import cmip6_downscaling.config.config as config
 from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
 from cmip6_downscaling.data.cmip import load_cmip
 from cmip6_downscaling.data.observations import open_era5
@@ -19,10 +17,6 @@ from cmip6_downscaling.workflows.utils import (
     regrid_dataset,
     subset_dataset,
 )
-
-cfg = config.CloudConfig()
-connection_string = cfg.connection_string
-fs = fsspec.filesystem('az')
 
 
 def make_flow_paths(
@@ -199,11 +193,7 @@ def get_coarse_obs(
     )
     # rechunk and regrid observation dataset to target gcm resolution
     coarse_obs_ds, fine_obs_rechunked_path = regrid_dataset(
-        ds=obs_ds,
-        ds_path=None,
-        target_grid_ds=gcm_subset,
-        variable=variable,
-        connection_string=connection_string,
+        ds=obs_ds, ds_path=None, target_grid_ds=gcm_subset, variable=variable
     )
     return coarse_obs_ds
 
@@ -273,14 +263,12 @@ def get_spatial_anomalies(
         ds_path=None,
         target_grid_ds=obs_ds.isel(time=0),
         variable=variable,
-        connection_string=connection_string,
     )
     obs_rechunked, _ = rechunk_zarr_array(
         obs_ds,
         None,
         chunk_dims=('time',),
         variable=variable,
-        connection_string=connection_string,
         max_mem='1GB',
     )
 
@@ -344,7 +332,6 @@ def return_coarse_obs_full_time(
     coarse_obs_full_time_ds = rechunk_zarr_array_with_caching(
         coarse_obs_ds,
         chunking_approach='full_time',
-        connection_string=connection_string,
         max_mem='1GB',
     )
     return coarse_obs_full_time_ds
@@ -417,7 +404,6 @@ def return_gcm_train_full_time(
     gcm_train_subset_full_time_ds = rechunk_zarr_array_with_caching(
         gcm_train_ds_subset,
         chunking_approach='full_time',
-        connection_string=connection_string,
         max_mem='1GB',
     )
     return gcm_train_subset_full_time_ds
@@ -505,7 +491,6 @@ def return_gcm_predict_rechunked(
         zarr_array_location=None,
         variable=variable,
         chunk_dims=matching_chunks_dict,
-        connection_string=connection_string,
         max_mem='1GB',
     )
     return gcm_predict_rechunked_ds
@@ -646,7 +631,6 @@ def postprocess_bcsd(
         ds_path=None,
         target_grid_ds=spatial_anomalies_ds,
         variable=variable,
-        connection_string=connection_string,
     )
     bcsd_results_ds = y_predict_fine.groupby("time.month") + spatial_anomalies_ds
     delete_chunks_encoding(bcsd_results_ds)

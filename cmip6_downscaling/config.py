@@ -2,6 +2,11 @@
 
 
 _defaults = {
+    'storage': {
+        'intermediate': {'uri': 'az://flow-outputs/intermediates', 'storage_options': {}},
+        'results': {'uri': 'az://flow-outputs/results', 'storage_options': {}},
+        'temporary': {'uri': 'az://cmip6/temp/', 'storage_options': {}},
+    },
     'methods': {'bcsd': {}, 'gard': {}, 'maca': {}},
     "data_catalog": {
         "cmip": "https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.json",

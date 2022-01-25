@@ -23,6 +23,7 @@ _threadsafe_env_vars = {
 class BaseRuntime:
     """Base configuration class that defines abstract methods (storage, run_config and executor) for subclasses."""
 
+    #
     serializer = "xarray.zarr"
 
     @property
@@ -39,14 +40,6 @@ class BaseRuntime:
     @abstractmethod
     def executor(self) -> Executor:  # pragma: no cover
         pass
-
-    @property
-    def intermediate_cache_path(self) -> str:  # pragma: no cover
-        return f"{self._storage_prefix}flow-outputs/intermediates"
-
-    @property
-    def results_cache_path(self) -> str:  # pragma: no cover
-        return f"{self._storage_prefix}flow-outputs/results"
 
 
 class CloudRuntime(BaseRuntime):
