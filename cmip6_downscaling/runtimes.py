@@ -12,6 +12,13 @@ from cmip6_downscaling import config
 
 # TODO: Add new config that is hybrid or local compute, but has prefect storage access (ie. what I've been using to debug. Local is now non-write permissions.)
 
+_threadsafe_env_vars = {
+    "OMP_NUM_THREADS": "1",
+    "MPI_NUM_THREADS": "1",
+    "MKL_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1",
+}
+
 
 class BaseRuntime:
     """Base configuration class that defines abstract methods (storage, run_config and executor) for subclasses."""
@@ -102,11 +109,8 @@ class CloudRuntime(BaseRuntime):
         env = {
             "AZURE_STORAGE_CONNECTION_STRING": self._connection_string,
             "EXTRA_PIP_PACKAGES": self._extra_pip_packages,
-            "OMP_NUM_THREADS": "1",
-            "MPI_NUM_THREADS": "1",
-            "MKL_NUM_THREADS": "1",
-            "OPENBLAS_NUM_THREADS": "1",
             "DASK_DISTRIBUTED__WORKER__RESOURCES__TASKSLOTS": self._dask_distributed_worker_resources_taskslots,
+            **_threadsafe_env_vars,
         }
         return env
 
@@ -168,13 +172,7 @@ class LocalRuntime(BaseRuntime):
         return LocalExecutor()
 
     def _generate_env(self):
-        env = {
-            "OMP_NUM_THREADS": "1",
-            "MPI_NUM_THREADS": "1",
-            "MKL_NUM_THREADS": "1",
-            "OPENBLAS_NUM_THREADS": "1",
-        }
-        return env
+        return _threadsafe_env_vars
 
 
 class TestRuntime(LocalRuntime):

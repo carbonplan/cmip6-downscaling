@@ -92,7 +92,7 @@ postprocess_bcsd_task = task(
 with Flow(
     name='bcsd_config_test',
     storage=runtime.storage,
-    runtime=runtime.runtime,
+    run_config=runtime.run_config,
     executor=runtime.executor,
 ) as bcsd_flow:
     gcm = Parameter("GCM")
