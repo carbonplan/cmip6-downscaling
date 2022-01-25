@@ -1,7 +1,3 @@
-# Imports -----------------------------------------------------------
-import os
-
-os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "true"
 from prefect import Flow, Parameter, task
 from xpersist import CacheStore
 from xpersist.prefect.result import XpersistResult
@@ -19,7 +15,6 @@ from cmip6_downscaling.methods.bcsd import (
     return_obs,
 )
 
-# instant config
 runtime = runtimes.get_runtime()
 
 
@@ -63,28 +58,28 @@ get_spatial_anomalies_task = task(
 return_coarse_obs_full_time_task = task(
     return_coarse_obs_full_time,
     tags=['dask-resource:TASKSLOTS=1'],
-    result=XpersistResult(intermediate_cache_store, "xarray.zarr"),
+    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target="y-full-time-" + target_naming_str,
 )
 
 return_gcm_train_full_time_task = task(
     return_gcm_train_full_time,
     tags=['dask-resource:TASKSLOTS=1'],
-    result=XpersistResult(intermediate_cache_store, "xarray.zarr"),
+    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target="x-train-full-time-" + target_naming_str,
 )
 
 return_gcm_predict_rechunked_task = task(
     return_gcm_predict_rechunked,
     tags=['dask-resource:TASKSLOTS=1'],
-    result=XpersistResult(intermediate_cache_store, "xarray.zarr"),
+    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target="x-predict-rechunked-" + target_naming_str,
 )
 
 fit_and_predict_task = task(
     fit_and_predict,
     log_stdout=True,
-    result=XpersistResult(intermediate_cache_store, "xarray.zarr"),
+    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target="fit-and-predict-" + target_naming_str,
 )
 
@@ -92,13 +87,13 @@ postprocess_bcsd_task = task(
     postprocess_bcsd,
     tags=['dask-resource:TASKSLOTS=1'],
     log_stdout=True,
-    result=XpersistResult(results_cache_store, "xarray.zarr"),
+    result=XpersistResult(results_cache_store, serializer="xarray.zarr"),
     target="postprocess-results-" + target_naming_str,
 )
 
 
 with Flow(
-    name='bcsd_config_test',
+    name='bcsd',
     storage=runtime.storage,
     runtime=runtime.runtime,
     executor=runtime.executor,

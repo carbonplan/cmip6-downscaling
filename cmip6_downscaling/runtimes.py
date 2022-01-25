@@ -1,6 +1,4 @@
 import os
-
-os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "true"
 from abc import abstractmethod
 
 from dask_kubernetes import KubeCluster, make_pod_spec
@@ -8,9 +6,7 @@ from prefect.executors import DaskExecutor, Executor, LocalDaskExecutor, LocalEx
 from prefect.run_configs import KubernetesRun, LocalRun, RunConfig
 from prefect.storage import Azure, Local, Storage
 
-from cmip6_downscaling import config
-
-# TODO: Add new config that is hybrid or local compute, but has prefect storage access (ie. what I've been using to debug. Local is now non-write permissions.)
+from . import config
 
 _threadsafe_env_vars = {
     "OMP_NUM_THREADS": "1",
@@ -22,9 +18,6 @@ _threadsafe_env_vars = {
 
 class BaseRuntime:
     """Base configuration class that defines abstract methods (storage, run_config and executor) for subclasses."""
-
-    #
-    serializer = "xarray.zarr"
 
     @property
     @abstractmethod
@@ -45,8 +38,7 @@ class BaseRuntime:
 class CloudRuntime(BaseRuntime):
     def __init__(
         self,
-        connection_string=None,
-        storage_prefix=None,
+        storage_options=None,
         agent=None,
         extra_pip_packages=None,
         kubernetes_cpu=None,
@@ -61,39 +53,45 @@ class CloudRuntime(BaseRuntime):
         adapt_min=None,
         adapt_max=None,
         dask_distributed_worker_resources_taskslots=None,
-        storage_kwargs: dict = None,
     ):
 
-        # note: add runtimes.cloud prefix to all
-        self._connection_string = connection_string or config.get("runtime.cloud.connection_string")
-        self._storage_prefix = storage_prefix or config.get("runtime.cloud.storage_prefix")
-        self._agent = agent or config.get("runtime.cloud.agent")
-        self._extra_pip_packages = extra_pip_packages or config.get(
+        self._storage_options = storage_options is not None or config.get(
+            "runtime.cloud.storage_options"
+        )
+        self._agent = agent is not None or config.get("runtime.cloud.agent")
+        self._extra_pip_packages = extra_pip_packages is not None or config.get(
             "runtime.cloud.extra_pip_packages"
         )
-        self._kubernetes_cpu = kubernetes_cpu or config.get("runtime.cloud.kubernetes_cpu")
-        self._kubernetes_memory = kubernetes_memory or config.get("runtime.cloud.kubernetes_memory")
-        self._image = image or config.get("runtime.cloud.image")
-        self._pod_memory_limit = pod_memory_limit or config.get("runtime.cloud.pod_memory_limit")
-        self._pod_memory_request = pod_memory_request or config.get(
+        self._kubernetes_cpu = kubernetes_cpu is not None or config.get(
+            "runtime.cloud.kubernetes_cpu"
+        )
+        self._kubernetes_memory = kubernetes_memory is not None or config.get(
+            "runtime.cloud.kubernetes_memory"
+        )
+        self._image = image is not None or config.get("runtime.cloud.image")
+        self._pod_memory_limit = pod_memory_limit is not None or config.get(
+            "runtime.cloud.pod_memory_limit"
+        )
+        self._pod_memory_request = pod_memory_request is not None or config.get(
             "runtime.cloud.pod_memory_request"
         )
-        self._pod_threads_per_worker = pod_threads_per_worker or config.get(
+        self._pod_threads_per_worker = pod_threads_per_worker is not None or config.get(
             "runtime.cloud.pod_threads_per_worker"
         )
-        self._pod_cpu_limit = pod_cpu_limit or config.get("runtime.cloud.pod_cpu_limit")
-        self._pod_cpu_request = pod_cpu_request or config.get("runtime.cloud.pod_cpu_request")
-        self._deploy_mode = deploy_mode or config.get("runtime.cloud.deploy_mode")
-        self._adapt_min = adapt_min or config.get("runtime.cloud.adapt_min")
-        self._adapt_max = adapt_max or config.get("runtime.cloud.adapt_max")
+        self._pod_cpu_limit = pod_cpu_limit is not None or config.get("runtime.cloud.pod_cpu_limit")
+        self._pod_cpu_request = pod_cpu_request is not None or config.get(
+            "runtime.cloud.pod_cpu_request"
+        )
+        self._deploy_mode = deploy_mode is not None or config.get("runtime.cloud.deploy_mode")
+        self._adapt_min = adapt_min is not None or config.get("runtime.cloud.adapt_min")
+        self._adapt_max = adapt_max is not None or config.get("runtime.cloud.adapt_max")
         self._dask_distributed_worker_resources_taskslots = (
-            dask_distributed_worker_resources_taskslots
+            dask_distributed_worker_resources_taskslots is not None
             or config.get("runtime.cloud.dask_distributed_worker_resources_taskslots")
         )
         self._dask_distributed_worker_resources_taskslots = self._storage_kwargs.get(
             "runtime.cloud.dask_distributed_worker_resources_taskslots"
         )
-        self._storage_kwargs = storage_kwargs or {}
 
     def __repr__(self):
         return """CloudRuntime configuration for running on prefect-cloud.  storage is `Azure("prefect")`, run_config is `KubernetesRun() and executor is ` DaskExecutor(KubeCluster())`"""
@@ -103,13 +101,14 @@ class CloudRuntime(BaseRuntime):
             "AZURE_STORAGE_CONNECTION_STRING": self._connection_string,
             "EXTRA_PIP_PACKAGES": self._extra_pip_packages,
             "DASK_DISTRIBUTED__WORKER__RESOURCES__TASKSLOTS": self._dask_distributed_worker_resources_taskslots,
+            "PREFECT__FLOWS__CHECKPOINTING": "true",
             **_threadsafe_env_vars,
         }
         return env
 
     @property
     def storage(self) -> Storage:
-        return Azure(self._storage_prefix)
+        return Azure(self._storage_options)
 
     @property
     def run_config(self) -> RunConfig:
@@ -145,16 +144,17 @@ class CloudRuntime(BaseRuntime):
 
 
 class LocalRuntime(BaseRuntime):
-    def __init__(self, storage_prefix: str = "./", storage_kwargs: dict = None):
-        self._storage_prefix = storage_prefix or config.get("runtimes.local.storage_prefix")
-        self._storage_kwargs = storage_kwargs or {}
+    def __init__(self, storage_options: dict = None):
+        self._storage_options = storage_options is not None or config.get(
+            "runtime.local.storage_options"
+        )
 
     def __repr__(self):
         return "LocalRuntime configuration is for running on local machines. storage is `Local()`, run_config is `LocalRun() and executor is `LocalExecutor()` "
 
     @property
     def storage(self) -> Storage:
-        return Local(**self._storage_kwargs)
+        return Local(**self._storage_options)
 
     @property
     def run_config(self) -> RunConfig:
@@ -162,25 +162,31 @@ class LocalRuntime(BaseRuntime):
 
     @property
     def executor(self) -> Executor:
-        return LocalExecutor()
+        return LocalDaskExecutor(scheduler="processes")
 
     def _generate_env(self):
         return _threadsafe_env_vars
 
 
 class TestRuntime(LocalRuntime):
-    def __init__(self, storage_prefix: str = "/tmp/", storage_kwargs: dict = None):
-        self._storage_prefix = storage_prefix
-        self._storage_prefix = storage_prefix or config.get("runtimes.CI.storage_prefix")
+    def __init__(self, storage_options: dict = None):
+        self._storage_options = storage_options is not None or config.get(
+            "runtime.test.storage_options"
+        )
+
+    @property
+    def executor(self) -> Executor:
+        return LocalExecutor()
 
     def __repr__(self):
         return "TestRuntime configuration is for running on CI machines. storage is `Local()`, run_config is `LocalRun() and executor is `LocalExecutor()` "
 
 
 class PangeoRuntime(LocalRuntime):
-    def __init__(self, storage_prefix: str = "az://", storage_kwargs: dict = None):
-        self._storage_prefix = storage_prefix or config.get("runtimes.pangeo.storage_prefix")
-        self._storage_kwargs = storage_kwargs or {}
+    def __init__(self, storage_options: dict = None):
+        self._storage_options = storage_options is not None or config.get(
+            "runtime.pangeo.storage_options"
+        )
 
     def __repr__(self):
         return "PangeoRuntime configuration is for running on jupyter-hubs. storage is `Local()`, run_config is `LocalRun() and executor is `LocalExecutor()` "
@@ -196,16 +202,9 @@ class PangeoRuntime(LocalRuntime):
     @property
     def executor(self) -> Executor:
         return LocalDaskExecutor(scheduler="threads")
-        # eventually move to dask distr instead of local
 
     def _generate_env(self):
-        env = {
-            "OMP_NUM_THREADS": "1",
-            "MPI_NUM_THREADS": "1",
-            "MKL_NUM_THREADS": "1",
-            "OPENBLAS_NUM_THREADS": "1",
-        }
-        return env
+        return _threadsafe_env_vars
 
 
 def get_runtime(name=None, **kwargs):

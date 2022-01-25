@@ -14,7 +14,7 @@ _defaults = {
     },
     "runtime": {
         "cloud": {
-            "storage_prefix": "az://",
+            "storage_options": {'container': 'prefect'},
             "agent": "az-eu-west",
             "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git git+https://github.com/pangeo-data/scikit-downscale.git",
             "kubernetes_cpu": 7,
@@ -29,17 +29,13 @@ _defaults = {
             "adapt_min": 2,
             "adapt_max": 2,
             "dask_distributed_worker_resources_taskslots": "1",
-            "OMP_NUM_THREADS": "1",
-            "MPI_NUM_THREADS": "1",
-            "MKL_NUM_THREADS": "1",
-            "OPENBLAS_NUM_THREADS": "1",
         },
-        "local": {"storage_prefix": "./"},
-        "CI": {
-            "storage_prefix": "/tmp/",
+        "local": {"storage_options": {'directory': './'}},
+        "test": {
+            "storage_options": {'directory': './'},
         },
         "pangeo": {
-            "storage_prefix": "./",
+            "storage_options": {'directory': './'},
         },
     },
 }
