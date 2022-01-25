@@ -6,8 +6,7 @@ from prefect import Flow, Parameter, task
 from xpersist import CacheStore
 from xpersist.prefect.result import XpersistResult
 
-import cmip6_downscaling.runtimes as get_runtime
-from cmip6_downscaling import config
+from cmip6_downscaling import config, runtimes
 from cmip6_downscaling.methods.bcsd import (
     fit_and_predict,
     get_coarse_obs,
@@ -21,7 +20,7 @@ from cmip6_downscaling.methods.bcsd import (
 )
 
 # instant config
-runtime = get_runtime()
+runtime = runtimes.get_runtime()
 
 
 target_naming_str = "{gcm}-{scenario}-{train_period_start}-{train_period_end}-{predict_period_start}-{predict_period_end}-{latmin}-{latmax}-{lonmin}-{lonmax}-{variable}.zarr"
