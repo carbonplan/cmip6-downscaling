@@ -12,6 +12,7 @@ from xpersist.prefect.result import XpersistResult
 import cmip6_downscaling as config
 from cmip6_downscaling.data.observations import get_obs
 from cmip6_downscaling.methods.gard import gard_fit_and_predict, gard_postprocess, generate_scrf
+from cmip6_downscaling.runtimes import get_runtime
 from cmip6_downscaling.tasks.common_tasks import (
     bias_correct_gcm_task,
     bias_correct_obs_task,
@@ -28,7 +29,7 @@ from cmip6_downscaling.workflows.paths import (
 )
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching
 
-run_config = config.get_config()
+runtime = get_runtime()
 
 intermediate_cache_store = CacheStore(
     config.get('storage.intermediate.uri'),
@@ -107,10 +108,10 @@ def prep_gard_input_task(
 
 
 with Flow(
-    name='gard-flow',
-    storage=run_config.storage,
-    run_config=run_config.run_config,
-    executor=run_config.executor,
+    name='gard',
+    storage=runtime.storage,
+    run_config=runtime.run_config,
+    executor=runtime.executor,
 ) as gard_flow:
     obs = Parameter("OBS")
     gcm = Parameter("GCM")

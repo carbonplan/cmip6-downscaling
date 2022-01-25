@@ -5,7 +5,7 @@ from prefect import Flow, Parameter, task
 from xpersist import CacheStore
 from xpersist.prefect.result import XpersistResult
 
-import cmip6_downscaling as config
+from cmip6_downscaling import config, runtimes
 from cmip6_downscaling.methods.detrend import calc_epoch_trend, remove_epoch_trend
 from cmip6_downscaling.methods.maca import maca_bias_correction, maca_construct_analogs
 from cmip6_downscaling.methods.regions import combine_outputs, generate_subdomains
@@ -26,7 +26,7 @@ from cmip6_downscaling.workflows.paths import (
 )
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching, regrid_ds
 
-run_config = config.get_config()
+runtime = runtimes.get_runtime()
 
 
 intermediate_cache_store = CacheStore(
@@ -417,10 +417,10 @@ def maca_fine_bias_correction_task(
 
 
 with Flow(
-    name='maca-flow',
-    storage=run_config.storage,
-    run_config=run_config.run_config,
-    executor=run_config.executor,
+    name='maca',
+    storage=runtime.storage,
+    run_config=runtime.run_config,
+    executor=runtime.executor,
 ) as maca_flow:
     # following https://climate.northwestknowledge.net/MACA/MACAmethod.php
 
