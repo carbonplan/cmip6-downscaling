@@ -18,6 +18,7 @@ _defaults = {
             'storage_options': {"account_name": "cmip6downscaling"},
         },
     },
+    'run_options': {'runtime': None},
     "runtime": {
         "cloud": {
             "storage_options": {'container': 'prefect'},
