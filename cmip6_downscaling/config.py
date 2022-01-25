@@ -9,7 +9,10 @@ _defaults = {
     },
     'methods': {'bcsd': {}, 'gard': {}, 'maca': {}},
     "data_catalog": {
-        "cmip": "https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.json",
+        "cmip": {
+            'uri': "https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.json",
+            'storage_options': {"account_name": "cmip6downscaling"},
+        },
         "era5": {
             'uri': "https://cmip6downscaling.blob.core.windows.net/cmip6/ERA5_daily/",
             'storage_options': {"account_name": "cmip6downscaling"},
