@@ -5,6 +5,7 @@ import numpy as np
 import xarray as xr
 import zarr
 
+from . import cat
 from cmip6_downscaling.workflows.paths import make_rechunked_gcm_path
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching
 
@@ -51,15 +52,15 @@ def load_cmip(
     ds : xr.Dataset or zarr group
         Dataset or zarr group with CMIP data
     """
-    col_url = "https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.json"
 
     if isinstance(variable_ids, str):
         variable_ids = [variable_ids]
 
+    col = cat.cmip6()
+
     for i, var in enumerate(variable_ids):
         stores = (
-            intake.open_esm_datastore(col_url)
-            .search(
+            col.search(
                 activity_id=activity_ids,
                 experiment_id=experiment_ids,
                 member_id=member_ids,
