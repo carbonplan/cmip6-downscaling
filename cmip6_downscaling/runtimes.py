@@ -210,14 +210,14 @@ class PangeoRuntime(LocalRuntime):
         return _threadsafe_env_vars
 
 
-def get_runtime(name=None, **kwargs):
-    if name == "ci":
+def get_runtime(**kwargs):
+    if config.get("run_options.runtime") == "ci":
         runtime = CIRuntime(**kwargs)
-    elif name == "local":
+    elif config.get("run_options.runtime") == "local":
         runtime = LocalRuntime(**kwargs)
-    elif name == "prefect-cloud":
+    elif config.get("run_options.runtime") == "cloud":
         runtime = CloudRuntime(**kwargs)
-    elif name == "pangeo":
+    elif config.get("run_options.runtime") == "pangeo":
         runtime = PangeoRuntime(**kwargs)
     elif os.environ.get("CI") == "true":
         runtime = CIRuntime(**kwargs)

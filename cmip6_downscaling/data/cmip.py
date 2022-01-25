@@ -4,6 +4,7 @@ import numpy as np
 import xarray as xr
 import zarr
 
+from cmip6_downscaling import config
 from cmip6_downscaling.workflows.paths import make_rechunked_gcm_path
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching
 
@@ -73,12 +74,13 @@ def load_cmip(
             .to_list()
         )
 
+        storage_options = config.get('data_catalog.era5.storage_options')
         if len(stores) > 1:
             raise ValueError('can only get 1 store at a time')
         if return_type == 'zarr':
-            ds = zarr.open_consolidated(stores[0], mode='r')
+            ds = zarr.open_consolidated(stores[0], mode='r', storage_options=storage_options)
         elif return_type == 'xr':
-            ds = xr.open_zarr(stores[0], consolidated=True)
+            ds = xr.open_zarr(stores[0], consolidated=True, storage_options=storage_options)
 
         # flip the lats if necessary and drop the extra dims/vars like bnds
         ds = gcm_munge(ds)
