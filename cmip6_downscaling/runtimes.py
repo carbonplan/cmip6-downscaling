@@ -6,7 +6,7 @@ from prefect.executors import DaskExecutor, Executor, LocalDaskExecutor, LocalEx
 from prefect.run_configs import KubernetesRun, LocalRun, RunConfig
 from prefect.storage import Azure, Local, Storage
 
-from cmip6_downscaling import config
+from . import config
 
 _threadsafe_env_vars = {
     "OMP_NUM_THREADS": "1",
