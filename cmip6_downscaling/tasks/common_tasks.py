@@ -1,7 +1,3 @@
-import os
-
-os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "true"
-
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np

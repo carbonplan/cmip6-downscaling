@@ -1,6 +1,16 @@
 import numpy as np
 import xarray as xr
 
+from cmip6_downscaling import config
+
+config.set(
+    {
+        'storage.intermediate.uri': '/tmp/intermediate',
+        'storage.results.uri': '/tmp/results',
+        'storage.temporary.uri': '/tmp/temporary',
+    }
+)
+
 
 def example_3d_dataarray_us_domain(val=0):
     return xr.DataArray(
