@@ -171,7 +171,7 @@ class LocalRuntime(BaseRuntime):
         return _threadsafe_env_vars
 
 
-class TestRuntime(LocalRuntime):
+class CIRuntime(LocalRuntime):
     def __init__(self, storage_options: dict = None):
         self._storage_options = storage_options is not None or config.get(
             "runtime.test.storage_options"
@@ -182,7 +182,7 @@ class TestRuntime(LocalRuntime):
         return LocalExecutor()
 
     def __repr__(self):
-        return "TestRuntime configuration is for running on CI machines. storage is `Local()`, run_config is `LocalRun() and executor is `LocalExecutor()` "
+        return "CIRuntime configuration is for running on CI machines. storage is `Local()`, run_config is `LocalRun() and executor is `LocalExecutor()` "
 
 
 class PangeoRuntime(LocalRuntime):
@@ -211,8 +211,8 @@ class PangeoRuntime(LocalRuntime):
 
 
 def get_runtime(name=None, **kwargs):
-    if name == "test":
-        runtime = TestRuntime(**kwargs)
+    if name == "ci":
+        runtime = CIRuntime(**kwargs)
     elif name == "local":
         runtime = LocalRuntime(**kwargs)
     elif name == "prefect-cloud":
@@ -220,8 +220,8 @@ def get_runtime(name=None, **kwargs):
     elif name == "pangeo":
         runtime = PangeoRuntime(**kwargs)
     elif os.environ.get("CI") == "true":
-        runtime = TestRuntime(**kwargs)
-        print("TestRuntime selected from os.environ")
+        runtime = CIRuntime(**kwargs)
+        print("CIRuntime selected from os.environ")
     elif os.environ.get("PREFECT__BACKEND") == "cloud":
         runtime = CloudRuntime(**kwargs)
         print("PrefectCloudRuntime selected from os.environ")
@@ -230,6 +230,6 @@ def get_runtime(name=None, **kwargs):
         print("PangeoRuntime selected from os.environ")
     else:
         raise ValueError(
-            "Name not in ['test', 'local', 'prefect-cloud', 'pangeo'] and environment variable not found for: [CI, PREFECT__BACKEND, PANGEO__BACKEND or TEST]"
+            "Name not in ['ci', 'local', 'prefect-cloud', 'pangeo'] and environment variable not found for: [CI, PREFECT__BACKEND, PANGEO__BACKEND or TEST]"
         )
     return runtime

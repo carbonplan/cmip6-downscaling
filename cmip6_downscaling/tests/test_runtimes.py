@@ -1,8 +1,8 @@
 from cmip6_downscaling.runtimes import (  # CloudRuntime,
     BaseRuntime,
+    CIRuntime,
     LocalRuntime,
     PangeoRuntime,
-    TestRuntime,
     get_runtime,
 )
 
@@ -13,8 +13,8 @@ def test_runtimes():
     # assert isinstance(cloud_runtime, BaseRuntime)
     local_runtime = LocalRuntime()
     assert isinstance(local_runtime, BaseRuntime)
-    test_runtime = TestRuntime()
-    assert isinstance(test_runtime, BaseRuntime)
+    ci_runtime = CIRuntime()
+    assert isinstance(ci_runtime, BaseRuntime)
     pangeo_runtime = PangeoRuntime()
     assert isinstance(pangeo_runtime, BaseRuntime)
 
