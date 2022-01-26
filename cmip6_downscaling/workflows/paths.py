@@ -497,6 +497,23 @@ def make_maca_output_path(gcm_identifier: str, label: str, **kwargs):
     return f"maca_output/{gcm_identifier}_{label}.zarr"
 
 
+def make_pyramid_path(gcm_identifier: str, **kwargs) -> str:
+    """Build the path for the pyramid
+
+
+    Parameters
+    ----------
+    gcm_identifier : str
+        Output from build_gcm_identifier. String to identify the gcm dataset used
+
+    Returns
+    -------
+    pyramid_path: str
+        Path to gcm_predict ds file location
+    """
+    return f"/pyramid/{gcm_identifier}.pyr"
+
+
 # ---addl bcsd paths
 
 

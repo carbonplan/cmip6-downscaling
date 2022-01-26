@@ -13,18 +13,18 @@ from cmip6_downscaling.methods.bcsd import (
     return_gcm_train_full_time,
     return_obs,
 )
+from cmip6_downscaling.tasks import pyramid
 from cmip6_downscaling.tasks.common_tasks import path_builder_task
 from cmip6_downscaling.workflows.paths import (
     make_bcsd_output_path,
     make_bias_corrected_path,
     make_coarse_obs_path,
     make_gcm_predict_path,
+    make_pyramid_path,
     make_rechunked_gcm_path,
     make_return_obs_path,
     make_spatial_anomalies_path,
 )
-
-from cmip6_downscaling.tasks import pyramid
 
 runtime = runtimes.get_runtime()
 
@@ -276,8 +276,7 @@ with Flow(
         lonmax,
         gcm_identifier=gcm_identifier,
     )
-    # regrid(ds: xr.Dataset, levels: int = 2, uri: str = None, other_chunks: dict = None)
-    # format naming w/ prefect context
     pyramid_location = pyramid.regrid(
-        postprocess_bcsd_ds, uri=config.get('storage.results.uri') + '/pyramids/' + 'test.pyr'
+        postprocess_bcsd_ds,
+        uri=config.get('storage.results.uri') + make_pyramid_path(gcm_identifier=gcm_identifier),
     )
