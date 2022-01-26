@@ -1,6 +1,3 @@
-import os
-
-os.environ["PREFECT__FLOWS__CHECKPOINTING"] = "true"
 from typing import Tuple
 
 import xarray as xr
@@ -53,13 +50,13 @@ def make_flow_paths(
     VARIABLE : str
         From run hyperparameters
     LATMIN : str
-            From run hyperparameters
+        From run hyperparameters
     LATMAX : str
-            From run hyperparameters
+        From run hyperparameters
     LONMIN : str
-            From run hyperparameters
+        From run hyperparameters
     LONMAX : str
-            From run hyperparameters
+        From run hyperparameters
     workdir : str, optional
         Intermediate files for caching (and might be used by other gcms), by default "az://cmip6"
     outdir : str, optional
@@ -109,13 +106,13 @@ def return_obs(
     variable: str
         The variable included in the dataset.
     latmin : str
-            From run hyperparameters
+        From run hyperparameters
     latmax : str
-            From run hyperparameters
+        From run hyperparameters
     lonmin : str
-            From run hyperparameters
+        From run hyperparameters
     lonmax : str
-            From run hyperparameters
+        From run hyperparameters
 
     Returns
     -------
@@ -172,13 +169,13 @@ def get_coarse_obs(
     variable: str
         The variable included in the dataset.
     latmin : str
-            From run hyperparameters
+        From run hyperparameters
     latmax : str
-            From run hyperparameters
+        From run hyperparameters
     lonmin : str
-            From run hyperparameters
+        From run hyperparameters
     lonmax : str
-            From run hyperparameters
+        From run hyperparameters
 
     Returns
     -------
@@ -244,13 +241,13 @@ def get_spatial_anomalies(
     variable: str
         The variable included in the dataset.
     latmin : str
-            From run hyperparameters
+        From run hyperparameters
     latmax : str
-            From run hyperparameters
+        From run hyperparameters
     lonmin : str
-            From run hyperparameters
+        From run hyperparameters
     lonmax : str
-            From run hyperparameters
+        From run hyperparameters
 
     Returns
     -------
@@ -316,13 +313,13 @@ def return_coarse_obs_full_time(
     variable: str
         The variable included in the dataset.
     latmin : str
-            From run hyperparameters
+        From run hyperparameters
     latmax : str
-            From run hyperparameters
+        From run hyperparameters
     lonmin : str
-            From run hyperparameters
+        From run hyperparameters
     lonmax : str
-            From run hyperparameters
+        From run hyperparameters
 
     Returns
     -------
@@ -372,13 +369,13 @@ def return_gcm_train_full_time(
     variable: str
         The variable included in the dataset.
     latmin : str
-            From run hyperparameters
+        From run hyperparameters
     latmax : str
-            From run hyperparameters
+        From run hyperparameters
     lonmin : str
-            From run hyperparameters
+        From run hyperparameters
     lonmax : str
-            From run hyperparameters
+        From run hyperparameters
 
     Returns
     -------
@@ -444,13 +441,13 @@ def return_gcm_predict_rechunked(
     variable: str
         The variable included in the dataset.
     latmin : str
-            From run hyperparameters
+        From run hyperparameters
     latmax : str
-            From run hyperparameters
+        From run hyperparameters
     lonmin : str
-            From run hyperparameters
+        From run hyperparameters
     lonmax : str
-            From run hyperparameters
+        From run hyperparameters
 
     Returns
     -------
@@ -539,13 +536,13 @@ def fit_and_predict(
     variable: str
         The variable included in the dataset.
     latmin : str
-            From run hyperparameters
+        From run hyperparameters
     latmax : str
-            From run hyperparameters
+        From run hyperparameters
     lonmin : str
-            From run hyperparameters
+        From run hyperparameters
     lonmax : str
-            From run hyperparameters
+        From run hyperparameters
     dim : str, optional
         dimension on which you want to do the modelling, by default "time"
 
@@ -613,13 +610,13 @@ def postprocess_bcsd(
     variable: str
         The variable included in the dataset.
     latmin : str
-            From run hyperparameters
+        From run hyperparameters
     latmax : str
-            From run hyperparameters
+        From run hyperparameters
     lonmin : str
-            From run hyperparameters
+        From run hyperparameters
     lonmax : str
-            From run hyperparameters
+        From run hyperparameters
 
     Returns
     -------
