@@ -24,10 +24,10 @@ def make_flow_paths(
     PREDICT_PERIOD_START: str,
     PREDICT_PERIOD_END: str,
     VARIABLE: str,
-    LATMIN: str,  # Q: why is this unused
-    LATMAX: str,  # Q: why is this unused
-    LONMIN: str,  # Q: why is this unused
-    LONMAX: str,  # Q: why is this unused
+    LATMIN: str,
+    LATMAX: str,
+    LONMIN: str,
+    LONMAX: str,
     workdir: str = "az://cmip6",
     outdir: str = "az://cmip6/results",
 ) -> Tuple[str, str, str, str]:
@@ -75,12 +75,12 @@ def make_flow_paths(
 
 
 def return_obs(
-    gcm: str,  # Q: why is this unused?
-    scenario: str,  # Q: why is this unused?
+    gcm: str,
+    scenario: str,
     train_period_start: str,
     train_period_end: str,
-    predict_period_start: str,  # Q: why is this unused?
-    predict_period_end: str,  # Q: why is this unused?
+    predict_period_start: str,
+    predict_period_end: str,
     variable: str,
     latmin: str,
     latmax: str,
@@ -136,12 +136,12 @@ def return_obs(
 
 def get_coarse_obs(
     obs_ds: xr.Dataset,
-    gcm: str,  # Q: why is this unused?
-    scenario: str,  # Q: why is this unused?
+    gcm: str,
+    scenario: str,
     train_period_start: str,
     train_period_end: str,
-    predict_period_start: str,  # Q: why is this unused?
-    predict_period_end: str,  # Q: why is this unused?
+    predict_period_start: str,
+    predict_period_end: str,
     variable: str,
     latmin: str,
     latmax: str,
@@ -198,17 +198,17 @@ def get_coarse_obs(
 def get_spatial_anomalies(
     coarse_obs: xr.Dataset,
     obs_ds: xr.Dataset,
-    gcm: str,  # Q: why is this unused?
-    scenario: str,  # Q: why is this unused?
-    train_period_start: str,  # Q: why is this unused?
-    train_period_end: str,  # Q: why is this unused?
-    predict_period_start: str,  # Q: why is this unused?
-    predict_period_end: str,  # Q: why is this unused?
+    gcm: str,
+    scenario: str,
+    train_period_start: str,
+    train_period_end: str,
+    predict_period_start: str,
+    predict_period_end: str,
     variable: str,
-    latmin: str,  # Q: why is this unused?
-    latmax: str,  # Q: why is this unused?
-    lonmin: str,  # Q: why is this unused?
-    lonmax: str,  # Q: why is this unused?
+    latmin: str,
+    latmax: str,
+    lonmin: str,
+    lonmax: str,
 ) -> xr.Dataset:
 
     """Returns spatial anomalies
@@ -277,17 +277,17 @@ def get_spatial_anomalies(
 
 def return_coarse_obs_full_time(
     coarse_obs_ds: xr.Dataset,
-    gcm: str,  # Q: why is this unused?
-    scenario: str,  # Q: why is this unused?
-    train_period_start: str,  # Q: why is this unused?
-    train_period_end: str,  # Q: why is this unused?
-    predict_period_start: str,  # Q: why is this unused?
-    predict_period_end: str,  # Q: why is this unused?
-    variable: str,  # Q: why is this unused?
-    latmin: str,  # Q: why is this unused?
-    latmax: str,  # Q: why is this unused?
-    lonmin: str,  # Q: why is this unused?
-    lonmax: str,  # Q: why is this unused?
+    gcm: str,
+    scenario: str,
+    train_period_start: str,
+    train_period_end: str,
+    predict_period_start: str,
+    predict_period_end: str,
+    variable: str,
+    latmin: str,
+    latmax: str,
+    lonmin: str,
+    lonmax: str,
 ) -> xr.Dataset:
 
     """
@@ -337,11 +337,11 @@ def return_coarse_obs_full_time(
 def return_gcm_train_full_time(
     coarse_obs_full_time_ds: xr.Dataset,
     gcm: str,
-    scenario: str,  # Q: why is this unused?
+    scenario: str,
     train_period_start: str,
     train_period_end: str,
-    predict_period_start: str,  # Q: why is this unused?
-    predict_period_end: str,  # Q: why is this unused?
+    predict_period_start: str,
+    predict_period_end: str,
     variable: str,
     latmin: str,
     latmax: str,
@@ -410,8 +410,8 @@ def return_gcm_predict_rechunked(
     gcm_train_subset_full_time_ds: xr.Dataset,
     gcm: str,
     scenario: str,
-    train_period_start: str,  # Q: why is this unused?
-    train_period_end: str,  # Q: why is this unused?
+    train_period_start: str,
+    train_period_end: str,
     predict_period_start: str,
     predict_period_end: str,
     variable: str,
@@ -497,17 +497,17 @@ def fit_and_predict(
     gcm_train_subset_full_time_ds: xr.Dataset,
     coarse_obs_full_time_ds: xr.Dataset,
     gcm_predict_rechunked_ds: xr.Dataset,
-    gcm: str,  # Q: why is this unused?
-    scenario: str,  # Q: why is this unused?
-    train_period_start: str,  # Q: why is this unused?
-    train_period_end: str,  # Q: why is this unused?
-    predict_period_start: str,  # Q: why is this unused?
-    predict_period_end: str,  # Q: why is this unused?
+    gcm: str,
+    scenario: str,
+    train_period_start: str,
+    train_period_end: str,
+    predict_period_start: str,
+    predict_period_end: str,
     variable: str,
-    latmin: str,  # Q: why is this unused?
-    latmax: str,  # Q: why is this unused?
-    lonmin: str,  # Q: why is this unused?
-    lonmax: str,  # Q: why is this unused?
+    latmin: str,
+    latmax: str,
+    lonmin: str,
+    lonmax: str,
     dim: str = "time",
 ) -> xr.Dataset:
     """Fit bcsd model on prepared CMIP data with obs at corresponding spatial scale.
@@ -574,17 +574,17 @@ def fit_and_predict(
 def postprocess_bcsd(
     bias_corrected_ds: xr.Dataset,
     spatial_anomalies_ds: xr.Dataset,
-    gcm,  # Q: why is this unused?
-    scenario,  # Q: why is this unused?
-    train_period_start,  # Q: why is this unused?
-    train_period_end,  # Q: why is this unused?
-    predict_period_start,  # Q: why is this unused?
-    predict_period_end,  # Q: why is this unused?
+    gcm,
+    scenario,
+    train_period_start,
+    train_period_end,
+    predict_period_start,
+    predict_period_end,
     variable,
-    latmin: str,  # Q: why is this unused?
-    latmax: str,  # Q: why is this unused?
-    lonmin: str,  # Q: why is this unused?
-    lonmax: str,  # Q: why is this unused?
+    latmin: str,
+    latmax: str,
+    lonmin: str,
+    lonmax: str,
 ) -> xr.Dataset:
     """Downscale the bias-corrected data by interpolating and then
     adding the spatial anomalies back in.
