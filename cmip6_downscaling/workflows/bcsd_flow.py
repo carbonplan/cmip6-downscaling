@@ -18,6 +18,9 @@ from cmip6_downscaling.tasks import pyramid
 
 runtime = runtimes.get_runtime()
 
+config.set({'storage.intermediate.uri': 'az://flow-outputs/intermediates'})
+config.set({'storage.results.uri': 'az://flow-outputs/results'})
+config.set({'storage.temporary.uri': 'az://flow-outputs/temporary'})
 
 target_naming_str = "{gcm}-{scenario}-{train_period_start}-{train_period_end}-{predict_period_start}-{predict_period_end}-{latmin}-{latmax}-{lonmin}-{lonmax}-{variable}.zarr"
 
@@ -251,10 +254,7 @@ with Flow(
         lonmax,
     )
     # regrid(ds: xr.Dataset, levels: int = 2, uri: str = None, other_chunks: dict = None)
+    # format naming w/ prefect context
     pyramid_location = pyramid.regrid(
-        postprocess_bcsd_ds,
-        uri=config.get('storage.results.uri')
-        + 'pyramids/'
-        + target_naming_str.split('.zarr')[0]
-        + '.pyr',
+        postprocess_bcsd_ds, uri=config.get('storage.results.uri') + '/pyramids/' + 'test.pyr'
     )
