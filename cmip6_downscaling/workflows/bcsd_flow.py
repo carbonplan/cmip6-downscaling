@@ -24,6 +24,8 @@ from cmip6_downscaling.workflows.paths import (
     make_spatial_anomalies_path,
 )
 
+from cmip6_downscaling.tasks import pyramid
+
 runtime = runtimes.get_runtime()
 
 config.set(
@@ -33,6 +35,7 @@ config.set(
         "storage.temporary.uri": "az://flow-outputs/temporary",
     }
 )
+
 
 intermediate_cache_store = CacheStore(
     config.get("storage.intermediate.uri"),
@@ -272,4 +275,9 @@ with Flow(
         lonmin,
         lonmax,
         gcm_identifier=gcm_identifier,
+    )
+    # regrid(ds: xr.Dataset, levels: int = 2, uri: str = None, other_chunks: dict = None)
+    # format naming w/ prefect context
+    pyramid_location = pyramid.regrid(
+        postprocess_bcsd_ds, uri=config.get('storage.results.uri') + '/pyramids/' + 'test.pyr'
     )
