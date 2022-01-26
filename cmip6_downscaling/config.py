@@ -3,6 +3,7 @@
 
 _defaults = {
     'storage': {
+        'gcm_identifier': '{gcm}/{scenario}/{train_period_start}/{train_period_end}/{predict_period_start}/{predict_period_end}/{latmin}/{latmax}/{lonmin}/{lonmax}/{var_string}',
         'intermediate': {'uri': '/tmp/flow-outputs/intermediates', 'storage_options': {}},
         'results': {'uri': '/tmp/flow-outputs/results', 'storage_options': {}},
         'temporary': {'uri': '/tmp/cmip6/temp/', 'storage_options': {}},

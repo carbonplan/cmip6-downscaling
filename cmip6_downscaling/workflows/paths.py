@@ -1,5 +1,8 @@
 from typing import List, Optional, Tuple, Union
 
+from cmip6_downscaling import config
+
+
 def build_obs_identifier(
     obs: str,
     train_period_start: str,
@@ -41,7 +44,18 @@ def build_obs_identifier(
     if isinstance(variables, str):
         variables = [variables]
     var_string = '_'.join(sorted(variables))
-    return f'{obs}_{train_period_start}_{train_period_end}_{latmin}_{latmax}_{lonmin}_{lonmax}_{var_string}'
+
+    obs_identifier = config.get('storage.obs_identifier').format(
+        obs=obs,
+        train_period_start=train_period_start,
+        train_period_end=train_period_end,
+        latmin=latmin,
+        latmax=latmax,
+        lonmin=lonmin,
+        lonmax=lonmax,
+        var_string=var_string,
+    )
+    return obs_identifier
 
 
 def build_gcm_identifier(
@@ -94,7 +108,21 @@ def build_gcm_identifier(
     if isinstance(variables, str):
         variables = [variables]
     var_string = '_'.join(variables)
-    return f'{gcm}_{scenario}_{train_period_start}_{train_period_end}_{predict_period_start}_{predict_period_end}_{latmin}_{latmax}_{lonmin}_{lonmax}_{var_string}'
+
+    gcm_identifier = config.get('storage.gcm_identifier').format(
+        gcm=gcm,
+        scenario=scenario,
+        train_period_start=train_period_start,
+        train_period_end=train_period_end,
+        predict_period_start=predict_period_start,
+        predict_period_end=predict_period_end,
+        latmin=latmin,
+        latmax=latmax,
+        lonmin=lonmin,
+        lonmax=lonmax,
+        var_string=var_string,
+    )
+    return gcm_identifier
 
 
 def make_rechunked_obs_path(
@@ -475,12 +503,10 @@ def make_maca_output_path(gcm_identifier: str, label: str, **kwargs):
     return f"maca_output/{gcm_identifier}_{label}.zarr"
 
 
+# ---addl bcsd paths
 
-#---addl bcsd paths
 
-def make_spatial_anomalies_path(
-   obs_identifier: str = None, **kwargs
-) -> str:
+def make_spatial_anomalies_path(obs_identifier: str = None, **kwargs) -> str:
     """Build the path for spatial anomalies
 
     Parameters
@@ -496,10 +522,7 @@ def make_spatial_anomalies_path(
     return f"spatial_anomalies/{obs_identifier}.zarr"
 
 
-
-def make_gcm_predict_path(
-   gcm_identifier: str = None, **kwargs
-) -> str:
+def make_gcm_predict_path(gcm_identifier: str = None, **kwargs) -> str:
     """Build the path for the gcm predict dataset
 
     Parameters
@@ -515,9 +538,7 @@ def make_gcm_predict_path(
     return f"gcm_predict/{gcm_identifier}.zarr"
 
 
-def make_bias_corrected_path(
-   gcm_identifier: str = None, **kwargs
-) -> str:
+def make_bias_corrected_path(gcm_identifier: str = None, **kwargs) -> str:
     """Build the path for the bias corrected bcsd dataset
 
     Parameters
@@ -532,9 +553,8 @@ def make_bias_corrected_path(
     """
     return f"bias_corrected/{gcm_identifier}.zarr"
 
-def make_bcsd_output_path(
-   gcm_identifier: str = None, **kwargs
-) -> str:
+
+def make_bcsd_output_path(gcm_identifier: str = None, **kwargs) -> str:
     """Build the path for the bcsd output dataset
 
     Parameters

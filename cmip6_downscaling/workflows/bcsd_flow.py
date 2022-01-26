@@ -14,21 +14,17 @@ from cmip6_downscaling.methods.bcsd import (
     return_gcm_train_full_time,
     return_obs,
 )
-from cmip6_downscaling.tasks.common_tasks import (
-    path_builder_task,
-)
+from cmip6_downscaling.tasks.common_tasks import path_builder_task
 from cmip6_downscaling.workflows.paths import (
-    make_coarse_obs_path,
-    make_spatial_anomalies_path,
-    make_bias_corrected_path,
     make_bcsd_output_path,
+    make_bias_corrected_path,
+    make_coarse_obs_path,
+    make_gcm_predict_path,
     make_rechunked_gcm_path,
-    make_gcm_predict_path
+    make_spatial_anomalies_path,
 )
+
 runtime = runtimes.get_runtime()
-
-
-target_naming_str = "{gcm}-{scenario}-{train_period_start}-{train_period_end}-{predict_period_start}-{predict_period_end}-{latmin}-{latmax}-{lonmin}-{lonmax}-{variable}.zarr"
 
 
 intermediate_cache_store = CacheStore(
@@ -45,11 +41,11 @@ results_cache_store = CacheStore(
 
 # make_flow_paths_task = task(make_flow_paths, log_stdout=True, nout=4)
 
-return_obs_task = task(
-    return_obs,
-    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
-    target="obs-ds-" + target_naming_str,
-)
+# return_obs_task = task(
+#     return_obs,
+#     result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
+#     target="obs-ds-" + target_naming_str,
+# )
 # get_coarse_obs_task = task(
 #     get_coarse_obs,
 #     tags=['dask-resource:TASKSLOTS=1'],
@@ -154,7 +150,9 @@ with Flow(
         lonmax=lonmax,
         variables=variable,
     )
-    obs_path = obs_identifier
+    print(obs_identifier)
+    print(gcm_identifier)
+    # obs_path = obs_identifier
     # coarse_obs_path = make_coarse_obs_path(gcm_grid_spec,'matched',obs_identifier)
     # spatial_anomalies_path = make_spatial_anomalies_path(obs_identifier)
     # coarse_obs_full_time_path = make_coarse_obs_path(gcm_grid_spec,'full-time',obs_identifier)
@@ -162,26 +160,13 @@ with Flow(
     # gcm_predict_rechunked_path = make_gcm_predict_path(gcm_identifier)
     # bias_corrected_path = make_bias_corrected_path(gcm_identifier)
     # final_out_path = make_bcsd_output_path(gcm_identifier)
- 
-    
+
     # preprocess_bcsd_tasks(s):
 
-
-
-
-    #current func working on
+    # current func working on
     obs_ds = return_obs_task(
-        train_period_start,
-        train_period_end,
-        variable,
-        latmin,
-        latmax,
-        lonmin,
-        lonmax,
-        obs_path
+        train_period_start, train_period_end, variable, latmin, latmax, lonmin, lonmax, obs_path
     )
-
-
 
     # coarse_obs_ds = get_coarse_obs_task(
     #     obs_ds,
