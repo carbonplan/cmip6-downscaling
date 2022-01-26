@@ -22,7 +22,7 @@ config.set(
     {
         'storage.intermediate.uri': 'az://flow-outputs/intermediates',
         'storage.results.uri': 'az://flow-outputs/results',
-        'storage.temporary.uri': 'az://flow-outputs/temporary'
+        'storage.temporary.uri': 'az://flow-outputs/temporary',
     }
 )
 
