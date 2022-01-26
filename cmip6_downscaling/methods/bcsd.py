@@ -1,5 +1,3 @@
-from typing import Tuple
-
 import xarray as xr
 from skdownscale.pointwise_models import PointWiseDownscaler
 from skdownscale.pointwise_models.bcsd import BcsdPrecipitation, BcsdTemperature
@@ -16,96 +14,27 @@ from cmip6_downscaling.workflows.utils import (
 )
 
 
-
-
-
-def make_flow_paths(
-    GCM: str,
-    SCENARIO: str,
-    TRAIN_PERIOD_START: str,
-    TRAIN_PERIOD_END: str,
-    PREDICT_PERIOD_START: str,
-    PREDICT_PERIOD_END: str,
-    VARIABLE: str,
-    LATMIN: str,
-    LATMAX: str,
-    LONMIN: str,
-    LONMAX: str,
-    workdir: str = "az://cmip6",
-    outdir: str = "az://cmip6/results",
-) -> Tuple[str, str, str, str]:
-    """Build the paths where your outputs (both intermediate and final) will go
-
-    Parameters
-    ----------
-    GCM : str
-        From run hyperparameters
-    SCENARIO : str
-        From run hyperparameters
-    TRAIN_PERIOD_START : str
-        From run hyperparameters
-    TRAIN_PERIOD_END : str
-        From run hyperparameters
-    PREDICT_PERIOD_START : str
-        From run hyperparameters
-    PREDICT_PERIOD_END : str
-        From run hyperparameters
-    VARIABLE : str
-        From run hyperparameters
-    LATMIN : str
-        From run hyperparameters
-    LATMAX : str
-        From run hyperparameters
-    LONMIN : str
-        From run hyperparameters
-    LONMAX : str
-        From run hyperparameters
-    workdir : str, optional
-        Intermediate files for caching (and might be used by other gcms), by default "az://cmip6"
-    outdir : str, optional
-        Final result space, by default "az://cmip6/results"
-
-    Returns
-    -------
-    tuple[str, str, str, str]
-        From run hyperparameters
-    """
-    coarse_obs_path = f"{workdir}/intermediates/ERA5_{GCM}_{TRAIN_PERIOD_START}_{TRAIN_PERIOD_END}_{VARIABLE}.zarr"
-    spatial_anomalies_path = f"{workdir}/intermediates/anomalies_{GCM}_{TRAIN_PERIOD_START}_{TRAIN_PERIOD_END}_{VARIABLE}.zarr"
-    bias_corrected_path = f"{workdir}/intermediates/bc_{SCENARIO}_{GCM}_{TRAIN_PERIOD_START}_{TRAIN_PERIOD_END}_{VARIABLE}.zarr"
-    final_out_path = f"{outdir}/bcsd_{SCENARIO}_{GCM}_{PREDICT_PERIOD_START}_{PREDICT_PERIOD_END}_{VARIABLE}.zarr"
-    return coarse_obs_path, spatial_anomalies_path, bias_corrected_path, final_out_path
-
-
 def return_obs(
+    obs: str,
     train_period_start: str,
     train_period_end: str,
-    variable: str,
     latmin: str,
     latmax: str,
     lonmin: str,
     lonmax: str,
-    **kwargs,
-
+    variable: str,
+    **kwargs
 ) -> xr.Dataset:
     """Loads ERA5 observation data for given time bounds and variable
 
     Parameters
     ----------
-    gcm : str
-        Input GCM
-    scenario: str
-        Input GCM scenario
+    obs : str
+        Input obs
     train_period_start : str
         Date for training period start (e.g. '1985')
     train_period_end : str
         Date for training period end (e.g. '2015')
-    predict_period_start : str
-        Date for prediction period start (e.g. '2090')
-    predict_period_end : str
-        Date for prediction period end (e.g. '2090')
-    variable: str
-        The variable included in the dataset.
     latmin : str
         From run hyperparameters
     latmax : str
@@ -113,7 +42,11 @@ def return_obs(
     lonmin : str
         From run hyperparameters
     lonmax : str
-        From run hyperparameters
+        From run hyperparameter
+    variable: str
+        The variable included in the dataset.
+    **kwargs: Dict
+            Other arguments to be used in generating the target path
 
     Returns
     -------
@@ -148,6 +81,7 @@ def get_coarse_obs(
     latmax: str,
     lonmin: str,
     lonmax: str,
+    **kwargs
 ) -> xr.Dataset:
     """Regrids the observation dataset to match the GCM resolution
 
@@ -177,6 +111,8 @@ def get_coarse_obs(
         From run hyperparameters
     lonmax : str
         From run hyperparameters
+    **kwargs: Dict
+            Other arguments to be used in generating the target path
 
     Returns
     -------
@@ -210,6 +146,7 @@ def get_spatial_anomalies(
     latmax: str,
     lonmin: str,
     lonmax: str,
+    **kwargs
 ) -> xr.Dataset:
 
     """Returns spatial anomalies
@@ -249,6 +186,8 @@ def get_spatial_anomalies(
         From run hyperparameters
     lonmax : str
         From run hyperparameters
+    **kwargs: Dict
+            Other arguments to be used in generating the target path
 
     Returns
     -------
@@ -289,6 +228,7 @@ def return_coarse_obs_full_time(
     latmax: str,
     lonmin: str,
     lonmax: str,
+    **kwargs
 ) -> xr.Dataset:
 
     """
@@ -321,6 +261,8 @@ def return_coarse_obs_full_time(
         From run hyperparameters
     lonmax : str
         From run hyperparameters
+    **kwargs: Dict
+            Other arguments to be used in generating the target path
 
     Returns
     -------
@@ -348,6 +290,7 @@ def return_gcm_train_full_time(
     latmax: str,
     lonmin: str,
     lonmax: str,
+    **kwargs
 ) -> xr.Dataset:
     """Returns GCM training rechunked dataset in full time.
 
@@ -377,6 +320,8 @@ def return_gcm_train_full_time(
         From run hyperparameters
     lonmax : str
         From run hyperparameters
+    **kwargs: Dict
+            Other arguments to be used in generating the target path
 
     Returns
     -------
@@ -420,6 +365,7 @@ def return_gcm_predict_rechunked(
     latmax: str,
     lonmin: str,
     lonmax: str,
+    **kwargs
 ) -> xr.Dataset:
     """Returns GCM prediction rechunked dataset in full time.  Chunks are matched to chunks of gcm train. In the current use case, this means in full_time.
 
@@ -449,6 +395,8 @@ def return_gcm_predict_rechunked(
         From run hyperparameters
     lonmax : str
         From run hyperparameters
+    **kwargs: Dict
+            Other arguments to be used in generating the target path
 
     Returns
     -------
@@ -510,6 +458,7 @@ def fit_and_predict(
     lonmin: str,
     lonmax: str,
     dim: str = "time",
+    **kwargs
 ) -> xr.Dataset:
     """Fit bcsd model on prepared CMIP data with obs at corresponding spatial scale.
     Then predict for a set of CMIP data (likely future).
@@ -546,6 +495,8 @@ def fit_and_predict(
         From run hyperparameters
     dim : str, optional
         dimension on which you want to do the modelling, by default "time"
+    **kwargs: Dict
+            Other arguments to be used in generating the target path
 
     Returns
     -------
@@ -586,6 +537,7 @@ def postprocess_bcsd(
     latmax: str,
     lonmin: str,
     lonmax: str,
+    **kwargs
 ) -> xr.Dataset:
     """Downscale the bias-corrected data by interpolating and then
     adding the spatial anomalies back in.
@@ -618,6 +570,8 @@ def postprocess_bcsd(
         From run hyperparameters
     lonmax : str
         From run hyperparameters
+    **kwargs: Dict
+            Other arguments to be used in generating the target path
 
     Returns
     -------

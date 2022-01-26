@@ -3,10 +3,11 @@
 
 _defaults = {
     'storage': {
-        'gcm_identifier': '{gcm}/{scenario}/{train_period_start}/{train_period_end}/{predict_period_start}/{predict_period_end}/{latmin}/{latmax}/{lonmin}/{lonmax}/{var_string}',
+        'gcm_identifier_template': '{gcm}/{scenario}/{variable}/{latmin}_{latmax}_{lonmin}_{lonmax}/{train_period_start}_{train_period_end}/{predict_period_start}_{predict_period_end}',
+        'obs_identifier_template': '{obs}/{variable}/{latmin}_{latmax}_{lonmin}_{lonmax}/{train_period_start}_{train_period_end}',
         'intermediate': {'uri': '/tmp/flow-outputs/intermediates', 'storage_options': {}},
         'results': {'uri': '/tmp/flow-outputs/results', 'storage_options': {}},
-        'temporary': {'uri': '/tmp/cmip6/temp/', 'storage_options': {}},
+        'temporary': {'uri': '/tmp/flow-outputs/temporary/', 'storage_options': {}},
     },
     'methods': {'bcsd': {}, 'gard': {}, 'maca': {}},
     "data_catalog": {

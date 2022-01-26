@@ -126,7 +126,11 @@ def path_builder_task(
     train_period_end: str,
     predict_period_start: str,
     predict_period_end: str,
-    variables: List[str],
+    latmin: str,
+    latmax: str,
+    lonmin: str,
+    lonmax: str,
+    variable: str,
 ) -> Tuple[str, str, str]:
     """
     Take in input parameters and make string patterns that identifies the obs dataset, gcm dataset, and the gcm grid. These
@@ -159,11 +163,16 @@ def path_builder_task(
         A string of parameters defining the GCM dataset used, including variables, start/end year for historical and future periods, etc
     """
     gcm_grid_spec = get_gcm_grid_spec(gcm_name=gcm)
+
     obs_identifier = build_obs_identifier(
         obs=obs,
         train_period_start=train_period_start,
         train_period_end=train_period_end,
-        variables=variables,
+        latmin=latmin,
+        latmax=latmax,
+        lonmin=lonmin,
+        lonmax=lonmax,
+        variable=variable,
     )
     gcm_identifier = build_gcm_identifier(
         gcm=gcm,
@@ -172,7 +181,11 @@ def path_builder_task(
         train_period_end=train_period_end,
         predict_period_start=predict_period_start,
         predict_period_end=predict_period_end,
-        variables=variables,
+        latmin=latmin,
+        latmax=latmax,
+        lonmin=lonmin,
+        lonmax=lonmax,
+        variable=variable,
     )
 
     return gcm_grid_spec, obs_identifier, gcm_identifier

@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple, Union
+from typing import Optional, Tuple
 
 from cmip6_downscaling import config
 
@@ -11,7 +11,7 @@ def build_obs_identifier(
     latmax: str,
     lonmin: str,
     lonmax: str,
-    variables: Union[str, List[str], Tuple[str]],
+    variable: str,
     **kwargs,
 ) -> str:
     """
@@ -34,18 +34,15 @@ def build_obs_identifier(
     lonmax : str
             Max longitude
     variables : str or List[str]
-        Name of variable(s) to use (e.g. tasmax, pr)
+        Name of variable
 
     Returns
     -------
     identifier : str
         string to be used in obs related paths as specified by the params
     """
-    if isinstance(variables, str):
-        variables = [variables]
-    var_string = '_'.join(sorted(variables))
 
-    obs_identifier = config.get('storage.obs_identifier').format(
+    obs_identifier = config.get('storage.obs_identifier_template').format(
         obs=obs,
         train_period_start=train_period_start,
         train_period_end=train_period_end,
@@ -53,7 +50,7 @@ def build_obs_identifier(
         latmax=latmax,
         lonmin=lonmin,
         lonmax=lonmax,
-        var_string=var_string,
+        variable=variable,
     )
     return obs_identifier
 
@@ -69,7 +66,7 @@ def build_gcm_identifier(
     latmax: str,
     lonmin: str,
     lonmax: str,
-    variables: Union[str, List[str]],
+    variable: str,
     **kwargs,
 ) -> str:
     """
@@ -98,18 +95,15 @@ def build_gcm_identifier(
     lonmax : str
             Max longitude
     variables : str or List[str]
-        Name of variable(s) to use (e.g. tasmax, pr)
+        Name of variable
 
     Returns
     -------
     identifier : str
         string to be used in gcm related paths as specified by the params
     """
-    if isinstance(variables, str):
-        variables = [variables]
-    var_string = '_'.join(variables)
 
-    gcm_identifier = config.get('storage.gcm_identifier').format(
+    gcm_identifier = config.get('storage.gcm_identifier_template').format(
         gcm=gcm,
         scenario=scenario,
         train_period_start=train_period_start,
@@ -120,7 +114,7 @@ def build_gcm_identifier(
         latmax=latmax,
         lonmin=lonmin,
         lonmax=lonmax,
-        var_string=var_string,
+        variable=variable,
     )
     return gcm_identifier
 
@@ -504,6 +498,22 @@ def make_maca_output_path(gcm_identifier: str, label: str, **kwargs):
 
 
 # ---addl bcsd paths
+
+
+def make_return_obs_path(obs_identifier: str, **kwargs) -> str:
+    """Build the path for return obs task
+
+    Parameters
+    ----------
+    obs_identifier : str
+        Output from build_obs_identifier. String to identify the observation dataset used
+
+    Returns
+    -------
+    obs_ds path: str
+        Path to bcsd obs_ds file location
+    """
+    return f"obs_ds/{obs_identifier}.zarr"
 
 
 def make_spatial_anomalies_path(obs_identifier: str = None, **kwargs) -> str:
