@@ -53,9 +53,9 @@ def _postprocess(dt: dt.DataTree, levels: int, other_chunks: dict = None) -> dt.
         dt[slevel].ds = set_zarr_encoding(
             dt[slevel].ds, codec_config={"id": "zlib", "level": 1}, float_dtype="float32"
         )
-        for dim in ['time', 'time_bnds']:
-            if dim in dt[slevel].ds:
-                dt[slevel].ds[dim].encoding['dtype'] = 'int32'
+        for var in ['time', 'time_bnds']:
+            if var in dt[slevel].ds:
+                dt[slevel].ds[var].encoding['dtype'] = 'int32'
 
     # set global metadata
     dt.ds.attrs.update(**get_cf_global_attrs())
