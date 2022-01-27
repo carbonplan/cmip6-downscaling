@@ -1,12 +1,19 @@
+import os
+
 import cartopy.crs as ccrs
+import fsspec
 import matplotlib.pyplot as plt
 import pandas as pd
 import papermill as pm
 import xarray as xr
 from prefect import task
+
 from cmip6_downscaling.data.cmip import convert_to_360
 
 from .qaqc import make_qaqc_ds
+
+connection_string = os.environ.get("AZURE_STORAGE")
+fs = fsspec.filesystem('az', connection_string=connection_string)
 
 
 def qaqc_checks(ds):
@@ -56,11 +63,13 @@ def annual_summary(ds):
 
     return out_ds
 
+
 @task(log_stdout=True, tags=['dask-resource:TASKSLOTS=1'])
 def run_analyses(parameters):
     pm.execute_notebook(
         'analyses.ipynb', 'analyses_{}.ipynb'.format(parameters['run_id']), parameters=parameters
     )
+
 
 def load_top_cities(plot=False):
     cities = pd.read_csv('worldcities.csv')
