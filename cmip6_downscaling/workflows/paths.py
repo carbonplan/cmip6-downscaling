@@ -511,7 +511,7 @@ def make_pyramid_path(gcm_identifier: str, **kwargs) -> str:
     pyramid_path: str
         Path to gcm_predict ds file location
     """
-    return f"/pyramid/{gcm_identifier}.pyr"
+    return f"/pyramid/{gcm_identifier}.zarr"
 
 
 # ---addl bcsd paths
