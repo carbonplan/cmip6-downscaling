@@ -27,8 +27,7 @@ config.set(
     }
 )
 
-target_naming_str = "{gcm}-{scenario}-{train_period_start}-{train_period_end}-{predict_period_start}-{predict_period_end}-{latmin}-{latmax}-{lonmin}-{lonmax}-{variable}.zarr"
-
+target_naming_str = "PLACEHOLDER"
 
 intermediate_cache_store = CacheStore(
     config.get('storage.intermediate.uri'),
@@ -297,9 +296,9 @@ with Flow(
 
     analysis_location = run_analyses(
         {'run_id': target_naming_str, 'var': variable, 'gcm': gcm, 'scenario': scenario,
-            'training_period_start':  training_period_start,
-            "training_period_end" = training_period_end
-            "predict_period_start" = predict_period_start
-            "predict_period_end" = predict_period_end},
+            'train_period_start':  train_period_start,
+            "train_period_end": train_period_end,
+            "predict_period_start": predict_period_start,
+            "predict_period_end": predict_period_end}, # TODO: add lat/lon boxes
         upstream_tasks=[postprocess_bcsd_ds]
     )
