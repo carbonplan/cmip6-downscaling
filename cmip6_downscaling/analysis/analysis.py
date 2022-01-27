@@ -58,7 +58,8 @@ def annual_summary(ds):
 
 @task(log_stdout=True, tags=['dask-resource:TASKSLOTS=1'])
 def run_analyses(parameters):
-    print('wooohooo')    # pm.execute_notebook(
+    print('wooohooo')    
+    # pm.execute_notebook(
     #     'analyses.ipynb', 'analyses_{}.ipynb'.format(parameters['run_id']), parameters=parameters
     # )
     return 'i love donuts' # TODO: path to analysis notebook
