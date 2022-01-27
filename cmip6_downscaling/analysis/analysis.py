@@ -28,9 +28,9 @@ def monthly_summary(ds):
     out_ds = xr.Dataset()
     for var in ds:
         if var in ['tasmax', 'tasmin']:
-            out_ds[var] = ds[var].groupby('time.month').mean()
+            out_ds[var] = ds[var].resample(time='1MS').mean(dim='time')
         elif var in ['pr']:
-            out_ds[var] = ds[var].groupby('time.month').sum()
+            out_ds[var] = ds[var].resample(time='1MS').sum(dim='time')
         else:
             print(f'{var} not implemented')
 
@@ -48,9 +48,9 @@ def annual_summary(ds):
     out_ds = xr.Dataset()
     for var in ds:
         if var in ['tasmax', 'tasmin']:
-            out_ds[var] = ds[var].groupby('time.year').mean()
+            out_ds[var] = ds[var].resample(time='YS').mean()
         elif var in ['pr']:
-            out_ds[var] = ds[var].groupby('time.year').sum()
+            out_ds[var] = ds[var].resample(time='YS').sum()
         else:
             print(f'{var} not implemented')
 
