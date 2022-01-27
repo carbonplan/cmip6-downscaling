@@ -58,11 +58,13 @@ def annual_summary(ds):
 
 @task(log_stdout=True, tags=['dask-resource:TASKSLOTS=1'])
 def run_analyses(parameters):
-    print('wooohooo')    
-    # pm.execute_notebook(
-    #     'analyses.ipynb', 'analyses_{}.ipynb'.format(parameters['run_id']), parameters=parameters
-    # )
-    return 'i love donuts' # TODO: path to analysis notebook
+    run_id = parameters['run_id']
+    workdir = '/home/jovyan/cmip6-downscaling/notebooks' 
+    executed_notebook_path = f'{workdir}/analyses_{run_id}.ipynb'
+    pm.execute_notebook(
+        f'{workdir}/analyses.ipynb', executed_notebook_path, parameters=parameters
+    ) # TODO do these local paths work regardless of execution environment?
+    return executed_notebook_path
 
 def load_top_cities(plot=False):
     cities = pd.read_csv('worldcities.csv')
