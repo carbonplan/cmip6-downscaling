@@ -4,79 +4,25 @@ plugins:
 
 sources:
 
-  obs:
-    metadata:
-      title: observed Terraclimate data
-    driver: zarr
-    parameters:
-      timestep:
-        description: data timestep
-        type: str
-        default: monthly
-        allowed: [monthly, annual]
-    args:
-      urlpath: 'az://carbonplan-downscaling/obs/conus/4000m/{{ timestep }}/terraclimate_plus.zarr'
-      consolidated: True
-      storage_options:
-        account_name: carbonplan
-
-  cmip6_regridded:
-    metadata:
-      title: regridded climate data
-    driver: zarr
-    parameters:
-      timestep:
-        description: data timestep
-        type: str
-        default: monthly
-        allowed: [monthly, annual]
-      model:
-        description: climate model id
-        type: str
-        default: CanESM5
-      scenario:
-        description: climate model scenario
-        type: str
-        default: historical
-        allowed: [historical, ssp245, ssp370, ssp585]
-      member:
-        description: climate model ensemble member
-        type: str
-        default: r10i1p1f1
-    args:
-      urlpath: 'az://carbonplan-downscaling/cmip6/regridded/conus/4000m/monthly/{{ model }}.{{ scenario }}.{{ member }}.zarr'
-      consolidated: True
-      storage_options:
-        account_name: carbonplan
-
   cmip6:
+    description: 'CMIP6 in Azure Blob Storage'
     metadata:
-      title: Processed CMIP6 including raw and downscaled variants.
+      url: 'https://pangeo-data.github.io/pangeo-cmip6-cloud/'
+    driver: intake_esm.esm_datastore
+    args:
+      esmcol_obj: "https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.json"
+
+  era5:
+    description: 'ERA5 Reanalysis'
+    metadata:
+      url: 'https://github.com/planet-os/notebooks/blob/master/aws/era5-pds.md'
     driver: zarr
     parameters:
-      timestep:
+      year:
         description: data timestep
-        type: str
-        default: monthly
-        allowed: [monthly, annual]
-      model:
-        description: climate model id
-        type: str
-      scenario:
-        description: climate model scenario
-        type: str
-        default: historical
-        allowed: [historical, ssp245, ssp370, ssp585]
-      member:
-        description: climate model ensemble member
-        type: str
-      method:
-        description: processing method
-        type: str
-        default: "quantile-mapping"
-        allowed: ["regridded", "bias-corrected", "quantile-mapping"]
+        type: int
+        default: 1979
     args:
-      urlpath: 'az://carbonplan-downscaling/cmip6/{{ method }}/conus/4000m/{{ timestep }}/{{ model }}.{{ scenario }}.{{ member }}.zarr'
-      consolidated: True
+      urlpath: az://cmip6/ERA5_daily/{{ '%04d' % year }}/
       storage_options:
-        account_name: carbonplan
+        account_name: cmip6downscaling

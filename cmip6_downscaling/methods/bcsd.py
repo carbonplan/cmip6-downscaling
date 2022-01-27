@@ -1,7 +1,5 @@
-import os
 from typing import Tuple
 
-import fsspec
 import xarray as xr
 from skdownscale.pointwise_models import PointWiseDownscaler
 from skdownscale.pointwise_models.bcsd import BcsdPrecipitation, BcsdTemperature
@@ -12,11 +10,10 @@ from cmip6_downscaling.data.observations import open_era5
 from cmip6_downscaling.workflows.utils import (
     delete_chunks_encoding,
     rechunk_zarr_array,
+    rechunk_zarr_array_with_caching,
     regrid_dataset,
+    subset_dataset,
 )
-
-connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
-fs = fsspec.filesystem('az')
 
 
 def make_flow_paths(
@@ -27,6 +24,10 @@ def make_flow_paths(
     PREDICT_PERIOD_START: str,
     PREDICT_PERIOD_END: str,
     VARIABLE: str,
+    LATMIN: str,
+    LATMAX: str,
+    LONMIN: str,
+    LONMAX: str,
     workdir: str = "az://cmip6",
     outdir: str = "az://cmip6/results",
 ) -> Tuple[str, str, str, str]:
@@ -48,6 +49,14 @@ def make_flow_paths(
         From run hyperparameters
     VARIABLE : str
         From run hyperparameters
+    LATMIN : str
+        From run hyperparameters
+    LATMAX : str
+        From run hyperparameters
+    LONMIN : str
+        From run hyperparameters
+    LONMAX : str
+        From run hyperparameters
     workdir : str, optional
         Intermediate files for caching (and might be used by other gcms), by default "az://cmip6"
     outdir : str, optional
@@ -65,40 +74,108 @@ def make_flow_paths(
     return coarse_obs_path, spatial_anomalies_path, bias_corrected_path, final_out_path
 
 
-def return_obs(train_period_start: str, train_period_end: str, variable: str) -> xr.Dataset:
+def return_obs(
+    gcm: str,
+    scenario: str,
+    train_period_start: str,
+    train_period_end: str,
+    predict_period_start: str,
+    predict_period_end: str,
+    variable: str,
+    latmin: str,
+    latmax: str,
+    lonmin: str,
+    lonmax: str,
+) -> xr.Dataset:
     """Loads ERA5 observation data for given time bounds and variable
 
     Parameters
     ----------
+    gcm : str
+        Input GCM
+    scenario: str
+        Input GCM scenario
     train_period_start : str
-        Starting time bounds
+        Date for training period start (e.g. '1985')
     train_period_end : str
-        Ending time bounds
-    variable : str
-        ERA5 variable. ex: 'tasmax'
+        Date for training period end (e.g. '2015')
+    predict_period_start : str
+        Date for prediction period start (e.g. '2090')
+    predict_period_end : str
+        Date for prediction period end (e.g. '2090')
+    variable: str
+        The variable included in the dataset.
+    latmin : str
+        From run hyperparameters
+    latmax : str
+        From run hyperparameters
+    lonmin : str
+        From run hyperparameters
+    lonmax : str
+        From run hyperparameters
 
     Returns
     -------
     xr.Dataset
         Loaded xarray dataset of ERA5 observation data. Chunked in time: 365
     """
-    obs_ds = open_era5(variable, start_year=train_period_start, end_year=train_period_end)
-    # Chunking the observation dataset by 'time':365 fixes irregular zarr chunking issues caused by leap-years.
-    obs_ds = obs_ds.chunk({'time': 365})
+    obs_load = open_era5(variable, start_year=train_period_start, end_year=train_period_end)
+    obs_ds = subset_dataset(
+        obs_load,
+        variable,
+        train_period_start,
+        train_period_end,
+        latmin,
+        latmax,
+        lonmin,
+        lonmax,
+        chunking_schema={'time': 365, 'lat': 150, 'lon': 150},
+    )
     return obs_ds
 
 
-def get_coarse_obs(obs_ds: xr.Dataset, variable: str) -> xr.Dataset:
+def get_coarse_obs(
+    obs_ds: xr.Dataset,
+    gcm: str,
+    scenario: str,
+    train_period_start: str,
+    train_period_end: str,
+    predict_period_start: str,
+    predict_period_end: str,
+    variable: str,
+    latmin: str,
+    latmax: str,
+    lonmin: str,
+    lonmax: str,
+) -> xr.Dataset:
     """Regrids the observation dataset to match the GCM resolution
 
     Parameters
     ----------
     obs_ds : xr.Dataset
-        Observation dataset
-    variable : str
-        Input variable. ex. 'tasmax'
-    connection_string : str
-        Azure storage connection string.
+        Input observation dataset.
+    gcm : str
+        Input GCM
+    scenario: str
+        Input GCM scenario
+    train_period_start : str
+        Date for training period start (e.g. '1985')
+    train_period_end : str
+        Date for training period end (e.g. '2015')
+    predict_period_start : str
+        Date for prediction period start (e.g. '2090')
+    predict_period_end : str
+        Date for prediction period end (e.g. '2090')
+    variable: str
+        The variable included in the dataset.
+    latmin : str
+        From run hyperparameters
+    latmax : str
+        From run hyperparameters
+    lonmin : str
+        From run hyperparameters
+    lonmax : str
+        From run hyperparameters
 
     Returns
     -------
@@ -106,15 +183,14 @@ def get_coarse_obs(obs_ds: xr.Dataset, variable: str) -> xr.Dataset:
         observation dataset at coarse resolution
     """
     # Load single slice of target cmip6 dataset for target grid dimensions
-    gcm_one_slice = load_cmip(return_type='xr', variable_ids=[variable]).isel(time=0)
-
+    # gcm_one_slice = load_cmip(return_type='xr', variable_ids=[variable]).isel(time=0)
+    gcm_ds = load_cmip(return_type='xr', variable_ids=[variable])
+    gcm_subset = subset_dataset(
+        gcm_ds, variable, train_period_start, train_period_end, latmin, latmax, lonmin, lonmax
+    )
     # rechunk and regrid observation dataset to target gcm resolution
     coarse_obs_ds, fine_obs_rechunked_path = regrid_dataset(
-        ds=obs_ds,
-        ds_path=None,
-        target_grid_ds=gcm_one_slice,
-        variable=variable,
-        connection_string=connection_string,
+        ds=obs_ds, ds_path=None, target_grid_ds=gcm_subset, variable=variable
     )
     return coarse_obs_ds
 
@@ -129,6 +205,10 @@ def get_spatial_anomalies(
     predict_period_start: str,
     predict_period_end: str,
     variable: str,
+    latmin: str,
+    latmax: str,
+    lonmin: str,
+    lonmax: str,
 ) -> xr.Dataset:
 
     """Returns spatial anomalies
@@ -160,6 +240,14 @@ def get_spatial_anomalies(
         Date for prediction period end (e.g. '2090')
     variable: str
         The variable included in the dataset.
+    latmin : str
+        From run hyperparameters
+    latmax : str
+        From run hyperparameters
+    lonmin : str
+        From run hyperparameters
+    lonmax : str
+        From run hyperparameters
 
     Returns
     -------
@@ -172,22 +260,22 @@ def get_spatial_anomalies(
         ds_path=None,
         target_grid_ds=obs_ds.isel(time=0),
         variable=variable,
-        connection_string=connection_string,
     )
     obs_rechunked, _ = rechunk_zarr_array(
         obs_ds,
         None,
         chunk_dims=('time',),
         variable=variable,
-        connection_string=connection_string,
         max_mem='1GB',
     )
+
     spatial_anomalies = obs_interpolated - obs_rechunked
     seasonal_cycle_spatial_anomalies = spatial_anomalies.groupby("time.month").mean()
+
     return seasonal_cycle_spatial_anomalies
 
 
-def return_y_full_time(
+def return_coarse_obs_full_time(
     coarse_obs_ds: xr.Dataset,
     gcm: str,
     scenario: str,
@@ -196,8 +284,15 @@ def return_y_full_time(
     predict_period_start: str,
     predict_period_end: str,
     variable: str,
+    latmin: str,
+    latmax: str,
+    lonmin: str,
+    lonmax: str,
 ) -> xr.Dataset:
-    """Return y full time rechunked dataset from coarse observation dataset
+
+    """
+
+    Return coarse observation dataset that has been chunked in time.
 
     Parameters
     ----------
@@ -217,25 +312,30 @@ def return_y_full_time(
         Date for prediction period end (e.g. '2090')
     variable: str
         The variable included in the dataset.
+    latmin : str
+        From run hyperparameters
+    latmax : str
+        From run hyperparameters
+    lonmin : str
+        From run hyperparameters
+    lonmax : str
+        From run hyperparameters
 
     Returns
     -------
     xr.Dataset
-        y_full_time rechunked dataset
+        coarse_obs_full_time_ds rechunked dataset
     """
-    y_full_time_ds, y_full_time_path = rechunk_zarr_array(
+    coarse_obs_full_time_ds = rechunk_zarr_array_with_caching(
         coarse_obs_ds,
-        None,
-        chunk_dims=('lat', 'lon'),
-        variable=variable,
-        connection_string=connection_string,
+        chunking_approach='full_time',
         max_mem='1GB',
     )
-    return y_full_time_ds
+    return coarse_obs_full_time_ds
 
 
-def return_x_train_full_time(
-    y_full_time_ds: xr.Dataset,
+def return_gcm_train_full_time(
+    coarse_obs_full_time_ds: xr.Dataset,
     gcm: str,
     scenario: str,
     train_period_start: str,
@@ -243,13 +343,17 @@ def return_x_train_full_time(
     predict_period_start: str,
     predict_period_end: str,
     variable: str,
+    latmin: str,
+    latmax: str,
+    lonmin: str,
+    lonmax: str,
 ) -> xr.Dataset:
-    """Returns x training rechunked dataset in full time.
+    """Returns GCM training rechunked dataset in full time.
 
     Parameters
     ----------
-    y_full_time_ds : xr.Dataset
-        Output y rechunked dataset in full_time
+    coarse_obs_full_time_ds : xr.Dataset
+        Output coarse observation dataset rechunked in full_time
     gcm : str
         Input GCM
     scenario: str
@@ -264,30 +368,46 @@ def return_x_train_full_time(
         Date for prediction period end (e.g. '2090')
     variable: str
         The variable included in the dataset.
+    latmin : str
+        From run hyperparameters
+    latmax : str
+        From run hyperparameters
+    lonmin : str
+        From run hyperparameters
+    lonmax : str
+        From run hyperparameters
 
     Returns
     -------
     xr.Dataset
         x_train rechunked dataset in full time.
     """
-    X_train = load_cmip(source_ids=gcm, variable_ids=[variable], return_type='xr').sel(
-        time=slice(train_period_start, train_period_end)
+    gcm_train_ds = load_cmip(source_ids=gcm, variable_ids=[variable], return_type='xr')
+    gcm_train_ds_subset = subset_dataset(
+        gcm_train_ds,
+        variable,
+        train_period_start,
+        train_period_end,
+        latmin,
+        latmax,
+        lonmin,
+        lonmax,
+        chunking_schema={'time': 365, 'lat': 150, 'lon': 150},
     )
-    X_train['time'] = y_full_time_ds.time.values
 
-    X_train_full_time_ds, X_train_full_time_path = rechunk_zarr_array(
-        X_train,
-        zarr_array_location=None,
-        variable=variable,
-        chunk_dims=('lat', 'lon'),
-        connection_string=connection_string,
+    # this call was to force the timestamps for the cmip data to use the friendlier era5 timestamps. (i forget which dataset used which time formats). i could picture this introducing a tricky bug though (for instance if gcm timestamp didn't align for some reason) so we could use another conversion system if that is better. Perhaps datetime equivilence test.
+    gcm_train_ds_subset['time'] = coarse_obs_full_time_ds.time.values
+
+    gcm_train_subset_full_time_ds = rechunk_zarr_array_with_caching(
+        gcm_train_ds_subset,
+        chunking_approach='full_time',
         max_mem='1GB',
     )
-    return X_train_full_time_ds
+    return gcm_train_subset_full_time_ds
 
 
-def return_x_predict_rechunked(
-    X_train_rechunked_ds: xr.Dataset,
+def return_gcm_predict_rechunked(
+    gcm_train_subset_full_time_ds: xr.Dataset,
     gcm: str,
     scenario: str,
     train_period_start: str,
@@ -295,13 +415,17 @@ def return_x_predict_rechunked(
     predict_period_start: str,
     predict_period_end: str,
     variable: str,
+    latmin: str,
+    latmax: str,
+    lonmin: str,
+    lonmax: str,
 ) -> xr.Dataset:
-    """Return x training rechunked dataset. Chunks are matched to chunks of X train. In the current use case, this means in full_time.
+    """Returns GCM prediction rechunked dataset in full time.  Chunks are matched to chunks of gcm train. In the current use case, this means in full_time.
 
     Parameters
     ----------
-    X_train_rechunked_ds : xr.Dataset
-        Input x training rechunked dataset
+    gcm_train_subset_full_time_ds : xr.Dataset
+        Input gcm training rechunked dataset
     gcm : str
         Input GCM
     scenario: str
@@ -316,44 +440,63 @@ def return_x_predict_rechunked(
         Date for prediction period end (e.g. '2090')
     variable: str
         The variable included in the dataset.
+    latmin : str
+        From run hyperparameters
+    latmax : str
+        From run hyperparameters
+    lonmin : str
+        From run hyperparameters
+    lonmax : str
+        From run hyperparameters
 
     Returns
     -------
     xr.Dataset
-        x prediction rechunked dataset
+        gcm predict rechunked dataset
     """
-    X_predict = load_cmip(
+    gcm_predict_ds = load_cmip(
         source_ids=gcm,
         activity_ids='ScenarioMIP',
         experiment_ids=scenario,
         variable_ids=[variable],
         return_type='xr',
-    ).sel(time=slice(predict_period_start, predict_period_end))
+    )
+
+    gcm_predict_ds_subset = subset_dataset(
+        gcm_predict_ds,
+        variable,
+        predict_period_start,
+        predict_period_end,
+        latmin,
+        latmax,
+        lonmin,
+        lonmax,
+    )
+
     # validate that X_predict spatial chunks match those of X_train since the spatial chunks of predict data need
     # to match when they get passed to the fit_and_predict utility
     # if they are not, rechunk X_predict to match those spatial chunks specifically (don't just pass lat/lon as the chunking dims)
     matching_chunks_dict = {
         variable: {
-            'time': X_train_rechunked_ds.chunks['time'][0],
-            'lat': X_train_rechunked_ds.chunks['lat'][0],
-            'lon': X_train_rechunked_ds.chunks['lon'][0],
+            'time': gcm_train_subset_full_time_ds.chunks['time'][0],
+            'lat': gcm_train_subset_full_time_ds.chunks['lat'][0],
+            'lon': gcm_train_subset_full_time_ds.chunks['lon'][0],
         }
     }
-    x_predict_rechunked_ds, X_predict_rechunked_path = rechunk_zarr_array(
-        X_predict,
+    gcm_predict_rechunked_ds, _ = rechunk_zarr_array(
+        gcm_predict_ds_subset,
         zarr_array_location=None,
         variable=variable,
         chunk_dims=matching_chunks_dict,
-        connection_string=connection_string,
         max_mem='1GB',
     )
-    return x_predict_rechunked_ds
+    return gcm_predict_rechunked_ds
 
 
 def fit_and_predict(
-    x_train_rechunked_ds: xr.Dataset,
-    y_rechunked_ds: xr.Dataset,
-    x_predict_rechunked_ds: xr.Dataset,
+    gcm_train_subset_full_time_ds: xr.Dataset,
+    coarse_obs_full_time_ds: xr.Dataset,
+    gcm_predict_rechunked_ds: xr.Dataset,
     gcm: str,
     scenario: str,
     train_period_start: str,
@@ -361,6 +504,10 @@ def fit_and_predict(
     predict_period_start: str,
     predict_period_end: str,
     variable: str,
+    latmin: str,
+    latmax: str,
+    lonmin: str,
+    lonmax: str,
     dim: str = "time",
 ) -> xr.Dataset:
     """Fit bcsd model on prepared CMIP data with obs at corresponding spatial scale.
@@ -368,11 +515,11 @@ def fit_and_predict(
 
     Parameters
     ----------
-    x_train_rechunked_ds : xr.Dataset
+    gcm_train_subset_full_time_ds : xr.Dataset
         GCM training dataset chunked along space
-    y_rechunked_ds : xr.Dataset
+    coarse_obs_full_time_ds : xr.Dataset
         Obs training dataset chunked along space
-    x_predict_rechunked_ds : xr.Dataset
+    gcm_predict_rechunked_ds : xr.Dataset
         GCM prediction dataset chunked along space.
     gcm : str
         Input GCM
@@ -388,6 +535,14 @@ def fit_and_predict(
         Date for prediction period end (e.g. '2090')
     variable: str
         The variable included in the dataset.
+    latmin : str
+        From run hyperparameters
+    latmax : str
+        From run hyperparameters
+    lonmin : str
+        From run hyperparameters
+    lonmax : str
+        From run hyperparameters
     dim : str, optional
         dimension on which you want to do the modelling, by default "time"
 
@@ -400,10 +555,19 @@ def fit_and_predict(
         bcsd_model = BcsdTemperature(return_anoms=False)
     elif variable in RELATIVE_VARS:
         bcsd_model = BcsdPrecipitation(return_anoms=False)
+
     pointwise_model = PointWiseDownscaler(model=bcsd_model, dim=dim)
-    pointwise_model.fit(x_train_rechunked_ds[variable], y_rechunked_ds[variable])
-    bias_corrected_da = pointwise_model.predict(x_predict_rechunked_ds[variable])
-    bias_corrected_ds = bias_corrected_da.to_dataset(name=variable)
+
+    coarse_obs_rechunked_validated_ds = rechunk_zarr_array_with_caching(
+        coarse_obs_full_time_ds, template_chunk_array=gcm_train_subset_full_time_ds
+    )
+    pointwise_model.fit(
+        gcm_train_subset_full_time_ds[variable], coarse_obs_rechunked_validated_ds[variable]
+    )
+    bias_corrected_da = pointwise_model.predict(gcm_predict_rechunked_ds[variable])
+
+    bias_corrected_ds = bias_corrected_da.astype('float32').to_dataset(name=variable)
+
     return bias_corrected_ds
 
 
@@ -417,6 +581,10 @@ def postprocess_bcsd(
     predict_period_start,
     predict_period_end,
     variable,
+    latmin: str,
+    latmax: str,
+    lonmin: str,
+    lonmax: str,
 ) -> xr.Dataset:
     """Downscale the bias-corrected data by interpolating and then
     adding the spatial anomalies back in.
@@ -441,20 +609,26 @@ def postprocess_bcsd(
         Date for prediction period end (e.g. '2090')
     variable: str
         The variable included in the dataset.
+    latmin : str
+        From run hyperparameters
+    latmax : str
+        From run hyperparameters
+    lonmin : str
+        From run hyperparameters
+    lonmax : str
+        From run hyperparameters
+
     Returns
     -------
     bcsd_results_ds : xr.Dataset
         Final BCSD dataset
     """
-
     y_predict_fine, _ = regrid_dataset(
         ds=bias_corrected_ds,
         ds_path=None,
         target_grid_ds=spatial_anomalies_ds,
         variable=variable,
-        connection_string=connection_string,
     )
-    print(y_predict_fine)
     bcsd_results_ds = y_predict_fine.groupby("time.month") + spatial_anomalies_ds
     delete_chunks_encoding(bcsd_results_ds)
     bcsd_results_ds = bcsd_results_ds.chunk({'time': 30})

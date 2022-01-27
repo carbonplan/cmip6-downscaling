@@ -1,9 +1,11 @@
 adlfs
 dask[complete]
 dask-kubernetes
+donfig
 fsspec
 google-cloud-storage
 gcsfs
+gstools
 intake
 intake-esm
 intake-xarray
