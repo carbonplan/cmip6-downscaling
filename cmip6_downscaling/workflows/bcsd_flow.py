@@ -119,7 +119,8 @@ annual_summary_task = task(
 
 # run_analyses_task = task(
 #     run_analyses,
-#     log_stdout=True,
+#     tags=['dask-resource:TASKSLOTS=1'],
+#     log_stdout=True
 #     # TODO: Force a dependency on whether postprocess_bcsd_task has
 #     # re-run. If it hasn't, then this task doesn't need to run again.
 #     # However, this step doesn't take `postprocess_bcsd_task` as an input
@@ -297,6 +298,7 @@ with Flow(
 
     annual_summary_ds = annual_summary_task(postprocess_bcsd_ds)
 
-    # run_analyses_task(
-    #     {'run_id': target_naming_str, 'var': variable, 'gcm': gcm, 'scenario': scenario}
-    # )
+    analysis_location = run_analyses(
+        {'run_id': target_naming_str, 'var': variable, 'gcm': gcm, 'scenario': scenario},
+        upstream_tasks=[postprocess_bcsd_ds]
+    )

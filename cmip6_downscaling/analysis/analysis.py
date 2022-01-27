@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import papermill as pm
 import xarray as xr
-
+from prefect import task
 from cmip6_downscaling.data.cmip import convert_to_360
 
 from .qaqc import make_qaqc_ds
@@ -56,12 +56,12 @@ def annual_summary(ds):
 
     return out_ds
 
-
+@task(log_stdout=True, tags=['dask-resource:TASKSLOTS=1'])
 def run_analyses(parameters):
-    pm.execute_notebook(
-        'analyses.ipynb', 'analyses_{}.ipynb'.format(parameters['run_id']), parameters=parameters
-    )
-
+    print('wooohooo')    # pm.execute_notebook(
+    #     'analyses.ipynb', 'analyses_{}.ipynb'.format(parameters['run_id']), parameters=parameters
+    # )
+    return 'i love donuts' # TODO: path to analysis notebook
 
 def load_top_cities(plot=False):
     cities = pd.read_csv('worldcities.csv')
