@@ -24,6 +24,7 @@ from cmip6_downscaling.workflows.paths import (
     make_coarse_obs_path,
     make_interpolated_gcm_path,
     make_interpolated_obs_path,
+    make_pyramid_path,
 )
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching, regrid_ds
 
@@ -131,7 +132,7 @@ def path_builder_task(
     lonmin: str,
     lonmax: str,
     variable: str,
-) -> Tuple[str, str, str]:
+) -> Tuple[str, str, str, str]:
     """
     Take in input parameters and make string patterns that identifies the obs dataset, gcm dataset, and the gcm grid. These
     strings will then be used to identify cached files.
@@ -161,6 +162,8 @@ def path_builder_task(
         A string of parameters defining the obs dataset used, including variables, start/end year, etc
     gcm_identifier: str
         A string of parameters defining the GCM dataset used, including variables, start/end year for historical and future periods, etc
+    pyramid_path: str
+        A string of parameters used to build the pyramid path.
     """
     gcm_grid_spec = get_gcm_grid_spec(gcm_name=gcm)
 
@@ -187,8 +190,9 @@ def path_builder_task(
         lonmax=lonmax,
         variable=variable,
     )
+    pyramid_path = make_pyramid_path(gcm_identifier)
 
-    return gcm_grid_spec, obs_identifier, gcm_identifier
+    return gcm_grid_spec, obs_identifier, gcm_identifier, pyramid_path
 
 
 @task(

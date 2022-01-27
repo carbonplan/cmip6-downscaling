@@ -20,7 +20,6 @@ from cmip6_downscaling.workflows.paths import (
     make_bias_corrected_path,
     make_coarse_obs_path,
     make_gcm_predict_path,
-    make_pyramid_path,
     make_rechunked_gcm_path,
     make_return_obs_path,
     make_spatial_anomalies_path,
@@ -35,7 +34,6 @@ config.set(
         "storage.temporary.uri": "az://flow-outputs/temporary",
     }
 )
-
 
 intermediate_cache_store = CacheStore(
     config.get("storage.intermediate.uri"),
@@ -125,7 +123,7 @@ with Flow(
     lonmax = Parameter("LONMAX")
     variable = Parameter("VARIABLE")
 
-    gcm_grid_spec, obs_identifier, gcm_identifier = path_builder_task(
+    gcm_grid_spec, obs_identifier, gcm_identifier, pyramid_path = path_builder_task(
         obs=obs,
         gcm=gcm,
         scenario=scenario,
@@ -278,5 +276,5 @@ with Flow(
     )
     pyramid_location = pyramid.regrid(
         postprocess_bcsd_ds,
-        uri=config.get('storage.results.uri') + make_pyramid_path(gcm_identifier=gcm_identifier),
+        uri=config.get('storage.results.uri') + pyramid_path,
     )
