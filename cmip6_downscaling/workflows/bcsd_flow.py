@@ -102,6 +102,7 @@ postprocess_bcsd_task = task(
 
 monthly_summary_task = task(
     monthly_summary,
+    tags=['dask-resource:TASKSLOTS=1'],
     log_stdout=True,
     result=XpersistResult(results_cache_store, serializer=serializer),
     target="monthly-summary-" + target_naming_str,
@@ -294,16 +295,6 @@ with Flow(
 
     annual_summary_ds = annual_summary_task(postprocess_bcsd_ds)
 
-    run_analyses_task(
-        {'run_id': target_naming_str, 'var': variable, 'gcm': gcm, 'scenario': scenario}
-    )
-
-    monthly_summary_ds = monthly_summary_task(
-        postprocess_bcsd_ds,
-    )
-
-    annual_summary_ds = annual_summary_task(postprocess_bcsd_ds)
-
-    run_analyses_task(
-        {'run_id': target_naming_str, 'var': variable, 'gcm': gcm, 'scenario': scenario}
-    )
+    # run_analyses_task(
+    #     {'run_id': target_naming_str, 'var': variable, 'gcm': gcm, 'scenario': scenario}
+    # )
