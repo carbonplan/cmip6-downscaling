@@ -295,6 +295,7 @@ with Flow(
 
     annual_summary_ds = annual_summary_task(postprocess_bcsd_ds)
 
-    # run_analyses_task(
-    #     {'run_id': target_naming_str, 'var': variable, 'gcm': gcm, 'scenario': scenario}
-    # )
+    analysis_location = run_analyses(
+        {'run_id': target_naming_str, 'var': variable, 'gcm': gcm, 'scenario': scenario},
+        upstream_tasks=[postprocess_bcsd_ds]
+    )
