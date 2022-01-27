@@ -1,12 +1,19 @@
+import os
+
 import cartopy.crs as ccrs
+import fsspec
 import matplotlib.pyplot as plt
 import pandas as pd
 import papermill as pm
 import xarray as xr
 from prefect import task
+
 from cmip6_downscaling.data.cmip import convert_to_360
 
 from .qaqc import make_qaqc_ds
+
+connection_string = os.environ.get("AZURE_STORAGE")
+fs = fsspec.filesystem('az', connection_string=connection_string)
 
 
 def qaqc_checks(ds):
@@ -56,15 +63,32 @@ def annual_summary(ds):
 
     return out_ds
 
+
 @task(log_stdout=True, tags=['dask-resource:TASKSLOTS=1'])
 def run_analyses(parameters):
     run_id = parameters['run_id']
-    workdir = '/home/jovyan/cmip6-downscaling/notebooks' 
+    workdir = '/home/jovyan/cmip6-downscaling/notebooks'
     executed_notebook_path = f'{workdir}/analyses_{run_id}.ipynb'
+    executed_notebook_html_path = f'{workdir}/analyses_{run_id}.html'
     pm.execute_notebook(
         f'{workdir}/analyses.ipynb', executed_notebook_path, parameters=parameters
-    ) # TODO do these local paths work regardless of execution environment?
+    )  # TODO do these local paths work regardless of execution environment?
+
+    # convert from ipynb to html
+    os.system(f"jupyter nbconvert {executed_notebook_path} --to html")
+    # TODO: mimic the writing as in pyramid task using mapper (mapper = fsspec.get_mapper(uri))- tricky bits:
+    # 1) what is syntax for it? fsspec.put doesnt exist so what should fs be?
+    try:
+        fs.rm(f'az://flow-outputs/results/analyses_{run_id}.html')
+    except:
+        pass
+    fs.put(
+        '/home/jovyan/cmip6-downscaling/notebooks/analyses_PLACEHOLDER.html',
+        'az://flow-outputs/results/',
+    )
+
     return executed_notebook_path
+
 
 def load_top_cities(plot=False):
     cities = pd.read_csv('worldcities.csv')

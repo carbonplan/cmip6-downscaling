@@ -298,10 +298,15 @@ with Flow(
     annual_summary_ds = annual_summary_task(postprocess_bcsd_ds)
 
     analysis_location = run_analyses(
-        {'run_id': target_naming_str, 'var': variable, 'gcm': gcm, 'scenario': scenario,
-            'train_period_start':  train_period_start,
+        {
+            'run_id': target_naming_str,
+            'var': variable,
+            'gcm': gcm,
+            'scenario': scenario,
+            'train_period_start': train_period_start,
             "train_period_end": train_period_end,
             "predict_period_start": predict_period_start,
-            "predict_period_end": predict_period_end}, # TODO: add lat/lon boxes
-        upstream_tasks=[postprocess_bcsd_ds]
+            "predict_period_end": predict_period_end,
+        },  # TODO: add lat/lon boxes
+        upstream_tasks=[postprocess_bcsd_ds],
     )
