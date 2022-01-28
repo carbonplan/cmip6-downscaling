@@ -544,7 +544,7 @@ def make_bcsd_output_path(gcm_identifier: str = None, **kwargs) -> str:
 
     Returns
     -------
-    bcsd_output_path: str
+    bcsd_output_path : str
         Path to bcsd output ds file location
     """
     return f"bcsd_output/{gcm_identifier}.zarr"
