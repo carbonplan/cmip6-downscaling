@@ -486,7 +486,7 @@ def make_return_obs_path(obs_identifier: str, **kwargs) -> str:
     return f"obs_ds/{obs_identifier}.zarr"
 
 
-def make_spatial_anomalies_path(obs_identifier: str = None, **kwargs) -> str:
+def make_spatial_anomalies_path(obs_identifier: str, **kwargs) -> str:
     """Build the path for spatial anomalies
 
     Parameters
