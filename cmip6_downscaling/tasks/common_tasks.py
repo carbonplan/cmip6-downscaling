@@ -54,7 +54,9 @@ def build_bbox(latmin: str, latmax: str, lonmin: str, lonmax: str) -> dataclass:
     BBox
     """
 
-    return BBox(latmin=latmin, latmax=latmax, lonmin=lonmin, lonmax=lonmax)
+    return BBox(
+        latmin=float(latmin), latmax=float(latmax), lonmin=float(lonmin), lonmax=float(lonmax)
+    )
 
 
 @task
