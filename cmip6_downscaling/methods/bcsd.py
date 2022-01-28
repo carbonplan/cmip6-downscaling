@@ -5,7 +5,7 @@ from skdownscale.pointwise_models import PointWiseDownscaler
 from skdownscale.pointwise_models.bcsd import BcsdPrecipitation, BcsdTemperature
 
 from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
-from cmip6_downscaling.data.cmip import load_cmip
+from cmip6_downscaling.data.cmip import load_cmip, get_gcm
 from cmip6_downscaling.data.observations import open_era5
 from cmip6_downscaling.workflows.utils import (
     delete_chunks_encoding,
@@ -454,12 +454,10 @@ def return_gcm_predict_rechunked(
     xr.Dataset
         gcm predict rechunked dataset
     """
-    gcm_predict_ds = load_cmip(
-        source_ids=gcm,
-        activity_ids='ScenarioMIP',
-        experiment_ids=scenario,
-        variable_ids=[variable],
-        return_type='xr',
+    gcm_predict_ds = get_gcm(
+        gcm=gcm,
+        scenario=scenario,
+        variables=[variable],
     )
 
     gcm_predict_ds_subset = subset_dataset(
