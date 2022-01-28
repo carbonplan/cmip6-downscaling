@@ -118,16 +118,14 @@ with Flow(
     gcm = Parameter("gcm")
     scenario = Parameter("scenario")
     variable = Parameter("variable")
-    train_period = Parameter('train_period')
-    predict_period = Parameter('predict_period')
-    latmin = Parameter("latmin")
-    latmax = Parameter("latmax")
-    lonmin = Parameter("lonmin")
-    lonmax = Parameter("lonmax")
-
-    bbox = build_bbox(latmin=latmin, latmax=latmax, lonmin=lonmin, lonmax=lonmax)
-    train_period = build_time_period_slices(train_period)
-    predict_period = build_time_period_slices(predict_period)
+    bbox = build_bbox(
+        latmin=Parameter("latmin"),
+        latmax=Parameter("latmax"),
+        lonmin=Parameter("lonmin"),
+        lonmax=Parameter("lonmax")
+    )
+    train_period = build_time_period_slices(Parameter('train_period'))
+    predict_period = build_time_period_slices(Parameter('predict_period'))
 
     gcm_grid_spec, obs_identifier, gcm_identifier, pyramid_path = path_builder_task(
         obs=obs,
