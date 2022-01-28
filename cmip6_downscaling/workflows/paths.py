@@ -60,14 +60,14 @@ def build_gcm_identifier(
         Name of the GCM model
     scenario : str
         Name of the future emission scenario to load
-    variable: str
+    variable : str
         Name of the variable used in obs and gcm dataset (including features and label)
-    train_period: slice
-        Start and end year slice of training/historical period. Ex: slice('1990','1990')
+    train_period : slice
+        Start and end year slice of training/historical period. Ex: slice('1990', '1990')
     predict_period: slice
-        Start and end year slice of prediction period. Ex: slice('2020','2020')
-    bbox: dataclass
-        dataclass containing the latmin,latmax,lonmin,lonmax. Class can be found in utils.
+        Start and end year slice of prediction period. Ex: slice('2020', '2040')
+    bbox: BBox
+        Bounding box including latmin,latmax,lonmin,lonmax.
 
     Returns
     -------
