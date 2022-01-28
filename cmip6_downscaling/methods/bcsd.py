@@ -98,7 +98,6 @@ def get_coarse_obs(
     gcm_ds_180 = lon_to_180(gcm_ds)
     gcm_subset = subset_dataset(gcm_ds_180, variable, train_period, bbox)
 
-
     # rechunk and regrid observation dataset to target gcm resolution
     coarse_obs_ds, fine_obs_rechunked_path = regrid_dataset(
         ds=obs_ds, ds_path=None, target_grid_ds=gcm_subset, variable=variable
