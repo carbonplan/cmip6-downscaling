@@ -84,7 +84,7 @@ def run_analyses(parameters):
         pass
     fs.put(
         '/home/jovyan/cmip6-downscaling/notebooks/analyses_PLACEHOLDER.html',
-        'az://flow-outputs/results/',
+        'az://$web/analysis_notebooks/',
     )
 
     return executed_notebook_path
