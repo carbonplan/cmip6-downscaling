@@ -38,17 +38,20 @@ def build_bbox(latmin: str, latmax: str, lonmin: str, lonmax: str) -> dataclass:
     """Build bounding box out of lat/lon inputs using BBox data class defined in /utils.py
 
     Args:
-        latmin : str
-            Latitude Minimum
-        latmax : str
-            Latitude Maximum
-        lonmin : str
-            Longitude Minimum
-        lonmax : str
-            Longitude Maximum
+    Paramters
+    ---------
+    latmin : float
+         Minimum latitude
+    latmax : float
+         Maximum latitude
+    lonmin : float
+         Minimum longitude
+    lonmax : float
+        Maximum longitude
 
-    Returns:
-        BBox: dataclass for bounding box
+    Returns
+    -------
+    BBox
     """
 
     return BBox(latmin=latmin, latmax=latmax, lonmin=lonmin, lonmax=lonmax)
