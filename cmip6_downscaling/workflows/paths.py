@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from cmip6_downscaling.workflows.utils import BBox
 from typing import Optional, Tuple
 
 from cmip6_downscaling import config
