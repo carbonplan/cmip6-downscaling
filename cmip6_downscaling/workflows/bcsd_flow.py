@@ -13,6 +13,7 @@ from cmip6_downscaling.methods.bcsd import (
     return_gcm_train_full_time,
     return_obs,
 )
+from cmip6_downscaling.tasks import pyramid
 from cmip6_downscaling.tasks.common_tasks import (
     build_bbox,
     build_time_period_slices,
@@ -230,7 +231,7 @@ with Flow(
         bbox=bbox,
         gcm_identifier=gcm_identifier,
     )
-    # pyramid_location = pyramid.regrid(
-    #     postprocess_bcsd_ds,
-    #     uri=config.get('storage.results.uri') + pyramid_path,
-    # )
+    pyramid_location = pyramid.regrid(
+        postprocess_bcsd_ds,
+        uri=config.get('storage.results.uri') + pyramid_path,
+    )
