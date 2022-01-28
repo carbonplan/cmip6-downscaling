@@ -72,7 +72,7 @@ def run_analyses(parameters):
 
 
 def load_top_cities(plot=False):
-    cities = pd.read_csv('worldcities.csv')
+    cities = pd.read_csv('/home/jovyan/cmip6-downscaling/notebooks/worldcities.csv')
     top_cities = (
         cities.sort_values('population', ascending=False)
         .groupby('country')
@@ -110,7 +110,7 @@ def select_points(ds, top_cities):
     cities = ds.sel(
         lat=xr.DataArray(top_cities.lat.values, dims='cities'),
         lon=xr.DataArray(top_cities.lng.apply(convert_to_360).values, dims='cities'),
-        method='nearest',
+        method='nearest',  # tolerance=1.5; tolerance doesn't work here! what a shame. not all data will be valid if running a subset
     )
     cities = cities.assign_coords({'cities': top_cities.city.values})
     return cities
