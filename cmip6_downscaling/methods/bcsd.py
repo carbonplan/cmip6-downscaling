@@ -9,6 +9,7 @@ from cmip6_downscaling.data.cmip import load_cmip
 from cmip6_downscaling.data.observations import open_era5
 from cmip6_downscaling.workflows.utils import (
     delete_chunks_encoding,
+    lon_to_180,
     rechunk_zarr_array,
     rechunk_zarr_array_with_caching,
     regrid_dataset,
@@ -120,8 +121,9 @@ def return_obs(
         Loaded xarray dataset of ERA5 observation data. Chunked in time: 365
     """
     obs_load = open_era5(variable, start_year=train_period_start, end_year=train_period_end)
+    obs_load_180 = lon_to_180(obs_load)
     obs_ds = subset_dataset(
-        obs_load,
+        obs_load_180,
         variable,
         train_period_start,
         train_period_end,
@@ -185,8 +187,10 @@ def get_coarse_obs(
     # Load single slice of target cmip6 dataset for target grid dimensions
     # gcm_one_slice = load_cmip(return_type='xr', variable_ids=[variable]).isel(time=0)
     gcm_ds = load_cmip(return_type='xr', variable_ids=[variable])
+    gcm_ds_180 = lon_to_180(gcm_ds)
+
     gcm_subset = subset_dataset(
-        gcm_ds, variable, train_period_start, train_period_end, latmin, latmax, lonmin, lonmax
+        gcm_ds_180, variable, train_period_start, train_period_end, latmin, latmax, lonmin, lonmax
     )
     # rechunk and regrid observation dataset to target gcm resolution
     coarse_obs_ds, fine_obs_rechunked_path = regrid_dataset(
@@ -383,8 +387,10 @@ def return_gcm_train_full_time(
         x_train rechunked dataset in full time.
     """
     gcm_train_ds = load_cmip(source_ids=gcm, variable_ids=[variable], return_type='xr')
+    gcm_train_ds_180 = lon_to_180(gcm_train_ds)
+
     gcm_train_ds_subset = subset_dataset(
-        gcm_train_ds,
+        gcm_train_ds_180,
         variable,
         train_period_start,
         train_period_end,
@@ -462,8 +468,10 @@ def return_gcm_predict_rechunked(
         return_type='xr',
     )
 
+    gcm_predict_ds_180 = lon_to_180(gcm_predict_ds)
+
     gcm_predict_ds_subset = subset_dataset(
-        gcm_predict_ds,
+        gcm_predict_ds_180,
         variable,
         predict_period_start,
         predict_period_end,
