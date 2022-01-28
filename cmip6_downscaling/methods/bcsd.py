@@ -442,13 +442,13 @@ def postprocess_bcsd(
         Input GCM scenario
     variable: str
         The variable included in the dataset.
-    train_period: slice
-        Start and end year slice of training/historical period. Ex: slice('1990','1990')
-    predict_period: slice
-        Start and end year slice of predict period. Ex: slice('2020','2020')
-    bbox: dataclass
-        dataclass containing the latmin,latmax,lonmin,lonmax. Class can be found in utils.
-    **kwargs: Dict
+    train_period : slice
+        Start and end year slice of training/historical period. Ex: slice('1990', '1990')
+    predict_period : slice
+        Start and end year slice of predict period. Ex: slice('2020', '2020')
+    bbox : BBox
+        Bounding box including latmin,latmax,lonmin,lonmax.
+    **kwargs : dict, optional
             Other arguments to be used in generating the target path
 
     Returns
