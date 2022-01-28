@@ -61,11 +61,14 @@ def build_bbox(latmin: str, latmax: str, lonmin: str, lonmax: str) -> dataclass:
 def build_time_period_slices(time_period: list) -> slice:
     """Return slice from list containing two time strings
 
-    Args:
-        time_period (list):  Input time period list. Ex. ['1990','1991']
-
-    Returns:
-        slice: Slice of lists used for subsetting
+    Parameters
+    ----------
+    time_period : list 
+        Input time period list. Ex. ['1990','1991']
+    
+    Returns
+    -------
+    slice
     """
     return slice(*time_period)
 
