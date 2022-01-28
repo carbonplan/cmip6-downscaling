@@ -194,9 +194,9 @@ def path_builder_task(
         A string of parameters defining the grid of GCM, including number of lat/lon points, interval between points, lower left corner, etc.
     obs_identifier: str
         A string of parameters defining the obs dataset used, including variables, start/end year, etc
-    gcm_identifier: str
+    gcm_identifier : str
         A string of parameters defining the GCM dataset used, including variables, start/end year for historical and future periods, etc
-    pyramid_path: str
+    pyramid_path : str
         A string of parameters used to build the pyramid path.
     """
     gcm_grid_spec = get_gcm_grid_spec(gcm_name=gcm)
