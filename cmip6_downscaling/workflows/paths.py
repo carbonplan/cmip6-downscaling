@@ -496,7 +496,7 @@ def make_spatial_anomalies_path(obs_identifier: str, **kwargs) -> str:
 
     Returns
     -------
-    spatial_anomalies_path: str
+    spatial_anomalies_path : str
         Path to bcsd spatial anomalies file location
     """
     return f"spatial_anomalies/{obs_identifier}.zarr"
