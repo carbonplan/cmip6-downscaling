@@ -21,7 +21,7 @@ def open_era5(variables: Union[str, List[str]], time_period: slice) -> xr.Datase
     ----------
     variables : str or list of string
         The variable(s) you want to grab from the ERA5 dataset.
-    time_period: slice
+    time_period : slice
         Start and end year slice. Ex: slice('2020','2020')
 
     Returns
