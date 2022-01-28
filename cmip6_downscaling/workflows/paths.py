@@ -1,14 +1,14 @@
-from cmip6_downscaling.workflows.utils import BBox
 from typing import Optional, Tuple
 
 from cmip6_downscaling import config
+from cmip6_downscaling.workflows.utils import BBox
 
 
 def build_obs_identifier(
     obs: str,
     variable: str,
     train_period: slice,
-    bbox: dataclass,
+    bbox: BBox,
     **kwargs,
 ) -> str:
     """
@@ -22,7 +22,7 @@ def build_obs_identifier(
         Name of the variable used in obs and gcm dataset (including features and label)
     train_period: slice
         Start and end year slice of training/historical period. Ex: slice('1990','1990')
-    bbox: dataclass
+    bbox: BBox
         dataclass containing the latmin,latmax,lonmin,lonmax. Class can be found in utils.
 
 
@@ -48,7 +48,7 @@ def build_gcm_identifier(
     variable: str,
     train_period: slice,
     predict_period: slice,
-    bbox: dataclass,
+    bbox: BBox,
     **kwargs,
 ) -> str:
     """

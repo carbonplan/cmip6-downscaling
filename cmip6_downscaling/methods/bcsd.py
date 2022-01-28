@@ -1,4 +1,3 @@
-
 import xarray as xr
 from skdownscale.pointwise_models import PointWiseDownscaler
 from skdownscale.pointwise_models.bcsd import BcsdPrecipitation, BcsdTemperature
@@ -7,6 +6,7 @@ from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
 from cmip6_downscaling.data.cmip import load_cmip
 from cmip6_downscaling.data.observations import open_era5
 from cmip6_downscaling.workflows.utils import (
+    BBox,
     delete_chunks_encoding,
     lon_to_180,
     rechunk_zarr_array,
@@ -16,9 +16,7 @@ from cmip6_downscaling.workflows.utils import (
 )
 
 
-def return_obs(
-    obs: str, variable: str, train_period: slice, bbox: BBox, **kwargs
-) -> xr.Dataset:
+def return_obs(obs: str, variable: str, train_period: slice, bbox: BBox, **kwargs) -> xr.Dataset:
     """Loads ERA5 observation data for given time bounds and variable
 
     Parameters
@@ -61,7 +59,7 @@ def get_coarse_obs(
     variable: str,
     train_period: slice,
     predict_period: slice,
-    bbox: dataclass,
+    bbox: BBox,
     **kwargs
 ) -> xr.Dataset:
     """Regrids the observation dataset to match the GCM resolution
@@ -201,7 +199,7 @@ def return_coarse_obs_full_time(
         Start and end year slice of training/historical period. Ex: slice('1990','1990')
     predict_period: slice
         Start and end year slice of predict period. Ex: slice('2020','2020')
-    bbox: dataclass
+    bbox: BBox
         dataclass containing the latmin,latmax,lonmin,lonmax. Class can be found in utils.
     **kwargs: Dict
             Other arguments to be used in generating the target path
@@ -226,7 +224,7 @@ def return_gcm_train_full_time(
     variable: str,
     train_period: slice,
     predict_period: slice,
-    bbox: dataclass,
+    bbox: BBox,
     **kwargs
 ) -> xr.Dataset:
     """Returns GCM training rechunked dataset in full time.
@@ -245,7 +243,7 @@ def return_gcm_train_full_time(
         Start and end year slice of training/historical period. Ex: slice('1990','1990')
     predict_period: slice
         Start and end year slice of predict period. Ex: slice('2020','2020')
-    bbox: dataclass
+    bbox: BBox
         dataclass containing the latmin,latmax,lonmin,lonmax. Class can be found in utils.
     **kwargs: Dict
             Other arguments to be used in generating the target path
@@ -284,7 +282,7 @@ def return_gcm_predict_rechunked(
     variable: str,
     train_period: slice,
     predict_period: slice,
-    bbox: dataclass,
+    bbox: BBox,
     **kwargs
 ) -> xr.Dataset:
     """Returns GCM prediction rechunked dataset in full time.  Chunks are matched to chunks of gcm train. In the current use case, this means in full_time.
@@ -303,7 +301,7 @@ def return_gcm_predict_rechunked(
         Start and end year slice of training/historical period. Ex: slice('1990','1990')
     predict_period: slice
         Start and end year slice of predict period. Ex: slice('2020','2020')
-    bbox: dataclass
+    bbox: BBox
         dataclass containing the latmin,latmax,lonmin,lonmax. Class can be found in utils.
     **kwargs: Dict
             Other arguments to be used in generating the target path
@@ -359,7 +357,7 @@ def fit_and_predict(
     variable: str,
     train_period: slice,
     predict_period: slice,
-    bbox: dataclass,
+    bbox: BBox,
     dim: str = "time",
     **kwargs
 ) -> xr.Dataset:
@@ -384,7 +382,7 @@ def fit_and_predict(
         Start and end year slice of training/historical period. Ex: slice('1990','1990')
     predict_period: slice
         Start and end year slice of predict period. Ex: slice('2020','2020')
-    bbox: dataclass
+    bbox: BBox
         dataclass containing the latmin,latmax,lonmin,lonmax. Class can be found in utils.
     dim : str, optional
         dimension on which you want to do the modelling, by default "time"
@@ -424,7 +422,7 @@ def postprocess_bcsd(
     variable: str,
     train_period: slice,
     predict_period: slice,
-    bbox: dataclass,
+    bbox: BBox,
     **kwargs
 ) -> xr.Dataset:
     """Downscale the bias-corrected data by interpolating and then

@@ -118,11 +118,13 @@ with Flow(
     gcm = Parameter("gcm")
     scenario = Parameter("scenario")
     variable = Parameter("variable")
+
+    # bbox and train and predict period had to be encapsulated into tasks to prevent prefect from complaining about unused parameters.
     bbox = build_bbox(
         latmin=Parameter("latmin"),
         latmax=Parameter("latmax"),
         lonmin=Parameter("lonmin"),
-        lonmax=Parameter("lonmax")
+        lonmax=Parameter("lonmax"),
     )
     train_period = build_time_period_slices(Parameter('train_period'))
     predict_period = build_time_period_slices(Parameter('predict_period'))
