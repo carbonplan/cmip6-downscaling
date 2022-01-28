@@ -179,7 +179,7 @@ def return_coarse_obs_full_time(
     variable: str,
     train_period: slice,
     predict_period: slice,
-    bbox: dataclass,
+    bbox: BBox,
     **kwargs
 ) -> xr.Dataset:
 
