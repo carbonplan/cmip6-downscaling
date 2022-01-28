@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 
 import xarray as xr
 from skdownscale.pointwise_models import PointWiseDownscaler
