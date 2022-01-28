@@ -63,9 +63,9 @@ def build_time_period_slices(time_period: list) -> slice:
 
     Parameters
     ----------
-    time_period : list 
+    time_period : list
         Input time period list. Ex. ['1990','1991']
-    
+
     Returns
     -------
     slice
@@ -157,8 +157,6 @@ def rechunker_task(
     )
 
     return rechunked
-
-
 
 
 @task

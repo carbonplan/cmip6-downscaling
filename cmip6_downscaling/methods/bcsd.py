@@ -199,10 +199,9 @@ def return_coarse_obs_full_time(
         Start and end year slice of training/historical period. Ex: slice('1990','1990')
     predict_period: slice
         Start and end year slice of predict period. Ex: slice('2020','2020')
-    bbox: BBox
-        dataclass containing the latmin,latmax,lonmin,lonmax. Class can be found in utils.
-    **kwargs: Dict
-            Other arguments to be used in generating the target path
+    bbox : BBox
+        Bounding box including latmin,latmax,lonmin,lonmax.
+    **kwargs : dict, optional
 
     Returns
     -------
@@ -243,10 +242,9 @@ def return_gcm_train_full_time(
         Start and end year slice of training/historical period. Ex: slice('1990','1990')
     predict_period: slice
         Start and end year slice of predict period. Ex: slice('2020','2020')
-    bbox: BBox
-        dataclass containing the latmin,latmax,lonmin,lonmax. Class can be found in utils.
-    **kwargs: Dict
-            Other arguments to be used in generating the target path
+    bbox : BBox
+        Bounding box including latmin,latmax,lonmin,lonmax.
+    **kwargs : dict, optional
 
     Returns
     -------
@@ -301,10 +299,9 @@ def return_gcm_predict_rechunked(
         Start and end year slice of training/historical period. Ex: slice('1990','1990')
     predict_period: slice
         Start and end year slice of predict period. Ex: slice('2020','2020')
-    bbox: BBox
-        dataclass containing the latmin,latmax,lonmin,lonmax. Class can be found in utils.
-    **kwargs: Dict
-            Other arguments to be used in generating the target path
+    bbox : BBox
+        Bounding box including latmin,latmax,lonmin,lonmax.
+    **kwargs : dict, optional
 
     Returns
     -------
@@ -382,12 +379,11 @@ def fit_and_predict(
         Start and end year slice of training/historical period. Ex: slice('1990','1990')
     predict_period: slice
         Start and end year slice of predict period. Ex: slice('2020','2020')
-    bbox: BBox
-        dataclass containing the latmin,latmax,lonmin,lonmax. Class can be found in utils.
+    bbox : BBox
+        Bounding box including latmin,latmax,lonmin,lonmax.
     dim : str, optional
         dimension on which you want to do the modelling, by default "time"
-    **kwargs: Dict
-            Other arguments to be used in generating the target path
+    **kwargs : dict, optional
 
     Returns
     -------
@@ -447,7 +443,6 @@ def postprocess_bcsd(
     bbox : BBox
         Bounding box including latmin,latmax,lonmin,lonmax.
     **kwargs : dict, optional
-            Other arguments to be used in generating the target path
 
     Returns
     -------
