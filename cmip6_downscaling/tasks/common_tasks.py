@@ -156,8 +156,6 @@ def rechunker_task(
     return rechunked
 
 
-# f'{time_slice.start}_{time_slice.stop}'
-# f'{bbox}'
 
 
 @task
