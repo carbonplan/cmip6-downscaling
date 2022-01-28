@@ -512,7 +512,7 @@ def make_gcm_predict_path(gcm_identifier: str = None, **kwargs) -> str:
 
     Returns
     -------
-    gcm_predict_path: str
+    gcm_predict_path : str
         Path to gcm_predict ds file location
     """
     return f"gcm_predict/{gcm_identifier}.zarr"
