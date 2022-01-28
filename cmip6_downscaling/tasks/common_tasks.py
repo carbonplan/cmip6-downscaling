@@ -165,7 +165,7 @@ def path_builder_task(
     variable: str,
     train_period: slice,
     predict_period: slice,
-    bbox: dataclass,
+    bbox: BBox,
 ) -> Tuple[str, str, str, str]:
     """
     Take in input parameters and make string patterns that identifies the obs dataset, gcm dataset, and the gcm grid. These
