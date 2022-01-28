@@ -206,7 +206,6 @@ class PangeoRuntime(LocalRuntime):
     def executor(self) -> Executor:
         return LocalDaskExecutor(scheduler="processes")
 
-
     def _generate_env(self):
         return _threadsafe_env_vars
 
