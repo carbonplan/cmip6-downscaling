@@ -17,7 +17,7 @@ from cmip6_downscaling.workflows.utils import (
 
 
 def return_obs(
-    obs: str, variable: str, train_period: slice, bbox: dataclass, **kwargs
+    obs: str, variable: str, train_period: slice, bbox: BBox, **kwargs
 ) -> xr.Dataset:
     """Loads ERA5 observation data for given time bounds and variable
 
