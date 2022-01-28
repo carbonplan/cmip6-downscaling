@@ -13,8 +13,11 @@ from cmip6_downscaling.methods.bcsd import (
     return_gcm_train_full_time,
     return_obs,
 )
-from cmip6_downscaling.tasks import pyramid
-from cmip6_downscaling.tasks.common_tasks import path_builder_task
+from cmip6_downscaling.tasks.common_tasks import (
+    build_bbox,
+    build_time_period_slices,
+    path_builder_task,
+)
 from cmip6_downscaling.workflows.paths import (
     make_bcsd_output_path,
     make_bias_corrected_path,
@@ -110,171 +113,124 @@ with Flow(
     run_config=runtime.run_config,
     executor=runtime.executor,
 ) as bcsd_flow:
-    obs = Parameter("OBS")
-    gcm = Parameter("GCM")
-    scenario = Parameter("SCENARIO")
-    train_period_start = Parameter("TRAIN_PERIOD_START")
-    train_period_end = Parameter("TRAIN_PERIOD_END")
-    predict_period_start = Parameter("PREDICT_PERIOD_START")
-    predict_period_end = Parameter("PREDICT_PERIOD_END")
-    latmin = Parameter("LATMIN")
-    latmax = Parameter("LATMAX")
-    lonmin = Parameter("LONMIN")
-    lonmax = Parameter("LONMAX")
-    variable = Parameter("VARIABLE")
+    obs = Parameter("obs")
+    gcm = Parameter("gcm")
+    scenario = Parameter("scenario")
+    variable = Parameter("variable")
+    train_period = Parameter('train_period')
+    predict_period = Parameter('predict_period')
+    latmin = Parameter("latmin")
+    latmax = Parameter("latmax")
+    lonmin = Parameter("lonmin")
+    lonmax = Parameter("lonmax")
+
+    bbox = build_bbox(latmin=latmin, latmax=latmax, lonmin=lonmin, lonmax=lonmax)
+    train_period = build_time_period_slices(train_period)
+    predict_period = build_time_period_slices(predict_period)
 
     gcm_grid_spec, obs_identifier, gcm_identifier, pyramid_path = path_builder_task(
         obs=obs,
         gcm=gcm,
         scenario=scenario,
-        train_period_start=train_period_start,
-        train_period_end=train_period_end,
-        predict_period_start=predict_period_start,
-        predict_period_end=predict_period_end,
-        latmin=latmin,
-        latmax=latmax,
-        lonmin=lonmin,
-        lonmax=lonmax,
         variable=variable,
+        train_period=train_period,
+        predict_period=predict_period,
+        bbox=bbox,
     )
 
     # preprocess_bcsd_tasks(s):
 
     obs_ds = return_obs_task(
         obs=obs,
-        train_period_start=train_period_start,
-        train_period_end=train_period_end,
-        latmin=latmin,
-        latmax=latmax,
-        lonmin=lonmin,
-        lonmax=lonmax,
         variable=variable,
+        train_period=train_period,
+        bbox=bbox,
         obs_identifier=obs_identifier,
     )
 
     coarse_obs_ds = get_coarse_obs_task(
-        obs_ds,
-        gcm,
-        scenario,
-        train_period_start,
-        train_period_end,
-        predict_period_start,
-        predict_period_end,
-        variable,
-        latmin,
-        latmax,
-        lonmin,
-        lonmax,
+        obs_ds=obs_ds,
+        gcm=gcm,
+        scenario=scenario,
+        variable=variable,
+        train_period=train_period,
+        predict_period=predict_period,
+        bbox=bbox,
         obs_identifier=obs_identifier,
-        gcm_grid_spec=gcm_grid_spec,
-        chunking_approach='matched',
     )
 
     spatial_anomalies_ds = get_spatial_anomalies_task(
-        coarse_obs_ds,
-        obs_ds,
-        gcm,
-        scenario,
-        train_period_start,
-        train_period_end,
-        predict_period_start,
-        predict_period_end,
-        variable,
-        latmin,
-        latmax,
-        lonmin,
-        lonmax,
+        coarse_obs=coarse_obs_ds,
+        obs_ds=obs_ds,
+        gcm=gcm,
+        scenario=scenario,
+        variable=variable,
+        train_period=train_period,
+        predict_period=predict_period,
+        bbox=bbox,
         obs_identifier=obs_identifier,
     )
 
     # the next three tasks prepare the inputs required by bcsd
     coarse_obs_full_time_ds = return_coarse_obs_full_time_task(
-        coarse_obs_ds,
-        gcm,
-        scenario,
-        train_period_start,
-        train_period_end,
-        predict_period_start,
-        predict_period_end,
-        variable,
-        latmin,
-        latmax,
-        lonmin,
-        lonmax,
+        coarse_obs_ds=coarse_obs_ds,
+        gcm=gcm,
+        scenario=scenario,
+        variable=variable,
+        train_period=train_period,
+        predict_period=predict_period,
+        bbox=bbox,
         obs_identifier=obs_identifier,
-        gcm_grid_spec=gcm_grid_spec,
-        chunking_approach='full_time',
     )
 
     gcm_train_subset_full_time_ds = return_gcm_train_full_time_task(
-        coarse_obs_full_time_ds,
-        gcm,
-        scenario,
-        train_period_start,
-        train_period_end,
-        predict_period_start,
-        predict_period_end,
-        variable,
-        latmin,
-        latmax,
-        lonmin,
-        lonmax,
+        coarse_obs_full_time_ds=coarse_obs_full_time_ds,
+        gcm=gcm,
+        scenario=scenario,
+        variable=variable,
+        train_period=train_period,
+        predict_period=predict_period,
+        bbox=bbox,
         gcm_identifier=gcm_identifier,
-        chunking_approach='full_time',
     )
 
     gcm_predict_rechunked_ds = return_gcm_predict_rechunked_task(
-        gcm_train_subset_full_time_ds,
-        gcm,
-        scenario,
-        train_period_start,
-        train_period_end,
-        predict_period_start,
-        predict_period_end,
-        variable,
-        latmin,
-        latmax,
-        lonmin,
-        lonmax,
+        gcm_train_subset_full_time_ds=gcm_train_subset_full_time_ds,
+        gcm=gcm,
+        scenario=scenario,
+        variable=variable,
+        train_period=train_period,
+        predict_period=predict_period,
+        bbox=bbox,
         gcm_identifier=gcm_identifier,
     )
 
     # fit and predict tasks(s):
     bias_corrected_ds = fit_and_predict_task(
-        gcm_train_subset_full_time_ds,
-        coarse_obs_full_time_ds,
-        gcm_predict_rechunked_ds,
-        gcm,
-        scenario,
-        train_period_start,
-        train_period_end,
-        predict_period_start,
-        predict_period_end,
-        variable,
-        latmin,
-        latmax,
-        lonmin,
-        lonmax,
+        gcm_train_subset_full_time_ds=gcm_train_subset_full_time_ds,
+        coarse_obs_full_time_ds=coarse_obs_full_time_ds,
+        gcm_predict_rechunked_ds=gcm_predict_rechunked_ds,
+        gcm=gcm,
+        scenario=scenario,
+        variable=variable,
+        train_period=train_period,
+        predict_period=predict_period,
+        bbox=bbox,
         gcm_identifier=gcm_identifier,
     )
     # postprocess_bcsd_task(s):
     postprocess_bcsd_ds = postprocess_bcsd_task(
-        bias_corrected_ds,
-        spatial_anomalies_ds,
-        gcm,
-        scenario,
-        train_period_start,
-        train_period_end,
-        predict_period_start,
-        predict_period_end,
-        variable,
-        latmin,
-        latmax,
-        lonmin,
-        lonmax,
+        bias_corrected_ds=bias_corrected_ds,
+        spatial_anomalies_ds=spatial_anomalies_ds,
+        gcm=gcm,
+        scenario=scenario,
+        variable=variable,
+        train_period=train_period,
+        predict_period=predict_period,
+        bbox=bbox,
         gcm_identifier=gcm_identifier,
     )
-    pyramid_location = pyramid.regrid(
-        postprocess_bcsd_ds,
-        uri=config.get('storage.results.uri') + pyramid_path,
-    )
+    # pyramid_location = pyramid.regrid(
+    #     postprocess_bcsd_ds,
+    #     uri=config.get('storage.results.uri') + pyramid_path,
+    # )

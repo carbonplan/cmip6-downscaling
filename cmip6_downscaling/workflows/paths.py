@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Optional, Tuple
 
 from cmip6_downscaling import config
@@ -5,13 +6,9 @@ from cmip6_downscaling import config
 
 def build_obs_identifier(
     obs: str,
-    train_period_start: str,
-    train_period_end: str,
-    latmin: str,
-    latmax: str,
-    lonmin: str,
-    lonmax: str,
     variable: str,
+    train_period: slice,
+    bbox: dataclass,
     **kwargs,
 ) -> str:
     """
@@ -19,22 +16,15 @@ def build_obs_identifier(
 
     Parameters
     ----------
-    obs : str
-        Name of observation dataset
-    train_period_start : str
-        Start year of the training period
-    train_period_end : str
-        End year of the training period
-    latmin : str
-            Minimum latitude
-    latmax : str
-            Maximum latitude
-    lonmin : str
-            Minimum longitude
-    lonmax : str
-            Max longitude
-    variables : str or List[str]
-        Name of variable
+    obs: str
+        Name of obs dataset
+    variable: str
+        Name of the variable used in obs and gcm dataset (including features and label)
+    train_period: slice
+        Start and end year slice of training/historical period. Ex: slice('1990','1990')
+    bbox: dataclass
+        dataclass containing the latmin,latmax,lonmin,lonmax. Class can be found in utils.
+
 
     Returns
     -------
@@ -44,29 +34,21 @@ def build_obs_identifier(
 
     obs_identifier = config.get('storage.obs_identifier_template').format(
         obs=obs,
-        train_period_start=train_period_start,
-        train_period_end=train_period_end,
-        latmin=latmin,
-        latmax=latmax,
-        lonmin=lonmin,
-        lonmax=lonmax,
+        train_period=f'{train_period.start}_{train_period.stop}',
+        bbox=bbox,
         variable=variable,
     )
+
     return obs_identifier
 
 
 def build_gcm_identifier(
     gcm: str,
     scenario: str,
-    train_period_start: str,
-    train_period_end: str,
-    predict_period_start: str,
-    predict_period_end: str,
-    latmin: str,
-    latmax: str,
-    lonmin: str,
-    lonmax: str,
     variable: str,
+    train_period: slice,
+    predict_period: slice,
+    bbox: dataclass,
     **kwargs,
 ) -> str:
     """
@@ -78,24 +60,14 @@ def build_gcm_identifier(
         Name of the GCM model
     scenario : str
         Name of the future emission scenario to load
-    train_period_start : str
-        Start year of the training period
-    train_period_end : str
-        End year of the training period
-    predict_period_start : str
-        Start year of the prediction period
-    predict_period_end : str
-        End year of the prediction period
-    latmin : str
-            Minimum latitude
-    latmax : str
-            Maximum latitude
-    lonmin : str
-            Minimum longitude
-    lonmax : str
-            Max longitude
-    variables : str or List[str]
-        Name of variable
+    variable: str
+        Name of the variable used in obs and gcm dataset (including features and label)
+    train_period: slice
+        Start and end year slice of training/historical period. Ex: slice('1990','1990')
+    predict_period: slice
+        Start and end year slice of prediction period. Ex: slice('2020','2020')
+    bbox: dataclass
+        dataclass containing the latmin,latmax,lonmin,lonmax. Class can be found in utils.
 
     Returns
     -------
@@ -106,15 +78,10 @@ def build_gcm_identifier(
     gcm_identifier = config.get('storage.gcm_identifier_template').format(
         gcm=gcm,
         scenario=scenario,
-        train_period_start=train_period_start,
-        train_period_end=train_period_end,
-        predict_period_start=predict_period_start,
-        predict_period_end=predict_period_end,
-        latmin=latmin,
-        latmax=latmax,
-        lonmin=lonmin,
-        lonmax=lonmax,
         variable=variable,
+        train_period=f'{train_period.start}_{train_period.stop}',
+        predict_period=f'{predict_period.start}_{predict_period.stop}',
+        bbox=bbox,
     )
     return gcm_identifier
 
@@ -142,29 +109,21 @@ def make_rechunked_obs_path(
     return f"rechunked_obs/{obs_identifier}_{chunking_approach}.zarr"
 
 
-def make_coarse_obs_path(
-    gcm_grid_spec: str, chunking_approach: str, obs_identifier: Optional[str] = None, **kwargs
-) -> str:
+def make_coarse_obs_path(obs_identifier: str, **kwargs) -> str:
     """Build the path for coarsened observation
 
     Parameters
     ----------
     obs_identifier : str
         Output from build_obs_identifier. String to identify the observation dataset used
-    chunking_approach : str
-        How the data is chunked. Eg. `full_time`, `full_space`, `matched` or None
-    gcm_grid_spec: str
-        Output of get_gcm_grid_spec. String to identify the GCM grid
 
     Returns
     -------
     coarse_obs_path: str
         Path to which coarsened observation defined by the parameters should be stored
     """
-    if obs_identifier is None:
-        obs_identifier = build_obs_identifier(**kwargs)
 
-    return f"coarsened_obs/{obs_identifier}_{chunking_approach}_{gcm_grid_spec}.zarr"
+    return f"coarsened_obs/{obs_identifier}.zarr"
 
 
 def make_interpolated_obs_path(
@@ -252,27 +211,21 @@ def make_bias_corrected_obs_path(
     return f"bias_corrected_obs/{obs_identifier}{chunking_approach}_{gcm_grid_spec}_{method}.zarr"
 
 
-def make_rechunked_gcm_path(
-    chunking_approach: str, gcm_identifier: Optional[str] = None, **kwargs
-) -> str:
+def make_rechunked_gcm_path(gcm_identifier: str, **kwargs) -> str:
     """Build the path for rechunked GCM
 
     Parameters
     ----------
     gcm_identifier : str
         Output from build_gcm_identifier. String to identify the GCM dataset used
-    chunking_approach : str
-        How the data is chunked. Eg. `full_time`, `full_space`, `matched` or None
 
     Returns
     -------
     rechunked_gcm_path: str
         Path to which rechunked GCM defined by the parameters should be stored
     """
-    if gcm_identifier is None:
-        gcm_identifier = build_gcm_identifier(**kwargs)
 
-    return f"rechunked_gcm/{gcm_identifier}_{chunking_approach}.zarr"
+    return f"rechunked_gcm/{gcm_identifier}.zarr"
 
 
 def make_bias_corrected_gcm_path(

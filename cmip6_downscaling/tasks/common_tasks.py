@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
@@ -26,10 +27,44 @@ from cmip6_downscaling.workflows.paths import (
     make_interpolated_obs_path,
     make_pyramid_path,
 )
-from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching, regrid_ds
+from cmip6_downscaling.workflows.utils import BBox, rechunk_zarr_array_with_caching, regrid_ds
 
 get_obs_task = task(get_obs)
 get_gcm_task = task(get_gcm)
+
+
+@task
+def build_bbox(latmin: str, latmax: str, lonmin: str, lonmax: str) -> dataclass:
+    """Build bounding box out of lat/lon inputs using BBox data class defined in /utils.py
+
+    Args:
+        latmin : str
+            Latitude Minimum
+        latmax : str
+            Latitude Maximum
+        lonmin : str
+            Longitude Minimum
+        lonmax : str
+            Longitude Maximum
+
+    Returns:
+        BBox: dataclass for bounding box
+    """
+
+    return BBox(latmin=latmin, latmax=latmax, lonmin=lonmin, lonmax=lonmax)
+
+
+@task
+def build_time_period_slices(time_period: list) -> slice:
+    """Return slice from list containing two time strings
+
+    Args:
+        time_period (list):  Input time period list. Ex. ['1990','1991']
+
+    Returns:
+        slice: Slice of lists used for subsetting
+    """
+    return slice(*time_period)
 
 
 @task
@@ -118,20 +153,19 @@ def rechunker_task(
     return rechunked
 
 
+# f'{time_slice.start}_{time_slice.stop}'
+# f'{bbox}'
+
+
 @task
 def path_builder_task(
     obs: str,
     gcm: str,
     scenario: str,
-    train_period_start: str,
-    train_period_end: str,
-    predict_period_start: str,
-    predict_period_end: str,
-    latmin: str,
-    latmax: str,
-    lonmin: str,
-    lonmax: str,
     variable: str,
+    train_period: slice,
+    predict_period: slice,
+    bbox: dataclass,
 ) -> Tuple[str, str, str, str]:
     """
     Take in input parameters and make string patterns that identifies the obs dataset, gcm dataset, and the gcm grid. These
@@ -144,16 +178,15 @@ def path_builder_task(
         Name of gcm model
     scenario: str
         Name of future emission scenario
-    train_period_start: str
-        Start year of training/historical period
-    train_period_end: str
-        End year of training/historical period
-    predict_period_start: str
-        Start year of predict/future period
-    predict_period_end: str
-        End year of predict/future period
-    variables: List[str]
-        Names of the variables used in obs and gcm dataset (including features and label)
+    variable: str
+        Name of the variable used in obs and gcm dataset (including features and label)
+    train_period: slice
+        Start and end year slice of training/historical period. Ex: slice('1990','1990')
+    predict_period: slice
+        Start and end year slice of predict period. Ex: slice('2020','2020')
+    bbox: dataclass
+        dataclass containing the latmin,latmax,lonmin,lonmax. Class can be found in utils.
+
     Returns
     -------
     gcm_grid_spec: str
@@ -169,26 +202,17 @@ def path_builder_task(
 
     obs_identifier = build_obs_identifier(
         obs=obs,
-        train_period_start=train_period_start,
-        train_period_end=train_period_end,
-        latmin=latmin,
-        latmax=latmax,
-        lonmin=lonmin,
-        lonmax=lonmax,
         variable=variable,
+        train_period=train_period,
+        bbox=bbox,
     )
     gcm_identifier = build_gcm_identifier(
         gcm=gcm,
         scenario=scenario,
-        train_period_start=train_period_start,
-        train_period_end=train_period_end,
-        predict_period_start=predict_period_start,
-        predict_period_end=predict_period_end,
-        latmin=latmin,
-        latmax=latmax,
-        lonmin=lonmin,
-        lonmax=lonmax,
         variable=variable,
+        train_period=train_period,
+        predict_period=predict_period,
+        bbox=bbox,
     )
     pyramid_path = make_pyramid_path(gcm_identifier)
 

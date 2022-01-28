@@ -3,8 +3,10 @@
 
 _defaults = {
     'storage': {
-        'gcm_identifier_template': '{gcm}/{scenario}/{variable}/{latmin}_{latmax}_{lonmin}_{lonmax}/{train_period_start}_{train_period_end}/{predict_period_start}_{predict_period_end}',
-        'obs_identifier_template': '{obs}/{variable}/{latmin}_{latmax}_{lonmin}_{lonmax}/{train_period_start}_{train_period_end}',
+        # 'gcm_identifier_template': '{gcm}/{scenario}/{variable}/{latmin}_{latmax}_{lonmin}_{lonmax}/{train_period_start}_{train_period_end}/{predict_period_start}_{predict_period_end}',
+        # 'obs_identifier_template': '{obs}/{variable}/{latmin}_{latmax}_{lonmin}_{lonmax}/{train_period_start}_{train_period_end}',
+        'gcm_identifier_template': '{gcm}/{scenario}/{variable}/{bbox}/{train_period}/{predict_period}',
+        'obs_identifier_template': '{obs}/{variable}/{bbox}/{train_period}',
         'intermediate': {'uri': '/tmp/flow-outputs/intermediates', 'storage_options': {}},
         'results': {'uri': '/tmp/flow-outputs/results', 'storage_options': {}},
         'temporary': {'uri': '/tmp/flow-outputs/temporary/', 'storage_options': {}},

@@ -17,6 +17,29 @@ from cmip6_downscaling import config
 
 schema_maps_chunks = DataArraySchema(chunks={'lat': -1, 'lon': -1})
 
+from dataclasses import dataclass
+
+
+@dataclass
+class BBox:
+    """Lat/lon bounding box"""
+
+    latmin: float = -90.0
+    latmax: float = 90.0
+    lonmin: float = -180.0
+    lonmax: float = 180
+
+    @property
+    def lat_slice(self) -> slice:
+        return slice(float(self.latmax), float(self.latmin))
+
+    @property
+    def lon_slice(self) -> slice:
+        return slice(float(self.lonmin), float(self.lonmax))
+
+    def __str__(self) -> str:
+        return f'{self.latmin}_{self.latmax}_{self.lonmin}_{self.lonmax}'
+
 
 def get_store(prefix, account_key=None):
     """helper function to create a zarr store"""
@@ -36,12 +59,8 @@ def get_store(prefix, account_key=None):
 def subset_dataset(
     ds: xr.Dataset,
     variable: str,
-    start_time: str,
-    end_time: str,
-    latmin: str,
-    latmax: str,
-    lonmin: str,
-    lonmax: str,
+    time_period: slice,
+    bbox: dataclass,
     chunking_schema: Optional[dict] = None,
 ) -> xr.Dataset:
     """Uses Xarray slicing to spatially subset a dataset based on input params.
@@ -50,18 +69,10 @@ def subset_dataset(
     ----------
     ds : xarray.Dataset
          Input Xarray dataset
-    start_time : str
-        Starting Time
-    end_time : str
-        Ending Time
-    latmin : str
-        Latitude Minimum
-    latmax : str
-        Latitude Maximum
-    lonmin : str
-        Longitude Minimum
-    lonmax : str
-        Longitude Maximum
+    time_period: slice
+        Start and end year slice. Ex: slice('2020','2020')
+    bbox: dataclass
+        dataclass containing the latmin,latmax,lonmin,lonmax. Class can be found in utils.
     chunking_schema : str, optional
         Desired chunking schema. ex: {'time': 365, 'lat': 150, 'lon': 150}
 
@@ -70,12 +81,15 @@ def subset_dataset(
     Xarray Dataset
         Spatially subsetted Xarray dataset.
     """
-    assert lonmax > lonmin
-    assert latmax > latmin
+
+    """
+    lon=slice(float(lonmin), float(lonmax)),
+    lat=slice(float(latmax), float(latmin)),"""
+
     subset_ds = ds.sel(
-        time=slice(start_time, end_time),
-        lon=slice(float(lonmin), float(lonmax)),
-        lat=slice(float(latmax), float(latmin)),
+        time=time_period,
+        lon=bbox.lon_slice,
+        lat=bbox.lat_slice,
     )
     if chunking_schema is not None:
         target_schema = DataArraySchema(chunks=chunking_schema)
