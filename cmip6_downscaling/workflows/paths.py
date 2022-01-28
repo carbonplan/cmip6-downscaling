@@ -480,7 +480,7 @@ def make_return_obs_path(obs_identifier: str, **kwargs) -> str:
 
     Returns
     -------
-    obs_ds path: str
+    obs_ds path : str
         Path to bcsd obs_ds file location
     """
     return f"obs_ds/{obs_identifier}.zarr"
