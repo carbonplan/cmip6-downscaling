@@ -21,8 +21,8 @@ runtime = runtimes.get_runtime()
 
 config.set(
     {
-        'storage.intermediate.uri': 'az://flow-outputs/intermediates',
-        'storage.results.uri': 'az://flow-outputs/results',
+        'storage.intermediate.uri': 'az://flow-outputs/intermediate_testing',
+        'storage.results.uri': 'az://flow-outputs/results_testing',
         'storage.temporary.uri': 'az://flow-outputs/temporary',
     }
 )
@@ -96,7 +96,7 @@ postprocess_bcsd_task = task(
     tags=['dask-resource:TASKSLOTS=1'],
     log_stdout=True,
     result=XpersistResult(results_cache_store, serializer="xarray.zarr"),
-    target="postprocess-results-" + target_naming_str,
+    target="postprocess-results-" + target_naming_str + ".zarr",
 )
 
 monthly_summary_task = task(
@@ -115,16 +115,6 @@ annual_summary_task = task(
     result=XpersistResult(results_cache_store, serializer="xarray.zarr"),
     target="annual-summary-" + "PLACEHOLDER.zarr",
 )
-
-# run_analyses_task = task(
-#     run_analyses,
-#     tags=['dask-resource:TASKSLOTS=1'],
-#     log_stdout=True
-#     # TODO: Force a dependency on whether postprocess_bcsd_task has
-#     # re-run. If it hasn't, then this task doesn't need to run again.
-#     # However, this step doesn't take `postprocess_bcsd_task` as an input
-#     # so it needs to have an explicit dependency.
-# )
 
 # Main Flow -----------------------------------------------------------
 
@@ -300,6 +290,8 @@ with Flow(
     analysis_location = run_analyses(
         {
             'run_id': target_naming_str,
+            'result_dir': config.get('storage.results.uri'),
+            'intermediate_dir': config.get('storage.intermediate.uri'),
             'var': variable,
             'gcm': gcm,
             'scenario': scenario,
@@ -307,6 +299,10 @@ with Flow(
             "train_period_end": train_period_end,
             "predict_period_start": predict_period_start,
             "predict_period_end": predict_period_end,
-        },  # TODO: add lat/lon boxes
+            "latmin": latmin,
+            "latmax": latmax,
+            "lonmin": lonmin,
+            "lonmax": lonmax,
+        },
         upstream_tasks=[postprocess_bcsd_ds],
     )

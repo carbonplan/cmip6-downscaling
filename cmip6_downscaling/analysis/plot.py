@@ -191,3 +191,40 @@ def plot_seasonal(ds1, ds2):
     for ax in axarr.reshape(-1):
         ax.coastlines()
     plt.tight_layout()
+
+
+def plot_each_step_bcsd(run_id, result_dir, intermediate_dir, train_period, var):
+    '''
+    Plots the training period mean of every intermediate and final file in the bcsd process
+    (for the spatial anomalies it just plots the first month)
+    '''
+    steps = [
+        'obs-ds-',
+        'coarse-obs-ds-',
+        'spatial-anomalies-ds-',
+        'y-full-time-',
+        'x-train-full-time-',
+        'x-predict-rechunked-',
+        'fit-and-predict-',
+        'postprocess-results-',
+    ]
+    fig, axarr = plt.subplots(ncols=len(steps), figsize=(20, 3))
+
+    for i, prefix in enumerate(steps):
+        if prefix == 'postprocess-results-':
+            ds = xr.open_zarr(result_dir + f'/{prefix}{run_id}.zarr')
+        else:
+            ds = xr.open_zarr(intermediate_dir + f'/{prefix}{run_id}')
+        try:
+            print(prefix)
+            print(ds.time.values)
+        except:
+            print('monthly data')
+            print(ds.month.values)
+
+        if prefix == 'spatial-anomalies-ds-':
+            ds[var].isel(month=0).plot(ax=axarr[i])
+        else:
+            ds[var].sel(time=train_period).mean(dim='time').plot(ax=axarr[i])
+        axarr[i].set_title(prefix)
+    plt.tight_layout()
