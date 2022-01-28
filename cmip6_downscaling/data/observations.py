@@ -37,7 +37,9 @@ def open_era5(variables: Union[str, List[str]], start_year: str, end_year: str) 
     years = range(int(start_year), int(end_year) + 1)
 
     ds = xr.concat([cat.era5(year=year).to_dask()[variables] for year in years], dim='time')
-
+    if 'pr' in variables:
+        # convert to mm/day - helpful to prevent rounding errors from very tiny numbers
+        ds['pr'] *= 86400
     return ds
 
 
