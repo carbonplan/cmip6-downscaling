@@ -14,7 +14,7 @@ variable_name_dict = {
 }
 
 
-def open_era5(variables: Union[str, List[str]], time_period=slice) -> xr.Dataset:
+def open_era5(variables: Union[str, List[str]], time_period: slice) -> xr.Dataset:
     """Open ERA5 daily data for one or more variables for period 1979-2021
 
     Parameters
