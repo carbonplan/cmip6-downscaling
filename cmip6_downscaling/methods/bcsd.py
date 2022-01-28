@@ -112,7 +112,7 @@ def get_spatial_anomalies(
     variable: str,
     train_period: slice,
     predict_period: slice,
-    bbox: dataclass,
+    bbox: BBox,
     **kwargs
 ) -> xr.Dataset:
 
