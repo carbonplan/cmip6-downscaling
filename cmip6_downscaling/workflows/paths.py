@@ -528,7 +528,7 @@ def make_bias_corrected_path(gcm_identifier: str = None, **kwargs) -> str:
 
     Returns
     -------
-    bias_corrected_path: str
+    bias_corrected_path : str
         Path to bcsd bias_corrected ds file location
     """
     return f"bias_corrected/{gcm_identifier}.zarr"
