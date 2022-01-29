@@ -11,8 +11,10 @@ from prefect import task
 from cmip6_downscaling.data.cmip import convert_to_360
 
 from .qaqc import make_qaqc_ds
+from azure.storage.blob import BlobServiceClient
+from azure.storage.blob import ContentSettings
 
-connection_string = os.environ.get("AZURE_STORAGE")
+connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 fs = fsspec.filesystem('az', connection_string=connection_string)
 
 
@@ -64,8 +66,10 @@ def annual_summary(ds):
     return out_ds
 
 
+
+
 @task(log_stdout=True, tags=['dask-resource:TASKSLOTS=1'])
-def run_analyses(parameters):
+def run_analyses(parameters, web_blob):
     run_id = parameters['run_id']
     workdir = '/home/jovyan/cmip6-downscaling/notebooks'
     executed_notebook_path = f'{workdir}/analyses_{run_id}.ipynb'
@@ -76,16 +80,19 @@ def run_analyses(parameters):
 
     # convert from ipynb to html
     os.system(f"jupyter nbconvert {executed_notebook_path} --to html")
-    # TODO: mimic the writing as in pyramid task using mapper (mapper = fsspec.get_mapper(uri))- tricky bits:
-    # 1) what is syntax for it? fsspec.put doesnt exist so what should fs be?
+
+    blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+    blob_name = web_blob+f'/analyses_{run_id}.html'
+    blob_client = blob_service_client.get_blob_client(container='$web', blob=blob_name)
+    # clean up before writing
     try:
-        fs.rm(f'az://flow-outputs/results/analyses_{run_id}.html')
+        blob_client.delete_blob()
     except:
         pass
-    fs.put(
-        executed_notebook_html_path,
-        'az://$web/analysis_notebooks/',
-    )
+
+    #  need to specify html content type so that it will render and not download
+    with open(executed_notebook_html_path, "rb") as data:
+        blob_client.upload_blob(data, content_settings=ContentSettings(content_type='text/html'))
 
     return executed_notebook_path
 
