@@ -19,15 +19,6 @@ from cmip6_downscaling.tasks import pyramid
 
 runtime = runtimes.get_runtime()
 
-config.set(
-    {
-        'storage.intermediate.uri': 'az://flow-outputs/intermediate_testing',
-        'storage.results.uri': 'az://flow-outputs/results_testing',
-        'storage.temporary.uri': 'az://flow-outputs/temporary',
-        'storage.web_results.blob': 'analysis_notebooks',
-    }
-)
-
 target_naming_str = "PLACEHOLDER"
 
 intermediate_cache_store = CacheStore(
