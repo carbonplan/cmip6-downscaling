@@ -11,8 +11,10 @@ from prefect import task
 from cmip6_downscaling.data.cmip import convert_to_360
 
 from .qaqc import make_qaqc_ds
+from azure.storage.blob import BlobServiceClient
+from azure.storage.blob import ContentSettings
 
-connection_string = os.environ.get("AZURE_STORAGE")
+connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 fs = fsspec.filesystem('az', connection_string=connection_string)
 
 
@@ -62,6 +64,8 @@ def annual_summary(ds):
             print(f'{var} not implemented')
 
     return out_ds
+
+
 
 
 @task(log_stdout=True, tags=['dask-resource:TASKSLOTS=1'])

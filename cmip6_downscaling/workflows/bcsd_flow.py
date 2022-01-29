@@ -24,6 +24,7 @@ config.set(
         'storage.intermediate.uri': 'az://flow-outputs/intermediate_testing',
         'storage.results.uri': 'az://flow-outputs/results_testing',
         'storage.temporary.uri': 'az://flow-outputs/temporary',
+        'storage.web_results.blob': 'analysis_notebooks',
     }
 )
 
@@ -311,5 +312,6 @@ with Flow(
             "lonmin": lonmin,
             "lonmax": lonmax,
         },
+        web_blob=config.get('storage.web_results.blob'),
         upstream_tasks=[postprocess_bcsd_ds],
     )
