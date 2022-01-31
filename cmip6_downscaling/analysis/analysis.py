@@ -6,13 +6,12 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import papermill as pm
 import xarray as xr
+from azure.storage.blob import BlobServiceClient, ContentSettings
 from prefect import task
 
 from cmip6_downscaling.data.cmip import convert_to_360
 
 from .qaqc import make_qaqc_ds
-from azure.storage.blob import BlobServiceClient
-from azure.storage.blob import ContentSettings
 
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 fs = fsspec.filesystem('az', connection_string=connection_string)
@@ -66,8 +65,6 @@ def annual_summary(ds):
     return out_ds
 
 
-
-
 @task(log_stdout=True, tags=['dask-resource:TASKSLOTS=1'])
 def run_analyses(parameters, web_blob):
     run_id = parameters['run_id']
@@ -82,7 +79,7 @@ def run_analyses(parameters, web_blob):
     os.system(f"jupyter nbconvert {executed_notebook_path} --to html")
 
     blob_service_client = BlobServiceClient.from_connection_string(connection_string)
-    blob_name = web_blob+f'/analyses_{run_id}.html'
+    blob_name = web_blob + f'/analyses_{run_id}.html'
     blob_client = blob_service_client.get_blob_client(container='$web', blob=blob_name)
     # clean up before writing
     try:
