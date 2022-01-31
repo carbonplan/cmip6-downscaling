@@ -83,14 +83,7 @@ def gard_fit_and_predict(
     model = PointWiseDownscaler(model=get_gard_model(model_type, model_params), dim=dim)
     model.fit(X_train, y_train[label])
 
-    out = xr.Dataset()
-    out['pred'] = model.predict(X_pred)
-    out['prediction_error'] = model.get_attr(
-        'prediction_error_', dtype='float64', template_output=out['pred']
-    )
-    out['exceedance_prob'] = model.get_attr(
-        'exceedance_prob_', dtype='float64', template_output=out['pred']
-    )
+    out = model.predict(X_pred).to_dataset(dim='variable')
 
     return out
 
