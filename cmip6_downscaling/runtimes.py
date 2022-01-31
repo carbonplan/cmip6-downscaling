@@ -38,7 +38,7 @@ class BaseRuntime:
 class CloudRuntime(BaseRuntime):
     def __init__(
         self,
-        storage_options=None,
+        storage=None,
         agent=None,
         extra_pip_packages=None,
         kubernetes_cpu=None,
@@ -55,9 +55,8 @@ class CloudRuntime(BaseRuntime):
         dask_distributed_worker_resources_taskslots=None,
     ):
 
-        self._storage_options = storage_options is not None or config.get(
-            "runtime.cloud.storage_options"
-        )
+        self._storage = storage is not None or config.get("runtime.cloud.storage")
+
         self._agent = agent is not None or config.get("runtime.cloud.agent")
         self._extra_pip_packages = extra_pip_packages is not None or config.get(
             "runtime.cloud.extra_pip_packages"
@@ -89,9 +88,6 @@ class CloudRuntime(BaseRuntime):
             dask_distributed_worker_resources_taskslots is not None
             or config.get("runtime.cloud.dask_distributed_worker_resources_taskslots")
         )
-        self._dask_distributed_worker_resources_taskslots = self._storage_options.get(
-            "runtime.cloud.dask_distributed_worker_resources_taskslots"
-        )
 
     def __repr__(self):
         return """CloudRuntime configuration for running on prefect-cloud.  storage is `Azure("prefect")`, run_config is `KubernetesRun() and executor is ` DaskExecutor(KubeCluster())`"""
@@ -111,7 +107,7 @@ class CloudRuntime(BaseRuntime):
 
     @property
     def storage(self) -> Storage:
-        return Azure(self._storage_options)
+        return Azure(self._storage)
 
     @property
     def run_config(self) -> RunConfig:

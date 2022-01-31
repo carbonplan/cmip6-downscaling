@@ -31,14 +31,6 @@ from cmip6_downscaling.workflows.paths import (
 
 runtime = runtimes.get_runtime()
 
-config.set(
-    {
-        "storage.intermediate.uri": "az://flow-outputs/intermediates",
-        "storage.results.uri": "az://flow-outputs/results",
-        "storage.temporary.uri": "az://flow-outputs/temporary",
-    }
-)
-
 intermediate_cache_store = CacheStore(
     config.get("storage.intermediate.uri"),
     storage_options=config.get("storage.intermediate.storage_options"),
@@ -65,7 +57,6 @@ get_coarse_obs_task = task(
 )
 get_spatial_anomalies_task = task(
     get_spatial_anomalies,
-    log_stdout=True,
     tags=['dask-resource:TASKSLOTS=1'],
     result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target=make_spatial_anomalies_path,
@@ -108,6 +99,7 @@ postprocess_bcsd_task = task(
 )
 
 
+# storage = Azure("prefect")
 with Flow(
     name="bcsd",
     storage=runtime.storage,

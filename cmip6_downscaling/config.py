@@ -23,7 +23,7 @@ _defaults = {
     'run_options': {'runtime': None},
     "runtime": {
         "cloud": {
-            "storage_options": {'container': 'prefect', 'connection_string': {}},
+            "storage": "prefect",
             "agent": "az-eu-west",
             "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git@features/update_bcsd_paths git+https://github.com/pangeo-data/scikit-downscale.git",
             "kubernetes_cpu": 7,
