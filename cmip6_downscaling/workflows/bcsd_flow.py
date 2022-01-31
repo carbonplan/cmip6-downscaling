@@ -7,7 +7,6 @@ from cmip6_downscaling.methods.bcsd import (
     fit_and_predict,
     get_coarse_obs,
     get_spatial_anomalies,
-    make_flow_paths,
     postprocess_bcsd,
     return_coarse_obs_full_time,
     return_gcm_predict_rechunked,
@@ -15,80 +14,80 @@ from cmip6_downscaling.methods.bcsd import (
     return_obs,
 )
 from cmip6_downscaling.tasks import pyramid
+from cmip6_downscaling.tasks.common_tasks import (
+    build_bbox,
+    build_time_period_slices,
+    path_builder_task,
+)
+from cmip6_downscaling.workflows.paths import (
+    make_bcsd_output_path,
+    make_bias_corrected_path,
+    make_coarse_obs_path,
+    make_gcm_predict_path,
+    make_rechunked_gcm_path,
+    make_return_obs_path,
+    make_spatial_anomalies_path,
+)
 
 runtime = runtimes.get_runtime()
 
-config.set(
-    {
-        'storage.intermediate.uri': 'az://flow-outputs/intermediates',
-        'storage.results.uri': 'az://flow-outputs/results',
-        'storage.temporary.uri': 'az://flow-outputs/temporary',
-    }
-)
-
-target_naming_str = "{gcm}-{scenario}-{train_period_start}-{train_period_end}-{predict_period_start}-{predict_period_end}-{latmin}-{latmax}-{lonmin}-{lonmax}-{variable}.zarr"
-
-
 intermediate_cache_store = CacheStore(
-    config.get('storage.intermediate.uri'),
-    storage_options=config.get('storage.intermediate.storage_options'),
+    config.get("storage.intermediate.uri"),
+    storage_options=config.get("storage.intermediate.storage_options"),
 )
 results_cache_store = CacheStore(
-    config.get('storage.results.uri'), storage_options=config.get('storage.results.storage_options')
+    config.get("storage.results.uri"),
+    storage_options=config.get("storage.results.storage_options"),
 )
 
 
 # Transform Functions into Tasks -----------------------------------------------------------
 
 
-make_flow_paths_task = task(make_flow_paths, log_stdout=True, nout=4)
-
 return_obs_task = task(
     return_obs,
     result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
-    target="obs-ds-" + target_naming_str,
+    target=make_return_obs_path,
 )
 get_coarse_obs_task = task(
     get_coarse_obs,
     tags=['dask-resource:TASKSLOTS=1'],
     result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
-    target="coarse-obs-ds-" + target_naming_str,
+    target=make_coarse_obs_path,
 )
 get_spatial_anomalies_task = task(
     get_spatial_anomalies,
-    log_stdout=True,
     tags=['dask-resource:TASKSLOTS=1'],
     result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
-    target="spatial-anomalies-ds-" + target_naming_str,
+    target=make_spatial_anomalies_path,
 )
-
 
 return_coarse_obs_full_time_task = task(
     return_coarse_obs_full_time,
     tags=['dask-resource:TASKSLOTS=1'],
     result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
-    target="y-full-time-" + target_naming_str,
+    target=make_coarse_obs_path,
 )
 
 return_gcm_train_full_time_task = task(
     return_gcm_train_full_time,
     tags=['dask-resource:TASKSLOTS=1'],
     result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
-    target="x-train-full-time-" + target_naming_str,
+    target=make_rechunked_gcm_path,
 )
 
 return_gcm_predict_rechunked_task = task(
     return_gcm_predict_rechunked,
     tags=['dask-resource:TASKSLOTS=1'],
     result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
-    target="x-predict-rechunked-" + target_naming_str,
+    target=make_gcm_predict_path,
 )
 
 fit_and_predict_task = task(
     fit_and_predict,
     log_stdout=True,
     result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
-    target="fit-and-predict-" + target_naming_str,
+    target=make_bias_corrected_path,
 )
 
 postprocess_bcsd_task = task(
@@ -96,169 +95,135 @@ postprocess_bcsd_task = task(
     tags=['dask-resource:TASKSLOTS=1'],
     log_stdout=True,
     result=XpersistResult(results_cache_store, serializer="xarray.zarr"),
-    target="postprocess-results-" + target_naming_str,
+    target=make_bcsd_output_path,
 )
 
 
+# storage = Azure("prefect")
 with Flow(
-    name='bcsd',
+    name="bcsd",
     storage=runtime.storage,
     run_config=runtime.run_config,
     executor=runtime.executor,
 ) as bcsd_flow:
-    gcm = Parameter("GCM")
-    scenario = Parameter("SCENARIO")
-    train_period_start = Parameter("TRAIN_PERIOD_START")
-    train_period_end = Parameter("TRAIN_PERIOD_END")
-    predict_period_start = Parameter("PREDICT_PERIOD_START")
-    predict_period_end = Parameter("PREDICT_PERIOD_END")
-    variable = Parameter("VARIABLE")
-    latmin = Parameter("LATMIN")
-    latmax = Parameter("LATMAX")
-    lonmin = Parameter("LONMIN")
-    lonmax = Parameter("LONMAX")
+    obs = Parameter("obs")
+    gcm = Parameter("gcm")
+    scenario = Parameter("scenario")
+    variable = Parameter("variable")
 
-    (
-        coarse_obs_path,
-        spatial_anomalies_path,
-        bias_corrected_path,
-        final_out_path,
-    ) = make_flow_paths_task(
-        GCM=gcm,
-        SCENARIO=scenario,
-        TRAIN_PERIOD_START=train_period_start,
-        TRAIN_PERIOD_END=train_period_end,
-        PREDICT_PERIOD_START=predict_period_start,
-        PREDICT_PERIOD_END=predict_period_end,
-        VARIABLE=variable,
-        LATMIN=latmin,
-        LATMAX=latmax,
-        LONMIN=lonmin,
-        LONMAX=lonmax,
+    # bbox and train and predict period had to be encapsulated into tasks to prevent prefect from complaining about unused parameters.
+    bbox = build_bbox(
+        latmin=Parameter("latmin"),
+        latmax=Parameter("latmax"),
+        lonmin=Parameter("lonmin"),
+        lonmax=Parameter("lonmax"),
     )
+    train_period = build_time_period_slices(Parameter('train_period'))
+    predict_period = build_time_period_slices(Parameter('predict_period'))
+
+    gcm_grid_spec, obs_identifier, gcm_identifier, pyramid_path = path_builder_task(
+        obs=obs,
+        gcm=gcm,
+        scenario=scenario,
+        variable=variable,
+        train_period=train_period,
+        predict_period=predict_period,
+        bbox=bbox,
+    )
+
     # preprocess_bcsd_tasks(s):
+
     obs_ds = return_obs_task(
-        gcm,
-        scenario,
-        train_period_start,
-        train_period_end,
-        predict_period_start,
-        predict_period_end,
-        variable,
-        latmin,
-        latmax,
-        lonmin,
-        lonmax,
+        obs=obs,
+        variable=variable,
+        train_period=train_period,
+        bbox=bbox,
+        obs_identifier=obs_identifier,
     )
+
     coarse_obs_ds = get_coarse_obs_task(
-        obs_ds,
-        gcm,
-        scenario,
-        train_period_start,
-        train_period_end,
-        predict_period_start,
-        predict_period_end,
-        variable,
-        latmin,
-        latmax,
-        lonmin,
-        lonmax,
+        obs_ds=obs_ds,
+        gcm=gcm,
+        scenario=scenario,
+        variable=variable,
+        train_period=train_period,
+        predict_period=predict_period,
+        bbox=bbox,
+        obs_identifier=obs_identifier,
     )
 
     spatial_anomalies_ds = get_spatial_anomalies_task(
-        coarse_obs_ds,
-        obs_ds,
-        gcm,
-        scenario,
-        train_period_start,
-        train_period_end,
-        predict_period_start,
-        predict_period_end,
-        variable,
-        latmin,
-        latmax,
-        lonmin,
-        lonmax,
+        coarse_obs=coarse_obs_ds,
+        obs_ds=obs_ds,
+        gcm=gcm,
+        scenario=scenario,
+        variable=variable,
+        train_period=train_period,
+        predict_period=predict_period,
+        bbox=bbox,
+        obs_identifier=obs_identifier,
     )
+
     # the next three tasks prepare the inputs required by bcsd
     coarse_obs_full_time_ds = return_coarse_obs_full_time_task(
-        coarse_obs_ds,
-        gcm,
-        scenario,
-        train_period_start,
-        train_period_end,
-        predict_period_start,
-        predict_period_end,
-        variable,
-        latmin,
-        latmax,
-        lonmin,
-        lonmax,
+        coarse_obs_ds=coarse_obs_ds,
+        gcm=gcm,
+        scenario=scenario,
+        variable=variable,
+        train_period=train_period,
+        predict_period=predict_period,
+        bbox=bbox,
+        obs_identifier=obs_identifier,
     )
 
     gcm_train_subset_full_time_ds = return_gcm_train_full_time_task(
-        coarse_obs_full_time_ds,
-        gcm,
-        scenario,
-        train_period_start,
-        train_period_end,
-        predict_period_start,
-        predict_period_end,
-        variable,
-        latmin,
-        latmax,
-        lonmin,
-        lonmax,
+        coarse_obs_full_time_ds=coarse_obs_full_time_ds,
+        gcm=gcm,
+        scenario=scenario,
+        variable=variable,
+        train_period=train_period,
+        predict_period=predict_period,
+        bbox=bbox,
+        gcm_identifier=gcm_identifier,
     )
+
     gcm_predict_rechunked_ds = return_gcm_predict_rechunked_task(
-        gcm_train_subset_full_time_ds,
-        gcm,
-        scenario,
-        train_period_start,
-        train_period_end,
-        predict_period_start,
-        predict_period_end,
-        variable,
-        latmin,
-        latmax,
-        lonmin,
-        lonmax,
+        gcm_train_subset_full_time_ds=gcm_train_subset_full_time_ds,
+        gcm=gcm,
+        scenario=scenario,
+        variable=variable,
+        train_period=train_period,
+        predict_period=predict_period,
+        bbox=bbox,
+        gcm_identifier=gcm_identifier,
     )
+
     # fit and predict tasks(s):
     bias_corrected_ds = fit_and_predict_task(
-        gcm_train_subset_full_time_ds,
-        coarse_obs_full_time_ds,
-        gcm_predict_rechunked_ds,
-        gcm,
-        scenario,
-        train_period_start,
-        train_period_end,
-        predict_period_start,
-        predict_period_end,
-        variable,
-        latmin,
-        latmax,
-        lonmin,
-        lonmax,
+        gcm_train_subset_full_time_ds=gcm_train_subset_full_time_ds,
+        coarse_obs_full_time_ds=coarse_obs_full_time_ds,
+        gcm_predict_rechunked_ds=gcm_predict_rechunked_ds,
+        gcm=gcm,
+        scenario=scenario,
+        variable=variable,
+        train_period=train_period,
+        predict_period=predict_period,
+        bbox=bbox,
+        gcm_identifier=gcm_identifier,
     )
     # postprocess_bcsd_task(s):
     postprocess_bcsd_ds = postprocess_bcsd_task(
-        bias_corrected_ds,
-        spatial_anomalies_ds,
-        gcm,
-        scenario,
-        train_period_start,
-        train_period_end,
-        predict_period_start,
-        predict_period_end,
-        variable,
-        latmin,
-        latmax,
-        lonmin,
-        lonmax,
+        bias_corrected_ds=bias_corrected_ds,
+        spatial_anomalies_ds=spatial_anomalies_ds,
+        gcm=gcm,
+        scenario=scenario,
+        variable=variable,
+        train_period=train_period,
+        predict_period=predict_period,
+        bbox=bbox,
+        gcm_identifier=gcm_identifier,
     )
-    # regrid(ds: xr.Dataset, levels: int = 2, uri: str = None, other_chunks: dict = None)
-    # format naming w/ prefect context
     pyramid_location = pyramid.regrid(
-        postprocess_bcsd_ds, uri=config.get('storage.results.uri') + '/pyramids/' + 'test.pyr'
+        postprocess_bcsd_ds,
+        uri=config.get('storage.results.uri') + pyramid_path,
     )
