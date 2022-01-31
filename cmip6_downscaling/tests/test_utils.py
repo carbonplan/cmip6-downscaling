@@ -32,12 +32,13 @@ def create_test_ds(xname, yname, zname, xlen, ylen, zlen):
 )  # cant handle positive shifts yet
 def test_lon_to_180(shift):
     xlen, ylen, zlen = (40, 20, 6)
-    ds = create_test_ds("x", "y", "lev", xlen, ylen, zlen)
+    ds = create_test_ds("lon", "lat", "time", xlen, ylen, zlen)
 
-    ds = ds.assign_coords(x=ds.x.data + shift)
+    ds = ds.assign_coords(lon=ds["lon"].data + shift)
     lon = ds["lon"].reset_coords(drop=True)
     ds = ds.assign_coords(lon=lon + shift)
 
     ds_lon_corrected = lon_to_180(ds)
     assert ds_lon_corrected.lon.min() < -1
     assert ds_lon_corrected.lon.max() <= 180
+    assert (ds_lon_corrected.lon.diff(dim='lon') > 0).all()
