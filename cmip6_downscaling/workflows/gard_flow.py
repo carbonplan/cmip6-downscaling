@@ -59,8 +59,6 @@ def prep_gard_input_task(
     obs: str,
     train_period_start: str,
     train_period_end: str,
-    predict_period_start: str,
-    predict_period_end: str,
     variables: List[str],
     X_train: xr.Dataset,
     X_pred: xr.Dataset,
@@ -94,9 +92,7 @@ def prep_gard_input_task(
         zarr_array=X_pred, template_chunk_array=X_train, output_path=rechunked_gcm_path
     )
 
-    predict_period = slice(predict_period_start, predict_period_end)
-
-    return X_train, y_train_rechunked, X_pred_rechunked.sel(time=predict_period)
+    return X_train, y_train_rechunked, X_pred_rechunked
 
 
 with Flow(name='gard-flow') as gard_flow:
@@ -177,8 +173,6 @@ with Flow(name='gard-flow') as gard_flow:
         obs=obs,
         train_period_start=train_period_start,
         train_period_end=train_period_end,
-        predict_period_start=predict_period_start,
-        predict_period_end=predict_period_end,
         variables=variables,
         X_train=ds_obs_bias_corrected,
         X_pred=ds_gcm_bias_corrected,
@@ -199,7 +193,7 @@ with Flow(name='gard-flow') as gard_flow:
     )
 
     # post process
-    scrf = generate_scrf_task(
+    scrf = read_scrf_task(
         data=y_train, 
         obs=obs, 
         label=label, 
