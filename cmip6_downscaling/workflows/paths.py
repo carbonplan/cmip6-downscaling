@@ -123,7 +123,7 @@ def make_coarse_obs_path(
 
 
 def make_interpolated_obs_path(
-    gcm_grid_spec: str, chunking_approach: str, obs_identifier: str, **kwargs
+    gcm_grid_spec: str, chunking_approach: str, obs_identifier: Optional[str] = None, **kwargs
 ) -> str:
     """Build the path for coarsened observation that has then been interpolated back to the observation grid
 

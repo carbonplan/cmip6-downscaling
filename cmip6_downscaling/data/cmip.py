@@ -85,6 +85,11 @@ def load_cmip(
         # flip the lats if necessary and drop the extra dims/vars like bnds
         ds = gcm_munge(ds)
 
+        #
+        if var == 'pr':
+            # convert to mm/day - helpful to prevent rounding errors from very tiny numbers
+            ds['pr'] *= 86400
+
         if i == 0:
             ds_out = ds
         else:
