@@ -1,6 +1,5 @@
 """Config file used by donfig"""
 
-
 _defaults = {
     'storage': {
         'gcm_identifier_template': '{gcm}/{scenario}/{variable}/{bbox}/{train_period}/{predict_period}/',
@@ -25,7 +24,7 @@ _defaults = {
         "cloud": {
             "storage_options": {'container': 'prefect'},
             "agent": "az-eu-west",
-            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git@features/update_bcsd_paths git+https://github.com/pangeo-data/scikit-downscale.git",
+            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git git+https://github.com/pangeo-data/scikit-downscale.git",
             "kubernetes_cpu": 7,
             "kubernetes_memory": "16Gi",
             "image": "carbonplan/cmip6-downscaling-prefect:2022.01.05",
