@@ -415,12 +415,8 @@ def regrid_dataset(
     except SchemaError:
         print('Entering rechunking...')
         # assert ds_path is not None, 'Must pass path to dataset so that you can rechunk it'
-        ds_rechunked, ds_rechunked_path = rechunk_zarr_array(
-            ds,
-            ds_path,
-            variable,
-            chunk_dims=("time",),
-            max_mem="1GB",
+        ds_rechunked = rechunk_zarr_array_with_caching(
+            zarr_array=ds, chunking_approach='full_time', max_mem='1GB'
         )
 
     regridder = xe.Regridder(ds_rechunked, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
