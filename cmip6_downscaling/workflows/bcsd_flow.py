@@ -269,8 +269,8 @@ with Flow(
     )
     # regrid(ds: xr.Dataset, levels: int = 2, uri: str = None, other_chunks: dict = None)
     # format naming w/ prefect context
-    pyramid_location = pyramid.regrid(
-        postprocess_bcsd_ds, uri=config.get('storage.results.uri') + '/pyramids/' + 'test.pyr'
+    pyramid_location_daily = pyramid.regrid(
+        postprocess_bcsd_ds, uri=config.get('storage.results.uri') + '/pyramids/' + 'daily.pyr'
     )
 
     monthly_summary_ds = monthly_summary_task(
@@ -278,6 +278,15 @@ with Flow(
     )
 
     annual_summary_ds = annual_summary_task(postprocess_bcsd_ds)
+
+
+    pyramid_location_monthly = pyramid.regrid(
+        monthly_summary_ds, uri=config.get('storage.results.uri') + '/pyramids/' + 'monthly.pyr'
+    )
+
+    pyramid_location_annual = pyramid.regrid(
+        annual_summary_ds, uri=config.get('storage.results.uri') + '/pyramids/' + 'annual.pyr'
+    )    
 
     analysis_location = run_analyses(
         {

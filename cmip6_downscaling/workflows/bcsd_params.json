@@ -8,6 +8,6 @@
   "VARIABLE": "tasmax",
   "LATMIN": "40",
   "LATMAX": "50",
-  "LONMIN": "235",
-  "LONMAX": "245"
+  "LONMIN": "-125",
+  "LONMAX": "-115"
 }
