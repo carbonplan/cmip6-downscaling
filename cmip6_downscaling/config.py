@@ -1,11 +1,12 @@
 """Config file used by donfig"""
 
-
 _defaults = {
     'storage': {
-        'intermediate': {'uri': '/tmp/flow-outputs/intermediates', 'storage_options': {}},
-        'results': {'uri': '/tmp/flow-outputs/results', 'storage_options': {}},
-        'temporary': {'uri': '/tmp/cmip6/temp/', 'storage_options': {}},
+        'gcm_identifier_template': '{gcm}/{scenario}/{variable}/{bbox}/{train_period}/{predict_period}/',
+        'obs_identifier_template': '{obs}/{variable}/{bbox}/{train_period}/',
+        'intermediate': {'uri': '/tmp/flow-outputs/intermediates/', 'storage_options': {}},
+        'results': {'uri': '/tmp/flow-outputs/results/', 'storage_options': {}},
+        'temporary': {'uri': '/tmp/flow-outputs/temporary/', 'storage_options': {}},
     },
     'methods': {'bcsd': {}, 'gard': {}, 'maca': {}},
     "data_catalog": {
