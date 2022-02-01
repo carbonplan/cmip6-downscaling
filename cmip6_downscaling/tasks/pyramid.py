@@ -1,3 +1,5 @@
+import time
+
 import dask
 import datatree as dt
 import fsspec
@@ -90,6 +92,7 @@ def regrid(ds: xr.Dataset, levels: int = 2, uri: str = None, other_chunks: dict 
             return
 
         # create
+        time.sleep(1)
         dt = pyramid_regrid(ds, target_pyramid=None, levels=levels)
 
         # postprocess
