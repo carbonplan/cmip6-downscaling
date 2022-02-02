@@ -53,7 +53,7 @@ def get_obs(
 ) -> xr.Dataset:
     if obs == 'ERA5':
         ds_obs = open_era5(
-            variables=variables, start_year=train_period_start, end_year=train_period_end
+            variables=variables, time_period=slice(train_period_start, train_period_end)
         )
     else:
         raise NotImplementedError('only ERA5 is available as observation dataset right now')
