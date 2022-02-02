@@ -7,8 +7,28 @@ _defaults = {
         'intermediate': {'uri': '/tmp/flow-outputs/intermediates/', 'storage_options': {}},
         'results': {'uri': '/tmp/flow-outputs/results/', 'storage_options': {}},
         'temporary': {'uri': '/tmp/flow-outputs/temporary/', 'storage_options': {}},
+        'xpersist_store_name': 'xpersist_metadata_store/',
     },
-    'methods': {'bcsd': {}, 'gard': {}, 'maca': {}},
+    'methods': {
+        'bcsd': {
+            'process_stages': {
+                "intermediate": {
+                    'obs_ds': {'path_template': 'obs_ds/{obs_identifier}'},
+                    'coarsened_obs': {'path_template': 'coarsened_obs/{obs_identifier}'},
+                    'spatial_anomalies': {'path_template': 'spatial_anomalies/{obs_identifier}'},
+                    'gcm_predict': {'path_template': 'gcm_predict/{gcm_identifier}'},
+                    'rechunked_gcm': {'path_template': 'rechunked_gcm/{gcm_identifier}'},
+                    # 'bias_corrected':{'path_template':'bias_corrected/{gcm_identifier}'}
+                },
+                "results": {
+                    #  "bcsd_output":{"path_template":"bcsd_output/{gcm_identifier}"},
+                    "pyramid": {"path_template": "pyramid/{gcm_identifier}"}
+                },
+            }
+        },
+        'gard': {},
+        'maca': {},
+    },
     "data_catalog": {
         "cmip": {
             'uri': "https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.json",
@@ -19,7 +39,7 @@ _defaults = {
             'storage_options': {"account_name": "cmip6downscaling"},
         },
     },
-    'run_options': {'runtime': None},
+    'run_options': {'runtime': None, 'cleanup_flag': True},
     "runtime": {
         "cloud": {
             "storage_options": {'container': 'prefect'},

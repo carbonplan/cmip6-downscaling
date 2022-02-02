@@ -13,7 +13,7 @@ from cmip6_downscaling.methods.bcsd import (
     return_gcm_train_full_time,
     return_obs,
 )
-from cmip6_downscaling.tasks import pyramid
+from cmip6_downscaling.tasks import cleanup, pyramid
 from cmip6_downscaling.tasks.common_tasks import (
     build_bbox,
     build_time_period_slices,
@@ -99,7 +99,6 @@ postprocess_bcsd_task = task(
 )
 
 
-# storage = Azure("prefect")
 with Flow(
     name="bcsd",
     storage=runtime.storage,
@@ -111,7 +110,7 @@ with Flow(
     scenario = Parameter("scenario")
     variable = Parameter("variable")
 
-    # bbox and train and predict period had to be encapsulated into tasks to prevent prefect from complaining about unused parameters.
+    # Note: bbox and train and predict period had to be encapsulated into tasks to prevent prefect from complaining about unused parameters.
     bbox = build_bbox(
         latmin=Parameter("latmin"),
         latmax=Parameter("latmax"),
@@ -130,6 +129,8 @@ with Flow(
         predict_period=predict_period,
         bbox=bbox,
     )
+    if config.get('run_options.cleanup_flag') is True:
+        cleanup.run_rsfip(gcm_identifier, obs_identifier)
 
     # preprocess_bcsd_tasks(s):
 

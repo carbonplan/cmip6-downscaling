@@ -598,9 +598,9 @@ def rechunk_zarr_array_with_caching(
                 temp_store=temp_store,
             )
             rechunk_plan.execute(retries=5)
-        rechunked_ds = xr.open_zarr(
-            target_store
-        )  # ideally we want consolidated=True but it seems that functionality isn't offered in rechunker right now
+        rechunked_ds = xr.open_zarr(target_store)
+
+        # ideally we want consolidated=True but it seems that functionality isn't offered in rechunker right now
         # we can just add a consolidate_metadata step here to do it after the fact (once rechunker is done) but only
         # necessary if we'll reopen this rechukned_ds multiple times
         return rechunked_ds
