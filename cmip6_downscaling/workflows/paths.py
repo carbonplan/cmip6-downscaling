@@ -301,13 +301,13 @@ def make_scrf_path(
     Parameters
     ----------
     obs : str
-        Name of observation dataset 
+        Name of observation dataset
     label: str
         The variable being predicted
     start_year: str
-        Start year of the dataset 
+        Start year of the dataset
     end_year: str
-        End year of the dataset 
+        End year of the dataset
 
     Returns
     -------
