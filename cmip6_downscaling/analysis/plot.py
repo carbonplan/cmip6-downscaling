@@ -4,6 +4,16 @@ import seaborn as sns
 import xarray as xr
 from carbonplan import styles
 
+from cmip6_downscaling.workflows.paths import (
+    make_bcsd_output_path,
+    make_bias_corrected_path,
+    make_coarse_obs_path,
+    make_gcm_predict_path,
+    make_rechunked_gcm_path,
+    make_return_obs_path,
+    make_spatial_anomalies_path,
+)
+
 styles.mpl.set_theme(style='carbonplan_light')
 
 
@@ -193,36 +203,34 @@ def plot_seasonal(ds1, ds2):
     plt.tight_layout()
 
 
-def plot_each_step_bcsd(run_id, result_dir, intermediate_dir, train_period, var):
+def plot_each_step_bcsd(
+    gcm_identifier, obs_identifier, result_dir, intermediate_dir, train_period, var
+):
     '''
     Plots the training period mean of every intermediate and final file in the bcsd process
     (for the spatial anomalies it just plots the first month)
     '''
+
     steps = [
-        'obs-ds-',
-        'coarse-obs-ds-',
-        'spatial-anomalies-ds-',
-        'y-full-time-',
-        'x-train-full-time-',
-        'x-predict-rechunked-',
-        'fit-and-predict-',
-        'postprocess-results-',
+        make_return_obs_path(obs_identifier),
+        make_coarse_obs_path(obs_identifier),
+        make_spatial_anomalies_path(obs_identifier),
+        make_rechunked_gcm_path(gcm_identifier),
+        make_gcm_predict_path(gcm_identifier),
+        make_bias_corrected_path(gcm_identifier),
+        make_bcsd_output_path(gcm_identifier),
     ]
     fig, axarr = plt.subplots(ncols=len(steps), figsize=(20, 3))
+    for i, path in enumerate(steps):
+        prefix = path.split('/')[0]
+        print(prefix)
 
-    for i, prefix in enumerate(steps):
-        if prefix == 'postprocess-results-':
-            ds = xr.open_zarr(result_dir + f'/{prefix}{run_id}.zarr')
+        if prefix == 'bcsd_output':
+            data_location = result_dir
         else:
-            ds = xr.open_zarr(intermediate_dir + f'/{prefix}{run_id}')
-        try:
-            print(prefix)
-            print(ds.time.values)
-        except:
-            print('monthly data')
-            print(ds.month.values)
-
-        if prefix == 'spatial-anomalies-ds-':
+            data_location = intermediate_dir
+        ds = xr.open_zarr('/'.join([data_location, path]))
+        if prefix == 'spatial_anomalies':
             ds[var].isel(month=0).plot(ax=axarr[i])
         else:
             ds[var].sel(time=train_period).mean(dim='time').plot(ax=axarr[i])

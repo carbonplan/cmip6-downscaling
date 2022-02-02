@@ -7,6 +7,7 @@ _defaults = {
         'intermediate': {'uri': '/tmp/flow-outputs/intermediates/', 'storage_options': {}},
         'results': {'uri': '/tmp/flow-outputs/results/', 'storage_options': {}},
         'temporary': {'uri': '/tmp/flow-outputs/temporary/', 'storage_options': {}},
+        'web_results': {'blob': 'analysis_notebooks', 'storage_options': {}},
     },
     'methods': {'bcsd': {}, 'gard': {}, 'maca': {}},
     "data_catalog": {

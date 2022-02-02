@@ -62,12 +62,11 @@ get_spatial_anomalies_task = task(
     result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target=make_spatial_anomalies_path,
 )
-
 return_coarse_obs_full_time_task = task(
     return_coarse_obs_full_time,
     tags=['dask-resource:TASKSLOTS=1'],
     result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
-    target=make_coarse_obs_path,
+    target=make_coarse_obs_path,  # is this right? to have the same target? maybe supposed to be make_rechunked_obs_path
 )
 
 return_gcm_train_full_time_task = task(
@@ -111,10 +110,10 @@ monthly_summary_task = task(
 annual_summary_task = task(
     annual_summary,
     tags=['dask-resource:TASKSLOTS=1'],
-    log_stdout=True,
     result=XpersistResult(results_cache_store, serializer="xarray.zarr"),
     target="annual-summary-" + "PLACEHOLDER.zarr",
 )
+
 
 # Main Flow -----------------------------------------------------------
 
@@ -139,7 +138,6 @@ with Flow(
     )
     train_period = build_time_period_slices(Parameter('train_period'))
     predict_period = build_time_period_slices(Parameter('predict_period'))
-
     gcm_grid_spec, obs_identifier, gcm_identifier, pyramid_path = path_builder_task(
         obs=obs,
         gcm=gcm,
@@ -248,13 +246,12 @@ with Flow(
         postprocess_bcsd_ds,
         uri=config.get('storage.results.uri') + pyramid_path,
     )
-    
+
     monthly_summary_ds = monthly_summary_task(
         postprocess_bcsd_ds,
     )
 
     annual_summary_ds = annual_summary_task(postprocess_bcsd_ds)
-
 
     pyramid_location_monthly = pyramid.regrid(
         monthly_summary_ds, uri=config.get('storage.results.uri') + '/pyramids/' + 'monthly.pyr'
@@ -262,25 +259,21 @@ with Flow(
 
     pyramid_location_annual = pyramid.regrid(
         annual_summary_ds, uri=config.get('storage.results.uri') + '/pyramids/' + 'annual.pyr'
-    )    
+    )
 
     analysis_location = run_analyses(
         {
-            'run_id': target_naming_str,
+            'gcm_identifier': gcm_identifier,
+            'obs_identifier': obs_identifier,
             'result_dir': config.get('storage.results.uri'),
             'intermediate_dir': config.get('storage.intermediate.uri'),
             'var': variable,
             'gcm': gcm,
             'scenario': scenario,
-            'train_period_start': train_period_start,
-            "train_period_end": train_period_end,
-            "predict_period_start": predict_period_start,
-            "predict_period_end": predict_period_end,
-            "latmin": latmin,
-            "latmax": latmax,
-            "lonmin": lonmin,
-            "lonmax": lonmax,
         },
         web_blob=config.get('storage.web_results.blob'),
+        bbox=bbox,
+        train_period=train_period,
+        predict_period=predict_period,
         upstream_tasks=[postprocess_bcsd_ds],
     )

@@ -1,4 +1,6 @@
 import os
+import pathlib
+from typing import Tuple
 
 import cartopy.crs as ccrs
 import fsspec
@@ -9,7 +11,9 @@ import xarray as xr
 from azure.storage.blob import BlobServiceClient, ContentSettings
 from prefect import task
 
+from cmip6_downscaling import config, runtimes
 from cmip6_downscaling.data.cmip import convert_to_360
+from cmip6_downscaling.workflows.utils import BBox
 
 from .qaqc import make_qaqc_ds
 
@@ -17,7 +21,22 @@ connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 fs = fsspec.filesystem('az', connection_string=connection_string)
 
 
-def qaqc_checks(ds):
+def qaqc_checks(ds: xr.Dataset) -> Tuple[xr.Dataset, xr.Dataset]:
+    '''
+    Create the temporal and spatial summaries of a handful of QAQC
+    analyses - nans, aphysical quantities
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Climate dataset with dimensions ['time', 'lat', 'lon']
+
+
+    Returns
+    -------
+    Xarray Dataset, Xarray Dataset
+        Temporal and spatial summaries of QAQC analyses
+    '''
     # run_qaqc_dir =  f"{analysis_dir}/qaqc/{run_id}"
     qaqc_ds = make_qaqc_ds(ds)
     annual_qaqc_ts = qaqc_ds.groupby('time.year').sum().sum(dim=['lat', 'lon']).to_dataframe()
@@ -25,13 +44,18 @@ def qaqc_checks(ds):
     return annual_qaqc_ts, qaqc_maps
 
 
-def monthly_summary(ds):
+def monthly_summary(ds: xr.Dataset) -> xr.Dataset:
     """Creates an monthly summary dataset.
 
     Parameters
     ----------
     ds : xr.Dataset
-        Downscaled dataset
+        Downscaled dataset at daily timestep
+
+    Returns
+    ----------
+    xr.Dataset
+        Downscaled dataset at monthly timestep
     """
     out_ds = xr.Dataset()
     for var in ds:
@@ -45,13 +69,18 @@ def monthly_summary(ds):
     return out_ds
 
 
-def annual_summary(ds):
+def annual_summary(ds: xr.Dataset) -> xr.Dataset:
     """Creates an annual summary dataset.
 
     Parameters
     ----------
     ds : xr.Dataset
-        Downscaled dataset
+        Downscaled dataset at daily timestep
+
+    Returns
+    ----------
+    xr.Dataset
+        Downscaled dataset at annual timestep
     """
     out_ds = xr.Dataset()
     for var in ds:
@@ -65,36 +94,69 @@ def annual_summary(ds):
     return out_ds
 
 
-@task(log_stdout=True, tags=['dask-resource:TASKSLOTS=1'])
-def run_analyses(parameters, web_blob):
-    run_id = parameters['run_id']
-    workdir = '/home/jovyan/cmip6-downscaling/notebooks'
-    executed_notebook_path = f'{workdir}/analyses_{run_id}.ipynb'
-    executed_notebook_html_path = f'{workdir}/analyses_{run_id}.html'
-    pm.execute_notebook(
-        f'{workdir}/analyses.ipynb', executed_notebook_path, parameters=parameters
-    )  # TODO do these local paths work regardless of execution environment?
+def get_notebook_paths(
+    run_id: str,
+) -> Tuple[pathlib.PosixPath, pathlib.PosixPath, pathlib.PosixPath]:
 
+    # just using this metrics as a shortcut to getting the location
+    from cmip6_downscaling.analysis import metrics
+
+    path = pathlib.PosixPath(metrics.__file__)
+    template_path = path.parent / 'analyses_template.ipynb'
+    executed_path = path.parent / f'analyses_{run_id}.ipynb'
+    executed_html_path = path.parent / f'analyses_{run_id}.html'
+    return template_path, executed_path, executed_html_path
+
+
+@task(log_stdout=True, tags=['dask-resource:TASKSLOTS=1'])
+def run_analyses(
+    parameters: dict, bbox: BBox, train_period: slice, predict_period: slice, web_blob
+):
+
+    # blob_service_client = BlobServiceClient.from_connection_string(config.get("storage.web_results.storage_options.connection_string"))
+    gcm_identifier = parameters['gcm_identifier']
+    template_path, executed_notebook_path, executed_html_path = get_notebook_paths(
+        gcm_identifier.replace('/', '_')
+    )
+
+    parameters['train_period_start'] = train_period.start
+    parameters['train_period_end'] = train_period.stop
+    parameters['predict_period_start'] = predict_period.start
+    parameters['predict_period_end'] = predict_period.stop
+    parameters['latmax'] = bbox.lat_slice.start
+    parameters['latmin'] = bbox.lat_slice.stop
+    parameters['lonmin'] = bbox.lon_slice.start
+    parameters['lonmax'] = bbox.lon_slice.stop
+    pm.execute_notebook(template_path, executed_notebook_path, parameters=parameters)
     # convert from ipynb to html
     os.system(f"jupyter nbconvert {executed_notebook_path} --to html")
+    connection_string = os.getenv('AZURE_STORAGE_CONNECTION_STRING', None)
+    if connection_string is not None:
+        # if you have a connection_string, copy the html to azure, if not just return
+        # because it is already in your local machine
+        blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+        # TODO: fix b/c the run_id has slashes now!!!
+        blob_name = web_blob + gcm_identifier + 'analyses.html'
+        blob_client = blob_service_client.get_blob_client(container='$web', blob=blob_name)
+        # clean up before writing
+        try:
+            blob_client.delete_blob()
+        except:
+            pass
 
-    blob_service_client = BlobServiceClient.from_connection_string(connection_string)
-    blob_name = web_blob + f'/analyses_{run_id}.html'
-    blob_client = blob_service_client.get_blob_client(container='$web', blob=blob_name)
-    # clean up before writing
-    try:
-        blob_client.delete_blob()
-    except:
-        pass
-
-    #  need to specify html content type so that it will render and not download
-    with open(executed_notebook_html_path, "rb") as data:
-        blob_client.upload_blob(data, content_settings=ContentSettings(content_type='text/html'))
-
+        #  need to specify html content type so that it will render and not download
+        with open(executed_html_path, "rb") as data:
+            blob_client.upload_blob(
+                data, content_settings=ContentSettings(content_type='text/html')
+            )
+        print(
+            f'**** Your notebook is hosted here! *****\nhttps://cmip6downscaling.z6.web.core.windows.net/{blob_name}'
+        )
     return executed_notebook_path
 
 
 def load_top_cities(plot=False):
+
     cities = pd.read_csv('/home/jovyan/cmip6-downscaling/notebooks/worldcities.csv')
     top_cities = (
         cities.sort_values('population', ascending=False)
