@@ -9,9 +9,9 @@ from prefect import Flow, Parameter, task
 from xpersist import CacheStore
 from xpersist.prefect.result import XpersistResult
 
-import cmip6_downscaling as config
+from cmip6_downscaling import config
 from cmip6_downscaling.data.observations import get_obs
-from cmip6_downscaling.methods.gard import gard_fit_and_predict, gard_postprocess, generate_scrf
+from cmip6_downscaling.methods.gard import gard_fit_and_predict, gard_postprocess, read_scrf
 from cmip6_downscaling.runtimes import get_runtime
 from cmip6_downscaling.tasks.common_tasks import (
     bias_correct_gcm_task,
@@ -25,7 +25,6 @@ from cmip6_downscaling.workflows.paths import (
     make_gard_post_processed_output_path,
     make_gard_predict_output_path,
     make_rechunked_obs_path,
-    make_scrf_path,
 )
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching
 
@@ -48,10 +47,8 @@ fit_and_predict_task = task(
 )
 
 
-generate_scrf_task = task(
-    generate_scrf,
-    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
-    target=make_scrf_path,
+read_scrf_task = task(
+    read_scrf,
 )
 
 
@@ -207,11 +204,13 @@ with Flow(
 
     # post process
     scrf = read_scrf_task(
-        data=y_train, 
-        obs=obs, 
-        label=label, 
-        start_year=predict_period_start,
-        end_year=predict_period_end,
+        model_output=model_output,
+        obs=obs,
+        label=label,
+        train_period_start=train_period_start,
+        train_period_end=train_period_end,
+        predict_period_start=predict_period_start,
+        predict_period_end=predict_period_end,
     )
 
     final_output = gard_postprocess_task(
