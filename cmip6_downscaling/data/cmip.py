@@ -6,7 +6,7 @@ import zarr
 
 from cmip6_downscaling import config
 from cmip6_downscaling.workflows.paths import make_rechunked_gcm_path
-from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching
+from cmip6_downscaling.workflows.utils import lon_to_180, rechunk_zarr_array_with_caching
 
 from . import cat
 
@@ -84,10 +84,10 @@ def load_cmip(
 
         # flip the lats if necessary and drop the extra dims/vars like bnds
         ds = gcm_munge(ds)
+        ds = lon_to_180(ds)
 
-        #
+        # convert to mm/day - helpful to prevent rounding errors from very tiny numbers
         if var == 'pr':
-            # convert to mm/day - helpful to prevent rounding errors from very tiny numbers
             ds['pr'] *= 86400
 
         if i == 0:
