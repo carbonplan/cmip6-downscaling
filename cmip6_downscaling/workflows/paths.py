@@ -1,3 +1,4 @@
+import pathlib
 from typing import Optional, Tuple
 
 from cmip6_downscaling import config
@@ -548,3 +549,29 @@ def make_bcsd_output_path(gcm_identifier: str = None, **kwargs) -> str:
         Path to bcsd output ds file location
     """
     return f"bcsd_output/{gcm_identifier}.zarr"
+
+
+def get_notebook_paths(
+    identifier: str,
+) -> Tuple[pathlib.PosixPath, pathlib.PosixPath, pathlib.PosixPath]:
+    """Create the paths for where the notebook template is, where
+    the output notebook will go, and where the converted html will go
+
+    Parameters
+    ----------
+    identifier : str
+        unique identifier including the gcm and domain
+
+    Returns
+    -------
+    Tuple[pathlib.PosixPath, pathlib.PosixPath, pathlib.PosixPath]
+        local paths to the three analysis files
+    """
+    # just using this metrics as a shortcut to getting the location
+    from cmip6_downscaling.analysis import metrics
+
+    path = pathlib.PosixPath(metrics.__file__)
+    template_path = path.parent / 'analyses_template.ipynb'
+    executed_path = path.parent / f'analyses_{identifier}.ipynb'
+    executed_html_path = path.parent / f'analyses_{identifier}.html'
+    return template_path, executed_path, executed_html_path

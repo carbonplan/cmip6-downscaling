@@ -1,5 +1,4 @@
 import os
-import pathlib
 from typing import Tuple
 
 import cartopy.crs as ccrs
@@ -11,8 +10,8 @@ import xarray as xr
 from azure.storage.blob import BlobServiceClient, ContentSettings
 from prefect import task
 
-from cmip6_downscaling import config, runtimes
 from cmip6_downscaling.data.cmip import convert_to_360
+from cmip6_downscaling.workflows.paths import get_notebook_paths
 from cmip6_downscaling.workflows.utils import BBox
 
 from .qaqc import make_qaqc_ds
@@ -37,7 +36,6 @@ def qaqc_checks(ds: xr.Dataset) -> Tuple[xr.Dataset, xr.Dataset]:
     Xarray Dataset, Xarray Dataset
         Temporal and spatial summaries of QAQC analyses
     '''
-    # run_qaqc_dir =  f"{analysis_dir}/qaqc/{run_id}"
     qaqc_ds = make_qaqc_ds(ds)
     annual_qaqc_ts = qaqc_ds.groupby('time.year').sum().sum(dim=['lat', 'lon']).to_dataframe()
     qaqc_maps = qaqc_ds.sum(dim='time')
@@ -94,26 +92,34 @@ def annual_summary(ds: xr.Dataset) -> xr.Dataset:
     return out_ds
 
 
-def get_notebook_paths(
-    run_id: str,
-) -> Tuple[pathlib.PosixPath, pathlib.PosixPath, pathlib.PosixPath]:
-
-    # just using this metrics as a shortcut to getting the location
-    from cmip6_downscaling.analysis import metrics
-
-    path = pathlib.PosixPath(metrics.__file__)
-    template_path = path.parent / 'analyses_template.ipynb'
-    executed_path = path.parent / f'analyses_{run_id}.ipynb'
-    executed_html_path = path.parent / f'analyses_{run_id}.html'
-    return template_path, executed_path, executed_html_path
-
-
 @task(log_stdout=True, tags=['dask-resource:TASKSLOTS=1'])
 def run_analyses(
-    parameters: dict, bbox: BBox, train_period: slice, predict_period: slice, web_blob
-):
+    parameters: dict, bbox: BBox, train_period: slice, predict_period: slice, web_blob: str
+) -> str:
+    """Prefect task to run the analyses on results from a downscaling run.
 
-    # blob_service_client = BlobServiceClient.from_connection_string(config.get("storage.web_results.storage_options.connection_string"))
+    Parameters
+    ----------
+    parameters : dict
+        Parameters provided from the downscaling run to uniquely identify
+        the output dataset (e.g. gcm, training period, obs dataset, etc.)
+    bbox : BBox
+        The bounding box over which you are running.
+    train_period : slice
+        Training period (e.g. slice('1981', '2010'))
+    predict_period : slice
+        Prediction period (e.g. slice('1981', '2099')). Currently this assumes
+        that the downscaled dataset has the historical and future timeseries all
+        in one file.
+    web_blob : str
+        The location in the web bucket where you want these files to go. Likely
+        specified in a yaml file in your local setup.
+
+    Returns
+    -------
+    str
+        The local location of an executed notebook path.
+    """
     gcm_identifier = parameters['gcm_identifier']
     template_path, executed_notebook_path, executed_html_path = get_notebook_paths(
         gcm_identifier.replace('/', '_')
@@ -155,29 +161,55 @@ def run_analyses(
     return executed_notebook_path
 
 
-def load_top_cities(plot=False):
+def load_top_cities(
+    num_cities: int = 100, plot: bool = False, add_additional_cities: bool = True
+) -> pd.DataFrame:
+    """Load in the biggest (by population) `num_cities` (default 100) cities in the world,
+    when limiting it to one in each country. This is a way to get
+    a sense of performance in individual pixels where many people live but
+    also have geographic diversity.
 
-    cities = pd.read_csv('/home/jovyan/cmip6-downscaling/notebooks/worldcities.csv')
+
+    Parameters
+    ----------
+    num_cities : int, optional
+        How many cities to evaluate, by default 100
+    plot : bool, optional
+        Whether or not you want to return a plot of the
+         cities, by default False
+    add_additional_cities : bool, optional
+        Whether you want to add 8 additional cities that
+        help get you better spatial coverage,
+        particularly in US, if num_cities=100
+
+    Returns
+    -------
+    pd.DataFrame
+        Dataframe with columns ['city', 'lat', 'lng']
+    """
+
+    cities = pd.read_csv('https://cmip6downscaling.blob.core.windows.net/cmip6/worldcities.csv')
     top_cities = (
         cities.sort_values('population', ascending=False)
         .groupby('country')
         .first()
-        .sort_values('population', ascending=False)[0:100][['city', 'lat', 'lng']]
+        .sort_values('population', ascending=False)[0:num_cities][['city', 'lat', 'lng']]
     )
-    additional_cities = [
-        'Seattle',
-        'Los Angeles',
-        'Denver',
-        'Chicago',
-        'Anchorage',
-        'Perth',
-        'Paramaribo',
-        'Fortaleza',
-    ]
-    for additional_city in additional_cities:
-        top_cities = top_cities.append(
-            cities[cities['city'] == additional_city][['city', 'lat', 'lng']]
-        )
+    if add_additional_cities:
+        additional_cities = [
+            'Seattle',
+            'Los Angeles',
+            'Denver',
+            'Chicago',
+            'Anchorage',
+            'Perth',
+            'Paramaribo',
+            'Fortaleza',
+        ]
+        for additional_city in additional_cities:
+            top_cities = top_cities.append(
+                cities[cities['city'] == additional_city][['city', 'lat', 'lng']]
+            )
     if plot:
         ax = plt.axes(projection=ccrs.PlateCarree())
         ax.stock_img()
@@ -191,17 +223,49 @@ def load_top_cities(plot=False):
     return top_cities
 
 
-def select_points(ds, top_cities):
+def select_points(ds: xr.Dataset, top_cities: pd.DataFrame) -> xr.Dataset:
+    """Select the nearest pixels to each of the cities listed in `top_cities`
+
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Dataset including dimensions ['lat', 'lon']
+    top_cities: pd.DataFrame
+        Dataframe with columns ['city', 'lat', 'lng']
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset with dimension 'city' (and maybe others like 'time')
+        with coordinate labels of the cities from `top_cities`
+    """
     cities = ds.sel(
         lat=xr.DataArray(top_cities.lat.values, dims='cities'),
         lon=xr.DataArray(top_cities.lng.apply(convert_to_360).values, dims='cities'),
-        method='nearest',  # tolerance=1.5; tolerance doesn't work here! what a shame. not all data will be valid if running a subset
+        method='nearest',  # you can't apply tolerance in 2d selections like this.
+        # as a result, if you're running a subset the data won't be valid for cities
+        # that aren't in the subset (but it will still return non-nan values)
     )
     cities = cities.assign_coords({'cities': top_cities.city.values})
     return cities
 
 
-def grab_top_city_data(ds_list, top_cities):
+def grab_top_city_data(ds_list: list, top_cities: pd.DataFrame) -> list:
+    """Given a list of datasets, perform the `select_points` operation on each of them.
+
+    Parameters
+    ----------
+    ds_list : list
+        List of xr.Datasets
+    top_cities: pd.DataFrame
+        Dataframe with columns ['city', 'lat', 'lng']
+
+    Returns
+    -------
+    list
+        List of datasets with dimension ['city']
+    """
     city_ds_list = []
     for ds in ds_list:
         city_ds_list.append(select_points(ds, top_cities).compute())
@@ -209,6 +273,19 @@ def grab_top_city_data(ds_list, top_cities):
 
 
 def get_seasonal(ds, aggregator='mean'):
+    """Aggregate to seasonal
+    Parameters
+    ----------
+    ds_list : list
+        List of xr.Datasets
+    top_cities: pd.DataFrame
+        Dataframe with columns ['city', 'lat', 'lng']
+
+    Returns
+    -------
+    list
+        List of datasets with dimension ['city']
+    """
     if aggregator == 'mean':
         return ds.groupby('time.season').mean()
     elif aggregator == 'stdev':
@@ -222,10 +299,26 @@ def get_seasonal(ds, aggregator='mean'):
 
 
 def change_ds(
-    ds_historic,
-    ds_future,
-    metrics=['mean', 'std', 'percentile1', 'percentile5', 'percentile95', 'percentile99'],
-):
+    ds_historic: xr.Dataset,
+    ds_future: xr.Dataset,
+    metrics: list = ['mean', 'std', 'percentile1', 'percentile5', 'percentile95', 'percentile99'],
+) -> xr.Dataset:
+    """Calculate change in a variety of metrics between a historic and future period
+
+    Parameters
+    ----------
+    ds_historic : xr.Dataset
+        Historical climate with dimension 'time'
+    ds_future : xr.Dataset
+        Future climate with dimension 'time'
+    metrics : list, optional
+        List of metrics you want to calculate, by default ['mean', 'std', 'percentile1', 'percentile5', 'percentile95', 'percentile99']
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset with changes for the metrics listed in `metrics`
+    """
     ds = xr.Dataset()
     for metric in metrics:
         if metric == 'mean':
