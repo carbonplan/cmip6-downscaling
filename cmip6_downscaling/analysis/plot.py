@@ -5,6 +5,7 @@ import xarray as xr
 from carbonplan import styles
 import matplotlib as mpl
 from typing import Tuple
+import pandas as pd
 
 from cmip6_downscaling.workflows.paths import (
     make_bcsd_output_path,
@@ -108,6 +109,7 @@ def plot_cdfs(
 
         ax.set_title(city)
     plt.legend()
+    plt.close()
     return fig
 
 
@@ -242,6 +244,7 @@ def plot_seasonal(ds1: xr.Dataset, ds2: xr.Dataset) -> mpl.figure.Figure:
             ds.sel(season=season).plot(ax=axarr[j, i], cmap=cmaps[j])
             axarr[j, i].coastlines()
     plt.tight_layout()
+    plt.close()
     return fig
 
 
@@ -301,4 +304,5 @@ def plot_each_step_bcsd(
             ds[var].sel(time=train_period).mean(dim='time').plot(ax=axarr[i])
         axarr[i].set_title(prefix)
     plt.tight_layout()
+    plt.close()
     return fig
