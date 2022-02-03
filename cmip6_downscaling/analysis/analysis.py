@@ -272,30 +272,22 @@ def grab_top_city_data(ds_list: list, top_cities: pd.DataFrame) -> list:
     return city_ds_list
 
 
-def get_seasonal(ds, aggregator='mean'):
+def get_seasonal(ds: xr.Dataset, aggregator: str = 'mean') -> xr.Dataset:
     """Aggregate to seasonal
     Parameters
     ----------
-    ds_list : list
-        List of xr.Datasets
-    top_cities: pd.DataFrame
-        Dataframe with columns ['city', 'lat', 'lng']
+    ds : xr.Dataset
+        dataset with climate on at least seasonal basis (but likely daily)
+    aggregator: str
+        kind of aggregation you want to do (e.g. mean, max, min, stdev)
 
     Returns
     -------
-    list
-        List of datasets with dimension ['city']
+    xr.Dataset
+        Dataset collapsed along the time dimension into a seasonally
+        aggregated dataset
     """
-    if aggregator == 'mean':
-        return ds.groupby('time.season').mean()
-    elif aggregator == 'stdev':
-        return ds.groupby('time.season').std()
-    elif aggregator == 'min':
-        return ds.groupby('time.season').min()
-    elif aggregator == 'max':
-        return ds.groupby('time.season').max()
-    else:
-        raise NotImplementedError
+    return getattr(ds.groupby('time.season', aggregator))()
 
 
 def change_ds(
