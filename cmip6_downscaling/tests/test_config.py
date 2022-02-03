@@ -1,4 +1,13 @@
+import pickle
+
 from cmip6_downscaling import config
+
+
+def test_config_serialization():
+    config1 = config.config
+    bts = pickle.dumps(config1)
+    config2 = pickle.loads(bts)
+    assert config.config == config2
 
 
 def test_config():
