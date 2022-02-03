@@ -3,6 +3,7 @@ from xpersist import CacheStore
 from xpersist.prefect.result import XpersistResult
 
 from cmip6_downscaling import config, runtimes
+from cmip6_downscaling.analysis.analysis import annual_summary, monthly_summary, run_analyses
 from cmip6_downscaling.methods.bcsd import (
     fit_and_predict,
     get_coarse_obs,
@@ -20,10 +21,12 @@ from cmip6_downscaling.tasks.common_tasks import (
     path_builder_task,
 )
 from cmip6_downscaling.workflows.paths import (
+    make_annual_summary_path,
     make_bcsd_output_path,
     make_bias_corrected_path,
     make_coarse_obs_path,
     make_gcm_predict_path,
+    make_monthly_summary_path,
     make_rechunked_gcm_path,
     make_return_obs_path,
     make_spatial_anomalies_path,
@@ -61,12 +64,11 @@ get_spatial_anomalies_task = task(
     result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target=make_spatial_anomalies_path,
 )
-
 return_coarse_obs_full_time_task = task(
     return_coarse_obs_full_time,
     tags=['dask-resource:TASKSLOTS=1'],
     result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
-    target=make_coarse_obs_path,
+    target=make_coarse_obs_path,  # is this right? to have the same target? maybe supposed to be make_rechunked_obs_path
 )
 
 return_gcm_train_full_time_task = task(
@@ -98,6 +100,23 @@ postprocess_bcsd_task = task(
     target=make_bcsd_output_path,
 )
 
+monthly_summary_task = task(
+    monthly_summary,
+    tags=['dask-resource:TASKSLOTS=1'],
+    log_stdout=True,
+    result=XpersistResult(results_cache_store, serializer="xarray.zarr"),
+    target=make_monthly_summary_path,  # TODO: replace with the paradigm from PR #84 once it's merged (also pull that)
+)
+
+annual_summary_task = task(
+    annual_summary,
+    tags=['dask-resource:TASKSLOTS=1'],
+    result=XpersistResult(results_cache_store, serializer="xarray.zarr"),
+    target=make_annual_summary_path,
+)
+
+
+# Main Flow -----------------------------------------------------------
 
 # storage = Azure("prefect")
 with Flow(
@@ -120,8 +139,14 @@ with Flow(
     )
     train_period = build_time_period_slices(Parameter('train_period'))
     predict_period = build_time_period_slices(Parameter('predict_period'))
-
-    gcm_grid_spec, obs_identifier, gcm_identifier, pyramid_path = path_builder_task(
+    (
+        gcm_grid_spec,
+        obs_identifier,
+        gcm_identifier,
+        pyramid_path_daily,
+        pyramid_path_monthly,
+        pyramid_path_annual,
+    ) = path_builder_task(
         obs=obs,
         gcm=gcm,
         scenario=scenario,
@@ -223,7 +248,40 @@ with Flow(
         bbox=bbox,
         gcm_identifier=gcm_identifier,
     )
-    pyramid_location = pyramid.regrid(
+    # regrid(ds: xr.Dataset, levels: int = 2, uri: str = None, other_chunks: dict = None)
+    # format naming w/ prefect context
+    pyramid_location_daily = pyramid.regrid(
         postprocess_bcsd_ds,
-        uri=config.get('storage.results.uri') + pyramid_path,
+        uri=config.get('storage.results.uri') + pyramid_path_daily,
+    )
+
+    monthly_summary_ds = monthly_summary_task(
+        postprocess_bcsd_ds,
+    )
+
+    annual_summary_ds = annual_summary_task(postprocess_bcsd_ds)
+
+    pyramid_location_monthly = pyramid.regrid(
+        monthly_summary_ds, uri=config.get('storage.results.uri') + pyramid_path_monthly
+    )
+
+    pyramid_location_annual = pyramid.regrid(
+        annual_summary_ds, uri=config.get('storage.results.uri') + pyramid_path_annual
+    )
+
+    analysis_location = run_analyses(
+        {
+            'gcm_identifier': gcm_identifier,
+            'obs_identifier': obs_identifier,
+            'result_dir': config.get('storage.results.uri'),
+            'intermediate_dir': config.get('storage.intermediate.uri'),
+            'var': variable,
+            'gcm': gcm,
+            'scenario': scenario,
+        },
+        web_blob=config.get('storage.web_results.blob'),
+        bbox=bbox,
+        train_period=train_period,
+        predict_period=predict_period,
+        upstream_tasks=[postprocess_bcsd_ds],
     )

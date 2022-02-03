@@ -6,7 +6,7 @@ import zarr
 
 from cmip6_downscaling import config
 from cmip6_downscaling.workflows.paths import make_rechunked_gcm_path
-from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching
+from cmip6_downscaling.workflows.utils import lon_to_180, rechunk_zarr_array_with_caching
 
 from . import cat
 
@@ -84,10 +84,9 @@ def load_cmip(
 
         # flip the lats if necessary and drop the extra dims/vars like bnds
         ds = gcm_munge(ds)
-
-        #
+        ds = lon_to_180(ds)
+        # convert to mm/day - helpful to prevent rounding errors from very tiny numbers
         if var == 'pr':
-            # convert to mm/day - helpful to prevent rounding errors from very tiny numbers
             ds['pr'] *= 86400
 
         if i == 0:
@@ -142,10 +141,10 @@ def get_gcm(
     gcm: str,
     scenario: str,
     variables: Union[str, List[str]],
-    train_period_start: str,
-    train_period_end: str,
-    predict_period_start: str,
-    predict_period_end: str,
+    train_period_start: str = '1970',
+    train_period_end: str = '2014',
+    predict_period_start: str = '2015',
+    predict_period_end: str = '2099',
     chunking_approach: Optional[str] = None,
     cache_within_rechunk: Optional[bool] = True,
 ) -> xr.Dataset:
