@@ -451,8 +451,8 @@ def make_maca_output_path(gcm_identifier: str, label: str, **kwargs):
     return f"maca_output/{gcm_identifier}_{label}.zarr"
 
 
-def make_pyramid_path(gcm_identifier: str, **kwargs) -> str:
-    """Build the path for the pyramid
+def make_daily_pyramid_path(gcm_identifier: str, **kwargs) -> str:
+    """Build the path for the daily pyramid
 
 
     Parameters
@@ -463,9 +463,42 @@ def make_pyramid_path(gcm_identifier: str, **kwargs) -> str:
     Returns
     -------
     pyramid_path : str
-        Path to gcm_predict ds file location
+        Path to pyramid location
     """
-    return f"/pyramid/{gcm_identifier}.zarr"
+    return f"/pyramid_daily/{gcm_identifier}.pyr"
+
+def make_monthly_pyramid_path(gcm_identifier: str, **kwargs) -> str:
+    """Build the path for the monthly pyramid
+
+
+    Parameters
+    ----------
+    gcm_identifier : str
+        Output from build_gcm_identifier. String to identify the gcm dataset used
+
+    Returns
+    -------
+    pyramid_path : str
+        Path to the monthly pyramid
+    """
+    return f"/pyramid_monthly/{gcm_identifier}.pyr"
+
+def make_annual_pyramid_path(gcm_identifier: str, **kwargs) -> str:
+    """Build the path for the annual pyramid
+
+
+    Parameters
+    ----------
+    gcm_identifier : str
+        Output from build_gcm_identifier. String to identify the gcm dataset used
+
+    Returns
+    -------
+    pyramid_path : str
+        Path to the annual pyramid
+    """
+    return f"/pyramid_annual/{gcm_identifier}.pyr"
+
 
 
 # ---addl bcsd paths
@@ -549,6 +582,37 @@ def make_bcsd_output_path(gcm_identifier: str = None, **kwargs) -> str:
         Path to bcsd output ds file location
     """
     return f"bcsd_output/{gcm_identifier}.zarr"
+
+
+def make_monthly_summary_path(gcm_identifier: str = None, **kwargs) -> str:
+    """Build the path for the monthly summary dataset
+
+    Parameters
+    ----------
+    gcm_identifier : str
+        Output from build_gcm_identifier. String to identify the gcm dataset used
+
+    Returns
+    -------
+    bcsd_output_monthly_path : str
+        Path to monthly bcsd output ds file location
+    """
+    return f"bcsd_output_monthly/{gcm_identifier}.zarr"
+
+def make_annual_summary_path(gcm_identifier: str = None, **kwargs) -> str:
+    """Build the path for the annual summary dataset
+
+    Parameters
+    ----------
+    gcm_identifier : str
+        Output from build_gcm_identifier. String to identify the gcm dataset used
+
+    Returns
+    -------
+    bcsd_output_annual_path : str
+        Path to annual bcsd output ds file location
+    """
+    return f"bcsd_output_annual/{gcm_identifier}.zarr"
 
 
 def get_notebook_paths(
