@@ -467,6 +467,7 @@ def make_daily_pyramid_path(gcm_identifier: str, **kwargs) -> str:
     """
     return f"/pyramid_daily/{gcm_identifier}.pyr"
 
+
 def make_monthly_pyramid_path(gcm_identifier: str, **kwargs) -> str:
     """Build the path for the monthly pyramid
 
@@ -483,6 +484,7 @@ def make_monthly_pyramid_path(gcm_identifier: str, **kwargs) -> str:
     """
     return f"/pyramid_monthly/{gcm_identifier}.pyr"
 
+
 def make_annual_pyramid_path(gcm_identifier: str, **kwargs) -> str:
     """Build the path for the annual pyramid
 
@@ -498,7 +500,6 @@ def make_annual_pyramid_path(gcm_identifier: str, **kwargs) -> str:
         Path to the annual pyramid
     """
     return f"/pyramid_annual/{gcm_identifier}.pyr"
-
 
 
 # ---addl bcsd paths
@@ -598,6 +599,7 @@ def make_monthly_summary_path(gcm_identifier: str = None, **kwargs) -> str:
         Path to monthly bcsd output ds file location
     """
     return f"bcsd_output_monthly/{gcm_identifier}.zarr"
+
 
 def make_annual_summary_path(gcm_identifier: str = None, **kwargs) -> str:
     """Build the path for the annual summary dataset

@@ -1,11 +1,10 @@
 import cartopy.crs as ccrs
+import matplotlib as mpl
 import matplotlib.pyplot as plt
+import pandas as pd
 import seaborn as sns
 import xarray as xr
 from carbonplan import styles
-import matplotlib as mpl
-from typing import Tuple
-import pandas as pd
 
 from cmip6_downscaling.workflows.paths import (
     make_bcsd_output_path,
@@ -18,6 +17,7 @@ from cmip6_downscaling.workflows.paths import (
 )
 
 styles.mpl.set_theme(style='carbonplan_light')
+
 
 def plot_cdfs(
     obs_ds: xr.Dataset,
@@ -55,7 +55,7 @@ def plot_cdfs(
         how many cols you want in your figure, by default 4
     sharex : bool, optional
         whether to force plots to share x-axis, when True it helps with cross-domain
-        comparisons, when false it supports QAQC checking for individual locations, 
+        comparisons, when false it supports QAQC checking for individual locations,
         by default True
 
     Returns
@@ -231,7 +231,7 @@ def plot_seasonal(ds1: xr.Dataset, ds2: xr.Dataset) -> mpl.figure.Figure:
     -------
     mpl.figure.Figure
         Figure
-    """    
+    """
     fig, axarr = plt.subplots(
         ncols=4, nrows=3, subplot_kw={'projection': ccrs.PlateCarree()}, figsize=(10, 6)
     )
@@ -249,12 +249,12 @@ def plot_seasonal(ds1: xr.Dataset, ds2: xr.Dataset) -> mpl.figure.Figure:
 
 
 def plot_each_step_bcsd(
-    gcm_identifier: str, 
+    gcm_identifier: str,
     obs_identifier: str,
-    result_dir: str, 
-    intermediate_dir: str, 
-    train_period: slice, 
-    var: str
+    result_dir: str,
+    intermediate_dir: str,
+    train_period: slice,
+    var: str,
 ) -> mpl.figure.Figure:
     """Plot the training period mean of each intermediary and output file in the
      bcsd process. For the spatial anomalies it just plots the first month.
@@ -277,7 +277,7 @@ def plot_each_step_bcsd(
     Returns
     -------
     mpl.figure.Figure
-        Figure    
+        Figure
     """
     steps = [
         make_return_obs_path(obs_identifier),

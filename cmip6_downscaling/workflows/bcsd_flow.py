@@ -21,15 +21,15 @@ from cmip6_downscaling.tasks.common_tasks import (
     path_builder_task,
 )
 from cmip6_downscaling.workflows.paths import (
+    make_annual_summary_path,
     make_bcsd_output_path,
     make_bias_corrected_path,
     make_coarse_obs_path,
     make_gcm_predict_path,
+    make_monthly_summary_path,
     make_rechunked_gcm_path,
     make_return_obs_path,
     make_spatial_anomalies_path,
-    make_monthly_summary_path,
-    make_annual_summary_path
 )
 
 runtime = runtimes.get_runtime()
@@ -139,7 +139,14 @@ with Flow(
     )
     train_period = build_time_period_slices(Parameter('train_period'))
     predict_period = build_time_period_slices(Parameter('predict_period'))
-    gcm_grid_spec, obs_identifier, gcm_identifier, pyramid_path_daily, pyramid_path_monthly, pyramid_path_annual = path_builder_task(
+    (
+        gcm_grid_spec,
+        obs_identifier,
+        gcm_identifier,
+        pyramid_path_daily,
+        pyramid_path_monthly,
+        pyramid_path_annual,
+    ) = path_builder_task(
         obs=obs,
         gcm=gcm,
         scenario=scenario,

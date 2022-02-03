@@ -17,7 +17,7 @@ def check_is_bad_data(ds: xr.Dataset, type: str) -> xr.Dataset:
     -------
     xr.Dataset
         boolean mask of whether it is bad data
-    """    
+    """
     if type == 'nulls':
         ds = ds.isnull()
     elif type == 'aphysical_high_temp':

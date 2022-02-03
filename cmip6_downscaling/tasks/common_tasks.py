@@ -20,14 +20,14 @@ from cmip6_downscaling.methods.bias_correction import (
 from cmip6_downscaling.workflows.paths import (
     build_gcm_identifier,
     build_obs_identifier,
+    make_annual_pyramid_path,
     make_bias_corrected_gcm_path,
     make_bias_corrected_obs_path,
     make_coarse_obs_path,
+    make_daily_pyramid_path,
     make_interpolated_gcm_path,
     make_interpolated_obs_path,
-    make_daily_pyramid_path,
     make_monthly_pyramid_path,
-    make_annual_pyramid_path
 )
 from cmip6_downscaling.workflows.utils import BBox, rechunk_zarr_array_with_caching, regrid_ds
 
@@ -228,8 +228,14 @@ def path_builder_task(
     pyramid_path_monthly = make_monthly_pyramid_path(gcm_identifier)
     pyramid_path_annual = make_annual_pyramid_path(gcm_identifier)
 
-
-    return gcm_grid_spec, obs_identifier, gcm_identifier, pyramid_path_daily, pyramid_path_monthly, pyramid_path_annual
+    return (
+        gcm_grid_spec,
+        obs_identifier,
+        gcm_identifier,
+        pyramid_path_daily,
+        pyramid_path_monthly,
+        pyramid_path_annual,
+    )
 
 
 @task(

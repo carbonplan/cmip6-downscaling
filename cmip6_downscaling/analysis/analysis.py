@@ -10,7 +10,6 @@ import xarray as xr
 from azure.storage.blob import BlobServiceClient, ContentSettings
 from prefect import task
 
-from cmip6_downscaling.data.cmip import convert_to_360
 from cmip6_downscaling.workflows.paths import get_notebook_paths
 from cmip6_downscaling.workflows.utils import BBox
 
