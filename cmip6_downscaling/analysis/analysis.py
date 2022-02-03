@@ -242,7 +242,7 @@ def select_points(ds: xr.Dataset, top_cities: pd.DataFrame) -> xr.Dataset:
     """
     cities = ds.sel(
         lat=xr.DataArray(top_cities.lat.values, dims='cities'),
-        lon=xr.DataArray(top_cities.lng.apply(convert_to_360).values, dims='cities'),
+        lon=xr.DataArray(top_cities.lng.values, dims='cities'),
         method='nearest',  # you can't apply tolerance in 2d selections like this.
         # as a result, if you're running a subset the data won't be valid for cities
         # that aren't in the subset (but it will still return non-nan values)
@@ -287,7 +287,7 @@ def get_seasonal(ds: xr.Dataset, aggregator: str = 'mean') -> xr.Dataset:
         Dataset collapsed along the time dimension into a seasonally
         aggregated dataset
     """
-    return getattr(ds.groupby('time.season', aggregator))()
+    return getattr(ds.groupby('time.season'), aggregator)()
 
 
 def change_ds(

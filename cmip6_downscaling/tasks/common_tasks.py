@@ -25,7 +25,9 @@ from cmip6_downscaling.workflows.paths import (
     make_coarse_obs_path,
     make_interpolated_gcm_path,
     make_interpolated_obs_path,
-    make_pyramid_path,
+    make_daily_pyramid_path,
+    make_monthly_pyramid_path,
+    make_annual_pyramid_path
 )
 from cmip6_downscaling.workflows.utils import BBox, rechunk_zarr_array_with_caching, regrid_ds
 
@@ -170,7 +172,7 @@ def path_builder_task(
     train_period: slice,
     predict_period: slice,
     bbox: BBox,
-) -> Tuple[str, str, str, str]:
+) -> Tuple[str, str, str, str, str, str]:
     """
     Take in input parameters and make string patterns that identifies the obs dataset, gcm dataset, and the gcm grid. These
     strings will then be used to identify cached files.
@@ -199,8 +201,12 @@ def path_builder_task(
         A string of parameters defining the obs dataset used, including variables, start/end year, etc
     gcm_identifier : str
         A string of parameters defining the GCM dataset used, including variables, start/end year for historical and future periods, etc
-    pyramid_path : str
-        A string of parameters used to build the pyramid path.
+    pyramid_path_daily : str
+        A string of parameters used to build the daily pyramid path.
+    pyramid_path_monthly : str
+        A string of parameters used to build the monthly pyramid path.
+    pyramid_path_annual : str
+        A string of parameters used to build the annual pyramid path.
     """
     gcm_grid_spec = get_gcm_grid_spec(gcm_name=gcm)
 
@@ -218,9 +224,12 @@ def path_builder_task(
         predict_period=predict_period,
         bbox=bbox,
     )
-    pyramid_path = make_pyramid_path(gcm_identifier)
+    pyramid_path_daily = make_daily_pyramid_path(gcm_identifier)
+    pyramid_path_monthly = make_monthly_pyramid_path(gcm_identifier)
+    pyramid_path_annual = make_annual_pyramid_path(gcm_identifier)
 
-    return gcm_grid_spec, obs_identifier, gcm_identifier, pyramid_path
+
+    return gcm_grid_spec, obs_identifier, gcm_identifier, pyramid_path_daily, pyramid_path_monthly, pyramid_path_annual
 
 
 @task(
