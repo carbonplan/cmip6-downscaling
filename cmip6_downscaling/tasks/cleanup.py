@@ -48,6 +48,15 @@ def remove_stores_from_input_params(gcm_identifier: str, obs_identifier: str):
         gcm_identifier (str): gcm_identifier string from path_builder_task output
         obs_identifier (str): obs_identifier string from path_builder_task output
     """
+
+    print(
+        '\n -------------------------------------------------------\n',
+        '-------------------------------------------------------\n',
+        '------ CLEANUP FLAG ENABLED. CACHING IS DISABLED ------\n',
+        '-------------------------------------------------------\n',
+        '-------------------------------------------------------\n',
+    )
+
     for stage in config.get("methods.bcsd.process_stages"):
         prefix_list = config.get(f"methods.bcsd.process_stages.{stage}")
         stage_uri = config.get(f"storage.{stage}.uri")
@@ -63,7 +72,7 @@ def remove_stores_from_input_params(gcm_identifier: str, obs_identifier: str):
                 stage_uri + '/' + config.get("storage.xpersist_store_name") + path_template
             )
             try:
-                print('Removing: ', store_uri, store_xpersist_cache, '\n')
+                print('Removing: ', store_uri, '\n', store_xpersist_cache, '\n')
                 remove_stores([store_uri, store_xpersist_cache])
             except Exception as e:
                 print(e)

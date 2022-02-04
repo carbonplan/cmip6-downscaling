@@ -18,11 +18,11 @@ _defaults = {
                     'spatial_anomalies': {'path_template': 'spatial_anomalies/{obs_identifier}'},
                     'gcm_predict': {'path_template': 'gcm_predict/{gcm_identifier}'},
                     'rechunked_gcm': {'path_template': 'rechunked_gcm/{gcm_identifier}'},
-                    # 'bias_corrected':{'path_template':'bias_corrected/{gcm_identifier}'}
+                    'bias_corrected': {'path_template': 'bias_corrected/{gcm_identifier}'},
                 },
                 "results": {
-                    #  "bcsd_output":{"path_template":"bcsd_output/{gcm_identifier}"},
-                    "pyramid": {"path_template": "pyramid/{gcm_identifier}"}
+                    "bcsd_output": {"path_template": "bcsd_output/{gcm_identifier}"},
+                    "pyramid": {"path_template": "pyramid/{gcm_identifier}"},
                 },
             }
         },
