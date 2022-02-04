@@ -1,13 +1,12 @@
-from typing import Tuple
-
 import xarray as xr
 from skdownscale.pointwise_models import PointWiseDownscaler
 from skdownscale.pointwise_models.bcsd import BcsdPrecipitation, BcsdTemperature
 
 from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
-from cmip6_downscaling.data.cmip import load_cmip
+from cmip6_downscaling.data.cmip import get_gcm, load_cmip
 from cmip6_downscaling.data.observations import open_era5
 from cmip6_downscaling.workflows.utils import (
+    BBox,
     delete_chunks_encoding,
     lon_to_180,
     rechunk_zarr_array,
@@ -17,120 +16,37 @@ from cmip6_downscaling.workflows.utils import (
 )
 
 
-def make_flow_paths(
-    GCM: str,
-    SCENARIO: str,
-    TRAIN_PERIOD_START: str,
-    TRAIN_PERIOD_END: str,
-    PREDICT_PERIOD_START: str,
-    PREDICT_PERIOD_END: str,
-    VARIABLE: str,
-    LATMIN: str,
-    LATMAX: str,
-    LONMIN: str,
-    LONMAX: str,
-    workdir: str = "az://cmip6",
-    outdir: str = "az://cmip6/results",
-) -> Tuple[str, str, str, str]:
-    """Build the paths where your outputs (both intermediate and final) will go
-
-    Parameters
-    ----------
-    GCM : str
-        From run hyperparameters
-    SCENARIO : str
-        From run hyperparameters
-    TRAIN_PERIOD_START : str
-        From run hyperparameters
-    TRAIN_PERIOD_END : str
-        From run hyperparameters
-    PREDICT_PERIOD_START : str
-        From run hyperparameters
-    PREDICT_PERIOD_END : str
-        From run hyperparameters
-    VARIABLE : str
-        From run hyperparameters
-    LATMIN : str
-        From run hyperparameters
-    LATMAX : str
-        From run hyperparameters
-    LONMIN : str
-        From run hyperparameters
-    LONMAX : str
-        From run hyperparameters
-    workdir : str, optional
-        Intermediate files for caching (and might be used by other gcms), by default "az://cmip6"
-    outdir : str, optional
-        Final result space, by default "az://cmip6/results"
-
-    Returns
-    -------
-    tuple[str, str, str, str]
-        From run hyperparameters
-    """
-    coarse_obs_path = f"{workdir}/intermediates/ERA5_{GCM}_{TRAIN_PERIOD_START}_{TRAIN_PERIOD_END}_{VARIABLE}.zarr"
-    spatial_anomalies_path = f"{workdir}/intermediates/anomalies_{GCM}_{TRAIN_PERIOD_START}_{TRAIN_PERIOD_END}_{VARIABLE}.zarr"
-    bias_corrected_path = f"{workdir}/intermediates/bc_{SCENARIO}_{GCM}_{TRAIN_PERIOD_START}_{TRAIN_PERIOD_END}_{VARIABLE}.zarr"
-    final_out_path = f"{outdir}/bcsd_{SCENARIO}_{GCM}_{PREDICT_PERIOD_START}_{PREDICT_PERIOD_END}_{VARIABLE}.zarr"
-    return coarse_obs_path, spatial_anomalies_path, bias_corrected_path, final_out_path
-
-
-def return_obs(
-    gcm: str,
-    scenario: str,
-    train_period_start: str,
-    train_period_end: str,
-    predict_period_start: str,
-    predict_period_end: str,
-    variable: str,
-    latmin: str,
-    latmax: str,
-    lonmin: str,
-    lonmax: str,
-) -> xr.Dataset:
+def return_obs(obs: str, variable: str, train_period: slice, bbox: BBox, **kwargs) -> xr.Dataset:
     """Loads ERA5 observation data for given time bounds and variable
 
     Parameters
     ----------
-    gcm : str
-        Input GCM
-    scenario: str
-        Input GCM scenario
-    train_period_start : str
-        Date for training period start (e.g. '1985')
-    train_period_end : str
-        Date for training period end (e.g. '2015')
-    predict_period_start : str
-        Date for prediction period start (e.g. '2090')
-    predict_period_end : str
-        Date for prediction period end (e.g. '2090')
+    obs : str
+        Input obs
     variable: str
         The variable included in the dataset.
-    latmin : str
-        From run hyperparameters
-    latmax : str
-        From run hyperparameters
-    lonmin : str
-        From run hyperparameters
-    lonmax : str
-        From run hyperparameters
+    train_period: slice
+        Start and end year slice of training/historical period. Ex: slice('1990','1990')
+    predict_period: slice
+        Start and end year slice of predict period. Ex: slice('2020','2020')
+    bbox : BBox
+        Bounding box including latmin,latmax,lonmin,lonmax.
+    **kwargs : dict, optional
+            Other arguments to be used in generating the target path
 
     Returns
     -------
     xr.Dataset
         Loaded xarray dataset of ERA5 observation data. Chunked in time: 365
     """
-    obs_load = open_era5(variable, start_year=train_period_start, end_year=train_period_end)
+    obs_load = open_era5(variable, train_period)
     obs_load_180 = lon_to_180(obs_load)
+
     obs_ds = subset_dataset(
         obs_load_180,
         variable,
-        train_period_start,
-        train_period_end,
-        latmin,
-        latmax,
-        lonmin,
-        lonmax,
+        train_period,
+        bbox,
         chunking_schema={'time': 365, 'lat': 150, 'lon': 150},
     )
     return obs_ds
@@ -140,15 +56,11 @@ def get_coarse_obs(
     obs_ds: xr.Dataset,
     gcm: str,
     scenario: str,
-    train_period_start: str,
-    train_period_end: str,
-    predict_period_start: str,
-    predict_period_end: str,
     variable: str,
-    latmin: str,
-    latmax: str,
-    lonmin: str,
-    lonmax: str,
+    train_period: slice,
+    predict_period: slice,
+    bbox: BBox,
+    **kwargs
 ) -> xr.Dataset:
     """Regrids the observation dataset to match the GCM resolution
 
@@ -160,24 +72,16 @@ def get_coarse_obs(
         Input GCM
     scenario: str
         Input GCM scenario
-    train_period_start : str
-        Date for training period start (e.g. '1985')
-    train_period_end : str
-        Date for training period end (e.g. '2015')
-    predict_period_start : str
-        Date for prediction period start (e.g. '2090')
-    predict_period_end : str
-        Date for prediction period end (e.g. '2090')
     variable: str
         The variable included in the dataset.
-    latmin : str
-        From run hyperparameters
-    latmax : str
-        From run hyperparameters
-    lonmin : str
-        From run hyperparameters
-    lonmax : str
-        From run hyperparameters
+    train_period: slice
+        Start and end year slice of training/historical period. Ex: slice('1990','1990')
+    predict_period: slice
+        Start and end year slice of predict period. Ex: slice('2020','2020')
+    bbox : BBox
+        Bounding box including latmin,latmax,lonmin,lonmax.
+    **kwargs : dict, optional
+            Other arguments to be used in generating the target path
 
     Returns
     -------
@@ -187,11 +91,10 @@ def get_coarse_obs(
     # Load single slice of target cmip6 dataset for target grid dimensions
     # gcm_one_slice = load_cmip(return_type='xr', variable_ids=[variable]).isel(time=0)
     gcm_ds = load_cmip(return_type='xr', variable_ids=[variable])
-    gcm_ds_180 = lon_to_180(gcm_ds)
 
-    gcm_subset = subset_dataset(
-        gcm_ds_180, variable, train_period_start, train_period_end, latmin, latmax, lonmin, lonmax
-    )
+    gcm_ds_180 = lon_to_180(gcm_ds)
+    gcm_subset = subset_dataset(gcm_ds_180, variable, train_period, bbox)
+
     # rechunk and regrid observation dataset to target gcm resolution
     coarse_obs_ds, fine_obs_rechunked_path = regrid_dataset(
         ds=obs_ds, ds_path=None, target_grid_ds=gcm_subset, variable=variable
@@ -204,15 +107,11 @@ def get_spatial_anomalies(
     obs_ds: xr.Dataset,
     gcm: str,
     scenario: str,
-    train_period_start: str,
-    train_period_end: str,
-    predict_period_start: str,
-    predict_period_end: str,
     variable: str,
-    latmin: str,
-    latmax: str,
-    lonmin: str,
-    lonmax: str,
+    train_period: slice,
+    predict_period: slice,
+    bbox: BBox,
+    **kwargs
 ) -> xr.Dataset:
 
     """Returns spatial anomalies
@@ -234,24 +133,16 @@ def get_spatial_anomalies(
         Input GCM
     scenario: str
         Input GCM scenario
-    train_period_start : str
-        Date for training period start (e.g. '1985')
-    train_period_end : str
-        Date for training period end (e.g. '2015')
-    predict_period_start : str
-        Date for prediction period start (e.g. '2090')
-    predict_period_end : str
-        Date for prediction period end (e.g. '2090')
     variable: str
         The variable included in the dataset.
-    latmin : str
-        From run hyperparameters
-    latmax : str
-        From run hyperparameters
-    lonmin : str
-        From run hyperparameters
-    lonmax : str
-        From run hyperparameters
+    train_period: slice
+        Start and end year slice of training/historical period. Ex: slice('1990','1990')
+    predict_period: slice
+        Start and end year slice of predict period. Ex: slice('2020','2020')
+    bbox : BBox
+        Bounding box including latmin,latmax,lonmin,lonmax.
+    **kwargs : dict, optional
+            Other arguments to be used in generating the target path
 
     Returns
     -------
@@ -283,15 +174,11 @@ def return_coarse_obs_full_time(
     coarse_obs_ds: xr.Dataset,
     gcm: str,
     scenario: str,
-    train_period_start: str,
-    train_period_end: str,
-    predict_period_start: str,
-    predict_period_end: str,
     variable: str,
-    latmin: str,
-    latmax: str,
-    lonmin: str,
-    lonmax: str,
+    train_period: slice,
+    predict_period: slice,
+    bbox: BBox,
+    **kwargs
 ) -> xr.Dataset:
 
     """
@@ -306,24 +193,15 @@ def return_coarse_obs_full_time(
         Input GCM
     scenario: str
         Input GCM scenario
-    train_period_start : str
-        Date for training period start (e.g. '1985')
-    train_period_end : str
-        Date for training period end (e.g. '2015')
-    predict_period_start : str
-        Date for prediction period start (e.g. '2090')
-    predict_period_end : str
-        Date for prediction period end (e.g. '2090')
     variable: str
         The variable included in the dataset.
-    latmin : str
-        From run hyperparameters
-    latmax : str
-        From run hyperparameters
-    lonmin : str
-        From run hyperparameters
-    lonmax : str
-        From run hyperparameters
+    train_period: slice
+        Start and end year slice of training/historical period. Ex: slice('1990','1990')
+    predict_period: slice
+        Start and end year slice of predict period. Ex: slice('2020','2020')
+    bbox : BBox
+        Bounding box including latmin,latmax,lonmin,lonmax.
+    **kwargs : dict, optional
 
     Returns
     -------
@@ -342,15 +220,11 @@ def return_gcm_train_full_time(
     coarse_obs_full_time_ds: xr.Dataset,
     gcm: str,
     scenario: str,
-    train_period_start: str,
-    train_period_end: str,
-    predict_period_start: str,
-    predict_period_end: str,
     variable: str,
-    latmin: str,
-    latmax: str,
-    lonmin: str,
-    lonmax: str,
+    train_period: slice,
+    predict_period: slice,
+    bbox: BBox,
+    **kwargs
 ) -> xr.Dataset:
     """Returns GCM training rechunked dataset in full time.
 
@@ -362,24 +236,15 @@ def return_gcm_train_full_time(
         Input GCM
     scenario: str
         Input GCM scenario
-    train_period_start : str
-        Date for training period start (e.g. '1985')
-    train_period_end : str
-        Date for training period end (e.g. '2015')
-    predict_period_start : str
-        Date for prediction period start (e.g. '2090')
-    predict_period_end : str
-        Date for prediction period end (e.g. '2090')
     variable: str
         The variable included in the dataset.
-    latmin : str
-        From run hyperparameters
-    latmax : str
-        From run hyperparameters
-    lonmin : str
-        From run hyperparameters
-    lonmax : str
-        From run hyperparameters
+    train_period: slice
+        Start and end year slice of training/historical period. Ex: slice('1990','1990')
+    predict_period: slice
+        Start and end year slice of predict period. Ex: slice('2020','2020')
+    bbox : BBox
+        Bounding box including latmin,latmax,lonmin,lonmax.
+    **kwargs : dict, optional
 
     Returns
     -------
@@ -392,12 +257,8 @@ def return_gcm_train_full_time(
     gcm_train_ds_subset = subset_dataset(
         gcm_train_ds_180,
         variable,
-        train_period_start,
-        train_period_end,
-        latmin,
-        latmax,
-        lonmin,
-        lonmax,
+        train_period,
+        bbox,
         chunking_schema={'time': 365, 'lat': 150, 'lon': 150},
     )
 
@@ -416,15 +277,11 @@ def return_gcm_predict_rechunked(
     gcm_train_subset_full_time_ds: xr.Dataset,
     gcm: str,
     scenario: str,
-    train_period_start: str,
-    train_period_end: str,
-    predict_period_start: str,
-    predict_period_end: str,
     variable: str,
-    latmin: str,
-    latmax: str,
-    lonmin: str,
-    lonmax: str,
+    train_period: slice,
+    predict_period: slice,
+    bbox: BBox,
+    **kwargs
 ) -> xr.Dataset:
     """Returns GCM prediction rechunked dataset in full time.  Chunks are matched to chunks of gcm train. In the current use case, this means in full_time.
 
@@ -436,36 +293,25 @@ def return_gcm_predict_rechunked(
         Input GCM
     scenario: str
         Input GCM scenario
-    train_period_start : str
-        Date for training period start (e.g. '1985')
-    train_period_end : str
-        Date for training period end (e.g. '2015')
-    predict_period_start : str
-        Date for prediction period start (e.g. '2090')
-    predict_period_end : str
-        Date for prediction period end (e.g. '2090')
     variable: str
         The variable included in the dataset.
-    latmin : str
-        From run hyperparameters
-    latmax : str
-        From run hyperparameters
-    lonmin : str
-        From run hyperparameters
-    lonmax : str
-        From run hyperparameters
+    train_period: slice
+        Start and end year slice of training/historical period. Ex: slice('1990','1990')
+    predict_period: slice
+        Start and end year slice of predict period. Ex: slice('2020','2020')
+    bbox : BBox
+        Bounding box including latmin,latmax,lonmin,lonmax.
+    **kwargs : dict, optional
 
     Returns
     -------
     xr.Dataset
         gcm predict rechunked dataset
     """
-    gcm_predict_ds = load_cmip(
-        source_ids=gcm,
-        activity_ids='ScenarioMIP',
-        experiment_ids=scenario,
-        variable_ids=[variable],
-        return_type='xr',
+    gcm_predict_ds = get_gcm(
+        gcm=gcm,
+        scenario=scenario,
+        variables=[variable],
     )
 
     gcm_predict_ds_180 = lon_to_180(gcm_predict_ds)
@@ -473,12 +319,8 @@ def return_gcm_predict_rechunked(
     gcm_predict_ds_subset = subset_dataset(
         gcm_predict_ds_180,
         variable,
-        predict_period_start,
-        predict_period_end,
-        latmin,
-        latmax,
-        lonmin,
-        lonmax,
+        predict_period,
+        bbox,
     )
 
     # validate that X_predict spatial chunks match those of X_train since the spatial chunks of predict data need
@@ -507,16 +349,12 @@ def fit_and_predict(
     gcm_predict_rechunked_ds: xr.Dataset,
     gcm: str,
     scenario: str,
-    train_period_start: str,
-    train_period_end: str,
-    predict_period_start: str,
-    predict_period_end: str,
     variable: str,
-    latmin: str,
-    latmax: str,
-    lonmin: str,
-    lonmax: str,
+    train_period: slice,
+    predict_period: slice,
+    bbox: BBox,
     dim: str = "time",
+    **kwargs
 ) -> xr.Dataset:
     """Fit bcsd model on prepared CMIP data with obs at corresponding spatial scale.
     Then predict for a set of CMIP data (likely future).
@@ -533,26 +371,17 @@ def fit_and_predict(
         Input GCM
     scenario: str
         Input GCM scenario
-    train_period_start : str
-        Date for training period start (e.g. '1985')
-    train_period_end : str
-        Date for training period end (e.g. '2015')
-    predict_period_start : str
-        Date for prediction period start (e.g. '2090')
-    predict_period_end : str
-        Date for prediction period end (e.g. '2090')
     variable: str
         The variable included in the dataset.
-    latmin : str
-        From run hyperparameters
-    latmax : str
-        From run hyperparameters
-    lonmin : str
-        From run hyperparameters
-    lonmax : str
-        From run hyperparameters
+    train_period: slice
+        Start and end year slice of training/historical period. Ex: slice('1990','1990')
+    predict_period: slice
+        Start and end year slice of predict period. Ex: slice('2020','2020')
+    bbox : BBox
+        Bounding box including latmin,latmax,lonmin,lonmax.
     dim : str, optional
         dimension on which you want to do the modelling, by default "time"
+    **kwargs : dict, optional
 
     Returns
     -------
@@ -582,17 +411,13 @@ def fit_and_predict(
 def postprocess_bcsd(
     bias_corrected_ds: xr.Dataset,
     spatial_anomalies_ds: xr.Dataset,
-    gcm,
-    scenario,
-    train_period_start,
-    train_period_end,
-    predict_period_start,
-    predict_period_end,
-    variable,
-    latmin: str,
-    latmax: str,
-    lonmin: str,
-    lonmax: str,
+    gcm: str,
+    scenario: str,
+    variable: str,
+    train_period: slice,
+    predict_period: slice,
+    bbox: BBox,
+    **kwargs
 ) -> xr.Dataset:
     """Downscale the bias-corrected data by interpolating and then
     adding the spatial anomalies back in.
@@ -607,24 +432,15 @@ def postprocess_bcsd(
         Input GCM
     scenario: str
         Input GCM scenario
-    train_period_start : str
-        Date for training period start (e.g. '1985')
-    train_period_end : str
-        Date for training period end (e.g. '2015')
-    predict_period_start : str
-        Date for prediction period start (e.g. '2090')
-    predict_period_end : str
-        Date for prediction period end (e.g. '2090')
     variable: str
         The variable included in the dataset.
-    latmin : str
-        From run hyperparameters
-    latmax : str
-        From run hyperparameters
-    lonmin : str
-        From run hyperparameters
-    lonmax : str
-        From run hyperparameters
+    train_period : slice
+        Start and end year slice of training/historical period. Ex: slice('1990', '1990')
+    predict_period : slice
+        Start and end year slice of predict period. Ex: slice('2020', '2020')
+    bbox : BBox
+        Bounding box including latmin,latmax,lonmin,lonmax.
+    **kwargs : dict, optional
 
     Returns
     -------

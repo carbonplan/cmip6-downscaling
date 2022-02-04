@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
@@ -19,16 +20,61 @@ from cmip6_downscaling.methods.bias_correction import (
 from cmip6_downscaling.workflows.paths import (
     build_gcm_identifier,
     build_obs_identifier,
+    make_annual_pyramid_path,
     make_bias_corrected_gcm_path,
     make_bias_corrected_obs_path,
     make_coarse_obs_path,
+    make_daily_pyramid_path,
     make_interpolated_gcm_path,
     make_interpolated_obs_path,
+    make_monthly_pyramid_path,
 )
-from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching, regrid_ds
+from cmip6_downscaling.workflows.utils import BBox, rechunk_zarr_array_with_caching, regrid_ds
 
 get_obs_task = task(get_obs)
 get_gcm_task = task(get_gcm)
+
+
+@task
+def build_bbox(latmin: str, latmax: str, lonmin: str, lonmax: str) -> dataclass:
+    """Build bounding box out of lat/lon inputs using BBox data class defined in /utils.py
+
+    Args:
+    Paramters
+    ---------
+    latmin : float
+         Minimum latitude
+    latmax : float
+         Maximum latitude
+    lonmin : float
+         Minimum longitude
+    lonmax : float
+        Maximum longitude
+
+    Returns
+    -------
+    BBox
+    """
+
+    return BBox(
+        latmin=float(latmin), latmax=float(latmax), lonmin=float(lonmin), lonmax=float(lonmax)
+    )
+
+
+@task
+def build_time_period_slices(time_period: list) -> slice:
+    """Return slice from list containing two time strings
+
+    Parameters
+    ----------
+    time_period : list
+        Input time period list. Ex. ['1990','1991']
+
+    Returns
+    -------
+    slice
+    """
+    return slice(*time_period)
 
 
 @task
@@ -122,12 +168,11 @@ def path_builder_task(
     obs: str,
     gcm: str,
     scenario: str,
-    train_period_start: str,
-    train_period_end: str,
-    predict_period_start: str,
-    predict_period_end: str,
-    variables: List[str],
-) -> Tuple[str, str, str]:
+    variable: str,
+    train_period: slice,
+    predict_period: slice,
+    bbox: BBox,
+) -> Tuple[str, str, str, str, str, str]:
     """
     Take in input parameters and make string patterns that identifies the obs dataset, gcm dataset, and the gcm grid. These
     strings will then be used to identify cached files.
@@ -139,43 +184,58 @@ def path_builder_task(
         Name of gcm model
     scenario: str
         Name of future emission scenario
-    train_period_start: str
-        Start year of training/historical period
-    train_period_end: str
-        End year of training/historical period
-    predict_period_start: str
-        Start year of predict/future period
-    predict_period_end: str
-        End year of predict/future period
-    variables: List[str]
-        Names of the variables used in obs and gcm dataset (including features and label)
+    variable: str
+        Name of the variable used in obs and gcm dataset (including features and label)
+    train_period: slice
+        Start and end year slice of training/historical period. Ex: slice('1990','1990')
+    predict_period: slice
+        Start and end year slice of predict period. Ex: slice('2020','2020')
+    bbox: dataclass
+        dataclass containing the latmin,latmax,lonmin,lonmax. Class can be found in utils.
+
     Returns
     -------
     gcm_grid_spec: str
         A string of parameters defining the grid of GCM, including number of lat/lon points, interval between points, lower left corner, etc.
     obs_identifier: str
         A string of parameters defining the obs dataset used, including variables, start/end year, etc
-    gcm_identifier: str
+    gcm_identifier : str
         A string of parameters defining the GCM dataset used, including variables, start/end year for historical and future periods, etc
+    pyramid_path_daily : str
+        A string of parameters used to build the daily pyramid path.
+    pyramid_path_monthly : str
+        A string of parameters used to build the monthly pyramid path.
+    pyramid_path_annual : str
+        A string of parameters used to build the annual pyramid path.
     """
     gcm_grid_spec = get_gcm_grid_spec(gcm_name=gcm)
+
     obs_identifier = build_obs_identifier(
         obs=obs,
-        train_period_start=train_period_start,
-        train_period_end=train_period_end,
-        variables=variables,
+        variable=variable,
+        train_period=train_period,
+        bbox=bbox,
     )
     gcm_identifier = build_gcm_identifier(
         gcm=gcm,
         scenario=scenario,
-        train_period_start=train_period_start,
-        train_period_end=train_period_end,
-        predict_period_start=predict_period_start,
-        predict_period_end=predict_period_end,
-        variables=variables,
+        variable=variable,
+        train_period=train_period,
+        predict_period=predict_period,
+        bbox=bbox,
     )
+    pyramid_path_daily = make_daily_pyramid_path(gcm_identifier)
+    pyramid_path_monthly = make_monthly_pyramid_path(gcm_identifier)
+    pyramid_path_annual = make_annual_pyramid_path(gcm_identifier)
 
-    return gcm_grid_spec, obs_identifier, gcm_identifier
+    return (
+        gcm_grid_spec,
+        obs_identifier,
+        gcm_identifier,
+        pyramid_path_daily,
+        pyramid_path_monthly,
+        pyramid_path_annual,
+    )
 
 
 @task(

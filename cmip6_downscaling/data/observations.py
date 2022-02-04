@@ -3,7 +3,7 @@ from typing import List, Optional, Union
 import xarray as xr
 
 from cmip6_downscaling.workflows.paths import make_rechunked_obs_path
-from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching
+from cmip6_downscaling.workflows.utils import lon_to_180, rechunk_zarr_array_with_caching
 
 from . import cat
 
@@ -14,17 +14,15 @@ variable_name_dict = {
 }
 
 
-def open_era5(variables: Union[str, List[str]], start_year: str, end_year: str) -> xr.Dataset:
+def open_era5(variables: Union[str, List[str]], time_period: slice) -> xr.Dataset:
     """Open ERA5 daily data for one or more variables for period 1979-2021
 
     Parameters
     ----------
     variables : str or list of string
         The variable(s) you want to grab from the ERA5 dataset.
-    start_year : str
-        The first year of the time period you want to grab from ERA5 dataset.
-    end_year : str
-        The last year of the time period you want to grab from ERA5 dataset.
+    time_period : slice
+        Start and end year slice. Ex: slice('2020','2020')
 
     Returns
     -------
@@ -34,9 +32,10 @@ def open_era5(variables: Union[str, List[str]], start_year: str, end_year: str) 
     if isinstance(variables, str):
         variables = [variables]
 
-    years = range(int(start_year), int(end_year) + 1)
+    years = range(int(time_period.start), int(time_period.stop) + 1)
 
     ds = xr.concat([cat.era5(year=year).to_dask()[variables] for year in years], dim='time')
+    ds = lon_to_180(ds)
     if 'pr' in variables:
         # convert to mm/day - helpful to prevent rounding errors from very tiny numbers
         ds['pr'] *= 86400

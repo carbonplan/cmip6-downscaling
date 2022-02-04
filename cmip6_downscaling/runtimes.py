@@ -56,8 +56,9 @@ class CloudRuntime(BaseRuntime):
     ):
 
         self._storage_options = storage_options is not None or config.get(
-            "runtime.cloud.storage_options"
+            "runtime.cloud.storage_options.container"
         )
+
         self._agent = agent is not None or config.get("runtime.cloud.agent")
         self._extra_pip_packages = extra_pip_packages is not None or config.get(
             "runtime.cloud.extra_pip_packages"
@@ -88,9 +89,6 @@ class CloudRuntime(BaseRuntime):
         self._dask_distributed_worker_resources_taskslots = (
             dask_distributed_worker_resources_taskslots is not None
             or config.get("runtime.cloud.dask_distributed_worker_resources_taskslots")
-        )
-        self._dask_distributed_worker_resources_taskslots = self._storage_options.get(
-            "runtime.cloud.dask_distributed_worker_resources_taskslots"
         )
 
     def __repr__(self):
@@ -204,7 +202,7 @@ class PangeoRuntime(LocalRuntime):
 
     @property
     def executor(self) -> Executor:
-        return LocalDaskExecutor(scheduler='processes')
+        return LocalDaskExecutor(scheduler="processes")
 
     def _generate_env(self):
         return _threadsafe_env_vars
