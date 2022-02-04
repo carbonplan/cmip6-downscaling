@@ -28,6 +28,7 @@ _defaults = {
         },
         'gard': {},
         'maca': {},
+        'web_results': {'blob': 'analysis_notebooks', 'storage_options': {}},
     },
     "data_catalog": {
         "cmip": {
