@@ -122,6 +122,15 @@ def get_spatial_anomalies(
     * a grid (as opposed to a specific GCM since some GCMs run on the same grid)
     * the time period which fine_obs (and by construct coarse_obs) cover
     * the variable
+    We will save these anomalies to use them in the post-processing. We will add them to the
+    spatially-interpolated coarse predictions to add the spatial heterogeneity back in.
+    Conceptually, this step figures out, for example, how much colder a finer-scale pixel
+    containing Mt. Rainier is compared to the coarse pixel where it exists. By saving those anomalies,
+    we can then preserve the fact that "Mt Rainier is x degrees colder than the pixels around it"
+    for the prediction. It is important to note that that spatial anomaly is the same for every month of the
+    year and the same for every day. So, if in January a finescale pixel was on average 4 degrees colder than
+    the neighboring pixel to the west, in every day in the prediction (historic or future) that pixel
+    will also be 4 degrees colder.
 
     Parameters
     ----------
@@ -149,8 +158,8 @@ def get_spatial_anomalies(
     seasonal_cycle_spatial_anomalies : xr.Dataset
         Spatial anomaly for each month (i.e. of shape (nlat, nlon, 12))
     """
-    # Regrid coarse observation dataset
-    obs_interpolated, _ = regrid_dataset(
+    # Regrid coarse observation dataset to the spatial scale of the raw obs
+    coarse_obs_interpolated, _ = regrid_dataset(
         ds=coarse_obs,
         ds_path=None,
         target_grid_ds=obs_ds.isel(time=0),
@@ -163,8 +172,11 @@ def get_spatial_anomalies(
         variable=variable,
         max_mem='1GB',
     )
+    # calculate the difference between the actual obs (with finer spatial heterogeneity)
+    # and the interpolated coarse obs this will be saved and added to the
+    # spatially-interpolated coarse predictions to add the spatial heterogeneity back in.
 
-    spatial_anomalies = obs_interpolated - obs_rechunked
+    spatial_anomalies = obs_rechunked - coarse_obs_interpolated
     seasonal_cycle_spatial_anomalies = spatial_anomalies.groupby("time.month").mean()
 
     return seasonal_cycle_spatial_anomalies
