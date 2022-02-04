@@ -6,7 +6,7 @@ import numpy as np
 from dask.distributed import get_worker
 from prefect import Flow, task
 
-from cmip6_downscaling import config
+from cmip6_downscaling import runtimes
 
 
 @task(log_stdout=True, tags=['dask-resource:TASKSLOTS=1'])
@@ -28,8 +28,7 @@ def make_grid(shape):
     return shape
 
 
-runtime = config.get_runtime()
-
+runtime = runtimes.get_runtime()
 
 with Flow(
     name="ESMF_DEBUG",
