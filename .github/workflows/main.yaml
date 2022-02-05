@@ -13,7 +13,7 @@ jobs:
     timeout-minutes: 20
     container:
       image: carbonplan/cmip6-downscaling-prefect:2022.02.04
-      options: --user jovyan
+      options: --user 1000
     steps:
       - uses: actions/checkout@v2
       - name: Install
