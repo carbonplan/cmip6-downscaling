@@ -12,14 +12,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     container:
-      image: carbonplan/cmip6-downscaling-prefect:2022.02.04
+      image: carbonplan/cmip6-downscaling-prefect:2022.02.05
       options: --user root
     steps:
       - uses: actions/checkout@v2
       - name: Install
         run: |
           python -m pip install --no-deps -e .
-          python -m pip install git+https://github.com/pangeo-data/scikit-downscale@84cd5f45de4aa61445ca74b85505b035f84fbb80
           python -m pip list
       - name: Running Tests
         run: |
