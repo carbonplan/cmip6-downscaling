@@ -28,7 +28,7 @@ _defaults = {
         },
         'gard': {},
         'maca': {},
-        'web_results': {'blob': 'analysis_notebooks', 'storage_options': {}},
+        # 'web_results': {'blob': 'analysis_notebooks', 'storage_options': {}},
     },
     "data_catalog": {
         "cmip": {
@@ -45,7 +45,7 @@ _defaults = {
         "cloud": {
             "storage_options": {'container': 'prefect'},
             "agent": "az-eu-west",
-            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git git+https://github.com/pangeo-data/scikit-downscale.git",
+            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git@feature/cleanup_utils git+https://github.com/pangeo-data/scikit-downscale.git",
             "kubernetes_cpu": 7,
             "kubernetes_memory": "16Gi",
             "image": "carbonplan/cmip6-downscaling-prefect:2022.01.05",
@@ -63,8 +63,6 @@ _defaults = {
         "test": {
             "storage_options": {'directory': './'},
         },
-        "pangeo": {
-            "storage_options": {'directory': './'},
-        },
+        "pangeo": {"storage_options": {'directory': './'}, 'n_workers': 2, 'threads_per_worker': 2},
     },
 }

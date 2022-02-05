@@ -1,9 +1,11 @@
+from datetime import timedelta
+
 from prefect import Flow, Parameter, task
 from xpersist import CacheStore
 from xpersist.prefect.result import XpersistResult
 
 from cmip6_downscaling import config, runtimes
-from cmip6_downscaling.analysis.analysis import annual_summary, monthly_summary, run_analyses
+from cmip6_downscaling.analysis.analysis import annual_summary, monthly_summary  # , run_analyses
 from cmip6_downscaling.methods.bcsd import (
     fit_and_predict,
     get_coarse_obs,
@@ -43,7 +45,6 @@ results_cache_store = CacheStore(
     storage_options=config.get("storage.results.storage_options"),
 )
 
-
 # Transform Functions into Tasks -----------------------------------------------------------
 
 
@@ -55,18 +56,24 @@ return_obs_task = task(
 get_coarse_obs_task = task(
     get_coarse_obs,
     tags=['dask-resource:TASKSLOTS=1'],
+    max_retries=5,
+    retry_delay=timedelta(seconds=5),
     result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target=make_coarse_obs_path,
 )
 get_spatial_anomalies_task = task(
     get_spatial_anomalies,
     tags=['dask-resource:TASKSLOTS=1'],
+    max_retries=5,
+    retry_delay=timedelta(seconds=5),
     result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target=make_spatial_anomalies_path,
 )
 return_coarse_obs_full_time_task = task(
     return_coarse_obs_full_time,
     tags=['dask-resource:TASKSLOTS=1'],
+    max_retries=5,
+    retry_delay=timedelta(seconds=5),
     result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target=make_coarse_obs_path,  # is this right? to have the same target? maybe supposed to be make_rechunked_obs_path
 )
@@ -74,6 +81,8 @@ return_coarse_obs_full_time_task = task(
 return_gcm_train_full_time_task = task(
     return_gcm_train_full_time,
     tags=['dask-resource:TASKSLOTS=1'],
+    max_retries=5,
+    retry_delay=timedelta(seconds=5),
     result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target=make_rechunked_gcm_path,
 )
@@ -81,6 +90,8 @@ return_gcm_train_full_time_task = task(
 return_gcm_predict_rechunked_task = task(
     return_gcm_predict_rechunked,
     tags=['dask-resource:TASKSLOTS=1'],
+    max_retries=5,
+    retry_delay=timedelta(seconds=5),
     result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target=make_gcm_predict_path,
 )
@@ -95,6 +106,8 @@ fit_and_predict_task = task(
 postprocess_bcsd_task = task(
     postprocess_bcsd,
     tags=['dask-resource:TASKSLOTS=1'],
+    max_retries=5,
+    retry_delay=timedelta(seconds=5),
     log_stdout=True,
     result=XpersistResult(results_cache_store, serializer="xarray.zarr"),
     target=make_bcsd_output_path,
@@ -102,7 +115,6 @@ postprocess_bcsd_task = task(
 
 monthly_summary_task = task(
     monthly_summary,
-    tags=['dask-resource:TASKSLOTS=1'],
     log_stdout=True,
     result=XpersistResult(results_cache_store, serializer="xarray.zarr"),
     target=make_monthly_summary_path,  # TODO: replace with the paradigm from PR #84 once it's merged (also pull that)
@@ -110,7 +122,6 @@ monthly_summary_task = task(
 
 annual_summary_task = task(
     annual_summary,
-    tags=['dask-resource:TASKSLOTS=1'],
     result=XpersistResult(results_cache_store, serializer="xarray.zarr"),
     target=make_annual_summary_path,
 )
@@ -256,33 +267,33 @@ with Flow(
         uri=config.get('storage.results.uri') + pyramid_path_daily,
     )
 
-    monthly_summary_ds = monthly_summary_task(
-        postprocess_bcsd_ds,
-    )
+    # monthly_summary_ds = monthly_summary_task(
+    #     postprocess_bcsd_ds,
+    # )
 
-    annual_summary_ds = annual_summary_task(postprocess_bcsd_ds)
+    # annual_summary_ds = annual_summary_task(postprocess_bcsd_ds)
 
-    pyramid_location_monthly = pyramid.regrid(
-        monthly_summary_ds, uri=config.get('storage.results.uri') + pyramid_path_monthly
-    )
+    # pyramid_location_monthly = pyramid.regrid(
+    #     monthly_summary_ds, uri=config.get('storage.results.uri') + pyramid_path_monthly
+    # )
 
-    pyramid_location_annual = pyramid.regrid(
-        annual_summary_ds, uri=config.get('storage.results.uri') + pyramid_path_annual
-    )
+    # pyramid_location_annual = pyramid.regrid(
+    #     annual_summary_ds, uri=config.get('storage.results.uri') + pyramid_path_annual
+    # )
 
-    analysis_location = run_analyses(
-        {
-            'gcm_identifier': gcm_identifier,
-            'obs_identifier': obs_identifier,
-            'result_dir': config.get('storage.results.uri'),
-            'intermediate_dir': config.get('storage.intermediate.uri'),
-            'var': variable,
-            'gcm': gcm,
-            'scenario': scenario,
-        },
-        web_blob=config.get('storage.web_results.blob'),
-        bbox=bbox,
-        train_period=train_period,
-        predict_period=predict_period,
-        upstream_tasks=[postprocess_bcsd_ds],
-    )
+    # analysis_location = run_analyses(
+    #     {
+    #         'gcm_identifier': gcm_identifier,
+    #         'obs_identifier': obs_identifier,
+    #         'result_dir': config.get('storage.results.uri'),
+    #         'intermediate_dir': config.get('storage.intermediate.uri'),
+    #         'var': variable,
+    #         'gcm': gcm,
+    #         'scenario': scenario,
+    #     },
+    #     web_blob=config.get('storage.web_results.blob'),
+    #     bbox=bbox,
+    #     train_period=train_period,
+    #     predict_period=predict_period,
+    #     upstream_tasks=[postprocess_bcsd_ds],
+    # )

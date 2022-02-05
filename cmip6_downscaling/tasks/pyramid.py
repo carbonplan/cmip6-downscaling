@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 import dask
 import datatree as dt
 import fsspec
@@ -62,7 +64,12 @@ def _postprocess(dt: dt.DataTree, levels: int, other_chunks: dict = None) -> dt.
     return dt
 
 
-@task(log_stdout=True, tags=['dask-resource:TASKSLOTS=1'])
+@task(
+    log_stdout=True,
+    tags=['dask-resource:TASKSLOTS=1'],
+    max_retries=5,
+    retry_delay=timedelta(seconds=5),
+)
 def regrid(ds: xr.Dataset, levels: int = 2, uri: str = None, other_chunks: dict = None) -> str:
     '''Task to create a data pyramid from an xarray Dataset
 
@@ -78,7 +85,7 @@ def regrid(ds: xr.Dataset, levels: int = 2, uri: str = None, other_chunks: dict 
         Chunks for non-spatial dims
     '''
 
-    with dask.config.set(scheduler='threads'):
+    with dask.config.set(scheduler='single-threaded'):
 
         ds.coords['date_str'] = ds['time'].dt.strftime('%Y-%m-%d').astype('S10')
 
