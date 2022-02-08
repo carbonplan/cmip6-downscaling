@@ -68,9 +68,9 @@ def remove_stores_from_input_params(gcm_identifier: str, obs_identifier: str):
             path_template = path_template.format(
                 gcm_identifier=gcm_identifier, obs_identifier=obs_identifier
             )
-            store_uri = stage_uri + '/' + path_template
+            store_uri = stage_uri + path_template
             store_xpersist_cache = (
-                stage_uri + '/' + config.get("storage.xpersist_store_name") + path_template
+                stage_uri + config.get("storage.xpersist_store_name") + path_template
             )
             try:
                 print('Removing: ', store_uri, '\n', store_xpersist_cache, '\n')
