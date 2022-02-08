@@ -38,6 +38,7 @@ class BaseRuntime:
 class CloudRuntime(BaseRuntime):
     def __init__(
         self,
+        runtime_name="cloud",
         storage_options=None,
         agent=None,
         extra_pip_packages=None,
@@ -54,7 +55,7 @@ class CloudRuntime(BaseRuntime):
         adapt_max=None,
         dask_distributed_worker_resources_taskslots=None,
     ):
-
+        self._runtime_name = runtime_name
         self._storage_options = storage_options is not None or config.get(
             "runtime.cloud.storage_options.container"
         )

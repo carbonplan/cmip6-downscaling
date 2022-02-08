@@ -5,7 +5,7 @@ from xpersist import CacheStore
 from xpersist.prefect.result import XpersistResult
 
 from cmip6_downscaling import config, runtimes
-from cmip6_downscaling.analysis.analysis import annual_summary, monthly_summary  # , run_analyses
+from cmip6_downscaling.analysis.analysis import annual_summary, monthly_summary, run_analyses
 from cmip6_downscaling.methods.bcsd import (
     fit_and_predict,
     get_coarse_obs,
@@ -34,12 +34,16 @@ from cmip6_downscaling.workflows.paths import (
     make_spatial_anomalies_path,
 )
 
+# storage_prefix = config.get("runtime.cloud.storage_prefix")
+
 runtime = runtimes.get_runtime()
 
 intermediate_cache_store = CacheStore(
     config.get("storage.intermediate.uri"),
     storage_options=config.get("storage.intermediate.storage_options"),
 )
+
+
 results_cache_store = CacheStore(
     config.get("storage.results.uri"),
     storage_options=config.get("storage.results.storage_options"),
@@ -165,8 +169,8 @@ with Flow(
         predict_period=predict_period,
         bbox=bbox,
     )
-    if config.get('run_options.cleanup_flag') is True:
-        cleanup.run_rsfip(gcm_identifier, obs_identifier)
+    # if config.get('run_options.cleanup_flag') is True:
+    cleanup.run_rsfip(gcm_identifier, obs_identifier)
 
     # preprocess_bcsd_tasks(s):
 
@@ -267,33 +271,33 @@ with Flow(
         uri=config.get('storage.results.uri') + pyramid_path_daily,
     )
 
-    # monthly_summary_ds = monthly_summary_task(
-    #     postprocess_bcsd_ds,
-    # )
+    monthly_summary_ds = monthly_summary_task(
+        postprocess_bcsd_ds,
+    )
 
-    # annual_summary_ds = annual_summary_task(postprocess_bcsd_ds)
+    annual_summary_ds = annual_summary_task(postprocess_bcsd_ds)
 
-    # pyramid_location_monthly = pyramid.regrid(
-    #     monthly_summary_ds, uri=config.get('storage.results.uri') + pyramid_path_monthly
-    # )
+    pyramid_location_monthly = pyramid.regrid(
+        monthly_summary_ds, uri=config.get('storage.results.uri') + pyramid_path_monthly
+    )
 
-    # pyramid_location_annual = pyramid.regrid(
-    #     annual_summary_ds, uri=config.get('storage.results.uri') + pyramid_path_annual
-    # )
+    pyramid_location_annual = pyramid.regrid(
+        annual_summary_ds, uri=config.get('storage.results.uri') + pyramid_path_annual
+    )
 
-    # analysis_location = run_analyses(
-    #     {
-    #         'gcm_identifier': gcm_identifier,
-    #         'obs_identifier': obs_identifier,
-    #         'result_dir': config.get('storage.results.uri'),
-    #         'intermediate_dir': config.get('storage.intermediate.uri'),
-    #         'var': variable,
-    #         'gcm': gcm,
-    #         'scenario': scenario,
-    #     },
-    #     web_blob=config.get('storage.web_results.blob'),
-    #     bbox=bbox,
-    #     train_period=train_period,
-    #     predict_period=predict_period,
-    #     upstream_tasks=[postprocess_bcsd_ds],
-    # )
+    analysis_location = run_analyses(
+        {
+            'gcm_identifier': gcm_identifier,
+            'obs_identifier': obs_identifier,
+            'result_dir': config.get('storage.results.uri'),
+            'intermediate_dir': config.get('storage.intermediate.uri'),
+            'var': variable,
+            'gcm': gcm,
+            'scenario': scenario,
+        },
+        web_blob=config.get('storage.web_results.blob'),
+        bbox=bbox,
+        train_period=train_period,
+        predict_period=predict_period,
+        upstream_tasks=[postprocess_bcsd_ds],
+    )

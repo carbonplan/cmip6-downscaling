@@ -1,13 +1,25 @@
 """Config file used by donfig"""
-
 _defaults = {
     'storage': {
         'gcm_identifier_template': '{gcm}/{scenario}/{variable}/{bbox}/{train_period}/{predict_period}/',
         'obs_identifier_template': '{obs}/{variable}/{bbox}/{train_period}/',
-        'intermediate': {'uri': '/tmp/flow-outputs/intermediates/', 'storage_options': {}},
-        'results': {'uri': '/tmp/flow-outputs/results/', 'storage_options': {}},
-        'temporary': {'uri': '/tmp/flow-outputs/temporary/', 'storage_options': {}},
+        'intermediate': {
+            'uri': 'az://flow-outputs/intermediates/',
+            'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
+        },
+        'results': {
+            'uri': 'az://flow-outputs/results/',
+            'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
+        },
+        'temporary': {
+            'uri': 'az://flow-outputs/temporary/',
+            'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
+        },
         'xpersist_store_name': 'xpersist_metadata_store/',
+        'web_results': {
+            'blob': 'analysis_notebooks',
+            'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
+        },
     },
     'methods': {
         'bcsd': {
@@ -28,7 +40,6 @@ _defaults = {
         },
         'gard': {},
         'maca': {},
-        # 'web_results': {'blob': 'analysis_notebooks', 'storage_options': {}},
     },
     "data_catalog": {
         "cmip": {
@@ -43,6 +54,7 @@ _defaults = {
     'run_options': {'runtime': None, 'cleanup_flag': True},
     "runtime": {
         "cloud": {
+            "storage_prefix": "az://",
             "storage_options": {'container': 'prefect'},
             "agent": "az-eu-west",
             "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git@feature/cleanup_utils git+https://github.com/pangeo-data/scikit-downscale.git",
@@ -59,10 +71,16 @@ _defaults = {
             "adapt_max": 2,
             "dask_distributed_worker_resources_taskslots": "1",
         },
-        "local": {"storage_options": {'directory': './'}},
+        "local": {"storage_prefix": "/tmp/", "storage_options": {'directory': './'}},
         "test": {
+            "storage_prefix": "/tmp/",
             "storage_options": {'directory': './'},
         },
-        "pangeo": {"storage_options": {'directory': './'}, 'n_workers': 2, 'threads_per_worker': 2},
+        "pangeo": {
+            "storage_prefix": "az://",
+            "storage_options": {'directory': './'},
+            'n_workers': 2,
+            'threads_per_worker': 2,
+        },
     },
 }
