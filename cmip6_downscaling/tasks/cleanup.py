@@ -35,8 +35,9 @@ def remove_stores(fpaths: List[str]):
             print('File not found: ', fil)
 
 
-@task
+@task(log_stdout=True)
 def run_rsfip(gcm_identifier: str, obs_identifier: str):
+    print(gcm_identifier)
     # remove_stores_from_input_params will stall if a task decorator is added. For some reason this seems to work...
     remove_stores_from_input_params(gcm_identifier, obs_identifier)
 

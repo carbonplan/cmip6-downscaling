@@ -4,11 +4,11 @@ _defaults = {
         'gcm_identifier_template': '{gcm}/{scenario}/{variable}/{bbox}/{train_period}/{predict_period}/',
         'obs_identifier_template': '{obs}/{variable}/{bbox}/{train_period}/',
         'intermediate': {
-            'uri': 'az://flow-outputs/intermediates/',
+            'uri': 'az://flow-outputs/testing_intermediates/',
             'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
         },
         'results': {
-            'uri': 'az://flow-outputs/results/',
+            'uri': 'az://flow-outputs/testing_results/',
             'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
         },
         'temporary': {
@@ -60,7 +60,7 @@ _defaults = {
             "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git@feature/cleanup_utils git+https://github.com/pangeo-data/scikit-downscale.git",
             "kubernetes_cpu": 7,
             "kubernetes_memory": "16Gi",
-            "image": "carbonplan/cmip6-downscaling-prefect:2022.01.05",
+            "image": "carbonplan/cmip6-downscaling-prefect:2022.02.05",
             "pod_memory_limit": "4Gi",
             "pod_memory_request": "4Gi",
             "pod_threads_per_worker": 2,
