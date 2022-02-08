@@ -257,9 +257,24 @@ with Flow(
 
     monthly_summary_ds = monthly_summary_task(
         postprocess_bcsd_ds,
+        gcm=gcm,
+        scenario=scenario,
+        variable=variable,
+        train_period=train_period,
+        predict_period=predict_period,
+        bbox=bbox,
+        gcm_identifier=gcm_identifier
     )
 
-    annual_summary_ds = annual_summary_task(postprocess_bcsd_ds)
+    annual_summary_ds = annual_summary_task(
+        postprocess_bcsd_ds,
+        gcm=gcm,
+        scenario=scenario,
+        variable=variable,
+        train_period=train_period,
+        predict_period=predict_period,
+        bbox=bbox,
+        gcm_identifier=gcm_identifier)
 
     pyramid_location_monthly = pyramid.regrid(
         monthly_summary_ds, uri=config.get('storage.results.uri') + pyramid_path_monthly
