@@ -293,7 +293,7 @@ def get_coarse_obs_task(
     target=make_interpolated_obs_path,
 )
 def coarsen_and_interpolate_obs_task(
-    obs, train_period_start, train_period_end, variables, gcm, chunking_approach, **kwargs
+    obs, train_period, predict_period, variable, gcm, scenario, chunking_approach, bbox, **kwargs
 ):
     """
     Coarsen the observation dataset to the grid of the GCM model specified in inputs then
@@ -319,25 +319,24 @@ def coarsen_and_interpolate_obs_task(
     ds_obs_interpolated_rechunked: xr.Dataset
         An observation dataset that has been coarsened, interpolated back to original grid, and then rechunked.
     """
-    # get obs in full space chunks
-    ds_obs_full_space = get_obs(
+    # get obs
+    ds_obs = return_obs(
         obs=obs,
-        train_period_start=train_period_start,
-        train_period_end=train_period_end,
-        variables=variables,
-        chunking_approach="full_space",
-        cache_within_rechunk=True,
+        train_period=train_period,
+        variable=variable,
+        bbox=bbox
     )
 
     # regrid to coarse scale
-    ds_obs_coarse = get_coarse_obs_task.run(
-        ds_obs=ds_obs_full_space, gcm=gcm, chunking_approach="full_space", **kwargs
+    ds_obs_coarse = get_coarse_obs(
+        obs_ds=ds_obs, gcm=gcm, scenario=scenario, variable=variable, 
+        train_period=train_period, predict_period=predict_period, bbox=bbox, **kwargs
     )
 
     # interpolate to fine scale again
     ds_obs_interpolated = regrid_ds(
         ds=ds_obs_coarse,
-        target_grid_ds=ds_obs_full_space.isel(time=0),
+        target_grid_ds=ds_obs.isel(time=0).chunk({'lat': -1, 'lon': -1}),
         chunking_approach="full_space",
     )
 

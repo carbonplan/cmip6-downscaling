@@ -9,11 +9,13 @@ from prefect import Flow, Parameter, task
 from xpersist import CacheStore
 from xpersist.prefect.result import XpersistResult
 
-import cmip6_downscaling as config
+from cmip6_downscaling import config, runtimes
 from cmip6_downscaling.data.observations import get_obs
 from cmip6_downscaling.methods.gard import gard_fit_and_predict, gard_postprocess, generate_scrf
 from cmip6_downscaling.runtimes import get_runtime
 from cmip6_downscaling.tasks.common_tasks import (
+    build_bbox,
+    build_time_period_slices,
     bias_correct_gcm_task,
     bias_correct_obs_task,
     coarsen_and_interpolate_obs_task,
@@ -113,40 +115,53 @@ with Flow(
     run_config=runtime.run_config,
     executor=runtime.executor,
 ) as gard_flow:
-    obs = Parameter("OBS")
-    gcm = Parameter("GCM")
-    scenario = Parameter("SCENARIO")
-    train_period_start = Parameter("TRAIN_PERIOD_START")
-    train_period_end = Parameter("TRAIN_PERIOD_END")
-    predict_period_start = Parameter("PREDICT_PERIOD_START")
-    predict_period_end = Parameter("PREDICT_PERIOD_END")
-    variables = Parameter("VARIABLES")
-    bias_correction_method = Parameter("BIAS_CORRECTION_METHOD")
-    bias_correction_kwargs = Parameter("BIAS_CORRECTION_KWARGS")
-    label = Parameter("LABEL")
-    model_type = Parameter("MODEL_TYPE")
-    model_params = Parameter("MODEL_PARAMS")
+    obs = Parameter("obs")
+    gcm = Parameter("gcm")
+    scenario = Parameter("scenario")
+    variable = Parameter("variables")
+    features = Parameter("features")
+    # bbox and train and predict period had to be encapsulated into tasks to prevent prefect from complaining about unused parameters.
+    bbox = build_bbox(
+        latmin=Parameter("latmin"),
+        latmax=Parameter("latmax"),
+        lonmin=Parameter("lonmin"),
+        lonmax=Parameter("lonmax"),
+    )
+    train_period = build_time_period_slices(Parameter('train_period'))
+    predict_period = build_time_period_slices(Parameter('predict_period'))
+    bias_correction_kwargs = Parameter("bias_correction_kwargs")
+    bias_correction_method = Parameter("bias_correction_method")
+    model_type = Parameter("model_type")
+    model_params = Parameter("model_params")
 
     # dictionary with information to build appropriate paths for caching
-    gcm_grid_spec, obs_identifier, gcm_identifier = path_builder_task(
+    (
+        gcm_grid_spec,
+        obs_identifier,
+        gcm_identifier,
+        pyramid_path_daily,
+        pyramid_path_monthly,
+        pyramid_path_annual,
+    ) = path_builder_task(
         obs=obs,
         gcm=gcm,
         scenario=scenario,
-        train_period_start=train_period_start,
-        train_period_end=train_period_end,
-        predict_period_start=predict_period_start,
-        predict_period_end=predict_period_end,
-        variables=variables,
+        variable=variable,
+        train_period=train_period,
+        predict_period=predict_period,
+        bbox=bbox,
     )
 
     # get interpolated observation
     ds_obs_interpolated_full_time = coarsen_and_interpolate_obs_task(
         obs=obs,
-        train_period_start=train_period_start,
-        train_period_end=train_period_end,
-        variables=variables,
+        train_period=train_period,
+        predict_period=predict_period,
+        variable=variable,
         gcm=gcm,
+        scenario=scenario,
         chunking_approach='full_time',
+        bbox=bbox,
         gcm_grid_spec=gcm_grid_spec,
         obs_identifier=obs_identifier,
     )
@@ -156,11 +171,9 @@ with Flow(
         obs=obs,
         gcm=gcm,
         scenario=scenario,
-        variables=variables,
-        train_period_start=train_period_start,
-        train_period_end=train_period_end,
-        predict_period_start=predict_period_start,
-        predict_period_end=predict_period_end,
+        variable=variable,
+        train_period=train_period,
+        predict_period=predict_period,
         chunking_approach='full_time',
     )
 
