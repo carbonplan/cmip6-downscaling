@@ -489,6 +489,7 @@ def bias_correct_gcm_task(
     historical_period_end: str,
     method: str,
     bc_kwargs: Optional[Dict[str, Any]] = None,
+    **kwargs,
 ) -> xr.DataArray:
     """
     Bias correct gcm data to the provided observation data according to methods and kwargs.

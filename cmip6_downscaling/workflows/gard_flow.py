@@ -9,9 +9,9 @@ from prefect import Flow, Parameter, task
 from xpersist import CacheStore
 from xpersist.prefect.result import XpersistResult
 
-import cmip6_downscaling as config
+from cmip6_downscaling import config
 from cmip6_downscaling.data.observations import get_obs
-from cmip6_downscaling.methods.gard import gard_fit_and_predict, gard_postprocess, generate_scrf
+from cmip6_downscaling.methods.gard import gard_fit_and_predict, gard_postprocess, read_scrf
 from cmip6_downscaling.runtimes import get_runtime
 from cmip6_downscaling.tasks.common_tasks import (
     bias_correct_gcm_task,
@@ -25,7 +25,6 @@ from cmip6_downscaling.workflows.paths import (
     make_gard_post_processed_output_path,
     make_gard_predict_output_path,
     make_rechunked_obs_path,
-    make_scrf_path,
 )
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching
 
@@ -48,10 +47,8 @@ fit_and_predict_task = task(
 )
 
 
-generate_scrf_task = task(
-    generate_scrf,
-    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
-    target=make_scrf_path,
+read_scrf_task = task(
+    read_scrf,
 )
 
 
@@ -67,8 +64,6 @@ def prep_gard_input_task(
     obs: str,
     train_period_start: str,
     train_period_end: str,
-    predict_period_start: str,
-    predict_period_end: str,
     variables: List[str],
     X_train: xr.Dataset,
     X_pred: xr.Dataset,
@@ -102,9 +97,7 @@ def prep_gard_input_task(
         zarr_array=X_pred, template_chunk_array=X_train, output_path=rechunked_gcm_path
     )
 
-    predict_period = slice(predict_period_start, predict_period_end)
-
-    return X_train, y_train_rechunked, X_pred_rechunked.sel(time=predict_period)
+    return X_train, y_train_rechunked, X_pred_rechunked
 
 
 with Flow(
@@ -190,8 +183,6 @@ with Flow(
         obs=obs,
         train_period_start=train_period_start,
         train_period_end=train_period_end,
-        predict_period_start=predict_period_start,
-        predict_period_end=predict_period_end,
         variables=variables,
         X_train=ds_obs_bias_corrected,
         X_pred=ds_gcm_bias_corrected,
@@ -212,7 +203,15 @@ with Flow(
     )
 
     # post process
-    scrf = generate_scrf_task(data=y_train, obs_identifier=obs_identifier, label=label)
+    scrf = read_scrf_task(
+        model_output=model_output,
+        obs=obs,
+        label=label,
+        train_period_start=train_period_start,
+        train_period_end=train_period_end,
+        predict_period_start=predict_period_start,
+        predict_period_end=predict_period_end,
+    )
 
     final_output = gard_postprocess_task(
         model_output=model_output,
