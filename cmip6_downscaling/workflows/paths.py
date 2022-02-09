@@ -290,8 +290,10 @@ def make_gard_predict_output_path(
 
 
 def make_scrf_path(
-    obs_identifier: str,
+    obs: str,
     label: str,
+    start_year: str,
+    end_year: str,
     **kwargs,
 ):
     """
@@ -299,17 +301,21 @@ def make_scrf_path(
 
     Parameters
     ----------
-    obs_identifier : str
-        Output from build_obs_identifier. String to identify the observation dataset used
+    obs : str
+        Name of observation dataset
     label: str
         The variable being predicted
+    start_year: str
+        Start year of the dataset
+    end_year: str
+        End year of the dataset
 
     Returns
     -------
     scrf_path : str
         Path of SCRF
     """
-    return f"scrf/{obs_identifier}_{label}.zarr"
+    return f"scrf/{obs}_{label}_{start_year}_{end_year}.zarr"
 
 
 def make_gard_post_processed_output_path(
