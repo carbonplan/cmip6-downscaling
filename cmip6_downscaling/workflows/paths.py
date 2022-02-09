@@ -107,10 +107,12 @@ def make_rechunked_obs_path(
     if obs_identifier is None:
         obs_identifier = build_obs_identifier(**kwargs)
 
-    return f"rechunked_obs/{obs_identifier}_{chunking_approach}.zarr"
+    return f"rechunked_obs/{obs_identifier}{chunking_approach}.zarr"
 
 
-def make_coarse_obs_path(obs_identifier: str, **kwargs) -> str:
+def make_coarse_obs_path(
+    chunking_approach: str, obs_identifier: str, gcm_grid_spec: str, **kwargs
+) -> str:
     """Build the path for coarsened observation
 
     Parameters
@@ -124,7 +126,7 @@ def make_coarse_obs_path(obs_identifier: str, **kwargs) -> str:
         Path to which coarsened observation defined by the parameters should be stored
     """
 
-    return f"coarsened_obs/{obs_identifier}.zarr"
+    return f"coarsened_obs/{obs_identifier}{chunking_approach}_{gcm_grid_spec}.zarr"
 
 
 def make_interpolated_obs_path(
@@ -148,7 +150,7 @@ def make_interpolated_obs_path(
     """
     if obs_identifier is None:
         obs_identifier = build_obs_identifier(**kwargs)
-    return f"interpolated_obs/{obs_identifier}_{chunking_approach}_{gcm_grid_spec}.zarr"
+    return f"interpolated_obs/{obs_identifier}{chunking_approach}_{gcm_grid_spec}.zarr"
 
 
 def make_interpolated_gcm_path(
@@ -521,7 +523,7 @@ def make_return_obs_path(obs_identifier: str, **kwargs) -> str:
     return f"obs_ds/{obs_identifier}.zarr"
 
 
-def make_spatial_anomalies_path(obs_identifier: str, **kwargs) -> str:
+def make_spatial_anomalies_path(obs_identifier: str, gcm_grid_spec: str, **kwargs) -> str:
     """Build the path for spatial anomalies
 
     Parameters
@@ -534,7 +536,7 @@ def make_spatial_anomalies_path(obs_identifier: str, **kwargs) -> str:
     spatial_anomalies_path : str
         Path to bcsd spatial anomalies file location
     """
-    return f"spatial_anomalies/{obs_identifier}.zarr"
+    return f"spatial_anomalies/{obs_identifier}{gcm_grid_spec}.zarr"
 
 
 def make_gcm_predict_path(gcm_identifier: str = None, **kwargs) -> str:

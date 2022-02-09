@@ -41,7 +41,7 @@ def qaqc_checks(ds: xr.Dataset) -> Tuple[xr.Dataset, xr.Dataset]:
     return annual_qaqc_ts, qaqc_maps
 
 
-def monthly_summary(ds: xr.Dataset) -> xr.Dataset:
+def monthly_summary(ds: xr.Dataset, **kwargs) -> xr.Dataset:
     """Creates an monthly summary dataset.
 
     Parameters
@@ -66,7 +66,7 @@ def monthly_summary(ds: xr.Dataset) -> xr.Dataset:
     return out_ds
 
 
-def annual_summary(ds: xr.Dataset) -> xr.Dataset:
+def annual_summary(ds: xr.Dataset, **kwargs) -> xr.Dataset:
     """Creates an annual summary dataset.
 
     Parameters
