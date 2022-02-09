@@ -175,6 +175,8 @@ with Flow(
         predict_period=predict_period,
         bbox=bbox,
         obs_identifier=obs_identifier,
+        chunking_approach='full_space',
+        gcm_grid_spec=gcm_grid_spec,
     )
 
     spatial_anomalies_ds = get_spatial_anomalies_task(
@@ -187,6 +189,7 @@ with Flow(
         predict_period=predict_period,
         bbox=bbox,
         obs_identifier=obs_identifier,
+        gcm_grid_spec=gcm_grid_spec,
     )
 
     # the next three tasks prepare the inputs required by bcsd
@@ -199,6 +202,8 @@ with Flow(
         predict_period=predict_period,
         bbox=bbox,
         obs_identifier=obs_identifier,
+        chunking_approach='full_time',
+        gcm_grid_spec=gcm_grid_spec,
     )
 
     gcm_train_subset_full_time_ds = return_gcm_train_full_time_task(
@@ -263,7 +268,7 @@ with Flow(
         train_period=train_period,
         predict_period=predict_period,
         bbox=bbox,
-        gcm_identifier=gcm_identifier
+        gcm_identifier=gcm_identifier,
     )
 
     annual_summary_ds = annual_summary_task(
@@ -274,7 +279,8 @@ with Flow(
         train_period=train_period,
         predict_period=predict_period,
         bbox=bbox,
-        gcm_identifier=gcm_identifier)
+        gcm_identifier=gcm_identifier,
+    )
 
     pyramid_location_monthly = pyramid.regrid(
         monthly_summary_ds, uri=config.get('storage.results.uri') + pyramid_path_monthly
