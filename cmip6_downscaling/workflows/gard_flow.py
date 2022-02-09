@@ -80,8 +80,7 @@ def prep_gard_input_task(
     # get observation data in the same chunking scheme as
     ds_obs = get_obs(
         obs=obs,
-        train_period_start=train_period_start,
-        train_period_end=train_period_end,
+        train_period=slice(train),
         variables=variables,
         chunking_approach=None,
         cache_within_rechunk=False,
@@ -157,7 +156,7 @@ with Flow(
         obs=obs,
         train_period=train_period,
         predict_period=predict_period,
-        variable=variable,
+        variables=features,
         gcm=gcm,
         scenario=scenario,
         chunking_approach='full_time',
@@ -171,7 +170,7 @@ with Flow(
         obs=obs,
         gcm=gcm,
         scenario=scenario,
-        variable=variable,
+        variables=features,
         train_period=train_period,
         predict_period=predict_period,
         chunking_approach='full_time',

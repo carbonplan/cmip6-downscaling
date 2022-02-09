@@ -293,7 +293,7 @@ def get_coarse_obs_task(
     target=make_interpolated_obs_path,
 )
 def coarsen_and_interpolate_obs_task(
-    obs, train_period, predict_period, variable, gcm, scenario, chunking_approach, bbox, **kwargs
+    obs, train_period, predict_period, variables, gcm, scenario, chunking_approach, bbox, **kwargs
 ):
     """
     Coarsen the observation dataset to the grid of the GCM model specified in inputs then
@@ -362,10 +362,8 @@ def interpolate_gcm_task(
     obs: str,
     gcm: str,
     scenario: str,
-    train_period_start: str,
-    train_period_end: str,
-    predict_period_start: str,
-    predict_period_end: str,
+    train_period: slice,
+    predict_period: slice,
     variables: Union[str, List[str]],
     chunking_approach: str,
 ):
@@ -380,14 +378,10 @@ def interpolate_gcm_task(
         Name of the GCM model
     scenario: str
         Name of the emission scenario
-    training_period_start: str
-        Start year of training/historical period
-    training_period_end: str
-        End year of training/historical period
-    predict_period_start: str
-        Start year of predict/future period
-    predict_period_end: str
-        End year of predict/future period
+    training_period: slice
+        Training/historical period bounds
+    predict_period: slice
+        Prediction (historical and/or future) period bounds
     variables: List[str]
         List of variables to get in obs dataset
     chunking_approach: str
@@ -414,8 +408,7 @@ def interpolate_gcm_task(
     # get obs as a template
     ds_obs_full_space = get_obs(
         obs=obs,
-        train_period_start=train_period_start,
-        train_period_end=train_period_end,
+        train_period=train_period,
         variables=variables,
         chunking_approach=None,
         cache_within_rechunk=False,
