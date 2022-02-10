@@ -129,24 +129,18 @@ def read_scrf(
 
     scrf_storage = 'az://flow-outputs/intermediate/'
 
-    train_period_start = train_period.start
-    train_period_end = train_period.stop
     predict_period_start = predict_period.start
     predict_period_end = predict_period.stop
 
     # first find out which decades of random fields we'd need to load
-    train_start_decade = get_decade_start_year(train_period_start)
-    train_end_decade = get_decade_start_year(train_period_end)
     predict_start_decade = get_decade_start_year(predict_period_start)
     predict_end_decade = get_decade_start_year(predict_period_end)
 
-    training_decades = np.arange(train_start_decade, train_end_decade + 1, 10)
     predict_decades = np.arange(predict_start_decade, predict_end_decade + 1, 10)
-    all_decades = list(set(list(training_decades) + list(predict_decades)))
 
     # load all the random field data
     scrf = []
-    for decade_start in sorted(all_decades):
+    for decade_start in sorted(predict_decades):
         start_year = str(int(decade_start))
         end_year = str(int(decade_start + 9))
         scrf_path = make_scrf_path(obs=obs, label=label, start_year=start_year, end_year=end_year)
@@ -154,19 +148,14 @@ def read_scrf(
         scrf.append(xr.open_zarr(mapper))
     scrf = xr.combine_by_coords(scrf, combine_attrs='drop_conflicts')
 
-    # subset into the spatial domain
+    # subset into the spatial/temporal domain
     scrf = scrf.sel(
         lon=bbox.lon_slice,
         lat=bbox.lat_slice,
+        time=predict_period
     )
 
-    # subset into the temporal period
-    historical = scrf.sel(time=train_period)
-    future = scrf.sel(time=predict_period)
-    scrf = xr.combine_by_coords([historical, future], combine_attrs='drop_conflicts')
-    scrf = scrf.reindex(time=sorted(scrf.time.values))
-
-    return future.scrf
+    return scrf.scrf
 
 
 def gard_postprocess(

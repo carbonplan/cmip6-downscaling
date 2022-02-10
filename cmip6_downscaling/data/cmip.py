@@ -208,8 +208,9 @@ def get_gcm(
         bbox=bbox,
     )
 
-    ds_gcm = xr.combine_by_coords([ds_gcm_train, ds_gcm_predict], combine_attrs='drop_conflicts')
-    ds_gcm = ds_gcm.reindex(time=sorted(ds_gcm.time.values))
+    # override here because the training and predict periods might overlap but we don't want to
+    # bother checking that the values are all the same because they are (they all come from `ds_gcm`)
+    ds_gcm = xr.combine_by_coords([ds_gcm_train, ds_gcm_predict], compat='override', combine_attrs='drop_conflicts')    ds_gcm = ds_gcm.reindex(time=sorted(ds_gcm.time.values))
 
     if chunking_approach is None:
         return ds_gcm
