@@ -1,0 +1,23 @@
+{
+  "obs": "ERA5",
+  "gcm": "MIROC6",
+  "scenario": "ssp370",
+  "features": ["tasmax", "tasmin", "pr"],  
+  "variable": "tasmax",
+  "train_period": [
+    "1990",
+    "1990"
+  ],
+  "predict_period": [
+    "2020",
+    "2020"
+  ],
+  "latmin": "40",
+  "latmax": "50",
+  "lonmin": "80",
+  "lonmax": "90",
+  "bias_correction_method": "quantile_transform",
+  "bias_correction_kwargs": {},
+  "model_type": "PureRegression",
+  "model_params": {} 
+}

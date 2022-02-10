@@ -10,9 +10,9 @@ from xpersist import CacheStore
 from xpersist.prefect.result import XpersistResult
 
 from cmip6_downscaling import config, runtimes
-from cmip6_downscaling.data.observations import get_obs
 from cmip6_downscaling.methods.gard import gard_fit_and_predict, gard_postprocess, read_scrf
 from cmip6_downscaling.runtimes import get_runtime
+from cmip6_downscaling.methods.bcsd import return_obs
 from cmip6_downscaling.tasks.common_tasks import (
     build_bbox,
     build_time_period_slices,
@@ -64,27 +64,27 @@ gard_postprocess_task = task(
 @task(nout=3)
 def prep_gard_input_task(
     obs: str,
-    train_period_start: str,
-    train_period_end: str,
+    train_period: slice,
     variables: List[str],
     X_train: xr.Dataset,
     X_pred: xr.Dataset,
     gcm_identifier: str,
     bias_correction_method: str,
+    bbox, 
 ):
     # get observation data in the same chunking scheme as
-    ds_obs = get_obs(
+    ds_obs = return_obs(
         obs=obs,
-        train_period=slice(train),
-        variables=variables,
-        chunking_approach=None,
-        cache_within_rechunk=False,
+        train_period=train_period,
+        variable=variables,
+        bbox=bbox
     )
+
     rechunked_obs_path = make_rechunked_obs_path(
         obs=obs,
-        train_period_start=train_period_start,
-        train_period_end=train_period_end,
-        variables=variables,
+        train_period=train_period,
+        variable=variables,
+        bbox=bbox,
         chunking_approach='matched',
     )
     y_train_rechunked = rechunk_zarr_array_with_caching(
@@ -110,8 +110,8 @@ with Flow(
     obs = Parameter("obs")
     gcm = Parameter("gcm")
     scenario = Parameter("scenario")
-    variable = Parameter("variables")
-    features = Parameter("features")
+    variable = Parameter("variable")
+    features = Parameter("features")  # this must include the variable as well 
     # bbox and train and predict period had to be encapsulated into tasks to prevent prefect from complaining about unused parameters.
     bbox = build_bbox(
         latmin=Parameter("latmin"),
@@ -167,6 +167,7 @@ with Flow(
         train_period=train_period,
         predict_period=predict_period,
         chunking_approach='full_time',
+        bbox=bbox,
     )
 
     # bias correction and transformation
@@ -179,12 +180,11 @@ with Flow(
         obs_identifier=obs_identifier,
     )
 
-    # TODO: decide whether we are bias correcting to interpolated obs or actual obs
+    # bias correcting to interpolated obs
     ds_gcm_bias_corrected = bias_correct_gcm_task(
         ds_gcm=ds_gcm_interpolated_full_time,
         ds_obs=ds_obs_interpolated_full_time,
-        historical_period_start=train_period_start,
-        historical_period_end=train_period_end,
+        historical_period=train_period,
         method=bias_correction_method,
         bc_kwargs=bias_correction_kwargs,
         chunking_approach='full_time',
@@ -193,13 +193,13 @@ with Flow(
 
     X_train, y_train, X_pred = prep_gard_input_task(
         obs=obs,
-        train_period_start=train_period_start,
-        train_period_end=train_period_end,
-        variables=variables,
+        train_period=train_period,
+        variables=features,
         X_train=ds_obs_bias_corrected,
         X_pred=ds_gcm_bias_corrected,
         gcm_identifier=gcm_identifier,
         bias_correction_method=bias_correction_method,
+        bbox=bbox,
     )
 
     # fit and predict
@@ -207,30 +207,30 @@ with Flow(
         X_train=X_train,
         y_train=y_train,
         X_pred=X_pred,
-        label=label,
+        label=variable,
         model_type=model_type,
         model_params=model_params,
         gcm_identifier=gcm_identifier,
         bias_correction_method=bias_correction_method,
     )
 
-    # post process
-    scrf = read_scrf_task(
-        model_output=model_output,
-        obs=obs,
-        label=label,
-        train_period_start=train_period_start,
-        train_period_end=train_period_end,
-        predict_period_start=predict_period_start,
-        predict_period_end=predict_period_end,
-    )
+    # # post process
+    # scrf = read_scrf_task(
+    #     model_output=model_output,
+    #     obs=obs,
+    #     label=label,
+    #     train_period_start=train_period_start,
+    #     train_period_end=train_period_end,
+    #     predict_period_start=predict_period_start,
+    #     predict_period_end=predict_period_end,
+    # )
 
-    final_output = gard_postprocess_task(
-        model_output=model_output,
-        scrf=scrf,
-        model_params=model_params,
-        gcm_identifier=gcm_identifier,
-        bias_correction_method=bias_correction_method,
-        model_type=model_type,
-        label=label,
-    )
+    # final_output = gard_postprocess_task(
+    #     model_output=model_output,
+    #     scrf=scrf,
+    #     model_params=model_params,
+    #     gcm_identifier=gcm_identifier,
+    #     bias_correction_method=bias_correction_method,
+    #     model_type=model_type,
+    #     label=label,
+    # )

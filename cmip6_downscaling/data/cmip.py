@@ -6,7 +6,7 @@ import zarr
 
 from cmip6_downscaling import config
 from cmip6_downscaling.workflows.paths import make_rechunked_gcm_path
-from cmip6_downscaling.workflows.utils import lon_to_180, rechunk_zarr_array_with_caching
+from cmip6_downscaling.workflows.utils import lon_to_180, rechunk_zarr_array_with_caching, subset_dataset
 
 from . import cat
 
@@ -141,10 +141,9 @@ def get_gcm(
     gcm: str,
     scenario: str,
     variables: Union[str, List[str]],
-    train_period_start: str = '1970',
-    train_period_end: str = '2014',
-    predict_period_start: str = '2015',
-    predict_period_end: str = '2099',
+    train_period: slice,
+    predict_period: slice,
+    bbox, 
     chunking_approach: Optional[str] = None,
     cache_within_rechunk: Optional[bool] = True,
 ) -> xr.Dataset:
@@ -179,15 +178,27 @@ def get_gcm(
         source_ids=gcm,
         variable_ids=variables,
         return_type='xr',
-    ).sel(time=slice(train_period_start, train_period_end))
+    ).sel(time=train_period)
+
     future_gcm = load_cmip(
         activity_ids='ScenarioMIP',
         experiment_ids=scenario,
         source_ids=gcm,
         variable_ids=variables,
         return_type='xr',
-    ).sel(time=slice(predict_period_start, predict_period_end))
+    ).sel(time=predict_period)
+
     ds_gcm = xr.combine_by_coords([historical_gcm, future_gcm], combine_attrs='drop_conflicts')
+
+    date_start = min(int(train_period.start), int(predict_period.start))
+    date_end = max(int(train_period.stop), int(predict_period.stop))
+
+    ds_gcm = subset_dataset(
+        ds=ds_gcm,
+        variable=variables[0],
+        time_period=slice(str(date_start), str(date_end)),
+        bbox=bbox,
+    )
 
     if chunking_approach is None:
         return ds_gcm
@@ -196,10 +207,8 @@ def get_gcm(
         path_dict = {
             'gcm': gcm,
             'scenario': scenario,
-            'train_period_start': train_period_start,
-            'train_period_end': train_period_end,
-            'predict_period_start': predict_period_start,
-            'predict_period_end': predict_period_end,
+            'train_period': train_period,
+            'predict_period': predict_period,
             'variables': variables,
         }
         rechunked_path = make_rechunked_gcm_path(chunking_approach=chunking_approach, **path_dict)

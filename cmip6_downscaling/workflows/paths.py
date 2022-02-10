@@ -32,12 +32,15 @@ def build_obs_identifier(
     identifier : str
         string to be used in obs related paths as specified by the params
     """
+    if isinstance(variable, str):
+        variable = [variable]
+    var_string = '_'.join(sorted(variable))
 
     obs_identifier = config.get('storage.obs_identifier_template').format(
         obs=obs,
         train_period=f'{train_period.start}_{train_period.stop}',
         bbox=bbox,
-        variable=variable,
+        variable=var_string,
     )
 
     return obs_identifier
@@ -75,11 +78,14 @@ def build_gcm_identifier(
     identifier : str
         string to be used in gcm related paths as specified by the params
     """
-
+    if isinstance(variable, str):
+        variable = [variable]
+    var_string = '_'.join(sorted(variable))
+    
     gcm_identifier = config.get('storage.gcm_identifier_template').format(
         gcm=gcm,
         scenario=scenario,
-        variable=variable,
+        variable=var_string,
         train_period=f'{train_period.start}_{train_period.stop}',
         predict_period=f'{predict_period.start}_{predict_period.stop}',
         bbox=bbox,
@@ -88,7 +94,7 @@ def build_gcm_identifier(
 
 
 def make_rechunked_obs_path(
-    chunking_approach: str, obs_identifier: Optional[str] = None, **kwargs
+    chunking_approach: Optional[str] = '', obs_identifier: Optional[str] = None, **kwargs
 ) -> str:
     """Build the path for rechunked observation
 
@@ -154,7 +160,7 @@ def make_interpolated_obs_path(
 
 
 def make_interpolated_gcm_path(
-    obs: str, chunking_approach: str, gcm_identifier: Optional[str] = None, **kwargs
+    obs: str, chunking_approach: Optional[str] = '', gcm_identifier: Optional[str] = None, **kwargs
 ) -> str:
     """Build the path for GCM that has then been interpolated back to the observation grid
 
@@ -174,7 +180,8 @@ def make_interpolated_gcm_path(
     """
     if gcm_identifier is None:
         gcm_identifier = build_gcm_identifier(**kwargs)
-    return f"interpolated_gcm/{gcm_identifier}_{chunking_approach}_{obs}.zarr"
+
+    return f"interpolated_gcm/{gcm_identifier}{chunking_approach}_{obs}.zarr"
 
 
 def make_bias_corrected_obs_path(
@@ -208,13 +215,13 @@ def make_bias_corrected_obs_path(
         obs_identifier = build_obs_identifier(**kwargs)
     if chunking_approach is None:
         chunking_approach = ''
-    else:
-        chunking_approach = '_' + chunking_approach
 
     return f"bias_corrected_obs/{obs_identifier}{chunking_approach}_{gcm_grid_spec}_{method}.zarr"
 
 
-def make_rechunked_gcm_path(gcm_identifier: str, **kwargs) -> str:
+def make_rechunked_gcm_path(
+    gcm_identifier: Optional[str] = None, 
+    chunking_approach: Optional[str] = None, **kwargs) -> str:
     """Build the path for rechunked GCM
 
     Parameters
@@ -227,8 +234,13 @@ def make_rechunked_gcm_path(gcm_identifier: str, **kwargs) -> str:
     rechunked_gcm_path: str
         Path to which rechunked GCM defined by the parameters should be stored
     """
+    if gcm_identifier is None:
+        gcm_identifier = build_gcm_identifier(**kwargs)
 
-    return f"rechunked_gcm/{gcm_identifier}.zarr"
+    if chunking_approach is None:
+        chunking_approach = ''
+
+    return f"rechunked_gcm/{gcm_identifier}{chunking_approach}.zarr"
 
 
 def make_bias_corrected_gcm_path(
@@ -258,8 +270,6 @@ def make_bias_corrected_gcm_path(
         gcm_identifier = build_gcm_identifier(**kwargs)
     if chunking_approach is None:
         chunking_approach = ''
-    else:
-        chunking_approach = '_' + chunking_approach
 
     return f"bias_corrected_gcm/{gcm_identifier}{chunking_approach}_{method}.zarr"
 

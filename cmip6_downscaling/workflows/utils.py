@@ -517,6 +517,7 @@ def rechunk_zarr_array_with_caching(
         example_var = list(zarr_array.data_vars)[0]
         chunk_def = calc_auspicious_chunks_dict(zarr_array[example_var], chunk_dims=chunk_dims)
     else:
+        example_var = list(zarr_array.data_vars)[0]
         chunk_def = {
             'time': min(template_chunk_array.chunks['time'][0], len(zarr_array.time)),
             'lat': min(template_chunk_array.chunks['lat'][0], len(zarr_array.lat)),
@@ -540,7 +541,7 @@ def rechunk_zarr_array_with_caching(
 
     # make storage patterns
     if output_path is not None:
-        output_path = config.get('storage.temporary.intermediate') + '/' + output_path
+        output_path = config.get('storage.intermediate.uri') + '/' + output_path
     temp_store, target_store, target_path = make_rechunker_stores(output_path)
     print(f'target path is {target_path}')
 
