@@ -1,4 +1,4 @@
-from typing import Union, List
+from typing import List, Union
 
 import xarray as xr
 from skdownscale.pointwise_models import PointWiseDownscaler
@@ -18,7 +18,9 @@ from cmip6_downscaling.workflows.utils import (
 )
 
 
-def return_obs(obs: str, variable: Union[str, List[str]], train_period: slice, bbox: BBox, **kwargs) -> xr.Dataset:
+def return_obs(
+    obs: str, variable: Union[str, List[str]], train_period: slice, bbox: BBox, **kwargs
+) -> xr.Dataset:
     """Loads ERA5 observation data for given time bounds and variable
 
     Parameters
@@ -97,7 +99,7 @@ def get_coarse_obs(
     # gcm_one_slice = load_cmip(return_type='xr', variable_ids=[variable]).isel(time=0)
     if isinstance(variable, str):
         variable = [variable]
-    
+
     gcm_ds = load_cmip(return_type='xr', variable_ids=variable)
 
     gcm_ds_180 = lon_to_180(gcm_ds)
@@ -271,8 +273,7 @@ def return_gcm_train_full_time(
     xr.Dataset
         x_train rechunked dataset in full time.
     """
-    gcm_train_ds = load_cmip(
-        source_ids=gcm, variable_ids=[variable], return_type='xr')
+    gcm_train_ds = load_cmip(source_ids=gcm, variable_ids=[variable], return_type='xr')
     gcm_train_ds_180 = lon_to_180(gcm_train_ds)
 
     gcm_train_ds_subset = subset_dataset(
@@ -330,9 +331,9 @@ def return_gcm_predict_rechunked(
         gcm predict rechunked dataset
     """
     gcm_predict_ds = get_gcm(
-        gcm=gcm, 
-        scenario=scenario, 
-        variables=[variable], 
+        gcm=gcm,
+        scenario=scenario,
+        variables=[variable],
         train_period=train_period,
         predict_period=predict_period,
         bbox=bbox,

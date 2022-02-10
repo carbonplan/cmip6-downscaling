@@ -11,20 +11,19 @@ from xpersist import CacheStore
 from xpersist.prefect.result import XpersistResult
 
 from cmip6_downscaling import config
-from cmip6_downscaling.data.cmip import get_gcm, get_gcm_grid_spec, load_cmip
+from cmip6_downscaling.data.cmip import get_gcm, get_gcm_grid_spec
 from cmip6_downscaling.data.observations import get_obs
+from cmip6_downscaling.methods.bcsd import get_coarse_obs, return_obs
 from cmip6_downscaling.methods.bias_correction import (
     bias_correct_gcm_by_method,
     bias_correct_obs_by_method,
 )
-from cmip6_downscaling.methods.bcsd import return_obs, get_coarse_obs
 from cmip6_downscaling.workflows.paths import (
     build_gcm_identifier,
     build_obs_identifier,
     make_annual_pyramid_path,
     make_bias_corrected_gcm_path,
     make_bias_corrected_obs_path,
-    make_coarse_obs_path,
     make_daily_pyramid_path,
     make_interpolated_gcm_path,
     make_interpolated_obs_path,
@@ -239,52 +238,6 @@ def path_builder_task(
     )
 
 
-# @task(
-#     checkpoint=True,
-#     result=XpersistResult(
-#         CacheStore(config.get('storage.intermediate.uri')),
-#         serializer='xarray.zarr',
-#     ),
-#     target=make_coarse_obs_path,
-# )
-# def get_coarse_obs_task(
-#     ds_obs: xr.Dataset, gcm: str, chunking_approach: str, **kwargs
-# ) -> xr.Dataset:
-#     """
-#     Coarsen the observation dataset to the grid of the GCM model specified in inputs.
-#     Parameters
-#     ----------
-#     ds_obs: xr.Dataset
-#         Observation dataset to be coarsened
-#     gcm: str
-#         Name of the GCM model whose grid to coarsen to
-#     **kwargs: Dict
-#         Other arguments to be used in generating the target path
-#     Returns
-#     -------
-#     ds_obs_coarse: xr.Dataset
-#         Coarsened observation dataset
-#     """
-#     # Load single slice of target cmip6 dataset for target grid dimensions
-#     gcm_grid = load_cmip(
-#         source_ids=gcm,
-#         return_type="xr",
-#     ).isel(time=0)
-
-#     # rechunk and regrid observation dataset to target gcm resolution
-#     ds_obs_coarse = regrid_ds(
-#         ds=ds_obs,
-#         target_grid_ds=gcm_grid,
-#     )
-
-#     if chunking_approach != 'full_space':
-#         ds_obs_coarse = rechunk_zarr_array_with_caching(
-#             zarr_array=ds_obs_coarse, chunking_approach=chunking_approach, output_path=None
-#         )
-
-#     return ds_obs_coarse
-
-
 @task(
     checkpoint=True,
     result=XpersistResult(
@@ -321,17 +274,18 @@ def coarsen_and_interpolate_obs_task(
         An observation dataset that has been coarsened, interpolated back to original grid, and then rechunked.
     """
     # get obs
-    ds_obs = return_obs(
-        obs=obs,
-        train_period=train_period,
-        variable=variables,
-        bbox=bbox
-    )
+    ds_obs = return_obs(obs=obs, train_period=train_period, variable=variables, bbox=bbox)
 
     # regrid to coarse scale
     ds_obs_coarse = get_coarse_obs(
-        obs_ds=ds_obs, gcm=gcm, scenario=scenario, variable=variables, 
-        train_period=train_period, predict_period=predict_period, bbox=bbox, **kwargs
+        obs_ds=ds_obs,
+        gcm=gcm,
+        scenario=scenario,
+        variable=variables,
+        train_period=train_period,
+        predict_period=predict_period,
+        bbox=bbox,
+        **kwargs,
     )
 
     # interpolate to fine scale again
@@ -367,7 +321,7 @@ def interpolate_gcm_task(
     predict_period: slice,
     variables: Union[str, List[str]],
     chunking_approach: str,
-    bbox, 
+    bbox,
 ):
     """
     Interpolate the GCM dataset to the grid of the observation dataset.
@@ -400,19 +354,14 @@ def interpolate_gcm_task(
         scenario=scenario,
         variables=variables,
         train_period=train_period,
-        predict_period=predict_period, 
+        predict_period=predict_period,
         chunking_approach="full_space",
         cache_within_rechunk=False,
-        bbox=bbox
+        bbox=bbox,
     )
 
     # get obs as a template
-    ds_obs = return_obs(
-        obs=obs,
-        train_period=train_period,
-        variable=variables,
-        bbox=bbox
-    )
+    ds_obs = return_obs(obs=obs, train_period=train_period, variable=variables, bbox=bbox)
 
     # interpolate gcm to obs resolution
     ds_gcm_interpolated = regrid_ds(

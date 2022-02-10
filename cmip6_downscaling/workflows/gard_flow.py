@@ -9,15 +9,15 @@ from prefect import Flow, Parameter, task
 from xpersist import CacheStore
 from xpersist.prefect.result import XpersistResult
 
-from cmip6_downscaling import config, runtimes
+from cmip6_downscaling import config
+from cmip6_downscaling.methods.bcsd import return_obs
 from cmip6_downscaling.methods.gard import gard_fit_and_predict, gard_postprocess, read_scrf
 from cmip6_downscaling.runtimes import get_runtime
-from cmip6_downscaling.methods.bcsd import return_obs
 from cmip6_downscaling.tasks.common_tasks import (
-    build_bbox,
-    build_time_period_slices,
     bias_correct_gcm_task,
     bias_correct_obs_task,
+    build_bbox,
+    build_time_period_slices,
     coarsen_and_interpolate_obs_task,
     interpolate_gcm_task,
     path_builder_task,
@@ -56,7 +56,7 @@ read_scrf_task = task(
 
 gard_postprocess_task = task(
     gard_postprocess,
-    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
+    result=XpersistResult(results_cache_store, serializer="xarray.zarr"),
     target=make_gard_post_processed_output_path,
 )
 
@@ -65,20 +65,16 @@ gard_postprocess_task = task(
 def prep_gard_input_task(
     obs: str,
     train_period: slice,
+    predict_period: slice,
     variables: List[str],
     X_train: xr.Dataset,
     X_pred: xr.Dataset,
     gcm_identifier: str,
     bias_correction_method: str,
-    bbox, 
+    bbox,
 ):
     # get observation data in the same chunking scheme as
-    ds_obs = return_obs(
-        obs=obs,
-        train_period=train_period,
-        variable=variables,
-        bbox=bbox
-    )
+    ds_obs = return_obs(obs=obs, train_period=train_period, variable=variables, bbox=bbox)
 
     rechunked_obs_path = make_rechunked_obs_path(
         obs=obs,
@@ -95,7 +91,9 @@ def prep_gard_input_task(
         gcm_identifier=gcm_identifier, method=bias_correction_method, chunking_approach='matched'
     )
     X_pred_rechunked = rechunk_zarr_array_with_caching(
-        zarr_array=X_pred, template_chunk_array=X_train, output_path=rechunked_gcm_path
+        zarr_array=X_pred.sel(time=predict_period),
+        template_chunk_array=X_train,
+        output_path=rechunked_gcm_path,
     )
 
     return X_train, y_train_rechunked, X_pred_rechunked
@@ -111,7 +109,7 @@ with Flow(
     gcm = Parameter("gcm")
     scenario = Parameter("scenario")
     variable = Parameter("variable")
-    features = Parameter("features")  # this must include the variable as well 
+    features = Parameter("features")  # this must include the variable as well
     # bbox and train and predict period had to be encapsulated into tasks to prevent prefect from complaining about unused parameters.
     bbox = build_bbox(
         latmin=Parameter("latmin"),
@@ -194,6 +192,7 @@ with Flow(
     X_train, y_train, X_pred = prep_gard_input_task(
         obs=obs,
         train_period=train_period,
+        predict_period=predict_period,
         variables=features,
         X_train=ds_obs_bias_corrected,
         X_pred=ds_gcm_bias_corrected,
@@ -216,11 +215,7 @@ with Flow(
 
     # post process
     scrf = read_scrf_task(
-        obs=obs,
-        label=variable,
-        train_period=train_period,
-        predict_period=predict_period,
-        bbox=bbox
+        obs=obs, label=variable, train_period=train_period, predict_period=predict_period, bbox=bbox
     )
 
     final_output = gard_postprocess_task(

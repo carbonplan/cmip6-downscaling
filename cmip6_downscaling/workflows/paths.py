@@ -81,7 +81,7 @@ def build_gcm_identifier(
     if isinstance(variable, str):
         variable = [variable]
     var_string = '_'.join(sorted(variable))
-    
+
     gcm_identifier = config.get('storage.gcm_identifier_template').format(
         gcm=gcm,
         scenario=scenario,
@@ -220,8 +220,8 @@ def make_bias_corrected_obs_path(
 
 
 def make_rechunked_gcm_path(
-    gcm_identifier: Optional[str] = None, 
-    chunking_approach: Optional[str] = None, **kwargs) -> str:
+    gcm_identifier: Optional[str] = None, chunking_approach: Optional[str] = None, **kwargs
+) -> str:
     """Build the path for rechunked GCM
 
     Parameters
@@ -350,7 +350,7 @@ def make_gard_post_processed_output_path(
     gard_post_processed_output_path: str
         Path to which GARD post processed output defined by the parameters should be stored
     """
-    return f"gard_post_processed_output/{gcm_identifier}_{bias_correction_method}_{model_type}_{label}.zarr"
+    return f"gard/{gcm_identifier}{bias_correction_method}_{model_type}_{label}.zarr"
 
 
 def make_epoch_trend_path(

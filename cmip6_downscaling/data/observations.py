@@ -50,9 +50,7 @@ def get_obs(
     cache_within_rechunk: Optional[bool] = True,
 ) -> xr.Dataset:
     if obs == 'ERA5':
-        ds_obs = open_era5(
-            variables=variables, time_period=train_period
-        )
+        ds_obs = open_era5(variables=variables, time_period=train_period)
     else:
         raise NotImplementedError('only ERA5 is available as observation dataset right now')
 

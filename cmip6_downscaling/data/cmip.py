@@ -6,7 +6,11 @@ import zarr
 
 from cmip6_downscaling import config
 from cmip6_downscaling.workflows.paths import make_rechunked_gcm_path
-from cmip6_downscaling.workflows.utils import lon_to_180, rechunk_zarr_array_with_caching, subset_dataset
+from cmip6_downscaling.workflows.utils import (
+    lon_to_180,
+    rechunk_zarr_array_with_caching,
+    subset_dataset,
+)
 
 from . import cat
 
@@ -143,7 +147,7 @@ def get_gcm(
     variables: Union[str, List[str]],
     train_period: slice,
     predict_period: slice,
-    bbox, 
+    bbox,
     chunking_approach: Optional[str] = None,
     cache_within_rechunk: Optional[bool] = True,
 ) -> xr.Dataset:
@@ -203,9 +207,7 @@ def get_gcm(
         bbox=bbox,
     )
 
-    ds_gcm = xr.combine_by_coords(
-        [ds_gcm_train, ds_gcm_predict], combine_attrs='drop_conflicts'
-    )
+    ds_gcm = xr.combine_by_coords([ds_gcm_train, ds_gcm_predict], combine_attrs='drop_conflicts')
     ds_gcm = ds_gcm.reindex(time=sorted(ds_gcm.time.values))
 
     if chunking_approach is None:

@@ -155,7 +155,10 @@ def read_scrf(
     scrf = xr.combine_by_coords(scrf, combine_attrs='drop_conflicts')
 
     # subset into the spatial domain
-    scrf = scrf.sel(lon=bbox.lon_slice, lat=bbox.lat_slice,)
+    scrf = scrf.sel(
+        lon=bbox.lon_slice,
+        lat=bbox.lat_slice,
+    )
 
     # subset into the temporal period
     historical = scrf.sel(time=train_period)
@@ -163,12 +166,13 @@ def read_scrf(
     scrf = xr.combine_by_coords([historical, future], combine_attrs='drop_conflicts')
     scrf = scrf.reindex(time=sorted(scrf.time.values))
 
-    return scrf.scrf
+    return future.scrf
 
 
 def gard_postprocess(
     model_output: xr.Dataset,
     scrf: xr.DataArray,
+    label: str,
     model_params: Optional[Dict[str, Any]] = None,
     **kwargs,
 ) -> xr.Dataset:
@@ -196,9 +200,15 @@ def gard_postprocess(
     else:
         thresh = None
 
-    # trim the scrf dataset to the length of the model output
-    n_timepoints = len(model_output.time)
-    scrf = scrf.isel(time=slice(0, n_timepoints))
+    ## CURRENTLY needs calendar to be gregorian
+    ## TODO: merge in the calendar conversion for GCMs and this should work great!
+    assert len(scrf.time) == len(model_output.time)
+    assert len(scrf.lat) == len(model_output.lat)
+    assert len(scrf.lon) == len(model_output.lon)
+
+    scrf = scrf.assign_coords(
+        {'lat': model_output.lat, 'lon': model_output.lon, 'time': model_output.time}
+    )
 
     if thresh is not None:
         # convert scrf from a normal distribution to a uniform distribution
@@ -226,5 +236,5 @@ def gard_postprocess(
         downscaled = downscaled.where(valids, 0)
     else:
         downscaled = model_output['pred'] + scrf * model_output['prediction_error']
-
-    return downscaled.to_dataset(name='downscaled')
+    downscaled = downscaled.chunk({'time': 365, 'lat': 150, 'lon': 150})
+    return downscaled.to_dataset(name=label)
