@@ -178,7 +178,7 @@ def get_gcm(
         source_ids=gcm,
         variable_ids=variables,
         return_type='xr',
-    ).sel(time=train_period)
+    )
 
     future_gcm = load_cmip(
         activity_ids='ScenarioMIP',
@@ -186,19 +186,27 @@ def get_gcm(
         source_ids=gcm,
         variable_ids=variables,
         return_type='xr',
-    ).sel(time=predict_period)
+    )
 
     ds_gcm = xr.combine_by_coords([historical_gcm, future_gcm], combine_attrs='drop_conflicts')
 
-    date_start = min(int(train_period.start), int(predict_period.start))
-    date_end = max(int(train_period.stop), int(predict_period.stop))
-
-    ds_gcm = subset_dataset(
+    ds_gcm_train = subset_dataset(
         ds=ds_gcm,
         variable=variables[0],
-        time_period=slice(str(date_start), str(date_end)),
+        time_period=train_period,
         bbox=bbox,
     )
+    ds_gcm_predict = subset_dataset(
+        ds=ds_gcm,
+        variable=variables[0],
+        time_period=predict_period,
+        bbox=bbox,
+    )
+
+    ds_gcm = xr.combine_by_coords(
+        [ds_gcm_train, ds_gcm_predict], combine_attrs='drop_conflicts'
+    )
+    ds_gcm = ds_gcm.reindex(time=sorted(ds_gcm.time.values))
 
     if chunking_approach is None:
         return ds_gcm

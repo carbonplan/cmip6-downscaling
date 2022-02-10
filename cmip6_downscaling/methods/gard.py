@@ -92,13 +92,11 @@ def gard_fit_and_predict(
 
 
 def read_scrf(
-    model_output: xr.Dataset,
     obs: str,
     label: str,
-    train_period_start: str,
-    train_period_end: str,
-    predict_period_start: str,
-    predict_period_end: str,
+    train_period: slice,
+    predict_period: slice,
+    bbox,
 ):
     """
     Read spatial-temporally correlated random fields on file and subset into the correct spatial/temporal domain according to model_output.
@@ -106,8 +104,6 @@ def read_scrf(
 
     Parameters
     ----------
-    model_output : xr.Dataset
-        A dataset used to determine the spatial boundaries of the output random field dataset
     obs : str
         The name of the observation dataset used for generating the random fields
     label : str
@@ -133,6 +129,11 @@ def read_scrf(
 
     scrf_storage = 'az://flow-outputs/intermediate/'
 
+    train_period_start = train_period.start
+    train_period_end = train_period.stop
+    predict_period_start = predict_period.start
+    predict_period_end = predict_period.stop
+
     # first find out which decades of random fields we'd need to load
     train_start_decade = get_decade_start_year(train_period_start)
     train_end_decade = get_decade_start_year(train_period_end)
@@ -154,16 +155,13 @@ def read_scrf(
     scrf = xr.combine_by_coords(scrf, combine_attrs='drop_conflicts')
 
     # subset into the spatial domain
-    max_lon = model_output.lon.max().values
-    min_lon = model_output.lon.min().values
-    max_lat = model_output.lat.max().values
-    min_lat = model_output.lat.min().values
-    scrf = scrf.sel(lat=slice(max_lat, min_lat), lon=slice(min_lon, max_lon))
+    scrf = scrf.sel(lon=bbox.lon_slice, lat=bbox.lat_slice,)
 
     # subset into the temporal period
-    historical = scrf.sel(time=slice(train_period_start, train_period_end))
-    future = scrf.sel(time=slice(predict_period_start, predict_period_end))
+    historical = scrf.sel(time=train_period)
+    future = scrf.sel(time=predict_period)
     scrf = xr.combine_by_coords([historical, future], combine_attrs='drop_conflicts')
+    scrf = scrf.reindex(time=sorted(scrf.time.values))
 
     return scrf.scrf
 

@@ -329,13 +329,17 @@ def return_gcm_predict_rechunked(
     xr.Dataset
         gcm predict rechunked dataset
     """
-    gcm_predict_ds = load_cmip(
-        source_ids=gcm, variable_ids=[variable], return_type='xr')
-
-    gcm_predict_ds_180 = lon_to_180(gcm_predict_ds)
+    gcm_predict_ds = get_gcm(
+        gcm=gcm, 
+        scenario=scenario, 
+        variables=[variable], 
+        train_period=train_period,
+        predict_period=predict_period,
+        bbox=bbox,
+    )
 
     gcm_predict_ds_subset = subset_dataset(
-        gcm_predict_ds_180,
+        gcm_predict_ds,
         variable,
         predict_period,
         bbox,

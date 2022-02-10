@@ -214,23 +214,21 @@ with Flow(
         bias_correction_method=bias_correction_method,
     )
 
-    # # post process
-    # scrf = read_scrf_task(
-    #     model_output=model_output,
-    #     obs=obs,
-    #     label=label,
-    #     train_period_start=train_period_start,
-    #     train_period_end=train_period_end,
-    #     predict_period_start=predict_period_start,
-    #     predict_period_end=predict_period_end,
-    # )
+    # post process
+    scrf = read_scrf_task(
+        obs=obs,
+        label=variable,
+        train_period=train_period,
+        predict_period=predict_period,
+        bbox=bbox
+    )
 
-    # final_output = gard_postprocess_task(
-    #     model_output=model_output,
-    #     scrf=scrf,
-    #     model_params=model_params,
-    #     gcm_identifier=gcm_identifier,
-    #     bias_correction_method=bias_correction_method,
-    #     model_type=model_type,
-    #     label=label,
-    # )
+    final_output = gard_postprocess_task(
+        model_output=model_output,
+        scrf=scrf,
+        model_params=model_params,
+        gcm_identifier=gcm_identifier,
+        bias_correction_method=bias_correction_method,
+        model_type=model_type,
+        label=variable,
+    )
