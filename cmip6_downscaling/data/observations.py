@@ -36,6 +36,7 @@ def open_era5(variables: Union[str, List[str]], time_period: slice) -> xr.Datase
 
     ds = xr.concat([cat.era5(year=year).to_dask()[variables] for year in years], dim='time')
     ds = lon_to_180(ds)
+
     if 'pr' in variables:
         # convert to mm/day - helpful to prevent rounding errors from very tiny numbers
         ds['pr'] *= 86400
