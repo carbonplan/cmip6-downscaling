@@ -36,6 +36,7 @@ def open_era5(variables: Union[str, List[str]], time_period: slice) -> xr.Datase
 
     ds = xr.concat([cat.era5(year=year).to_dask()[variables] for year in years], dim='time')
     ds = lon_to_180(ds)
+
     if 'pr' in variables:
         # convert to mm/day - helpful to prevent rounding errors from very tiny numbers
         ds['pr'] *= 86400
@@ -52,7 +53,7 @@ def get_obs(
 ) -> xr.Dataset:
     if obs == 'ERA5':
         ds_obs = open_era5(
-            variables=variables, start_year=train_period_start, end_year=train_period_end
+            variables=variables, time_period=slice(train_period_start, train_period_end)
         )
     else:
         raise NotImplementedError('only ERA5 is available as observation dataset right now')
