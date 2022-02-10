@@ -1,3 +1,5 @@
+from typing import List, Union
+
 import xarray as xr
 from skdownscale.pointwise_models import PointWiseDownscaler
 from skdownscale.pointwise_models.bcsd import BcsdPrecipitation, BcsdTemperature
@@ -16,7 +18,9 @@ from cmip6_downscaling.workflows.utils import (
 )
 
 
-def return_obs(obs: str, variable: str, train_period: slice, bbox: BBox, **kwargs) -> xr.Dataset:
+def return_obs(
+    obs: str, variable: Union[str, List[str]], train_period: slice, bbox: BBox, **kwargs
+) -> xr.Dataset:
     """Loads ERA5 observation data for given time bounds and variable
 
     Parameters
@@ -39,12 +43,15 @@ def return_obs(obs: str, variable: str, train_period: slice, bbox: BBox, **kwarg
     xr.Dataset
         Loaded xarray dataset of ERA5 observation data. Chunked in time: 365
     """
+    if isinstance(variable, str):
+        variable = [variable]
+
     obs_load = open_era5(variable, train_period)
     obs_load_180 = lon_to_180(obs_load)
 
     obs_ds = subset_dataset(
         obs_load_180,
-        variable,
+        variable[0],
         train_period,
         bbox,
         chunking_schema={'time': 365, 'lat': 150, 'lon': 150},
@@ -56,7 +63,7 @@ def get_coarse_obs(
     obs_ds: xr.Dataset,
     gcm: str,
     scenario: str,
-    variable: str,
+    variable: Union[str, List[str]],
     train_period: slice,
     predict_period: slice,
     bbox: BBox,
@@ -90,14 +97,17 @@ def get_coarse_obs(
     """
     # Load single slice of target cmip6 dataset for target grid dimensions
     # gcm_one_slice = load_cmip(return_type='xr', variable_ids=[variable]).isel(time=0)
-    gcm_ds = load_cmip(return_type='xr', variable_ids=[variable])
+    if isinstance(variable, str):
+        variable = [variable]
+
+    gcm_ds = load_cmip(return_type='xr', variable_ids=variable)
 
     gcm_ds_180 = lon_to_180(gcm_ds)
-    gcm_subset = subset_dataset(gcm_ds_180, variable, train_period, bbox)
+    gcm_subset = subset_dataset(gcm_ds_180, variable[0], train_period, bbox)
 
     # rechunk and regrid observation dataset to target gcm resolution
     coarse_obs_ds, fine_obs_rechunked_path = regrid_dataset(
-        ds=obs_ds, ds_path=None, target_grid_ds=gcm_subset, variable=variable
+        ds=obs_ds, ds_path=None, target_grid_ds=gcm_subset, variable=variable[0]
     )
     return coarse_obs_ds
 
@@ -324,12 +334,13 @@ def return_gcm_predict_rechunked(
         gcm=gcm,
         scenario=scenario,
         variables=[variable],
+        train_period=train_period,
+        predict_period=predict_period,
+        bbox=bbox,
     )
 
-    gcm_predict_ds_180 = lon_to_180(gcm_predict_ds)
-
     gcm_predict_ds_subset = subset_dataset(
-        gcm_predict_ds_180,
+        gcm_predict_ds,
         variable,
         predict_period,
         bbox,

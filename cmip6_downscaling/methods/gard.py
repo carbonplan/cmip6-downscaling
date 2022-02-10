@@ -92,13 +92,11 @@ def gard_fit_and_predict(
 
 
 def read_scrf(
-    model_output: xr.Dataset,
     obs: str,
     label: str,
-    train_period_start: str,
-    train_period_end: str,
-    predict_period_start: str,
-    predict_period_end: str,
+    train_period: slice,
+    predict_period: slice,
+    bbox,
 ):
     """
     Read spatial-temporally correlated random fields on file and subset into the correct spatial/temporal domain according to model_output.
@@ -106,8 +104,6 @@ def read_scrf(
 
     Parameters
     ----------
-    model_output : xr.Dataset
-        A dataset used to determine the spatial boundaries of the output random field dataset
     obs : str
         The name of the observation dataset used for generating the random fields
     label : str
@@ -133,6 +129,11 @@ def read_scrf(
 
     scrf_storage = 'az://flow-outputs/intermediate/'
 
+    train_period_start = train_period.start
+    train_period_end = train_period.stop
+    predict_period_start = predict_period.start
+    predict_period_end = predict_period.stop
+
     # first find out which decades of random fields we'd need to load
     train_start_decade = get_decade_start_year(train_period_start)
     train_end_decade = get_decade_start_year(train_period_end)
@@ -154,23 +155,24 @@ def read_scrf(
     scrf = xr.combine_by_coords(scrf, combine_attrs='drop_conflicts')
 
     # subset into the spatial domain
-    max_lon = model_output.lon.max().values
-    min_lon = model_output.lon.min().values
-    max_lat = model_output.lat.max().values
-    min_lat = model_output.lat.min().values
-    scrf = scrf.sel(lat=slice(max_lat, min_lat), lon=slice(min_lon, max_lon))
+    scrf = scrf.sel(
+        lon=bbox.lon_slice,
+        lat=bbox.lat_slice,
+    )
 
     # subset into the temporal period
-    historical = scrf.sel(time=slice(train_period_start, train_period_end))
-    future = scrf.sel(time=slice(predict_period_start, predict_period_end))
+    historical = scrf.sel(time=train_period)
+    future = scrf.sel(time=predict_period)
     scrf = xr.combine_by_coords([historical, future], combine_attrs='drop_conflicts')
+    scrf = scrf.reindex(time=sorted(scrf.time.values))
 
-    return scrf.scrf
+    return future.scrf
 
 
 def gard_postprocess(
     model_output: xr.Dataset,
     scrf: xr.DataArray,
+    label: str,
     model_params: Optional[Dict[str, Any]] = None,
     **kwargs,
 ) -> xr.Dataset:
@@ -198,9 +200,15 @@ def gard_postprocess(
     else:
         thresh = None
 
-    # trim the scrf dataset to the length of the model output
-    n_timepoints = len(model_output.time)
-    scrf = scrf.isel(time=slice(0, n_timepoints))
+    ## CURRENTLY needs calendar to be gregorian
+    ## TODO: merge in the calendar conversion for GCMs and this should work great!
+    assert len(scrf.time) == len(model_output.time)
+    assert len(scrf.lat) == len(model_output.lat)
+    assert len(scrf.lon) == len(model_output.lon)
+
+    scrf = scrf.assign_coords(
+        {'lat': model_output.lat, 'lon': model_output.lon, 'time': model_output.time}
+    )
 
     if thresh is not None:
         # convert scrf from a normal distribution to a uniform distribution
@@ -228,5 +236,5 @@ def gard_postprocess(
         downscaled = downscaled.where(valids, 0)
     else:
         downscaled = model_output['pred'] + scrf * model_output['prediction_error']
-
-    return downscaled.to_dataset(name='downscaled')
+    downscaled = downscaled.chunk({'time': 365, 'lat': 150, 'lon': 150})
+    return downscaled.to_dataset(name=label)
