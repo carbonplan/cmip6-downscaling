@@ -1,5 +1,3 @@
-import time
-
 import dask
 import datatree as dt
 import fsspec
