@@ -33,23 +33,6 @@ get_obs_task = task(get_obs)
 get_gcm_task = task(get_gcm)
 
 
-# @task(log_stdout=True)
-# def config_printer():
-#     print('CONFIG DICT:')
-#     print('\n')
-#     # for key, val in config.config.items():
-#     #     try:
-#     #         print(f'{key}: {val}')
-#     #     except TypeError:
-#     #         print(f'failed to print {key}')
-#     print('\n')
-#     print('os env:')
-#     print('\n')
-#     print(os.environ)
-#     print('\n')
-#     # print(config.pprint())
-
-
 @task
 def build_bbox(latmin: str, latmax: str, lonmin: str, lonmax: str) -> dataclass:
     """Build bounding box out of lat/lon inputs using BBox data class defined in /utils.py

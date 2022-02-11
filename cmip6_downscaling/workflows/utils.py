@@ -419,7 +419,6 @@ def regrid_dataset(
         ds_rechunked = rechunk_zarr_array_with_caching(
             zarr_array=ds, chunking_approach='full_time', max_mem='1GB'
         )
-    time.sleep(1)
     regridder = xe.Regridder(ds_rechunked, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
     ds_regridded = regridder(ds_rechunked)
 
@@ -645,7 +644,6 @@ def regrid_ds(
             max_mem='1GB',
             output_path=rechunked_ds_path,
         )
-    time.sleep(1)
     regridder = xe.Regridder(ds_rechunked, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
     ds_regridded = regridder(ds_rechunked)
     return ds_regridded
