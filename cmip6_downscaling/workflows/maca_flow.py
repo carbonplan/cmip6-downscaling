@@ -10,13 +10,18 @@ from cmip6_downscaling.methods.detrend import calc_epoch_trend, remove_epoch_tre
 from cmip6_downscaling.methods.maca import maca_bias_correction, maca_construct_analogs
 from cmip6_downscaling.methods.regions import combine_outputs, generate_subdomains
 from cmip6_downscaling.tasks.common_tasks import (
-    get_coarse_obs_task,
     get_gcm_task,
     get_obs_task,
     path_builder_task,
     rechunker_task,
+    build_bbox,
+    build_time_period_slices,
 )
+from cmip6_downscaling.workflows.bcsd_flow import get_coarse_obs_task, return_obs_task
+
 from cmip6_downscaling.workflows.paths import (
+    make_rechunked_obs_path,
+    make_coarse_obs_path,
     make_bias_corrected_gcm_path,
     make_epoch_adjusted_downscaled_gcm_path,
     make_epoch_adjusted_gcm_path,
@@ -47,10 +52,9 @@ def calc_epoch_trend_task(
     gcm: str,
     scenario: str,
     variables: List[str],
-    train_period_start: str,
-    train_period_end: str,
-    predict_period_start: str,
-    predict_period_end: str,
+    train_period: slice,
+    predict_period: slice,
+    bbox, 
     day_rolling_window: int = 21,
     year_rolling_window: int = 31,
     **kwargs,
@@ -89,6 +93,10 @@ def calc_epoch_trend_task(
     # obtain a buffer period for both training and prediction period equal to half of the year_rolling_window
     y_offset = int((year_rolling_window - 1) / 2)
 
+    train_period_start = train_period.start
+    train_period_end = train_period.stop
+    predict_period_start = predict_period.start 
+    predict_period_end = predict_period.stop
     train_start = int(train_period_start) - y_offset
     train_end = int(train_period_end) + y_offset
     predict_start = int(predict_period_start) - y_offset
@@ -104,26 +112,23 @@ def calc_epoch_trend_task(
     ds_gcm_full_time = get_gcm_task.run(
         gcm=gcm,
         scenario=scenario,
-        variables=[label],
-        train_period_start=str(int(train_start)),
-        train_period_end=str(int(train_end)),
-        predict_period_start=str(int(predict_start)),
-        predict_period_end=str(int(predict_end)),
+        variables=variables,
+        train_period=train_period,
+        predict_period=predict_period,
+        bbox=bbox,
         chunking_approach='full_time',
         cache_within_rechunk=True,
     )
 
     # note that this is the non-buffered slice
-    historical_period = slice(train_period_start, train_period_end)
-    predict_period = slice(predict_period_start, predict_period_end)
     trend = calc_epoch_trend(
         data=ds_gcm_full_time,
-        historical_period=historical_period,
+        historical_period=train_period,
         day_rolling_window=day_rolling_window,
         year_rolling_window=year_rolling_window,
     )
 
-    hist_trend = trend.sel(time=historical_period)
+    hist_trend = trend.sel(time=train_period)
     pred_trend = trend.sel(time=predict_period)
 
     trend = xr.combine_by_coords([hist_trend, pred_trend], combine_attrs='drop_conflicts')
@@ -145,8 +150,7 @@ remove_epoch_trend_task = task(
 def maca_coarse_bias_correction_task(
     ds_gcm: xr.Dataset,
     ds_obs: xr.Dataset,
-    train_period_start: str,
-    train_period_end: str,
+    train_period: slice,
     variables: Union[str, List[str]],
     chunking_approach: str,
     batch_size: Optional[int] = 15,
@@ -185,11 +189,10 @@ def maca_coarse_bias_correction_task(
         zarr_array=ds_gcm, template_chunk_array=ds_obs
     )
 
-    historical_period = slice(train_period_start, train_period_end)
     bias_corrected = maca_bias_correction(
         ds_gcm=ds_gcm_rechunked,
         ds_obs=ds_obs,
-        historical_period=historical_period,
+        historical_period=train_period,
         variables=variables,
         batch_size=batch_size,
         buffer_size=buffer_size,
@@ -424,56 +427,85 @@ with Flow(
 ) as maca_flow:
     # following https://climate.northwestknowledge.net/MACA/MACAmethod.php
 
-    obs = Parameter("OBS")
-    gcm = Parameter("GCM")
-    scenario = Parameter("SCENARIO")
-    label = Parameter("LABEL")
+    obs = Parameter("obs")
+    gcm = Parameter("gcm")
+    scenario = Parameter("scenario")
+    variable = Parameter("variable")
 
-    train_period_start = Parameter("TRAIN_PERIOD_START")
-    train_period_end = Parameter("TRAIN_PERIOD_END")
-    predict_period_start = Parameter("PREDICT_PERIOD_START")
-    predict_period_end = Parameter("PREDICT_PERIOD_END")
+    bbox = build_bbox(
+        latmin=Parameter("latmin"),
+        latmax=Parameter("latmax"),
+        lonmin=Parameter("lonmin"),
+        lonmax=Parameter("lonmax"),
+    )
+    train_period = build_time_period_slices(Parameter('train_period'))
+    predict_period = build_time_period_slices(Parameter('predict_period'))
 
-    epoch_adjustment_day_rolling_window = Parameter("EPOCH_ADJUSTMENT_DAY_ROLLING_WINDOW")
-    epoch_adjustment_year_rolling_window = Parameter("EPOCH_ADJUSTMENT_YEAR_ROLLING_WINDOW")
-    bias_correction_batch_size = Parameter("BIAS_CORRECTION_BATCH_SIZE")
-    bias_correction_buffer_size = Parameter("BIAS_CORRECTION_BUFFER_SIZE")
-    constructed_analog_n_analogs = Parameter("CONSTRUCTED_ANALOG_N_ANALOGS")
-    constructed_analog_doy_range = Parameter("CONSTRUCTED_ANALOG_DOY_RANGE")
+    epoch_adjustment_day_rolling_window = Parameter("epoch_adjustment_day_rolling_window")
+    epoch_adjustment_year_rolling_window = Parameter("epoch_adjustment_year_rolling_window")
+    bias_correction_batch_size = Parameter("bias_correction_batch_size")
+    bias_correction_buffer_size = Parameter("bias_correction_buffer_size")
+    # constructed_analog_n_analogs = Parameter("constructed_analog_n_analogs")
+    # constructed_analog_doy_range = Parameter("constructed_analog_doy_range")
 
     ## Step 0: tasks to get inputs and set up
     ## Step 1: Common Grid -- this step is skipped since it seems like an unnecessary extra step for convenience
 
     # dictionary with information to build appropriate paths for caching
-    gcm_grid_spec, obs_identifier, gcm_identifier = path_builder_task(
+    (
+        gcm_grid_spec,
+        obs_identifier,
+        gcm_identifier,
+        pyramid_path_daily,
+        pyramid_path_monthly,
+        pyramid_path_annual,
+    ) = path_builder_task(
         obs=obs,
         gcm=gcm,
         scenario=scenario,
-        train_period_start=train_period_start,
-        train_period_end=train_period_end,
-        predict_period_start=predict_period_start,
-        predict_period_end=predict_period_end,
-        variables=[label],
+        variable=variable,
+        train_period=train_period,
+        predict_period=predict_period,
+        bbox=bbox,
     )
 
     # get original resolution observations
-    ds_obs_full_space = get_obs_task(
+    ds_obs = return_obs_task(
         obs=obs,
-        train_period_start=train_period_start,
-        train_period_end=train_period_end,
-        variables=[label],
+        variable=variable,
+        train_period=train_period,
+        bbox=bbox,
+        obs_identifier=obs_identifier,
+    )
+
+    ds_obs_full_space = rechunker_task(
+        zarr_array=ds_obs,
         chunking_approach='full_space',
-        cache_within_rechunk=True,
+        naming_func=make_rechunked_obs_path,
+        obs_identifier=obs_identifier,
     )
 
     # get coarsened resolution observations
     # this coarse obs is going to be used in bias correction next, so rechunk into full time first
-    ds_obs_coarse_full_time = get_coarse_obs_task(
-        ds_obs=ds_obs_full_space,
+    ds_obs_coarse_full_space = get_coarse_obs_task(
+        obs_ds=ds_obs_full_space,
         gcm=gcm,
-        chunking_approach='full_time',
-        gcm_grid_spec=gcm_grid_spec,
+        scenario=scenario,
+        variable=variable,
+        train_period=train_period,
+        predict_period=predict_period,
+        bbox=bbox,
         obs_identifier=obs_identifier,
+        chunking_approach='full_space',
+        gcm_grid_spec=gcm_grid_spec,
+    )
+
+    ds_obs_coarse_full_time = rechunker_task(
+        zarr_array=ds_obs_coarse_full_space,
+        chunking_approach='full_time',
+        naming_func=make_coarse_obs_path,
+        obs_identifier=obs_identifier,
+        gcm_grid_spec=gcm_grid_spec
     )
 
     ## Step 2: Epoch Adjustment -- all variables undergo this epoch adjustment
@@ -482,24 +514,23 @@ with Flow(
     coarse_epoch_trend = calc_epoch_trend_task(
         gcm=gcm,
         scenario=scenario,
-        variables=[label],
-        train_period_start=train_period_start,
-        train_period_end=train_period_end,
-        predict_period_start=predict_period_start,
-        predict_period_end=predict_period_end,
+        variables=[variable],
+        train_period=train_period,
+        predict_period=predict_period,
+        bbox=bbox,
         day_rolling_window=epoch_adjustment_day_rolling_window,
         year_rolling_window=epoch_adjustment_year_rolling_window,
+        gcm_identifier=gcm_identifier,
     )
 
     # get gcm
     ds_gcm_full_time = get_gcm_task(
         gcm=gcm,
         scenario=scenario,
-        variables=[label],
-        train_period_start=train_period_start,
-        train_period_end=train_period_end,
-        predict_period_start=predict_period_start,
-        predict_period_end=predict_period_end,
+        variables=[variable],
+        train_period=train_period,
+        predict_period=predict_period,
+        bbox=bbox,
         chunking_approach='full_time',
         cache_within_rechunk=True,
     )
@@ -516,9 +547,8 @@ with Flow(
     bias_corrected_gcm = maca_coarse_bias_correction_task(
         ds_gcm=epoch_adjusted_gcm,
         ds_obs=ds_obs_coarse_full_time,
-        train_period_start=train_period_start,
-        train_period_end=train_period_end,
-        variables=[label],
+        train_period=train_period,
+        variables=[variable],
         batch_size=bias_correction_batch_size,
         buffer_size=bias_correction_buffer_size,
         method='maca_edcdfm',
@@ -526,112 +556,104 @@ with Flow(
         chunking_approach='matched',
     )
 
-    # do epoch adjustment again for multiplicative variables, see MACA v1 vs. v2 guide for details
-    if label in ['pr', 'huss', 'vas', 'uas']:
-        coarse_epoch_trend_2 = calc_epoch_trend_task(
-            data=bias_corrected_gcm,
-            train_period_start=train_period_start,
-            train_period_end=train_period_end,
-            day_rolling_window=epoch_adjustment_day_rolling_window,
-            year_rolling_window=epoch_adjustment_year_rolling_window,
-            gcm_identifier=gcm_identifier + '_2',
-        )
+    # # do epoch adjustment again for multiplicative variables, see MACA v1 vs. v2 guide for details
+    # if label in ['pr', 'huss', 'vas', 'uas']:
+    #     coarse_epoch_trend_2 = calc_epoch_trend_task(
+    #         data=bias_corrected_gcm,
+    #         train_period_start=train_period_start,
+    #         train_period_end=train_period_end,
+    #         day_rolling_window=epoch_adjustment_day_rolling_window,
+    #         year_rolling_window=epoch_adjustment_year_rolling_window,
+    #         gcm_identifier=gcm_identifier + '_2',
+    #     )
 
-        bias_corrected_gcm = remove_epoch_trend_task(
-            data=bias_corrected_gcm,
-            trend=coarse_epoch_trend_2,
-            day_rolling_window=epoch_adjustment_day_rolling_window,
-            year_rolling_window=epoch_adjustment_year_rolling_window,
-            gcm_identifier=gcm_identifier + '_2',
-        )
+    #     bias_corrected_gcm = remove_epoch_trend_task(
+    #         data=bias_corrected_gcm,
+    #         trend=coarse_epoch_trend_2,
+    #         day_rolling_window=epoch_adjustment_day_rolling_window,
+    #         year_rolling_window=epoch_adjustment_year_rolling_window,
+    #         gcm_identifier=gcm_identifier + '_2',
+    #     )
 
-    ## Step 4: Constructed Analogs
-    # rechunk into full space and cache the output
-    bias_corrected_gcm_full_space = rechunker_task(
-        zarr_array=bias_corrected_gcm,
-        chunking_approach='full_space',
-        naming_func=make_bias_corrected_gcm_path,
-        gcm_identifier=gcm_identifier,
-        method='maca_edcdfm',
-    )
+    # ## Step 4: Constructed Analogs
+    # # rechunk into full space and cache the output
+    # bias_corrected_gcm_full_space = rechunker_task(
+    #     zarr_array=bias_corrected_gcm,
+    #     chunking_approach='full_space',
+    #     naming_func=make_bias_corrected_gcm_path,
+    #     gcm_identifier=gcm_identifier,
+    #     method='maca_edcdfm',
+    # )
 
-    # subset into regions
-    subdomains_list, subdomains_dict, mask, n_subdomains = get_subdomains_task(
-        ds_obs=ds_obs_full_space
-    )
+    # # subset into regions
+    # subdomains_list, subdomains_dict, mask, n_subdomains = get_subdomains_task(
+    #     ds_obs=ds_obs_full_space
+    # )
 
-    # everything should be rechunked to full space and then subset
-    ds_obs_coarse_full_space = get_coarse_obs_task(
-        ds_obs=ds_obs_full_space,
-        gcm=gcm,
-        chunking_approach='full_space',
-        gcm_grid_spec=gcm_grid_spec,
-        obs_identifier=obs_identifier,
-    )
-    # all inputs into the map function needs to be a list
-    ds_gcm_list, ds_obs_coarse_list, ds_obs_fine_list = subset_task(
-        ds_gcm=bias_corrected_gcm_full_space,
-        ds_obs_coarse=ds_obs_coarse_full_space,
-        ds_obs_fine=ds_obs_full_space,
-        subdomains_list=subdomains_list,
-    )
+    # # all inputs into the map function needs to be a list
+    # ds_gcm_list, ds_obs_coarse_list, ds_obs_fine_list = subset_task(
+    #     ds_gcm=bias_corrected_gcm_full_space,
+    #     ds_obs_coarse=ds_obs_coarse_full_space,
+    #     ds_obs_fine=ds_obs_full_space,
+    #     subdomains_list=subdomains_list,
+    # )
 
-    # downscaling by constructing analogs
-    downscaled_gcm_list = maca_construct_analogs_task.map(
-        ds_gcm=ds_gcm_list,
-        ds_obs_coarse=ds_obs_coarse_list,
-        ds_obs_fine=ds_obs_fine_list,
-        subdomain_bound=subdomains_list,
-        n_analogs=[constructed_analog_n_analogs] * n_subdomains,
-        doy_range=[constructed_analog_doy_range] * n_subdomains,
-        gcm_identifier=[gcm_identifier] * n_subdomains,
-        label=[label] * n_subdomains,
-    )
+    # # downscaling by constructing analogs
+    # downscaled_gcm_list = maca_construct_analogs_task.map(
+    #     ds_gcm=ds_gcm_list,
+    #     ds_obs_coarse=ds_obs_coarse_list,
+    #     ds_obs_fine=ds_obs_fine_list,
+    #     subdomain_bound=subdomains_list,
+    #     n_analogs=[constructed_analog_n_analogs] * n_subdomains,
+    #     doy_range=[constructed_analog_doy_range] * n_subdomains,
+    #     gcm_identifier=[gcm_identifier] * n_subdomains,
+    #     label=[label] * n_subdomains,
+    # )
 
-    # combine back into full domain
-    combined_downscaled_output = combine_outputs_task(
-        ds_list=downscaled_gcm_list,
-        subdomains_dict=subdomains_dict,
-        mask=mask,
-        gcm_identifier=gcm_identifier,
-        label=label,
-    )
+    # # combine back into full domain
+    # combined_downscaled_output = combine_outputs_task(
+    #     ds_list=downscaled_gcm_list,
+    #     subdomains_dict=subdomains_dict,
+    #     mask=mask,
+    #     gcm_identifier=gcm_identifier,
+    #     label=label,
+    # )
 
-    ## Step 5: Epoch Replacement
-    if label in ['pr', 'huss', 'vas', 'uas']:
-        combined_downscaled_output = maca_epoch_replacement_task(
-            ds_gcm_fine=combined_downscaled_output,
-            trend_coarse=coarse_epoch_trend_2,
-            day_rolling_window=epoch_adjustment_day_rolling_window,
-            year_rolling_window=epoch_adjustment_year_rolling_window,
-            gcm_identifier=gcm_identifier + '_2',
-        )
+    # ## Step 5: Epoch Replacement
+    # if label in ['pr', 'huss', 'vas', 'uas']:
+    #     combined_downscaled_output = maca_epoch_replacement_task(
+    #         ds_gcm_fine=combined_downscaled_output,
+    #         trend_coarse=coarse_epoch_trend_2,
+    #         day_rolling_window=epoch_adjustment_day_rolling_window,
+    #         year_rolling_window=epoch_adjustment_year_rolling_window,
+    #         gcm_identifier=gcm_identifier + '_2',
+    #     )
 
-    epoch_replaced_gcm = maca_epoch_replacement_task(
-        ds_gcm_fine=combined_downscaled_output,
-        trend_coarse=coarse_epoch_trend,
-        day_rolling_window=epoch_adjustment_day_rolling_window,
-        year_rolling_window=epoch_adjustment_year_rolling_window,
-        gcm_identifier=gcm_identifier,
-    )
+    # epoch_replaced_gcm = maca_epoch_replacement_task(
+    #     ds_gcm_fine=combined_downscaled_output,
+    #     trend_coarse=coarse_epoch_trend,
+    #     day_rolling_window=epoch_adjustment_day_rolling_window,
+    #     year_rolling_window=epoch_adjustment_year_rolling_window,
+    #     gcm_identifier=gcm_identifier,
+    # )
 
-    ds_obs_full_time = get_obs_task(
-        obs=obs,
-        train_period_start=train_period_start,
-        train_period_end=train_period_end,
-        variables=[label],
-        chunking_approach='full_time',
-        cache_within_rechunk=True,
-    )
+    # ds_obs_full_time = get_obs_task(
+    #     obs=obs,
+    #     train_period_start=train_period_start,
+    #     train_period_end=train_period_end,
+    #     variables=[label],
+    #     chunking_approach='full_time',
+    #     cache_within_rechunk=True,
+    # )
 
-    ## Step 6: Fine Bias Correction
-    final_output = maca_fine_bias_correction_task(
-        ds_gcm=epoch_replaced_gcm,
-        ds_obs=ds_obs_full_time,
-        train_period_start=train_period_start,
-        train_period_end=train_period_end,
-        variables=[label],
-        batch_size=bias_correction_batch_size,
-        buffer_size=bias_correction_buffer_size,
-        gcm_identifier=gcm_identifier,
-    )
+    # ## Step 6: Fine Bias Correction
+    # final_output = maca_fine_bias_correction_task(
+    #     ds_gcm=epoch_replaced_gcm,
+    #     ds_obs=ds_obs_full_time,
+    #     train_period_start=train_period_start,
+    #     train_period_end=train_period_end,
+    #     variables=[label],
+    #     batch_size=bias_correction_batch_size,
+    #     buffer_size=bias_correction_buffer_size,
+    #     gcm_identifier=gcm_identifier,
+    # )

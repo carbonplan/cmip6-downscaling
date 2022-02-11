@@ -210,7 +210,15 @@ def get_gcm(
 
     # override here because the training and predict periods might overlap but we don't want to
     # bother checking that the values are all the same because they are (they all come from `ds_gcm`)
-    ds_gcm = xr.combine_by_coords([ds_gcm_train, ds_gcm_predict], compat='override', combine_attrs='drop_conflicts')    ds_gcm = ds_gcm.reindex(time=sorted(ds_gcm.time.values))
+    ds_gcm = xr.combine_by_coords(
+        [ds_gcm_train, ds_gcm_predict], 
+        coords='all', 
+        compat='override', 
+        combine_attrs='drop_conflicts'
+    )
+    for v in ds_gcm.data_vars:
+        ds_gcm[v] = ds_gcm[v].drop_duplicates(dim='time', keep='first')
+    ds_gcm = ds_gcm.reindex(time=sorted(ds_gcm.time.values))
 
     if chunking_approach is None:
         return ds_gcm
@@ -221,7 +229,8 @@ def get_gcm(
             'scenario': scenario,
             'train_period': train_period,
             'predict_period': predict_period,
-            'variables': variables,
+            'variable': variables,
+            'bbox': bbox,
         }
         rechunked_path = make_rechunked_gcm_path(chunking_approach=chunking_approach, **path_dict)
     else:

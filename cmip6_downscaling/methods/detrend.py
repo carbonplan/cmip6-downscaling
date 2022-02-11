@@ -151,7 +151,8 @@ def calc_epoch_trend(data, historical_period, day_rolling_window=21, year_rollin
     # remove historical mean from rolling average, leaving trend as the anamoly
     trend = rolling_doy_mean.groupby('time.dayofyear') - hist_mean
 
-    assert trend.isnull().sum().values == 0
+    example_var = list(trend.data_vars)[0]
+    assert trend[example_var].isnull().sum().values == 0
 
     return trend
 
