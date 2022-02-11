@@ -97,41 +97,50 @@ def calc_epoch_trend_task(
     train_period_end = train_period.stop
     predict_period_start = predict_period.start 
     predict_period_end = predict_period.stop
-    train_start = int(train_period_start) - y_offset
-    train_end = int(train_period_end) + y_offset
-    predict_start = int(predict_period_start) - y_offset
-    predict_end = int(predict_period_end) + y_offset
+    buffered_train_start = int(train_period_start) - y_offset
+    buffered_train_end = int(train_period_end) + y_offset
+    buffered_predict_start = int(predict_period_start) - y_offset
+    buffered_predict_end = int(predict_period_end) + y_offset
 
     # make sure there are no overlapping years
-    if train_end > int(predict_period_start):
-        train_end = int(predict_period_start) - 1
-        predict_start = int(predict_period_start)
-    elif train_end > predict_start:
-        predict_start = train_end + 1
+    if buffered_train_end > int(predict_period_start):
+        buffered_train_end = int(predict_period_start) - 1
+        buffered_predict_start = int(predict_period_start)
+    elif buffered_train_end > buffered_predict_start:
+        buffered_predict_start = buffered_train_end + 1
 
     ds_gcm_full_time = get_gcm_task.run(
         gcm=gcm,
         scenario=scenario,
         variables=variables,
-        train_period=train_period,
-        predict_period=predict_period,
+        train_period=slice(buffered_train_start, buffered_train_end),
+        predict_period=slice(buffered_predict_start, buffered_predict_end),
         bbox=bbox,
         chunking_approach='full_time',
         cache_within_rechunk=True,
     )
 
-    # note that this is the non-buffered slice
     trend = calc_epoch_trend(
         data=ds_gcm_full_time,
-        historical_period=train_period,
+        historical_period=train_period,  # note that this is the non-buffered slice
         day_rolling_window=day_rolling_window,
         year_rolling_window=year_rolling_window,
     )
 
+    # select the original time periods and merge 
     hist_trend = trend.sel(time=train_period)
     pred_trend = trend.sel(time=predict_period)
 
-    trend = xr.combine_by_coords([hist_trend, pred_trend], combine_attrs='drop_conflicts')
+    trend = xr.combine_by_coords(
+        [hist_trend, pred_trend], 
+        coords='all', 
+        compat='override', 
+        combine_attrs='drop_conflicts'
+    )
+    for v in trend.data_vars:
+        trend[v] = trend[v].drop_duplicates(dim='time', keep='first')
+    trend = trend.reindex(time=sorted(trend.time.values))
+    
     return trend
 
 

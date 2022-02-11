@@ -16,5 +16,7 @@
   "lonmin": "80",
   "lonmax": "90",
   "epoch_adjustment_day_rolling_window": 21,
-  "epoch_adjustment_year_rolling_window": 31
+  "epoch_adjustment_year_rolling_window": 31,
+  "bias_correction_batch_size": 15,
+  "bias_correction_buffer_size": 15
 }
