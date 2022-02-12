@@ -60,15 +60,15 @@ return_obs_task = task(
 get_coarse_obs_task = task(
     get_coarse_obs,
     tags=['dask-resource:TASKSLOTS=1'],
-    max_retries=5,
-    retry_delay=timedelta(seconds=5),
+    max_retries=10,
+    retry_delay=timedelta(seconds=10),
     result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target=make_coarse_obs_path,
 )
 get_spatial_anomalies_task = task(
     get_spatial_anomalies,
     tags=['dask-resource:TASKSLOTS=1'],
-    max_retries=5,
+    max_retries=10,
     retry_delay=timedelta(seconds=5),
     result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target=make_spatial_anomalies_path,
@@ -76,7 +76,7 @@ get_spatial_anomalies_task = task(
 return_coarse_obs_full_time_task = task(
     return_coarse_obs_full_time,
     tags=['dask-resource:TASKSLOTS=1'],
-    max_retries=5,
+    max_retries=10,
     retry_delay=timedelta(seconds=5),
     result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target=make_coarse_obs_path,  # is this right? to have the same target? maybe supposed to be make_rechunked_obs_path
@@ -85,7 +85,7 @@ return_coarse_obs_full_time_task = task(
 return_gcm_train_full_time_task = task(
     return_gcm_train_full_time,
     tags=['dask-resource:TASKSLOTS=1'],
-    max_retries=5,
+    max_retries=10,
     retry_delay=timedelta(seconds=5),
     result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target=make_rechunked_gcm_path,
@@ -94,7 +94,7 @@ return_gcm_train_full_time_task = task(
 return_gcm_predict_rechunked_task = task(
     return_gcm_predict_rechunked,
     tags=['dask-resource:TASKSLOTS=1'],
-    max_retries=5,
+    max_retries=10,
     retry_delay=timedelta(seconds=5),
     result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target=make_gcm_predict_path,
@@ -110,7 +110,7 @@ fit_and_predict_task = task(
 postprocess_bcsd_task = task(
     postprocess_bcsd,
     tags=['dask-resource:TASKSLOTS=1'],
-    max_retries=5,
+    max_retries=10,
     retry_delay=timedelta(seconds=5),
     log_stdout=True,
     result=XpersistResult(results_cache_store, serializer="xarray.zarr"),
@@ -169,8 +169,8 @@ with Flow(
         predict_period=predict_period,
         bbox=bbox,
     )
-    # if config.get('run_options.cleanup_flag') is True:
-    cleanup.run_rsfip(gcm_identifier, obs_identifier)
+    if config.get('run_options.cleanup_flag') is True:
+        cleanup.run_rsfip(gcm_identifier, obs_identifier)
 
     # preprocess_bcsd_tasks(s):
 

@@ -1,18 +1,19 @@
 """Config file used by donfig"""
 _defaults = {
     'storage': {
+        'top_level': {'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"}},
         'gcm_identifier_template': '{gcm}/{scenario}/{variable}/{bbox}/{train_period}/{predict_period}/',
         'obs_identifier_template': '{obs}/{variable}/{bbox}/{train_period}/',
         'intermediate': {
-            'uri': 'az://flow-outputs/testing_intermediates/',
+            'uri': 'az://flow-outputs/testing_intermediates',
             'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
         },
         'results': {
-            'uri': 'az://flow-outputs/testing_results/',
+            'uri': 'az://flow-outputs/testing_results',
             'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
         },
         'temporary': {
-            'uri': 'az://flow-outputs/temporary/',
+            'uri': 'az://flow-outputs/temporary',
             'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
         },
         'xpersist_store_name': 'xpersist_metadata_store/',
@@ -34,9 +35,15 @@ _defaults = {
                 },
                 "results": {
                     "bcsd_output": {"path_template": "bcsd_output/{gcm_identifier}"},
-                    "pyramid": {"path_template": "pyramid/{gcm_identifier}"},
+                    "bcsd_output_monthly": {
+                        "path_template": "bcsd_output_monthly/{gcm_identifier}"
+                    },
+                    "bcsd_output_annual": {"path_template": "bcsd_output_annual/{gcm_identifier}"},
+                    "pyramid_daily": {"path_template": "pyramid_daily/{gcm_identifier}"},
+                    "pyramid_monthly": {"path_template": "pyramid_monthly/{gcm_identifier}"},
+                    "pyramid_annual": {"path_template": "pyramid_annual/{gcm_identifier}"},
                 },
-            }
+            },
         },
         'gard': {},
         'maca': {},

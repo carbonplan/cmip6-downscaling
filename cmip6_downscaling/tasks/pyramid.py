@@ -67,8 +67,8 @@ def _postprocess(dt: dt.DataTree, levels: int, other_chunks: dict = None) -> dt.
 @task(
     log_stdout=True,
     tags=['dask-resource:TASKSLOTS=1'],
-    max_retries=5,
-    retry_delay=timedelta(seconds=5),
+    max_retries=10,
+    retry_delay=timedelta(seconds=10),
 )
 def regrid(ds: xr.Dataset, levels: int = 2, uri: str = None, other_chunks: dict = None) -> str:
     '''Task to create a data pyramid from an xarray Dataset

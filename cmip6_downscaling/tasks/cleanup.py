@@ -14,7 +14,7 @@ def instantiate_az_filesystem() -> fsspec.filesystem:
     """
     # should this have another more generalized conn str?
     fs = fsspec.filesystem(
-        'az', connection_string=config.get("storage.intermediate.storage_options.connection_string")
+        'az', connection_string=config.get("storage.top_level.storage_options.connection_string")
     )
     return fs
 

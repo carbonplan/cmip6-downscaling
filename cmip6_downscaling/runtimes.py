@@ -186,14 +186,16 @@ class CIRuntime(LocalRuntime):
 
 class PangeoRuntime(LocalRuntime):
     def __init__(
-        self, storage_options: dict = None, n_workers: dict = None, threads_per_worker: dict = None
+        self, storage_options: dict = None, n_workers: int = None, threads_per_worker: int = None
     ):
         self._storage_options = storage_options is not None or config.get(
             "runtime.pangeo.storage_options"
         )
-        self._n_workers = n_workers is not None or config.get("runtime.pangeo.n_workers")
-        self._threads_per_worker = threads_per_worker is not None or config.get(
-            "runtime.pangeo.threads_per_worker"
+        self._n_workers = (
+            n_workers if n_workers is not None else config.get("runtime.pangeo.n_workers")
+        )
+        self._n_workers = (
+            n_workers if n_workers is not None else config.get("runtime.pangeo.threads_per_worker")
         )
 
     def __repr__(self):
@@ -216,7 +218,6 @@ class PangeoRuntime(LocalRuntime):
                 'threads_per_worker': self._threads_per_worker,
             }
         )
-        # return DaskExecutor(cluster_kwargs={'resources':{'TASKSLOTS':1},'n_workers':2,'threads_per_worker':2})
 
     def _generate_env(self):
         return _threadsafe_env_vars
