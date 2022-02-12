@@ -67,7 +67,7 @@ _defaults = {
                 'connection_string': "$AZURE_STORAGE_CONNECTION_STRING",
             },
             "agent": "az-eu-west",
-            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git@feature/cleanup_utils git+https://github.com/pangeo-data/scikit-downscale.git",
+            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git",
             "kubernetes_cpu": 7,
             "kubernetes_memory": "16Gi",
             "image": "carbonplan/cmip6-downscaling-prefect:2022.02.08",

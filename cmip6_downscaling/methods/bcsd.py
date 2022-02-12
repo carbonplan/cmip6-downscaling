@@ -1,3 +1,5 @@
+from typing import List, Union
+
 import xarray as xr
 from skdownscale.pointwise_models import PointWiseDownscaler
 from skdownscale.pointwise_models.bcsd import BcsdPrecipitation, BcsdTemperature
@@ -16,7 +18,9 @@ from cmip6_downscaling.workflows.utils import (
 )
 
 
-def return_obs(obs: str, variable: str, train_period: slice, bbox: BBox, **kwargs) -> xr.Dataset:
+def return_obs(
+    obs: str, variable: Union[str, List[str]], train_period: slice, bbox: BBox, **kwargs
+) -> xr.Dataset:
     """Loads ERA5 observation data for given time bounds and variable
 
     Parameters
@@ -39,12 +43,15 @@ def return_obs(obs: str, variable: str, train_period: slice, bbox: BBox, **kwarg
     xr.Dataset
         Loaded xarray dataset of ERA5 observation data. Chunked in time: 365
     """
+    if isinstance(variable, str):
+        variable = [variable]
+
     obs_load = open_era5(variable, train_period)
     obs_load_180 = lon_to_180(obs_load)
 
     obs_ds = subset_dataset(
         obs_load_180,
-        variable,
+        variable[0],
         train_period,
         bbox,
         chunking_schema={'time': 365, 'lat': 150, 'lon': 150},
@@ -56,7 +63,7 @@ def get_coarse_obs(
     obs_ds: xr.Dataset,
     gcm: str,
     scenario: str,
-    variable: str,
+    variable: Union[str, List[str]],
     train_period: slice,
     predict_period: slice,
     bbox: BBox,
@@ -90,14 +97,17 @@ def get_coarse_obs(
     """
     # Load single slice of target cmip6 dataset for target grid dimensions
     # gcm_one_slice = load_cmip(return_type='xr', variable_ids=[variable]).isel(time=0)
-    gcm_ds = load_cmip(return_type='xr', variable_ids=[variable])
+    if isinstance(variable, str):
+        variable = [variable]
+
+    gcm_ds = load_cmip(return_type='xr', variable_ids=variable)
 
     gcm_ds_180 = lon_to_180(gcm_ds)
-    gcm_subset = subset_dataset(gcm_ds_180, variable, train_period, bbox)
+    gcm_subset = subset_dataset(gcm_ds_180, variable[0], train_period, bbox)
 
     # rechunk and regrid observation dataset to target gcm resolution
     coarse_obs_ds, fine_obs_rechunked_path = regrid_dataset(
-        ds=obs_ds, ds_path=None, target_grid_ds=gcm_subset, variable=variable
+        ds=obs_ds, ds_path=None, target_grid_ds=gcm_subset, variable=variable[0]
     )
     return coarse_obs_ds
 
@@ -122,6 +132,15 @@ def get_spatial_anomalies(
     * a grid (as opposed to a specific GCM since some GCMs run on the same grid)
     * the time period which fine_obs (and by construct coarse_obs) cover
     * the variable
+    We will save these anomalies to use them in the post-processing. We will add them to the
+    spatially-interpolated coarse predictions to add the spatial heterogeneity back in.
+    Conceptually, this step figures out, for example, how much colder a finer-scale pixel
+    containing Mt. Rainier is compared to the coarse pixel where it exists. By saving those anomalies,
+    we can then preserve the fact that "Mt Rainier is x degrees colder than the pixels around it"
+    for the prediction. It is important to note that that spatial anomaly is the same for every month of the
+    year and the same for every day. So, if in January a finescale pixel was on average 4 degrees colder than
+    the neighboring pixel to the west, in every day in the prediction (historic or future) that pixel
+    will also be 4 degrees colder.
 
     Parameters
     ----------
@@ -149,8 +168,8 @@ def get_spatial_anomalies(
     seasonal_cycle_spatial_anomalies : xr.Dataset
         Spatial anomaly for each month (i.e. of shape (nlat, nlon, 12))
     """
-    # Regrid coarse observation dataset
-    obs_interpolated, _ = regrid_dataset(
+    # Regrid coarse observation dataset to the spatial scale of the raw obs
+    coarse_obs_interpolated, _ = regrid_dataset(
         ds=coarse_obs,
         ds_path=None,
         target_grid_ds=obs_ds.isel(time=0),
@@ -163,8 +182,11 @@ def get_spatial_anomalies(
         variable=variable,
         max_mem='1GB',
     )
+    # calculate the difference between the actual obs (with finer spatial heterogeneity)
+    # and the interpolated coarse obs this will be saved and added to the
+    # spatially-interpolated coarse predictions to add the spatial heterogeneity back in.
 
-    spatial_anomalies = obs_interpolated - obs_rechunked
+    spatial_anomalies = obs_rechunked - coarse_obs_interpolated
     seasonal_cycle_spatial_anomalies = spatial_anomalies.groupby("time.month").mean()
 
     return seasonal_cycle_spatial_anomalies
@@ -312,12 +334,13 @@ def return_gcm_predict_rechunked(
         gcm=gcm,
         scenario=scenario,
         variables=[variable],
+        train_period=train_period,
+        predict_period=predict_period,
+        bbox=bbox,
     )
 
-    gcm_predict_ds_180 = lon_to_180(gcm_predict_ds)
-
     gcm_predict_ds_subset = subset_dataset(
-        gcm_predict_ds_180,
+        gcm_predict_ds,
         variable,
         predict_period,
         bbox,

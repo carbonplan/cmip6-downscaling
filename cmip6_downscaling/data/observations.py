@@ -36,6 +36,7 @@ def open_era5(variables: Union[str, List[str]], time_period: slice) -> xr.Datase
 
     ds = xr.concat([cat.era5(year=year).to_dask()[variables] for year in years], dim='time')
     ds = lon_to_180(ds)
+
     if 'pr' in variables:
         # convert to mm/day - helpful to prevent rounding errors from very tiny numbers
         ds['pr'] *= 86400
@@ -44,16 +45,13 @@ def open_era5(variables: Union[str, List[str]], time_period: slice) -> xr.Datase
 
 def get_obs(
     obs: str,
-    train_period_start: str,
-    train_period_end: str,
+    train_period: slice,
     variables: Union[str, List[str]],
     chunking_approach: Optional[str] = None,
     cache_within_rechunk: Optional[bool] = True,
 ) -> xr.Dataset:
     if obs == 'ERA5':
-        ds_obs = open_era5(
-            variables=variables, start_year=train_period_start, end_year=train_period_end
-        )
+        ds_obs = open_era5(variables=variables, time_period=train_period)
     else:
         raise NotImplementedError('only ERA5 is available as observation dataset right now')
 
@@ -63,8 +61,7 @@ def get_obs(
     if cache_within_rechunk:
         path_dict = {
             'obs': obs,
-            'train_period_start': train_period_start,
-            'train_period_end': train_period_end,
+            'train_period': train_period,
             'variables': variables,
         }
         rechunked_path = make_rechunked_obs_path(

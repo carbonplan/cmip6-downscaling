@@ -421,7 +421,6 @@ def regrid_dataset(
         ds_rechunked = rechunk_zarr_array_with_caching(
             zarr_array=ds, chunking_approach='full_time', max_mem='1GB'
         )
-
     regridder = xe.Regridder(ds_rechunked, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
     ds_regridded = regridder(ds_rechunked)
 
@@ -520,6 +519,7 @@ def rechunk_zarr_array_with_caching(
         example_var = list(zarr_array.data_vars)[0]
         chunk_def = calc_auspicious_chunks_dict(zarr_array[example_var], chunk_dims=chunk_dims)
     else:
+        example_var = list(zarr_array.data_vars)[0]
         chunk_def = {
             'time': min(template_chunk_array.chunks['time'][0], len(zarr_array.time)),
             'lat': min(template_chunk_array.chunks['lat'][0], len(zarr_array.lat)),
@@ -543,7 +543,7 @@ def rechunk_zarr_array_with_caching(
 
     # make storage patterns
     if output_path is not None:
-        output_path = config.get('storage.temporary.intermediate') + '/' + output_path
+        output_path = config.get('storage.intermediate.uri') + '/' + output_path
     temp_store, target_store, target_path = make_rechunker_stores(output_path)
     print(f'target path is {target_path}')
 
@@ -616,6 +616,7 @@ def regrid_ds(
     rechunked_ds_path: Optional[str] = None,
     **kwargs,
 ) -> xr.Dataset:
+
     """Regrid a dataset to a target grid. For use in both coarsening or interpolating to finer resolution.
     The function will check whether the dataset is chunked along time (into spatially-contiguous maps)
     and if not it will rechunk it. **kwargs are used to construct target path
@@ -647,7 +648,6 @@ def regrid_ds(
             max_mem='1GB',
             output_path=rechunked_ds_path,
         )
-
     regridder = xe.Regridder(ds_rechunked, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
     ds_regridded = regridder(ds_rechunked)
     return ds_regridded
