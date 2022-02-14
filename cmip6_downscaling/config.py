@@ -84,7 +84,10 @@ _defaults = {
         "local": {"storage_prefix": "/tmp/", "storage_options": {'directory': './'}},
         "test": {
             "storage_prefix": "/tmp/",
-            "storage_options": {'directory': './'},
+            "storage_options": {
+                'directory': './',
+                'connection_string': "$AZURE_STORAGE_CONNECTION_STRING",
+            },
         },
         "pangeo": {
             "storage_prefix": "az://",
