@@ -1,7 +1,10 @@
 """Config file used by donfig"""
 _defaults = {
     'storage': {
-        'top_level': {'uri': 'tmp/', 'storage_options': {}},
+        'top_level': {
+            'uri': 'tmp/',
+            'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
+        },
         'gcm_identifier_template': '{gcm}/{scenario}/{variable}/{bbox}/{train_period}/{predict_period}/',
         'obs_identifier_template': '{obs}/{variable}/{bbox}/{train_period}/',
         'intermediate': {
