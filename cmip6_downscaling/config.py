@@ -1,19 +1,19 @@
 """Config file used by donfig"""
 _defaults = {
     'storage': {
-        'top_level': {'storage_options': {}},
+        'top_level': {'uri': 'tmp/', 'storage_options': {}},
         'gcm_identifier_template': '{gcm}/{scenario}/{variable}/{bbox}/{train_period}/{predict_period}/',
         'obs_identifier_template': '{obs}/{variable}/{bbox}/{train_period}/',
         'intermediate': {
-            'uri': 'az://flow-outputs/testing_intermediates',
+            'uri': 'tmp/low-outputs/testing_intermediates',
             'storage_options': {},
         },
         'results': {
-            'uri': 'az://flow-outputs/testing_results',
+            'uri': 'tmp/flow-outputs/testing_results',
             'storage_options': {},
         },
         'temporary': {
-            'uri': 'az://flow-outputs/temporary',
+            'uri': 'tmp/flow-outputs/temporary',
             'storage_options': {},
         },
         'xpersist_store_name': 'xpersist_metadata_store/',
