@@ -517,6 +517,7 @@ def make_annual_pyramid_path(gcm_identifier: str, **kwargs) -> str:
     pyramid_path : str
         Path to the annual pyramid
     """
+
     return f"/pyramid_annual/{gcm_identifier}.pyr"
 
 

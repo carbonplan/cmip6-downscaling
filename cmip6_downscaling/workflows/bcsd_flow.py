@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from prefect import Flow, Parameter, task
 from xpersist import CacheStore
 from xpersist.prefect.result import XpersistResult
@@ -14,7 +16,7 @@ from cmip6_downscaling.methods.bcsd import (
     return_gcm_train_full_time,
     return_obs,
 )
-from cmip6_downscaling.tasks import pyramid
+from cmip6_downscaling.tasks import cleanup, pyramid
 from cmip6_downscaling.tasks.common_tasks import (
     build_bbox,
     build_time_period_slices,
@@ -32,17 +34,20 @@ from cmip6_downscaling.workflows.paths import (
     make_spatial_anomalies_path,
 )
 
+# storage_prefix = config.get("runtime.cloud.storage_prefix")
+
 runtime = runtimes.get_runtime()
 
 intermediate_cache_store = CacheStore(
     config.get("storage.intermediate.uri"),
     storage_options=config.get("storage.intermediate.storage_options"),
 )
+
+
 results_cache_store = CacheStore(
     config.get("storage.results.uri"),
     storage_options=config.get("storage.results.storage_options"),
 )
-
 
 # Transform Functions into Tasks -----------------------------------------------------------
 
@@ -55,18 +60,24 @@ return_obs_task = task(
 get_coarse_obs_task = task(
     get_coarse_obs,
     tags=['dask-resource:TASKSLOTS=1'],
+    max_retries=10,
+    retry_delay=timedelta(seconds=10),
     result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target=make_coarse_obs_path,
 )
 get_spatial_anomalies_task = task(
     get_spatial_anomalies,
     tags=['dask-resource:TASKSLOTS=1'],
+    max_retries=10,
+    retry_delay=timedelta(seconds=5),
     result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target=make_spatial_anomalies_path,
 )
 return_coarse_obs_full_time_task = task(
     return_coarse_obs_full_time,
     tags=['dask-resource:TASKSLOTS=1'],
+    max_retries=10,
+    retry_delay=timedelta(seconds=5),
     result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target=make_coarse_obs_path,  # is this right? to have the same target? maybe supposed to be make_rechunked_obs_path
 )
@@ -74,6 +85,8 @@ return_coarse_obs_full_time_task = task(
 return_gcm_train_full_time_task = task(
     return_gcm_train_full_time,
     tags=['dask-resource:TASKSLOTS=1'],
+    max_retries=10,
+    retry_delay=timedelta(seconds=5),
     result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target=make_rechunked_gcm_path,
 )
@@ -81,6 +94,8 @@ return_gcm_train_full_time_task = task(
 return_gcm_predict_rechunked_task = task(
     return_gcm_predict_rechunked,
     tags=['dask-resource:TASKSLOTS=1'],
+    max_retries=10,
+    retry_delay=timedelta(seconds=5),
     result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
     target=make_gcm_predict_path,
 )
@@ -95,6 +110,8 @@ fit_and_predict_task = task(
 postprocess_bcsd_task = task(
     postprocess_bcsd,
     tags=['dask-resource:TASKSLOTS=1'],
+    max_retries=10,
+    retry_delay=timedelta(seconds=5),
     log_stdout=True,
     result=XpersistResult(results_cache_store, serializer="xarray.zarr"),
     target=make_bcsd_output_path,
@@ -102,7 +119,6 @@ postprocess_bcsd_task = task(
 
 monthly_summary_task = task(
     monthly_summary,
-    tags=['dask-resource:TASKSLOTS=1'],
     log_stdout=True,
     result=XpersistResult(results_cache_store, serializer="xarray.zarr"),
     target=make_monthly_summary_path,  # TODO: replace with the paradigm from PR #84 once it's merged (also pull that)
@@ -110,7 +126,6 @@ monthly_summary_task = task(
 
 annual_summary_task = task(
     annual_summary,
-    tags=['dask-resource:TASKSLOTS=1'],
     result=XpersistResult(results_cache_store, serializer="xarray.zarr"),
     target=make_annual_summary_path,
 )
@@ -118,7 +133,6 @@ annual_summary_task = task(
 
 # Main Flow -----------------------------------------------------------
 
-# storage = Azure("prefect")
 with Flow(
     name="bcsd",
     storage=runtime.storage,
@@ -130,7 +144,7 @@ with Flow(
     scenario = Parameter("scenario")
     variable = Parameter("variable")
 
-    # bbox and train and predict period had to be encapsulated into tasks to prevent prefect from complaining about unused parameters.
+    # Note: bbox and train and predict period had to be encapsulated into tasks to prevent prefect from complaining about unused parameters.
     bbox = build_bbox(
         latmin=Parameter("latmin"),
         latmax=Parameter("latmax"),
@@ -155,6 +169,8 @@ with Flow(
         predict_period=predict_period,
         bbox=bbox,
     )
+    if config.get('run_options.cleanup_flag') is True:
+        cleanup.run_rsfip(gcm_identifier, obs_identifier)
 
     # preprocess_bcsd_tasks(s):
 

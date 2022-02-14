@@ -5,5 +5,5 @@ from cmip6_downscaling.config import _defaults
 
 config = Config("cmip6_downscaling", defaults=[_defaults])
 config.config_lock = SerializableLock()
-
+config.expand_environment_variables()
 CLIMATE_NORMAL_PERIOD = (1970, 2000)

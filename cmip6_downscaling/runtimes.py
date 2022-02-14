@@ -38,6 +38,7 @@ class BaseRuntime:
 class CloudRuntime(BaseRuntime):
     def __init__(
         self,
+        runtime_name="cloud",
         storage_options=None,
         agent=None,
         extra_pip_packages=None,
@@ -54,7 +55,7 @@ class CloudRuntime(BaseRuntime):
         adapt_max=None,
         dask_distributed_worker_resources_taskslots=None,
     ):
-
+        self._runtime_name = runtime_name
         self._storage_options = storage_options is not None or config.get(
             "runtime.cloud.storage_options.container"
         )
@@ -184,9 +185,17 @@ class CIRuntime(LocalRuntime):
 
 
 class PangeoRuntime(LocalRuntime):
-    def __init__(self, storage_options: dict = None):
+    def __init__(
+        self, storage_options: dict = None, n_workers: int = None, threads_per_worker: int = None
+    ):
         self._storage_options = storage_options is not None or config.get(
             "runtime.pangeo.storage_options"
+        )
+        self._n_workers = (
+            n_workers if n_workers is not None else config.get("runtime.pangeo.n_workers")
+        )
+        self._n_workers = (
+            n_workers if n_workers is not None else config.get("runtime.pangeo.threads_per_worker")
         )
 
     def __repr__(self):
@@ -202,7 +211,13 @@ class PangeoRuntime(LocalRuntime):
 
     @property
     def executor(self) -> Executor:
-        return LocalDaskExecutor(scheduler="processes")
+        return DaskExecutor(
+            cluster_kwargs={
+                'resources': {'TASKSLOTS': 1},
+                'n_workers': self._n_workers,
+                'threads_per_worker': self._threads_per_worker,
+            }
+        )
 
     def _generate_env(self):
         return _threadsafe_env_vars
