@@ -1,11 +1,11 @@
-from adlfs import AzureBlobFileSystem
+# from adlfs import AzureBlobFileSystem
 
-from cmip6_downscaling.tasks.cleanup import instantiate_az_filesystem  # , remove_stores
+# from cmip6_downscaling.tasks.cleanup import instantiate_az_filesystem  # , remove_stores
 
 
-def test_instantiate_az_filesystem():
-    filesystem = instantiate_az_filesystem()
-    assert isinstance(filesystem, AzureBlobFileSystem)
+# def test_instantiate_az_filesystem():
+#     filesystem = instantiate_az_filesystem()
+#     assert isinstance(filesystem, AzureBlobFileSystem)
 
 
 # perhaps a comprehensive test of this would be to do a tiny run with the cleanup flag on and then confirm that an fs.ls of the bucket at the end returns a FileNotFoundError?
