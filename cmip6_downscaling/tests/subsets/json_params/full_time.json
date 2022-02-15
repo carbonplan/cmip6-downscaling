@@ -1,0 +1,18 @@
+{
+  "obs": "ERA5",
+  "gcm": "MIROC6",
+  "scenario": "ssp370",
+  "variable": "tasmax",
+  "train_period": [
+    "1979",
+    "2014"
+  ],
+  "predict_period": [
+    "2015",
+    "2099"
+  ],
+  "latmin": "40",
+  "latmax": "50",
+  "lonmin": "80",
+  "lonmax": "90"
+}
