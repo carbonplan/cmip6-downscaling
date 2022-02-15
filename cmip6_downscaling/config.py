@@ -19,7 +19,7 @@ _defaults = {
             'uri': 'tmp/flow-outputs/temporary',
             'storage_options': {},
         },
-        'xpersist_store_name': 'xpersist_metadata_store/',
+        'xpersist_store_name': '/xpersist_metadata_store',
         'web_results': {
             'blob': 'analysis_notebooks',
             'storage_options': {},
@@ -29,22 +29,22 @@ _defaults = {
         'bcsd': {
             'process_stages': {
                 "intermediate": {
-                    'obs_ds': {'path_template': 'obs_ds/{obs_identifier}'},
-                    'coarsened_obs': {'path_template': 'coarsened_obs/{obs_identifier}'},
-                    'spatial_anomalies': {'path_template': 'spatial_anomalies/{obs_identifier}'},
-                    'gcm_predict': {'path_template': 'gcm_predict/{gcm_identifier}'},
-                    'rechunked_gcm': {'path_template': 'rechunked_gcm/{gcm_identifier}'},
-                    'bias_corrected': {'path_template': 'bias_corrected/{gcm_identifier}'},
+                    'obs_ds': {'path_template': '/obs_ds/{obs_identifier}'},
+                    'coarsened_obs': {'path_template': '/coarsened_obs/{obs_identifier}'},
+                    'spatial_anomalies': {'path_template': '/spatial_anomalies/{obs_identifier}'},
+                    'gcm_predict': {'path_template': '/gcm_predict/{gcm_identifier}'},
+                    'rechunked_gcm': {'path_template': '/rechunked_gcm/{gcm_identifier}'},
+                    'bias_corrected': {'path_template': '/bias_corrected/{gcm_identifier}'},
                 },
                 "results": {
-                    "bcsd_output": {"path_template": "bcsd_output/{gcm_identifier}"},
+                    "bcsd_output": {"path_template": "/bcsd_output/{gcm_identifier}"},
                     "bcsd_output_monthly": {
-                        "path_template": "bcsd_output_monthly/{gcm_identifier}"
+                        "path_template": "/bcsd_output_monthly/{gcm_identifier}"
                     },
-                    "bcsd_output_annual": {"path_template": "bcsd_output_annual/{gcm_identifier}"},
-                    "pyramid_daily": {"path_template": "pyramid_daily/{gcm_identifier}"},
-                    "pyramid_monthly": {"path_template": "pyramid_monthly/{gcm_identifier}"},
-                    "pyramid_annual": {"path_template": "pyramid_annual/{gcm_identifier}"},
+                    "bcsd_output_annual": {"path_template": "/bcsd_output_annual/{gcm_identifier}"},
+                    "pyramid_daily": {"path_template": "/pyramid_daily/{gcm_identifier}"},
+                    "pyramid_monthly": {"path_template": "/pyramid_monthly/{gcm_identifier}"},
+                    "pyramid_annual": {"path_template": "/pyramid_annual/{gcm_identifier}"},
                 },
             },
         },
