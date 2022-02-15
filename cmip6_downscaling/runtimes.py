@@ -194,7 +194,7 @@ class PangeoRuntime(LocalRuntime):
         self._n_workers = (
             n_workers if n_workers is not None else config.get("runtime.pangeo.n_workers")
         )
-        self._n_workers = (
+        self._threads_per_worker = (
             n_workers if n_workers is not None else config.get("runtime.pangeo.threads_per_worker")
         )
 
