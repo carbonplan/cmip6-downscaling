@@ -18,7 +18,7 @@ def bias_correct_obs_by_method(
 ) -> xr.DataArray:
     if method == 'quantile_transform':
         if 'n_quantiles' not in bc_kwargs:
-            bc_kwargs['n_quantiles'] = len(da_obs)
+            bc_kwargs['n_quantiles'] = len(da_obs.time)
         qt = PointWiseDownscaler(model=QuantileTransformer(**bc_kwargs))
         qt.fit(da_obs)
         return qt.transform(da_obs)
@@ -53,7 +53,7 @@ def bias_correct_gcm_by_method(
     if method == 'quantile_transform':
         # transform gcm
         if 'n_quantiles' not in bc_kwargs:
-            bc_kwargs['n_quantiles'] = len(da_gcm.sel(time=historical_period))
+            bc_kwargs['n_quantiles'] = len(da_gcm.sel(time=historical_period).time)
         qt = PointWiseDownscaler(model=QuantileTransformer(**bc_kwargs))
         qt.fit(da_gcm.sel(time=historical_period))
         return qt.transform(da_gcm)
