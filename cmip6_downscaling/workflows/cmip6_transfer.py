@@ -7,12 +7,14 @@ import intake
 import pandas as pd
 import xarray as xr
 from prefect import Flow, task
-from prefect.run_configs import KubernetesRun
-from prefect.storage import Azure
+
+from cmip6_downscaling import runtimes
 
 # vars/pathing -----------------------------------------------------------
 
-variable_ids = ["pr", "tasmin", "tasmax"]
+# variable_ids = ["pr", "tasmin", "tasmax"]
+runtime = runtimes.get_runtime()
+variable_ids = ["ua", "va"]
 col_url = "https://storage.googleapis.com/cmip6/pangeo-cmip6.json"
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 csv_catalog_path = "az://cmip6/pangeo-cmip6.csv"
@@ -145,26 +147,23 @@ def copy_to_azure(src_tgt_uris):
         copy_cleaned_data(xdf, tgt_map)
 
 
-# Prefect cloud config settings -----------------------------------------------------------
-
-run_config = KubernetesRun(
-    cpu_request=2,
-    memory_request="2Gi",
-    image="gcr.io/carbonplan/hub-notebook:7252fc3",
-    labels=["az-eu-west"],
-)
-storage = Azure("prefect")
-
 # Prefect Flow -----------------------------------------------------------
 
 
-with Flow(name="Transfer_CMIP6", storage=storage, run_config=run_config) as flow:
+with Flow(
+    name="Transfer_CMIP6",
+    storage=runtime.storage,
+    run_config=runtime.run_config,
+    executor=runtime.executor,
+) as flow:
     full_subset = retrive_cmip6_catalog()
     df = load_csv_catalog()
-    subset_df = full_subset.df  # .iloc[0:3]
+    subset_df = full_subset.df
     uris = [(src_uri, rename_gs_to_az(src_uri)) for src_uri in subset_df.zstore.to_list()]
     df_new = subset_df.copy()
     copy_to_azure.map(uris)
     df_new["zstore"] = [tgt_uri[1] for tgt_uri in uris]
     updated_df = pd.concat([df, df_new], axis=0).drop_duplicates(keep="last", ignore_index=True)
-    updated_df.to_csv(csv_catalog_path, storage_options={"connection_string": connection_string})
+    updated_df.to_csv(
+        csv_catalog_path, index=False, storage_options={"connection_string": connection_string}
+    )
