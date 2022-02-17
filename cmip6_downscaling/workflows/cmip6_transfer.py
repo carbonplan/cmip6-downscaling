@@ -1,6 +1,7 @@
 # Imports -----------------------------------------------------------
 import json
 import os
+from datetime import timedelta
 
 import fsspec
 import intake
@@ -12,9 +13,8 @@ from cmip6_downscaling import runtimes
 
 # vars/pathing -----------------------------------------------------------
 
-# variable_ids = ["pr", "tasmin", "tasmax"]
 runtime = runtimes.get_runtime()
-variable_ids = ["ua", "va"]
+variable_ids = ["pr", "tasmin", "tasmax", "ua", "va"]
 col_url = "https://storage.googleapis.com/cmip6/pangeo-cmip6.json"
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 csv_catalog_path = "az://cmip6/pangeo-cmip6.csv"
@@ -126,7 +126,6 @@ def retrive_cmip6_catalog():
     full_subset = col.search(
         activity_id=["CMIP", "ScenarioMIP"],
         experiment_id=["historical", "ssp245", "ssp370", "ssp585"],
-        member_id="r1i1p1f1",
         table_id="day",
         grid_label="gn",
         variable_id=variable_ids,
@@ -138,7 +137,7 @@ def retrive_cmip6_catalog():
 # Prefect Task(s) -----------------------------------------------------------
 
 
-@task
+@task(max_retries=3, retry_delay=timedelta(seconds=5))
 def copy_to_azure(src_tgt_uris):
     src_uri, tgt_uri = src_tgt_uris
     src_map, tgt_map = map_src_tgt(src_uri, tgt_uri, connection_string)
