@@ -11,8 +11,8 @@
     "2020",
     "2020"
   ],
-  "latmin": "-180",
-  "latmax": "180",
-  "lonmin": "-90",
-  "lonmax": "90"
+  "latmin": "-90",
+  "latmax": "90",
+  "lonmin": "-180",
+  "lonmax": "180"
 }

@@ -2,7 +2,9 @@ import glob
 import os
 
 # --- Settings ---
-downscaling_methods = ['bcsd', 'gard', 'maca']
+# downscaling_methods = ['bcsd', 'gard', 'maca']
+downscaling_methods = ['bcsd']
+
 _prefect_register_str = (
     """prefect register --project "envs" -p ../../workflows/{downscaling_method}_flow.py"""
 )
