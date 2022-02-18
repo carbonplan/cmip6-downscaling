@@ -2,27 +2,27 @@
 _defaults = {
     'storage': {
         'top_level': {
-            'uri': 'tmp/',
+            'uri': 'az://',
             'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
         },
         'gcm_identifier_template': '{gcm}/{scenario}/{variable}/{bbox}/{train_period}/{predict_period}/',
         'obs_identifier_template': '{obs}/{variable}/{bbox}/{train_period}/',
         'intermediate': {
-            'uri': 'tmp/flow-outputs/testing_intermediates',
-            'storage_options': {},
+            'uri': 'az://flow-outputs/testing_intermediates',
+            'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
         },
         'results': {
-            'uri': 'tmp/flow-outputs/testing_results',
-            'storage_options': {},
+            'uri': 'az://flow-outputs/testing_results',
+            'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
         },
         'temporary': {
-            'uri': 'tmp/flow-outputs/temporary',
-            'storage_options': {},
+            'uri': 'az://flow-outputs/temporary',
+            'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
         },
         'xpersist_store_name': '/xpersist_metadata_store',
         'web_results': {
             'blob': 'analysis_notebooks',
-            'storage_options': {},
+            'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
         },
     },
     'methods': {

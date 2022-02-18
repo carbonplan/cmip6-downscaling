@@ -44,27 +44,28 @@ runtime = runtimes.get_runtime()
 # Transform Functions into Tasks -----------------------------------------------------------
 
 
+# def override_config(
+#     intermediate_uri,
+#     results_uri,
+#     temporary_uri,
+#     intermediate_storage_options,
+#     results_storage_options,
+#     temporary_storage_options,
+#     runtime,
+#     cleanup_flag,
+# ):
 @task()
-def override_config(
-    intermediate_uri,
-    results_uri,
-    temporary_uri,
-    intermediate_storage_options,
-    results_storage_options,
-    temporary_storage_options,
-    runtime,
-    cleanup_flag,
-):
+def override_config(json_config):
     config.set(
         {
-            'config.intermediate.uri': intermediate_uri,
-            'config.results.uri': results_uri,
-            'config.temporary.uri': temporary_uri,
-            'config.intermediate.storage_options': intermediate_storage_options,
-            'config.results.storage_options': results_storage_options,
-            'config.temporary.storage_options': temporary_storage_options,
-            'runtime': runtime,
-            'cleanup_flag': cleanup_flag,
+            'storage.intermediate.uri': json_config['intermediate_uri'],
+            'storage.results.uri': json_config['results_uri'],
+            'storage.temporary.uri': json_config['temporary_uri'],
+            'storage.intermediate.storage_options': json_config['intermediate_storage_options'],
+            'storage.results.storage_options': json_config['results_storage_options'],
+            'storage.temporary.storage_options': json_config['temporary_storage_options'],
+            'runtime': json_config['runtime'],
+            'cleanup_flag': json_config['cleanup_flag'],
         }
     )
 
@@ -165,14 +166,15 @@ with Flow(
     scenario = Parameter("scenario")
     variable = Parameter("variable")
 
-    intermediate_uri = Parameter('config.intermediate.uri')
-    results_uri = Parameter('config.results.uri')
-    temporary_uri = Parameter('config.temporary.uri')
-    intermediate_storage_options = Parameter('config.intermediate.storage_options')
-    results_storage_options = Parameter('config.results.storage_options')
-    temporary_storage_options = Parameter('config.temporary.storage_options')
-    runtime = Parameter('runtime')
-    cleanup_flag = Parameter('cleanup_flag')
+    json_config = Parameter('config')
+    # intermediate_uri = Parameter('storage.intermediate.uri')
+    # results_uri = Parameter('storage.results.uri')
+    # temporary_uri = Parameter('storage.temporary.uri')
+    # intermediate_storage_options = Parameter('storage.intermediate.storage_options')
+    # results_storage_options = Parameter('storage.results.storage_options')
+    # temporary_storage_options = Parameter('storage.temporary.storage_options')
+    # runtime = Parameter('runtime')
+    # cleanup_flag = Parameter('cleanup_flag')
 
     intermediate_cache_store = intermediate_cache_store_task()
     results_cache_store = results_cache_store_task()
@@ -204,16 +206,17 @@ with Flow(
         bbox=bbox,
     )
 
-    override_config(
-        intermediate_uri,
-        results_uri,
-        temporary_uri,
-        intermediate_storage_options,
-        results_storage_options,
-        temporary_storage_options,
-        runtime,
-        cleanup_flag,
-    )
+    override_config(json_config)
+    # override_config(
+    #     intermediate_uri,
+    #     results_uri,
+    #     temporary_uri,
+    #     intermediate_storage_options,
+    #     results_storage_options,
+    #     temporary_storage_options,
+    #     runtime,
+    #     cleanup_flag,
+    # )
 
     intermediate_cache_store = return_intermediate_cache_store()
     results_cache_store = return_results_cache_store()

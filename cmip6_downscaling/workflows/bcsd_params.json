@@ -3,20 +3,22 @@
   "gcm": "MIROC6",
   "scenario": "ssp370",
   "variable": "tasmax",
-  "config.intermediate.uri": "az://flow-outputs/testing_intermediates",
-  "config.results.uri": "az://flow-outputs/testing_results",
-  "config.temporary.uri": "az://flow-outputs/temporary",
-  "config.intermediate.storage_options": {
-    "connection_string": "$AZURE_STORAGE_CONNECTION_STRING"
+  "config": {
+    "storage.intermediate.uri": "az://flow-outputs/testing_intermediates",
+    "storage.results.uri": "az://flow-outputs/testing_results",
+    "storage.temporary.uri": "az://flow-outputs/temporary",
+    "storage.intermediate.storage_options": {
+      "connection_string": "$AZURE_STORAGE_CONNECTION_STRING"
+    },
+    "storage.results.storage_options": {
+      "connection_string": "$AZURE_STORAGE_CONNECTION_STRING"
+    },
+    "storage.temporary.storage_options": {
+      "connection_string": "$AZURE_STORAGE_CONNECTION_STRING"
+    },
+    "runtime": "pangeo",
+    "cleanup_flag": "True"
   },
-  "config.results.storage_options": {
-    "connection_string": "$AZURE_STORAGE_CONNECTION_STRING"
-  },
-  "config.temporary.storage_options": {
-    "connection_string": "$AZURE_STORAGE_CONNECTION_STRING"
-  },
-  "runtime": "runtime",
-  "cleanup_flag": "cleanup_flag",
   "train_period": [
     "1990",
     "1990"
