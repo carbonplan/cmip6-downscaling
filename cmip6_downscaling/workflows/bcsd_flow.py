@@ -1,7 +1,6 @@
 from datetime import timedelta
 
 from prefect import Flow, Parameter, task
-from xpersist import CacheStore
 from xpersist.prefect.result import XpersistResult
 
 from cmip6_downscaling import config, runtimes
@@ -21,6 +20,8 @@ from cmip6_downscaling.tasks.common_tasks import (
     build_bbox,
     build_time_period_slices,
     path_builder_task,
+    return_intermediate_cache_store,
+    return_results_cache_store,
 )
 from cmip6_downscaling.workflows.paths import (
     make_annual_summary_path,
@@ -36,22 +37,40 @@ from cmip6_downscaling.workflows.paths import (
 
 # storage_prefix = config.get("runtime.cloud.storage_prefix")
 
+
 runtime = runtimes.get_runtime()
 
-intermediate_cache_store = CacheStore(
-    config.get("storage.intermediate.uri"),
-    storage_options=config.get("storage.intermediate.storage_options"),
-)
-
-
-results_cache_store = CacheStore(
-    config.get("storage.results.uri"),
-    storage_options=config.get("storage.results.storage_options"),
-)
 
 # Transform Functions into Tasks -----------------------------------------------------------
 
 
+@task()
+def override_config(
+    intermediate_uri,
+    results_uri,
+    temporary_uri,
+    intermediate_storage_options,
+    results_storage_options,
+    temporary_storage_options,
+    runtime,
+    cleanup_flag,
+):
+    config.set(
+        {
+            'config.intermediate.uri': intermediate_uri,
+            'config.results.uri': results_uri,
+            'config.temporary.uri': temporary_uri,
+            'config.intermediate.storage_options': intermediate_storage_options,
+            'config.results.storage_options': results_storage_options,
+            'config.temporary.storage_options': temporary_storage_options,
+            'runtime': runtime,
+            'cleanup_flag': cleanup_flag,
+        }
+    )
+
+
+intermediate_cache_store = return_intermediate_cache_store()
+results_cache_store = return_results_cache_store()
 return_obs_task = task(
     return_obs,
     result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
@@ -130,6 +149,8 @@ annual_summary_task = task(
     target=make_annual_summary_path,
 )
 
+intermediate_cache_store_task = task(return_intermediate_cache_store)
+results_cache_store_task = task(return_results_cache_store)
 
 # Main Flow -----------------------------------------------------------
 
@@ -144,6 +165,18 @@ with Flow(
     scenario = Parameter("scenario")
     variable = Parameter("variable")
 
+    intermediate_uri = Parameter('config.intermediate.uri')
+    results_uri = Parameter('config.results.uri')
+    temporary_uri = Parameter('config.temporary.uri')
+    intermediate_storage_options = Parameter('config.intermediate.storage_options')
+    results_storage_options = Parameter('config.results.storage_options')
+    temporary_storage_options = Parameter('config.temporary.storage_options')
+    runtime = Parameter('runtime')
+    cleanup_flag = Parameter('cleanup_flag')
+
+    intermediate_cache_store = intermediate_cache_store_task()
+    results_cache_store = results_cache_store_task()
+
     # Note: bbox and train and predict period had to be encapsulated into tasks to prevent prefect from complaining about unused parameters.
     bbox = build_bbox(
         latmin=Parameter("latmin"),
@@ -153,6 +186,7 @@ with Flow(
     )
     train_period = build_time_period_slices(Parameter('train_period'))
     predict_period = build_time_period_slices(Parameter('predict_period'))
+
     (
         gcm_grid_spec,
         obs_identifier,
@@ -169,6 +203,21 @@ with Flow(
         predict_period=predict_period,
         bbox=bbox,
     )
+
+    override_config(
+        intermediate_uri,
+        results_uri,
+        temporary_uri,
+        intermediate_storage_options,
+        results_storage_options,
+        temporary_storage_options,
+        runtime,
+        cleanup_flag,
+    )
+
+    intermediate_cache_store = return_intermediate_cache_store()
+    results_cache_store = return_results_cache_store()
+
     if config.get('run_options.cleanup_flag') is True:
         cleanup.run_rsfip(gcm_identifier, obs_identifier)
 

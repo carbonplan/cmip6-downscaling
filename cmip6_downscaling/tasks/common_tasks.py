@@ -35,6 +35,20 @@ get_obs_task = task(get_obs)
 get_gcm_task = task(get_gcm)
 
 
+def return_intermediate_cache_store():
+    return CacheStore(
+        config.get("storage.intermediate.uri"),
+        storage_options=config.get("storage.intermediate.storage_options"),
+    )
+
+
+def return_results_cache_store():
+    return CacheStore(
+        config.get("storage.results.uri"),
+        storage_options=config.get("storage.results.storage_options"),
+    )
+
+
 @task
 def build_bbox(latmin: str, latmax: str, lonmin: str, lonmax: str) -> dataclass:
     """Build bounding box out of lat/lon inputs using BBox data class defined in /utils.py

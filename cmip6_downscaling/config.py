@@ -8,7 +8,7 @@ _defaults = {
         'gcm_identifier_template': '{gcm}/{scenario}/{variable}/{bbox}/{train_period}/{predict_period}/',
         'obs_identifier_template': '{obs}/{variable}/{bbox}/{train_period}/',
         'intermediate': {
-            'uri': 'tmp/low-outputs/testing_intermediates',
+            'uri': 'tmp/flow-outputs/testing_intermediates',
             'storage_options': {},
         },
         'results': {
@@ -70,7 +70,7 @@ _defaults = {
                 'connection_string': "$AZURE_STORAGE_CONNECTION_STRING",
             },
             "agent": "az-eu-west",
-            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git",
+            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git@bugfix/config",
             "kubernetes_cpu": 7,
             "kubernetes_memory": "16Gi",
             "image": "carbonplan/cmip6-downscaling-prefect:2022.02.08",
