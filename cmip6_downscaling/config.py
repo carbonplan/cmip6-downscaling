@@ -2,8 +2,8 @@
 
 _defaults = {
     'storage': {
-        'gcm_identifier_template': '{gcm}/{scenario}/{variable}/{bbox}/{train_period}/{predict_period}/',
-        'obs_identifier_template': '{obs}/{variable}/{bbox}/{train_period}/',
+        'gcm_identifier_template': '{gcm}/{scenario}/{features}/{bbox}/{train_period}/{predict_period}/{variable}',
+        'obs_identifier_template': '{obs}/{features}/{variable}/{bbox}/{train_period}/{variable}',
         'intermediate': {'uri': '/tmp/flow-outputs/intermediates/', 'storage_options': {}},
         'results': {'uri': '/tmp/flow-outputs/results/', 'storage_options': {}},
         'temporary': {'uri': '/tmp/flow-outputs/temporary/', 'storage_options': {}},

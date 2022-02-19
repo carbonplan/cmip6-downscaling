@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
@@ -165,10 +166,12 @@ def rechunker_task(
 
 @task
 def path_builder_task(
+    downscaling_method: str,
     obs: str,
     gcm: str,
     scenario: str,
     variable: str,
+    features: Union[str, List[str]],
     train_period: slice,
     predict_period: slice,
     bbox: BBox,
@@ -178,6 +181,8 @@ def path_builder_task(
     strings will then be used to identify cached files.
     Parameters
     ----------
+    downscaling_method: str
+        Name of the downscaling method
     obs: str
         Name of obs dataset
     gcm: str
@@ -213,6 +218,7 @@ def path_builder_task(
     obs_identifier = build_obs_identifier(
         obs=obs,
         variable=variable,
+        features=features,
         train_period=train_period,
         bbox=bbox,
     )
@@ -220,14 +226,22 @@ def path_builder_task(
         gcm=gcm,
         scenario=scenario,
         variable=variable,
+        features=features,
         train_period=train_period,
         predict_period=predict_period,
         bbox=bbox,
     )
-    pyramid_path_daily = make_daily_pyramid_path(gcm_identifier)
-    pyramid_path_monthly = make_monthly_pyramid_path(gcm_identifier)
-    pyramid_path_annual = make_annual_pyramid_path(gcm_identifier)
-
+    pyramid_path_daily = make_daily_pyramid_path(downscaling_method, gcm_identifier)
+    pyramid_path_monthly = make_monthly_pyramid_path(downscaling_method, gcm_identifier)
+    pyramid_path_annual = make_annual_pyramid_path(downscaling_method, gcm_identifier)
+    for string in [
+        obs_identifier,
+        gcm_identifier,
+        pyramid_path_daily,
+        pyramid_path_monthly,
+        pyramid_path_annual,
+    ]:
+        print(string)
     return (
         gcm_grid_spec,
         obs_identifier,
@@ -244,6 +258,8 @@ def path_builder_task(
         CacheStore(config.get('storage.intermediate.uri')),
         serializer='xarray.zarr',
     ),
+    max_retries=10,
+    retry_delay=timedelta(seconds=5),
     target=make_interpolated_obs_path,
 )
 def coarsen_and_interpolate_obs_task(
@@ -311,6 +327,8 @@ def coarsen_and_interpolate_obs_task(
         CacheStore(config.get('storage.intermediate.uri')),
         serializer='xarray.zarr',
     ),
+    max_retries=10,
+    retry_delay=timedelta(seconds=5),
     target=make_interpolated_gcm_path,
 )
 def interpolate_gcm_task(

@@ -1,5 +1,5 @@
 import pathlib
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 from cmip6_downscaling import config
 from cmip6_downscaling.workflows.utils import BBox
@@ -8,6 +8,7 @@ from cmip6_downscaling.workflows.utils import BBox
 def build_obs_identifier(
     obs: str,
     variable: str,
+    features: Union[str, List[str]],
     train_period: slice,
     bbox: BBox,
     **kwargs,
@@ -21,6 +22,8 @@ def build_obs_identifier(
         Name of obs dataset
     variable: str
         Name of the variable used in obs and gcm dataset (including features and label)
+    features: str or list of str
+        The features going into predicting this variable.
     train_period: slice
         Start and end year slice of training/historical period. Ex: slice('1990','1990')
     bbox: BBox
@@ -32,15 +35,16 @@ def build_obs_identifier(
     identifier : str
         string to be used in obs related paths as specified by the params
     """
-    if isinstance(variable, str):
-        variable = [variable]
-    var_string = '_'.join(sorted(variable))
+    if isinstance(features, str):
+        feature_string = [features]
+    feature_string = '_'.join(sorted(features))
 
     obs_identifier = config.get('storage.obs_identifier_template').format(
         obs=obs,
         train_period=f'{train_period.start}_{train_period.stop}',
         bbox=bbox,
-        variable=var_string,
+        variable=variable,
+        features=feature_string,
     )
 
     return obs_identifier
@@ -50,6 +54,7 @@ def build_gcm_identifier(
     gcm: str,
     scenario: str,
     variable: str,
+    features: Union[str, List[str]],
     train_period: slice,
     predict_period: slice,
     bbox: BBox,
@@ -66,6 +71,8 @@ def build_gcm_identifier(
         Name of the future emission scenario to load
     variable : str
         Name of the variable used in obs and gcm dataset (including features and label)
+    features: str or list of str
+        The features going into predicting this variable.
     train_period : slice
         Start and end year slice of training/historical period. Ex: slice('1990', '1990')
     predict_period: slice
@@ -78,14 +85,15 @@ def build_gcm_identifier(
     identifier : str
         string to be used in gcm related paths as specified by the params
     """
-    if isinstance(variable, str):
-        variable = [variable]
-    var_string = '_'.join(sorted(variable))
+    if isinstance(features, str):
+        features = [features]
+    feature_string = '_'.join(sorted(features))
 
     gcm_identifier = config.get('storage.gcm_identifier_template').format(
         gcm=gcm,
         scenario=scenario,
-        variable=var_string,
+        variable=variable,
+        features=feature_string,
         train_period=f'{train_period.start}_{train_period.stop}',
         predict_period=f'{predict_period.start}_{predict_period.stop}',
         bbox=bbox,
@@ -113,7 +121,7 @@ def make_rechunked_obs_path(
     if obs_identifier is None:
         obs_identifier = build_obs_identifier(**kwargs)
 
-    return f"rechunked_obs/{obs_identifier}{chunking_approach}.zarr"
+    return f"rechunked_obs/{obs_identifier}_{chunking_approach}.zarr"
 
 
 def make_coarse_obs_path(
@@ -132,7 +140,7 @@ def make_coarse_obs_path(
         Path to which coarsened observation defined by the parameters should be stored
     """
 
-    return f"coarsened_obs/{obs_identifier}{chunking_approach}_{gcm_grid_spec}.zarr"
+    return f"coarsened_obs/{obs_identifier}_{chunking_approach}_{gcm_grid_spec}.zarr"
 
 
 def make_interpolated_obs_path(
@@ -156,7 +164,7 @@ def make_interpolated_obs_path(
     """
     if obs_identifier is None:
         obs_identifier = build_obs_identifier(**kwargs)
-    return f"interpolated_obs/{obs_identifier}{chunking_approach}_{gcm_grid_spec}.zarr"
+    return f"interpolated_obs/{obs_identifier}_{chunking_approach}_{gcm_grid_spec}.zarr"
 
 
 def make_interpolated_gcm_path(
@@ -181,7 +189,7 @@ def make_interpolated_gcm_path(
     if gcm_identifier is None:
         gcm_identifier = build_gcm_identifier(**kwargs)
 
-    return f"interpolated_gcm/{gcm_identifier}{chunking_approach}_{obs}.zarr"
+    return f"interpolated_gcm/{gcm_identifier}_{chunking_approach}_{obs}.zarr"
 
 
 def make_bias_corrected_obs_path(
@@ -216,7 +224,7 @@ def make_bias_corrected_obs_path(
     if chunking_approach is None:
         chunking_approach = ''
 
-    return f"bias_corrected_obs/{obs_identifier}{chunking_approach}_{gcm_grid_spec}_{method}.zarr"
+    return f"bias_corrected_obs/{obs_identifier}_{chunking_approach}_{gcm_grid_spec}_{method}.zarr"
 
 
 def make_rechunked_gcm_path(
@@ -240,7 +248,7 @@ def make_rechunked_gcm_path(
     if chunking_approach is None:
         chunking_approach = ''
 
-    return f"rechunked_gcm/{gcm_identifier}{chunking_approach}.zarr"
+    return f"rechunked_gcm/{gcm_identifier}_{chunking_approach}.zarr"
 
 
 def make_bias_corrected_gcm_path(
@@ -271,7 +279,7 @@ def make_bias_corrected_gcm_path(
     if chunking_approach is None:
         chunking_approach = ''
 
-    return f"bias_corrected_gcm/{gcm_identifier}{chunking_approach}_{method}.zarr"
+    return f"bias_corrected_gcm/{gcm_identifier}_{chunking_approach}_{method}.zarr"
 
 
 def make_gard_predict_output_path(
@@ -329,7 +337,7 @@ def make_scrf_path(
 
 
 def make_gard_post_processed_output_path(
-    gcm_identifier: str, bias_correction_method: str, model_type: str, label: str, **kwargs
+    gcm_identifier: str, bias_correction_method: str, model_type: str, **kwargs
 ):
     """
     Path to save GARD post processed output
@@ -350,7 +358,7 @@ def make_gard_post_processed_output_path(
     gard_post_processed_output_path: str
         Path to which GARD post processed output defined by the parameters should be stored
     """
-    return f"gard/{gcm_identifier}{bias_correction_method}_{model_type}_{label}.zarr"
+    return f"gard/{gcm_identifier}_{bias_correction_method}_{model_type}.zarr"
 
 
 def make_epoch_trend_path(
@@ -469,12 +477,14 @@ def make_maca_output_path(gcm_identifier: str, label: str, **kwargs):
     return f"maca_output/{gcm_identifier}_{label}.zarr"
 
 
-def make_daily_pyramid_path(gcm_identifier: str, **kwargs) -> str:
+def make_daily_pyramid_path(downscaling_method: str, gcm_identifier: str, **kwargs) -> str:
     """Build the path for the daily pyramid
 
 
     Parameters
     ----------
+    downscaling_method : str
+        Method that you're using. e.g. gard
     gcm_identifier : str
         Output from build_gcm_identifier. String to identify the gcm dataset used
 
@@ -483,15 +493,17 @@ def make_daily_pyramid_path(gcm_identifier: str, **kwargs) -> str:
     pyramid_path : str
         Path to pyramid location
     """
-    return f"/pyramid_daily/{gcm_identifier}.pyr"
+    return f"/pyramid_daily/{downscaling_method}/{gcm_identifier}.pyr"
 
 
-def make_monthly_pyramid_path(gcm_identifier: str, **kwargs) -> str:
+def make_monthly_pyramid_path(downscaling_method: str, gcm_identifier: str, **kwargs) -> str:
     """Build the path for the monthly pyramid
 
 
     Parameters
     ----------
+    downscaling_method : str
+        Method that you're using. e.g. gard
     gcm_identifier : str
         Output from build_gcm_identifier. String to identify the gcm dataset used
 
@@ -500,15 +512,17 @@ def make_monthly_pyramid_path(gcm_identifier: str, **kwargs) -> str:
     pyramid_path : str
         Path to the monthly pyramid
     """
-    return f"/pyramid_monthly/{gcm_identifier}.pyr"
+    return f"/pyramid_monthly/{downscaling_method}/{gcm_identifier}.pyr"
 
 
-def make_annual_pyramid_path(gcm_identifier: str, **kwargs) -> str:
+def make_annual_pyramid_path(downscaling_method: str, gcm_identifier: str, **kwargs) -> str:
     """Build the path for the annual pyramid
 
 
     Parameters
     ----------
+    downscaling_method : str
+        Method that you're using. e.g. gard
     gcm_identifier : str
         Output from build_gcm_identifier. String to identify the gcm dataset used
 
@@ -517,7 +531,8 @@ def make_annual_pyramid_path(gcm_identifier: str, **kwargs) -> str:
     pyramid_path : str
         Path to the annual pyramid
     """
-    return f"/pyramid_annual/{gcm_identifier}.pyr"
+
+    return f"/pyramid_annual/{downscaling_method}/{gcm_identifier}.pyr"
 
 
 # ---addl bcsd paths
@@ -603,11 +618,13 @@ def make_bcsd_output_path(gcm_identifier: str = None, **kwargs) -> str:
     return f"bcsd_output/{gcm_identifier}.zarr"
 
 
-def make_monthly_summary_path(gcm_identifier: str = None, **kwargs) -> str:
+def make_monthly_summary_path(downscaling_method: str, gcm_identifier: str = None, **kwargs) -> str:
     """Build the path for the monthly summary dataset
 
     Parameters
     ----------
+    downscaling_method : str
+        Method that you're using. e.g. gard
     gcm_identifier : str
         Output from build_gcm_identifier. String to identify the gcm dataset used
 
@@ -616,14 +633,16 @@ def make_monthly_summary_path(gcm_identifier: str = None, **kwargs) -> str:
     bcsd_output_monthly_path : str
         Path to monthly bcsd output ds file location
     """
-    return f"bcsd_output_monthly/{gcm_identifier}.zarr"
+    return f"{downscaling_method}_output_monthly/{gcm_identifier}.zarr"
 
 
-def make_annual_summary_path(gcm_identifier: str = None, **kwargs) -> str:
+def make_annual_summary_path(downscaling_method: str, gcm_identifier: str = None, **kwargs) -> str:
     """Build the path for the annual summary dataset
 
     Parameters
     ----------
+    downscaling_method : str
+        Method that you're using. e.g. gard
     gcm_identifier : str
         Output from build_gcm_identifier. String to identify the gcm dataset used
 
@@ -632,7 +651,7 @@ def make_annual_summary_path(gcm_identifier: str = None, **kwargs) -> str:
     bcsd_output_annual_path : str
         Path to annual bcsd output ds file location
     """
-    return f"bcsd_output_annual/{gcm_identifier}.zarr"
+    return f"{downscaling_method}_output_annual/{gcm_identifier}.zarr"
 
 
 def get_notebook_paths(
@@ -659,3 +678,25 @@ def get_notebook_paths(
     executed_path = path.parent / f'analyses_{identifier}.ipynb'
     executed_html_path = path.parent / f'analyses_{identifier}.html'
     return template_path, executed_path, executed_html_path
+
+
+def make_output_path(downscaling_method: str, gcm_identifier: str, gard_model_type=None):
+    """Build the path for the daily output dataset you'll read
+
+    Parameters
+    ----------
+    downscaling_method : str
+        Method that you're using. e.g. gard
+    gcm_identifier : str
+        Output from build_gcm_identifier. String to identify the gcm dataset used
+
+    Returns
+    -------
+    output_path : str
+        Path to daily output ds file location
+    """
+    if downscaling_method == 'gard':
+        return f"{downscaling_method}/{gcm_identifier}.zarr"
+
+    else:
+        return f"{downscaling_method}/{gcm_identifier}_quantile_transform_{gard_model_type}.zarr"

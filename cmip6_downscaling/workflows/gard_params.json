@@ -1,4 +1,5 @@
 {
+  "downscaling_method": "gard",
   "obs": "ERA5",
   "gcm": "MIROC6",
   "scenario": "ssp370",
@@ -22,8 +23,6 @@
   "lonmax": "90",
   "bias_correction_method": "quantile_transform",
   "bias_correction_kwargs": {},
-  "model_type": "AnalogRegression",
-  "model_params": {
-    "n_analogs": 50
-  }
+  "model_type": "PureRegression",
+  "model_params": {}
 }

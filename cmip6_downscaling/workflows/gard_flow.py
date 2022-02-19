@@ -2,7 +2,7 @@ import os
 
 os.environ['PREFECT__FLOWS__CHECKPOINTING'] = 'true'
 
-from typing import List
+from typing import List, Union
 
 import xarray as xr
 from prefect import Flow, Parameter, task
@@ -10,9 +10,11 @@ from xpersist import CacheStore
 from xpersist.prefect.result import XpersistResult
 
 from cmip6_downscaling import config
+from cmip6_downscaling.analysis.analysis import annual_summary, monthly_summary, run_analyses
 from cmip6_downscaling.methods.bcsd import return_obs
 from cmip6_downscaling.methods.gard import gard_fit_and_predict, gard_postprocess, read_scrf
 from cmip6_downscaling.runtimes import get_runtime
+from cmip6_downscaling.tasks import pyramid
 from cmip6_downscaling.tasks.common_tasks import (
     bias_correct_gcm_task,
     bias_correct_obs_task,
@@ -23,9 +25,11 @@ from cmip6_downscaling.tasks.common_tasks import (
     path_builder_task,
 )
 from cmip6_downscaling.workflows.paths import (
+    make_annual_summary_path,
     make_bias_corrected_gcm_path,
     make_gard_post_processed_output_path,
     make_gard_predict_output_path,
+    make_monthly_summary_path,
     make_rechunked_obs_path,
 )
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching
@@ -60,13 +64,29 @@ gard_postprocess_task = task(
     target=make_gard_post_processed_output_path,
 )
 
+monthly_summary_task = task(
+    monthly_summary,
+    tags=['dask-resource:TASKSLOTS=1'],
+    log_stdout=True,
+    result=XpersistResult(results_cache_store, serializer="xarray.zarr"),
+    target=make_monthly_summary_path,  # TODO: replace with the paradigm from PR #84 once it's merged (also pull that)
+)
+
+annual_summary_task = task(
+    annual_summary,
+    tags=['dask-resource:TASKSLOTS=1'],
+    result=XpersistResult(results_cache_store, serializer="xarray.zarr"),
+    target=make_annual_summary_path,
+)
+
 
 @task(nout=3)
 def prep_gard_input_task(
     obs: str,
     train_period: slice,
     predict_period: slice,
-    variables: List[str],
+    variable: str,
+    features: Union[str, List[str]],
     X_train: xr.Dataset,
     X_pred: xr.Dataset,
     gcm_identifier: str,
@@ -74,12 +94,13 @@ def prep_gard_input_task(
     bbox,
 ):
     # get observation data in the same chunking scheme as
-    ds_obs = return_obs(obs=obs, train_period=train_period, variable=variables, bbox=bbox)
+    ds_obs = return_obs(obs=obs, train_period=train_period, variable=features, bbox=bbox)
 
     rechunked_obs_path = make_rechunked_obs_path(
         obs=obs,
         train_period=train_period,
-        variable=variables,
+        variable=variable,
+        features=features,
         bbox=bbox,
         chunking_approach='matched',
     )
@@ -105,6 +126,7 @@ with Flow(
     run_config=runtime.run_config,
     executor=runtime.executor,
 ) as gard_flow:
+    downscaling_method = Parameter("downscaling_method")
     obs = Parameter("obs")
     gcm = Parameter("gcm")
     scenario = Parameter("scenario")
@@ -133,10 +155,12 @@ with Flow(
         pyramid_path_monthly,
         pyramid_path_annual,
     ) = path_builder_task(
+        downscaling_method=downscaling_method,
         obs=obs,
         gcm=gcm,
         scenario=scenario,
         variable=variable,
+        features=features,
         train_period=train_period,
         predict_period=predict_period,
         bbox=bbox,
@@ -193,7 +217,8 @@ with Flow(
         obs=obs,
         train_period=train_period,
         predict_period=predict_period,
-        variables=features,
+        variable=variable,
+        features=features,
         X_train=ds_obs_bias_corrected,
         X_pred=ds_gcm_bias_corrected,
         gcm_identifier=gcm_identifier,
@@ -226,4 +251,60 @@ with Flow(
         bias_correction_method=bias_correction_method,
         model_type=model_type,
         label=variable,
+    )
+
+    pyramid_location_daily = pyramid.regrid(
+        final_output,
+        uri=config.get('storage.results.uri') + pyramid_path_daily,
+    )
+
+    monthly_summary_ds = monthly_summary_task(
+        final_output,
+        downscaling_method=downscaling_method,
+        gcm=gcm,
+        scenario=scenario,
+        variable=variable,
+        train_period=train_period,
+        predict_period=predict_period,
+        bbox=bbox,
+        gcm_identifier=gcm_identifier,
+    )
+
+    annual_summary_ds = annual_summary_task(
+        final_output,
+        downscaling_method=downscaling_method,
+        gcm=gcm,
+        scenario=scenario,
+        variable=variable,
+        train_period=train_period,
+        predict_period=predict_period,
+        bbox=bbox,
+        gcm_identifier=gcm_identifier,
+    )
+
+    pyramid_location_monthly = pyramid.regrid(
+        monthly_summary_ds, uri=config.get('storage.results.uri') + pyramid_path_monthly
+    )
+
+    pyramid_location_annual = pyramid.regrid(
+        annual_summary_ds, uri=config.get('storage.results.uri') + pyramid_path_annual
+    )
+
+    analysis_location = run_analyses(
+        {
+            'downscaling_method': downscaling_method,
+            'gard_model_type': model_type,
+            'gcm_identifier': gcm_identifier,
+            'obs_identifier': obs_identifier,
+            'result_dir': config.get('storage.results.uri'),
+            'intermediate_dir': config.get('storage.intermediate.uri'),
+            'var': variable,
+            'gcm': gcm,
+            'scenario': scenario,
+        },
+        web_blob=config.get('storage.web_results.blob'),
+        bbox=bbox,
+        train_period=train_period,
+        predict_period=predict_period,
+        upstream_tasks=[final_output],
     )
