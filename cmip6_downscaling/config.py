@@ -81,7 +81,7 @@ _defaults = {
             "pod_cpu_request": 2,
             "deploy_mode": "remote",
             "adapt_min": 2,
-            "adapt_max": 2,
+            "adapt_max": 50,
             "dask_distributed_worker_resources_taskslots": "1",
         },
         "local": {"storage_prefix": "/tmp/", "storage_options": {'directory': './'}},
