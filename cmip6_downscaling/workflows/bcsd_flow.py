@@ -26,7 +26,8 @@ from cmip6_downscaling.workflows.paths import (
     make_annual_summary_path,
     make_bcsd_output_path,
     make_bias_corrected_path,
-    make_coarse_obs_path,
+    make_coarse_obs_path_full_space,
+    make_coarse_obs_path_full_time,
     make_gcm_predict_path,
     make_monthly_summary_path,
     make_rechunked_gcm_path,
@@ -63,7 +64,7 @@ get_coarse_obs_task = task(
     max_retries=10,
     retry_delay=timedelta(seconds=10),
     result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
-    target=make_coarse_obs_path,
+    target=make_coarse_obs_path_full_space,
 )
 get_spatial_anomalies_task = task(
     get_spatial_anomalies,
@@ -79,7 +80,7 @@ return_coarse_obs_full_time_task = task(
     max_retries=10,
     retry_delay=timedelta(seconds=5),
     result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
-    target=make_coarse_obs_path,  # is this right? to have the same target? maybe supposed to be make_rechunked_obs_path
+    target=make_coarse_obs_path_full_time,
 )
 
 return_gcm_train_full_time_task = task(
@@ -131,6 +132,15 @@ annual_summary_task = task(
 )
 
 
+@task(log_stdout=True)
+def return_gcm_grid_spec(gcm_grid_spec, obs_identifier):
+    print('\n')
+    print(gcm_grid_spec)
+    print('\n')
+    print(obs_identifier)
+    print('\n')
+
+
 # Main Flow -----------------------------------------------------------
 
 with Flow(
@@ -173,7 +183,6 @@ with Flow(
         cleanup.run_rsfip(gcm_identifier, obs_identifier)
 
     # preprocess_bcsd_tasks(s):
-
     obs_ds = return_obs_task(
         obs=obs,
         variable=variable,
@@ -218,7 +227,6 @@ with Flow(
         predict_period=predict_period,
         bbox=bbox,
         obs_identifier=obs_identifier,
-        chunking_approach='full_time',
         gcm_grid_spec=gcm_grid_spec,
     )
 
@@ -305,11 +313,13 @@ with Flow(
     pyramid_location_annual = pyramid.regrid(
         annual_summary_ds, uri=config.get('storage.results.uri') + pyramid_path_annual
     )
+    return_gcm_grid_spec(gcm_grid_spec, obs_identifier)
 
     analysis_location = run_analyses(
         {
             'gcm_identifier': gcm_identifier,
             'obs_identifier': obs_identifier,
+            'gcm_grid_spec': gcm_grid_spec,
             'result_dir': config.get('storage.results.uri'),
             'intermediate_dir': config.get('storage.intermediate.uri'),
             'var': variable,

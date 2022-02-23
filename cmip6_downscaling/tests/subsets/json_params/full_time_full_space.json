@@ -4,11 +4,11 @@
   "scenario": "ssp370",
   "variable": "tasmax",
   "train_period": [
-    "1979",
-    "2014"
+    "1981",
+    "2010"
   ],
   "predict_period": [
-    "2015",
+    "1981",
     "2099"
   ],
   "latmin": "-90",

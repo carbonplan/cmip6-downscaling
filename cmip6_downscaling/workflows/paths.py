@@ -117,7 +117,10 @@ def make_rechunked_obs_path(
 
 
 def make_coarse_obs_path(
-    chunking_approach: str, obs_identifier: str, gcm_grid_spec: str, **kwargs
+    chunking_approach: Optional[str] = '',
+    obs_identifier: Optional[str] = '',
+    gcm_grid_spec: Optional[str] = '',
+    **kwargs,
 ) -> str:
     """Build the path for coarsened observation
 
@@ -133,6 +136,44 @@ def make_coarse_obs_path(
     """
 
     return f"coarsened_obs/{obs_identifier}{chunking_approach}_{gcm_grid_spec}.zarr"
+
+
+def make_coarse_obs_path_full_space(
+    obs_identifier: Optional[str] = '', gcm_grid_spec: Optional[str] = '', **kwargs
+) -> str:
+    """Build the path for coarsened observation for full_time
+
+    Parameters
+    ----------
+    obs_identifier : str
+        Output from build_obs_identifier. String to identify the observation dataset used
+
+    Returns
+    -------
+    coarse_obs_path: str
+        Path to which coarsened observation defined by the parameters should be stored
+    """
+
+    return f"coarsened_obs/{obs_identifier}full_space_{gcm_grid_spec}.zarr"
+
+
+def make_coarse_obs_path_full_time(
+    obs_identifier: Optional[str] = '', gcm_grid_spec: Optional[str] = '', **kwargs
+) -> str:
+    """Build the path for coarsened observation for full_time
+
+    Parameters
+    ----------
+    obs_identifier : str
+        Output from build_obs_identifier. String to identify the observation dataset used
+
+    Returns
+    -------
+    coarse_obs_path: str
+        Path to which coarsened observation defined by the parameters should be stored
+    """
+
+    return f"coarsened_obs/{obs_identifier}full_time_{gcm_grid_spec}.zarr"
 
 
 def make_interpolated_obs_path(

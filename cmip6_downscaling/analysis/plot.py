@@ -9,7 +9,8 @@ from carbonplan import styles
 from cmip6_downscaling.workflows.paths import (
     make_bcsd_output_path,
     make_bias_corrected_path,
-    make_coarse_obs_path,
+    make_coarse_obs_path_full_space,
+    make_coarse_obs_path_full_time,
     make_gcm_predict_path,
     make_rechunked_gcm_path,
     make_return_obs_path,
@@ -251,6 +252,7 @@ def plot_seasonal(ds1: xr.Dataset, ds2: xr.Dataset) -> mpl.figure.Figure:
 def plot_each_step_bcsd(
     gcm_identifier: str,
     obs_identifier: str,
+    gcm_grid_spec: str,
     result_dir: str,
     intermediate_dir: str,
     train_period: slice,
@@ -281,13 +283,15 @@ def plot_each_step_bcsd(
     """
     steps = [
         make_return_obs_path(obs_identifier),
-        make_coarse_obs_path(obs_identifier),
-        make_spatial_anomalies_path(obs_identifier),
+        make_coarse_obs_path_full_time(obs_identifier=obs_identifier, gcm_grid_spec=gcm_grid_spec),
+        make_coarse_obs_path_full_space(obs_identifier=obs_identifier, gcm_grid_spec=gcm_grid_spec),
+        make_spatial_anomalies_path(obs_identifier=obs_identifier, gcm_grid_spec=gcm_grid_spec),
         make_rechunked_gcm_path(gcm_identifier),
         make_gcm_predict_path(gcm_identifier),
         make_bias_corrected_path(gcm_identifier),
         make_bcsd_output_path(gcm_identifier),
     ]
+
     fig, axarr = plt.subplots(ncols=len(steps), figsize=(20, 3))
     for i, path in enumerate(steps):
         prefix = path.split('/')[0]
@@ -297,6 +301,7 @@ def plot_each_step_bcsd(
             data_location = result_dir
         else:
             data_location = intermediate_dir
+        print('/'.join([data_location, path]))
         ds = xr.open_zarr('/'.join([data_location, path]))
         if prefix == 'spatial_anomalies':
             ds[var].isel(month=0).plot(ax=axarr[i])
