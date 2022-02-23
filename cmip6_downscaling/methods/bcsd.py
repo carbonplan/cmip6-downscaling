@@ -13,7 +13,7 @@ from cmip6_downscaling.workflows.utils import (
     lon_to_180,
     rechunk_zarr_array,
     rechunk_zarr_array_with_caching,
-    regrid_dataset,
+    regrid_ds,
     subset_dataset,
 )
 
@@ -97,6 +97,7 @@ def get_coarse_obs(
     """
     # Load single slice of target cmip6 dataset for target grid dimensions
     # gcm_one_slice = load_cmip(return_type='xr', variable_ids=[variable]).isel(time=0)
+
     if isinstance(variable, str):
         variable = [variable]
 
@@ -106,9 +107,8 @@ def get_coarse_obs(
     gcm_subset = subset_dataset(gcm_ds_180, variable[0], train_period, bbox)
 
     # rechunk and regrid observation dataset to target gcm resolution
-    coarse_obs_ds, fine_obs_rechunked_path = regrid_dataset(
-        ds=obs_ds, ds_path=None, target_grid_ds=gcm_subset, variable=variable[0]
-    )
+    coarse_obs_ds = regrid_ds(ds=obs_ds, target_grid_ds=gcm_subset)
+
     return coarse_obs_ds
 
 
@@ -169,19 +169,12 @@ def get_spatial_anomalies(
         Spatial anomaly for each month (i.e. of shape (nlat, nlon, 12))
     """
     # Regrid coarse observation dataset to the spatial scale of the raw obs
-    coarse_obs_interpolated, _ = regrid_dataset(
-        ds=coarse_obs,
-        ds_path=None,
-        target_grid_ds=obs_ds.isel(time=0),
-        variable=variable,
+    coarse_obs_interpolated = regrid_ds(ds=coarse_obs, target_grid_ds=obs_ds.isel(time=0))
+
+    obs_rechunked = rechunk_zarr_array_with_caching(
+        obs_ds, chunking_approach='full_time', max_mem='1GB'
     )
-    obs_rechunked, _ = rechunk_zarr_array(
-        obs_ds,
-        None,
-        chunk_dims=('time',),
-        variable=variable,
-        max_mem='1GB',
-    )
+
     # calculate the difference between the actual obs (with finer spatial heterogeneity)
     # and the interpolated coarse obs this will be saved and added to the
     # spatially-interpolated coarse predictions to add the spatial heterogeneity back in.
@@ -363,6 +356,7 @@ def return_gcm_predict_rechunked(
         chunk_dims=matching_chunks_dict,
         max_mem='1GB',
     )
+
     return gcm_predict_rechunked_ds
 
 
@@ -470,12 +464,8 @@ def postprocess_bcsd(
     bcsd_results_ds : xr.Dataset
         Final BCSD dataset
     """
-    y_predict_fine, _ = regrid_dataset(
-        ds=bias_corrected_ds,
-        ds_path=None,
-        target_grid_ds=spatial_anomalies_ds,
-        variable=variable,
-    )
+    y_predict_fine = regrid_ds(ds=bias_corrected_ds, target_grid_ds=spatial_anomalies_ds)
+
     bcsd_results_ds = y_predict_fine.groupby("time.month") + spatial_anomalies_ds
     delete_chunks_encoding(bcsd_results_ds)
     bcsd_results_ds = bcsd_results_ds.chunk({'time': 30})

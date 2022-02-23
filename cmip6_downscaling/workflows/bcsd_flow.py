@@ -132,15 +132,6 @@ annual_summary_task = task(
 )
 
 
-@task(log_stdout=True)
-def return_gcm_grid_spec(gcm_grid_spec, obs_identifier):
-    print('\n')
-    print(gcm_grid_spec)
-    print('\n')
-    print(obs_identifier)
-    print('\n')
-
-
 # Main Flow -----------------------------------------------------------
 
 with Flow(
@@ -313,7 +304,6 @@ with Flow(
     pyramid_location_annual = pyramid.regrid(
         annual_summary_ds, uri=config.get('storage.results.uri') + pyramid_path_annual
     )
-    return_gcm_grid_spec(gcm_grid_spec, obs_identifier)
 
     analysis_location = run_analyses(
         {
