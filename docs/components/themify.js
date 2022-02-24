@@ -21,8 +21,8 @@ const styleTags = {
   code: Span,
   pre: Span,
   ol: Themed.ol,
-  ul: Themed.ul,
-  li: Themed.li,
+  ul: Span,
+  li: Span,
   hr: Themed.thematicBreak,
   em: Span,
   tr: Span,
@@ -48,7 +48,7 @@ const styleClasses = {
         py: [3],
         fontFamily: 'mono',
         letterSpacing: 'mono',
-        fontSize: [1],
+        fontSize: [1, 1, 1, 2],
         color: 'primary',
         mb: [3, 3, 3, 4],
       }}
@@ -61,11 +61,7 @@ const styleClasses = {
       {children}
     </Box>
   ),
-  'viewcode-link': ({ children }) => (
-    <RotatingArrow
-      sx={{ ml: [2], width: 14, position: 'relative', top: '8px', mt: '-10px' }}
-    />
-  ),
+  'viewcode-link': Noop,
   classifier: ({ children }) => (
     <Box as='span' sx={{ ml: [2], color: 'secondary' }}>
       {children}
@@ -122,6 +118,23 @@ const instructions = [
       )
     },
   },
+  // collapse nested tables
+  {
+    shouldProcessNode: (node) => {
+      return (
+        node.name === 'dl' &&
+        node.attribs?.class &&
+        node.attribs.class === 'simple' &&
+        node.parent.name === 'dd' &&
+        node.parent.parent.name === 'dl' &&
+        node.parent.parent.attribs?.class &&
+        node.parent.parent.attribs?.class === 'simple'
+      )
+    },
+    processNode: (node, children, index) => {
+      return <Box key={index}>{children}</Box>
+    },
+  },
   // make tables from simple description lists
   {
     shouldProcessNode: (node) => {
@@ -133,15 +146,31 @@ const instructions = [
       )
     },
     processNode: (node, children, index) => {
+      const indices = Array(Math.round(children.length / 3))
+        .fill(0)
+        .map((_, d) => 3 * d + 1)
+
       return (
-        <Row key={index} columns={6} sx={{ mt: [3, 3, 3, 4] }}>
-          <Column start={1} width={2}>
-            <Box sx={{ fontFamily: 'mono' }}>{children[1]}</Box>
-          </Column>
-          <Column start={3} width={4}>
-            {children[2]}
-          </Column>
-        </Row>
+        <Box key={index}>
+          {indices.map((d, i) => {
+            return (
+              <Row
+                key={i}
+                columns={6}
+                sx={{ wordBreak: 'break-all', mt: [3, 3, 3, 4] }}
+              >
+                <Column start={1} width={2}>
+                  <Box sx={{ fontSize: [1, 1, 1, 2], fontFamily: 'mono' }}>
+                    {children[d]}
+                  </Box>
+                </Column>
+                <Column start={3} width={4}>
+                  {children[d + 1]}
+                </Column>
+              </Row>
+            )
+          })}
+        </Box>
       )
     },
   },
@@ -155,10 +184,18 @@ const instructions = [
         if (d.props?.children.length > 0)
           return (
             <Row key={i} columns={6} sx={{ mt: [3, 3, 3, 4] }}>
-              <Column start={1} width={2}>
-                <Box sx={{ fontFamily: 'mono' }}>{d.props.children[0]}</Box>
+              <Column start={1} width={3}>
+                <Box
+                  sx={{
+                    fontSize: [1, 1, 1, 2],
+                    fontFamily: 'mono',
+                    wordBreak: 'break-all',
+                  }}
+                >
+                  {d.props.children[0]}
+                </Box>
               </Column>
-              <Column start={3} width={4}>
+              <Column start={4} width={3}>
                 {d.props.children[2]}
               </Column>
             </Row>

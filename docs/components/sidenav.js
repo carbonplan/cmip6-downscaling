@@ -61,7 +61,7 @@ const Sidenav = ({ active, expanded }) => {
         }}
       >
         <Link
-          href={'/'}
+          href={'/ton-year'}
           sx={{
             width: 'fit-content',
             display: 'block',
@@ -93,7 +93,7 @@ const Sidenav = ({ active, expanded }) => {
               <Box sx={{ my: [2] }}>
                 {contents[d].map((e) => {
                   const href =
-                    '/' +
+                    '/ton-year/' +
                     (e['href'] ? e['href'] : e.replace(/ /g, '-').toLowerCase())
                   const label = e['label'] ? e['label'] : e
                   return (
@@ -105,7 +105,7 @@ const Sidenav = ({ active, expanded }) => {
                         display: 'block',
                         textDecoration: 'none',
                         color:
-                          label.toLowerCase() === active
+                          label.toLowerCase() === active.toLowerCase()
                             ? 'primary'
                             : 'secondary',
                         '&:hover': {

@@ -1,5 +1,5 @@
 {
-  "name": "cmip6-dowscaling",
+  "name": "docs",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -10,6 +10,7 @@
   },
   "author": "",
   "license": "MIT",
+  "prettier": "@carbonplan/prettier",
   "dependencies": {
     "@carbonplan/components": "^11.1.1",
     "@carbonplan/icons": "^1.1.0",
@@ -22,5 +23,9 @@
     "react-dom": "^17.0.2",
     "rehype-slug": "^4.0.1",
     "theme-ui": "^0.12.1"
+  },
+  "devDependencies": {
+    "@carbonplan/prettier": "^1.2.0",
+    "prettier": "^2.5.1"
   }
 }
