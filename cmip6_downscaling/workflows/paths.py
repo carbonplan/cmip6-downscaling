@@ -696,7 +696,7 @@ def make_output_path(downscaling_method: str, gcm_identifier: str, gard_model_ty
         Path to daily output ds file location
     """
     if downscaling_method == 'gard':
-        return f"{downscaling_method}/{gcm_identifier}.zarr"
+        return f"{downscaling_method}/{gcm_identifier}_quantile_transform_{gard_model_type}.zarr"
 
     else:
-        return f"{downscaling_method}/{gcm_identifier}_quantile_transform_{gard_model_type}.zarr"
+        return f"{downscaling_method}/{gcm_identifier}.zarr"
