@@ -1,0 +1,16 @@
+name: docs
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.8
+  - pip
+  - ipykernel
+  - ipython
+  - setuptools
+  - sphinx
+  - sphinx-copybutton
+  - sphinx_rtd_theme
+  - numpydoc
+  # - pip:
+  #     - -e ../..
