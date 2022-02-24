@@ -270,10 +270,6 @@ with Flow(
     )
     # regrid(ds: xr.Dataset, levels: int = 2, uri: str = None, other_chunks: dict = None)
     # format naming w/ prefect context
-    pyramid_location_daily = pyramid.regrid(
-        postprocess_bcsd_ds,
-        uri=config.get('storage.results.uri') + pyramid_path_daily,
-    )
 
     monthly_summary_ds = monthly_summary_task(
         postprocess_bcsd_ds,
@@ -297,14 +293,6 @@ with Flow(
         gcm_identifier=gcm_identifier,
     )
 
-    pyramid_location_monthly = pyramid.regrid(
-        monthly_summary_ds, uri=config.get('storage.results.uri') + pyramid_path_monthly
-    )
-
-    pyramid_location_annual = pyramid.regrid(
-        annual_summary_ds, uri=config.get('storage.results.uri') + pyramid_path_annual
-    )
-
     analysis_location = run_analyses(
         {
             'gcm_identifier': gcm_identifier,
@@ -321,4 +309,17 @@ with Flow(
         train_period=train_period,
         predict_period=predict_period,
         upstream_tasks=[postprocess_bcsd_ds],
+    )
+
+    pyramid_location_daily = pyramid.regrid(
+        postprocess_bcsd_ds,
+        uri=config.get('storage.results.uri') + pyramid_path_daily,
+    )
+
+    pyramid_location_monthly = pyramid.regrid(
+        monthly_summary_ds, uri=config.get('storage.results.uri') + pyramid_path_monthly
+    )
+
+    pyramid_location_annual = pyramid.regrid(
+        annual_summary_ds, uri=config.get('storage.results.uri') + pyramid_path_annual
     )

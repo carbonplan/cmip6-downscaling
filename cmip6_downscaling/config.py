@@ -8,11 +8,11 @@ _defaults = {
         'gcm_identifier_template': '{gcm}/{scenario}/{variable}/{bbox}/{train_period}/{predict_period}/',
         'obs_identifier_template': '{obs}/{variable}/{bbox}/{train_period}/',
         'intermediate': {
-            'uri': 'az://flow-outputs/prefect_intermediates',
+            'uri': 'az://flow-outputs/testing_intermediates',
             'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
         },
         'results': {
-            'uri': 'az://flow-outputs/prefect_results',
+            'uri': 'az://flow-outputs/testing_results',
             'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
         },
         'temporary': {
@@ -81,7 +81,7 @@ _defaults = {
             "pod_cpu_request": 2,
             "deploy_mode": "remote",
             "adapt_min": 2,
-            "adapt_max": 50,
+            "adapt_max": 2,
             "dask_distributed_worker_resources_taskslots": "1",
         },
         "local": {"storage_prefix": "/tmp/", "storage_options": {'directory': './'}},
