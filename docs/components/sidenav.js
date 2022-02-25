@@ -61,7 +61,7 @@ const Sidenav = ({ active, expanded }) => {
         }}
       >
         <Link
-          href={'/ton-year'}
+          href={'/cmip6-downscaling'}
           sx={{
             width: 'fit-content',
             display: 'block',
@@ -93,7 +93,7 @@ const Sidenav = ({ active, expanded }) => {
               <Box sx={{ my: [2] }}>
                 {contents[d].map((e) => {
                   const href =
-                    '/ton-year/' +
+                    '/cmip6-downscaling/' +
                     (e['href'] ? e['href'] : e.replace(/ /g, '-').toLowerCase())
                   const label = e['label'] ? e['label'] : e
                   return (
