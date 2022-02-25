@@ -312,14 +312,13 @@ with Flow(
     )
 
     pyramid_location_daily = pyramid.regrid(
-        postprocess_bcsd_ds,
-        uri=config.get('storage.results.uri') + pyramid_path_daily,
+        postprocess_bcsd_ds, uri=config.get('storage.results.uri') + pyramid_path_daily, levels=4
     )
 
     pyramid_location_monthly = pyramid.regrid(
-        monthly_summary_ds, uri=config.get('storage.results.uri') + pyramid_path_monthly
+        monthly_summary_ds, uri=config.get('storage.results.uri') + pyramid_path_monthly, levels=4
     )
 
     pyramid_location_annual = pyramid.regrid(
-        annual_summary_ds, uri=config.get('storage.results.uri') + pyramid_path_annual
+        annual_summary_ds, uri=config.get('storage.results.uri') + pyramid_path_annual, levels=4
     )

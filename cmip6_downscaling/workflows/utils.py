@@ -229,7 +229,6 @@ def make_rechunker_stores(
 
     if output_path is None:
         output_path = config.get('storage.temporary.uri') + "/{}.zarr".format(temp_file_name())
-
     target_store = fsspec.get_mapper(output_path, **storage_options)
     return temp_store, target_store, output_path
 
@@ -538,7 +537,6 @@ def rechunk_zarr_array_with_caching(
     for var in zarr_array.data_vars:
         schema_dict[var] = DataArraySchema(chunks=chunk_def)
     target_schema = DatasetSchema(schema_dict)
-
     # make storage patterns
     if output_path is not None:
         output_path = config.get('storage.intermediate.uri') + '/' + output_path
