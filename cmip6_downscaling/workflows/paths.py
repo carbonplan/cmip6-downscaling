@@ -228,7 +228,10 @@ def make_bias_corrected_obs_path(
 
 
 def make_rechunked_gcm_path(
-    gcm_identifier: Optional[str] = None, chunking_approach: Optional[str] = None, **kwargs
+    gcm_identifier: Optional[str] = None,
+    chunking_approach: Optional[str] = None,
+    interpolated_obs_ds: Optional[str] = None,
+    **kwargs,
 ) -> str:
     """Build the path for rechunked GCM
 
@@ -248,7 +251,10 @@ def make_rechunked_gcm_path(
     if chunking_approach is None:
         chunking_approach = ''
 
-    return f"rechunked_gcm/{gcm_identifier}_{chunking_approach}.zarr"
+    if interpolated_obs_ds is None:
+        interpolated_obs_ds = ''
+
+    return f"rechunked_gcm/{gcm_identifier}_{chunking_approach}{interpolated_obs_ds}.zarr"
 
 
 def make_bias_corrected_gcm_path(

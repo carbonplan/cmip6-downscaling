@@ -149,6 +149,7 @@ def get_gcm(
     train_period: slice,
     predict_period: slice,
     bbox,
+    output_variable: Optional[str] = None,
     chunking_approach: Optional[str] = None,
     cache_within_rechunk: Optional[bool] = True,
 ) -> xr.Dataset:
@@ -214,14 +215,16 @@ def get_gcm(
     if chunking_approach is None:
         return ds_gcm
 
-    if cache_within_rechunk:
+    if cache_within_rechunk:  # default is set to True
         path_dict = {
             'gcm': gcm,
             'scenario': scenario,
             'train_period': train_period,
             'predict_period': predict_period,
-            'variables': variables,
+            'features': variables,
+            'variable': output_variable,
         }
+
         rechunked_path = make_rechunked_gcm_path(chunking_approach=chunking_approach, **path_dict)
     else:
         rechunked_path = None

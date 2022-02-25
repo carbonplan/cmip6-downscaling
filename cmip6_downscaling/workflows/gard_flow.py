@@ -186,6 +186,7 @@ with Flow(
         gcm=gcm,
         scenario=scenario,
         variables=features,
+        output_variable=variable,
         train_period=train_period,
         predict_period=predict_period,
         chunking_approach='full_time',

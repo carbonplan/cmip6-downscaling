@@ -452,11 +452,11 @@ def get_spatial_anomalies(
     # interpolate coarse_obs back to the original scale
     [coarse_obs, fine_obs_rechunked] = load_paths([coarse_obs_path, fine_obs_rechunked_path])
 
-    obs_interpolated, _ = regrid_dataset(
+    obs_interpolated, _ = regrid_ds(
         ds=coarse_obs,
         ds_path=coarse_obs_path,
         target_grid_ds=fine_obs_rechunked.isel(time=0),
-        variable=variable,
+        # variable=variable,
     )
     # use rechunked fine_obs from coarsening step above because that is in map chunks so it
     # will play nice with the interpolated obs

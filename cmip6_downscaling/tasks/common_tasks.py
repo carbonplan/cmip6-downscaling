@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from datetime import timedelta
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
@@ -29,6 +28,7 @@ from cmip6_downscaling.workflows.paths import (
     make_interpolated_gcm_path,
     make_interpolated_obs_path,
     make_monthly_pyramid_path,
+    make_rechunked_gcm_path,
 )
 from cmip6_downscaling.workflows.utils import BBox, rechunk_zarr_array_with_caching, regrid_ds
 
@@ -258,8 +258,6 @@ def path_builder_task(
         CacheStore(config.get('storage.intermediate.uri')),
         serializer='xarray.zarr',
     ),
-    max_retries=10,
-    retry_delay=timedelta(seconds=5),
     target=make_interpolated_obs_path,
 )
 def coarsen_and_interpolate_obs_task(
@@ -327,8 +325,6 @@ def coarsen_and_interpolate_obs_task(
         CacheStore(config.get('storage.intermediate.uri')),
         serializer='xarray.zarr',
     ),
-    max_retries=10,
-    retry_delay=timedelta(seconds=5),
     target=make_interpolated_gcm_path,
 )
 def interpolate_gcm_task(
@@ -340,6 +336,7 @@ def interpolate_gcm_task(
     variables: Union[str, List[str]],
     chunking_approach: str,
     bbox,
+    output_variable: str,
 ):
     """
     Interpolate the GCM dataset to the grid of the observation dataset.
@@ -374,24 +371,40 @@ def interpolate_gcm_task(
         train_period=train_period,
         predict_period=predict_period,
         chunking_approach="full_space",
-        cache_within_rechunk=False,
+        cache_within_rechunk=False,  # no caching of the rechunked dataset here - maybe want to make this true during testing?
         bbox=bbox,
     )
 
     # get obs as a template
     ds_obs = return_obs(obs=obs, train_period=train_period, variable=variables, bbox=bbox)
+    path_dict = {
+        'gcm': gcm,
+        'scenario': scenario,
+        'train_period': train_period,
+        'predict_period': predict_period,
+        'features': variables,
+        'bbox': bbox,
+        'variable': output_variable,
+    }
+    full_time_interpolated_gcm_path = make_rechunked_gcm_path(
+        chunking_approach='full_time', interpolated_obs_ds=obs, **path_dict
+    )
+    full_space_interpolated_gcm_path = make_rechunked_gcm_path(
+        chunking_approach='full_space', interpolated_obs_ds=obs, **path_dict
+    )
 
     # interpolate gcm to obs resolution
     ds_gcm_interpolated = regrid_ds(
         ds=ds_gcm_full_space,
         target_grid_ds=ds_obs.isel(time=0).load(),
         chunking_approach="full_space",
+        rechunked_ds_path=full_space_interpolated_gcm_path,
     )
 
     # rechunked to final output chunking approach if needed
     ds_gcm_interpolated_rechunked = rechunk_zarr_array_with_caching(
         zarr_array=ds_gcm_interpolated,
-        output_path=None,
+        output_path=full_time_interpolated_gcm_path,
         chunking_approach=chunking_approach,
     )
 
