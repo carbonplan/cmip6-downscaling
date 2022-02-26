@@ -609,7 +609,7 @@ def rechunk_zarr_array_with_caching(
 def regrid_ds(
     ds: xr.Dataset,
     target_grid_ds: xr.Dataset,
-    rechunked_ds_path: Optional[str] = None,
+    cached_file: Optional[str] = None,
     **kwargs,
 ) -> xr.Dataset:
 
@@ -629,6 +629,16 @@ def regrid_ds(
     """
     # regridding requires ds to be contiguous in lat/lon, check if the input matches the
     # target_schema.
+
+    if cached_file is not None:
+        storage_options = config.get('storage.temporary.storage_options')
+        cached_file = config.get('storage.intermediate.uri') + '/' + cached_file
+        cache_store = fsspec.get_mapper(cached_file, **storage_options)
+        try:
+            ds_regridded = xr.open_zarr(cache_store)
+            return ds_regridded
+        except:
+            pass
     schema_dict = {}
     for var in ds.data_vars:
         schema_dict[var] = schema_maps_chunks
@@ -639,11 +649,10 @@ def regrid_ds(
         ds_rechunked = ds
     except SchemaError:
         ds_rechunked = rechunk_zarr_array_with_caching(
-            zarr_array=ds,
-            chunking_approach='full_space',
-            max_mem='1GB',
-            output_path=rechunked_ds_path,
+            zarr_array=ds, chunking_approach='full_space', max_mem='1GB'
         )
     regridder = xe.Regridder(ds_rechunked, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
     ds_regridded = regridder(ds_rechunked)
+    if cached_file is not None:
+        ds_regridded.to_zarr(cache_store)
     return ds_regridded

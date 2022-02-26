@@ -398,9 +398,8 @@ def interpolate_gcm_task(
         ds=ds_gcm_full_space,
         target_grid_ds=ds_obs.isel(time=0).load(),
         chunking_approach="full_space",
-        rechunked_ds_path=full_space_interpolated_gcm_path,
+        cached_file=full_space_interpolated_gcm_path,
     )
-
     # rechunked to final output chunking approach if needed
     ds_gcm_interpolated_rechunked = rechunk_zarr_array_with_caching(
         zarr_array=ds_gcm_interpolated,
