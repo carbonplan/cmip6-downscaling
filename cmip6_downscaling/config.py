@@ -20,6 +20,7 @@ _defaults = {
             'storage_options': {},
         },
         'xpersist_store_name': '/xpersist_metadata_store',
+        'xpersist_overwrite': {'mode': 'w'},
         'web_results': {
             'blob': 'analysis_notebooks',
             'storage_options': {},

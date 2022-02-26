@@ -39,12 +39,17 @@ intermediate_cache_store = CacheStore(
 results_cache_store = CacheStore(
     config.get('storage.results.uri'), storage_options=config.get('storage.results.storage_options')
 )
+serializer_dump_kwargs = config.get('storage.xpersist_overwrite')
 
 
 fit_and_predict_task = task(
     gard_fit_and_predict,
     checkpoint=True,
-    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
+    result=XpersistResult(
+        intermediate_cache_store,
+        serializer="xarray.zarr",
+        serializer_dump_kwargs=serializer_dump_kwargs,
+    ),
     target=make_gard_predict_output_path,
 )
 
@@ -56,7 +61,9 @@ read_scrf_task = task(
 
 gard_postprocess_task = task(
     gard_postprocess,
-    result=XpersistResult(results_cache_store, serializer="xarray.zarr"),
+    result=XpersistResult(
+        results_cache_store, serializer="xarray.zarr", serializer_dump_kwargs=serializer_dump_kwargs
+    ),
     target=make_gard_post_processed_output_path,
 )
 

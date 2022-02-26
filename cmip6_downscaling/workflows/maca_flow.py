@@ -36,11 +36,16 @@ intermediate_cache_store = CacheStore(
 results_cache_store = CacheStore(
     config.get('storage.results.uri'), storage_options=config.get('storage.results.storage_options')
 )
+serializer_dump_kwargs = config.get('storage.xpersist_overwrite')
 
 
 @task(
     checkpoint=True,
-    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
+    result=XpersistResult(
+        intermediate_cache_store,
+        serializer="xarray.zarr",
+        serializer_dump_kwargs=serializer_dump_kwargs,
+    ),
     target=make_epoch_trend_path,
 )
 def calc_epoch_trend_task(
@@ -132,14 +137,22 @@ def calc_epoch_trend_task(
 
 remove_epoch_trend_task = task(
     remove_epoch_trend,
-    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
+    result=XpersistResult(
+        intermediate_cache_store,
+        serializer="xarray.zarr",
+        serializer_dump_kwargs=serializer_dump_kwargs,
+    ),
     target=make_epoch_adjusted_gcm_path,
 )
 
 
 @task(
     checkpoint=True,
-    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
+    result=XpersistResult(
+        intermediate_cache_store,
+        serializer="xarray.zarr",
+        serializer_dump_kwargs=serializer_dump_kwargs,
+    ),
     target=make_bias_corrected_gcm_path,
 )
 def maca_coarse_bias_correction_task(
@@ -281,14 +294,22 @@ def subset_task(
 
 maca_construct_analogs_task = task(
     maca_construct_analogs,
-    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
+    result=XpersistResult(
+        intermediate_cache_store,
+        serializer="xarray.zarr",
+        serializer_dump_kwargs=serializer_dump_kwargs,
+    ),
     target=make_epoch_adjusted_downscaled_gcm_path,
 )
 
 
 @task(
     checkpoint=True,
-    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
+    result=XpersistResult(
+        intermediate_cache_store,
+        serializer="xarray.zarr",
+        serializer_dump_kwargs=serializer_dump_kwargs,
+    ),
     target=make_epoch_adjusted_downscaled_gcm_path,
 )
 def combine_outputs_task(
@@ -325,7 +346,11 @@ def combine_outputs_task(
 
 @task(
     checkpoint=True,
-    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
+    result=XpersistResult(
+        intermediate_cache_store,
+        serializer="xarray.zarr",
+        serializer_dump_kwargs=serializer_dump_kwargs,
+    ),
     target=make_epoch_replaced_downscaled_gcm_path,
 )
 def maca_epoch_replacement_task(
@@ -359,7 +384,11 @@ def maca_epoch_replacement_task(
 
 @task(
     checkpoint=True,
-    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
+    result=XpersistResult(
+        intermediate_cache_store,
+        serializer="xarray.zarr",
+        serializer_dump_kwargs=serializer_dump_kwargs,
+    ),
     target=make_maca_output_path,
 )
 def maca_fine_bias_correction_task(
