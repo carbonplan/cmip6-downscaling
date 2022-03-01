@@ -49,12 +49,17 @@ results_cache_store = CacheStore(
     storage_options=config.get("storage.results.storage_options"),
 )
 
+serializer_dump_kwargs = config.get('storage.xpersist_overwrite')
 # Transform Functions into Tasks -----------------------------------------------------------
 
 
 return_obs_task = task(
     return_obs,
-    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
+    result=XpersistResult(
+        intermediate_cache_store,
+        serializer="xarray.zarr",
+        serializer_dump_kwargs=serializer_dump_kwargs,
+    ),
     target=make_return_obs_path,
 )
 get_coarse_obs_task = task(
@@ -62,7 +67,11 @@ get_coarse_obs_task = task(
     tags=['dask-resource:TASKSLOTS=1'],
     max_retries=10,
     retry_delay=timedelta(seconds=10),
-    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
+    result=XpersistResult(
+        intermediate_cache_store,
+        serializer="xarray.zarr",
+        serializer_dump_kwargs=serializer_dump_kwargs,
+    ),
     target=make_coarse_obs_path,
 )
 get_spatial_anomalies_task = task(
@@ -70,7 +79,11 @@ get_spatial_anomalies_task = task(
     tags=['dask-resource:TASKSLOTS=1'],
     max_retries=10,
     retry_delay=timedelta(seconds=5),
-    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
+    result=XpersistResult(
+        intermediate_cache_store,
+        serializer="xarray.zarr",
+        serializer_dump_kwargs=serializer_dump_kwargs,
+    ),
     target=make_spatial_anomalies_path,
 )
 return_coarse_obs_full_time_task = task(
@@ -78,7 +91,11 @@ return_coarse_obs_full_time_task = task(
     tags=['dask-resource:TASKSLOTS=1'],
     max_retries=10,
     retry_delay=timedelta(seconds=5),
-    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
+    result=XpersistResult(
+        intermediate_cache_store,
+        serializer="xarray.zarr",
+        serializer_dump_kwargs=serializer_dump_kwargs,
+    ),
     target=make_coarse_obs_path,  # is this right? to have the same target? maybe supposed to be make_rechunked_obs_path
 )
 
@@ -87,7 +104,11 @@ return_gcm_train_full_time_task = task(
     tags=['dask-resource:TASKSLOTS=1'],
     max_retries=10,
     retry_delay=timedelta(seconds=5),
-    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
+    result=XpersistResult(
+        intermediate_cache_store,
+        serializer="xarray.zarr",
+        serializer_dump_kwargs=serializer_dump_kwargs,
+    ),
     target=make_rechunked_gcm_path,
 )
 
@@ -96,14 +117,22 @@ return_gcm_predict_rechunked_task = task(
     tags=['dask-resource:TASKSLOTS=1'],
     max_retries=10,
     retry_delay=timedelta(seconds=5),
-    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
+    result=XpersistResult(
+        intermediate_cache_store,
+        serializer="xarray.zarr",
+        serializer_dump_kwargs=serializer_dump_kwargs,
+    ),
     target=make_gcm_predict_path,
 )
 
 fit_and_predict_task = task(
     fit_and_predict,
     log_stdout=True,
-    result=XpersistResult(intermediate_cache_store, serializer="xarray.zarr"),
+    result=XpersistResult(
+        intermediate_cache_store,
+        serializer="xarray.zarr",
+        serializer_dump_kwargs=serializer_dump_kwargs,
+    ),
     target=make_bias_corrected_path,
 )
 
@@ -113,20 +142,26 @@ postprocess_bcsd_task = task(
     max_retries=10,
     retry_delay=timedelta(seconds=5),
     log_stdout=True,
-    result=XpersistResult(results_cache_store, serializer="xarray.zarr"),
+    result=XpersistResult(
+        results_cache_store, serializer="xarray.zarr", serializer_dump_kwargs=serializer_dump_kwargs
+    ),
     target=make_bcsd_output_path,
 )
 
 monthly_summary_task = task(
     monthly_summary,
     log_stdout=True,
-    result=XpersistResult(results_cache_store, serializer="xarray.zarr"),
+    result=XpersistResult(
+        results_cache_store, serializer="xarray.zarr", serializer_dump_kwargs=serializer_dump_kwargs
+    ),
     target=make_monthly_summary_path,  # TODO: replace with the paradigm from PR #84 once it's merged (also pull that)
 )
 
 annual_summary_task = task(
     annual_summary,
-    result=XpersistResult(results_cache_store, serializer="xarray.zarr"),
+    result=XpersistResult(
+        results_cache_store, serializer="xarray.zarr", serializer_dump_kwargs=serializer_dump_kwargs
+    ),
     target=make_annual_summary_path,
 )
 
