@@ -171,6 +171,9 @@ def get_spatial_anomalies(
 
     coarse_obs_interpolated = regrid_ds(ds=coarse_obs, target_grid_ds=obs_ds.isel(time=0))
 
+    coarse_obs_rechunked = rechunk_zarr_array_with_caching(
+        coarse_obs_interpolated, chunking_approach='full_time', max_mem='1GB'
+    )
     obs_rechunked = rechunk_zarr_array_with_caching(
         obs_ds, chunking_approach='full_time', max_mem='1GB'
     )
@@ -179,7 +182,7 @@ def get_spatial_anomalies(
     # and the interpolated coarse obs this will be saved and added to the
     # spatially-interpolated coarse predictions to add the spatial heterogeneity back in.
 
-    spatial_anomalies = obs_rechunked - coarse_obs_interpolated
+    spatial_anomalies = obs_rechunked - coarse_obs_rechunked
     seasonal_cycle_spatial_anomalies = spatial_anomalies.groupby("time.month").mean()
 
     return seasonal_cycle_spatial_anomalies
