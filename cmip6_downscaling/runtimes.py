@@ -202,7 +202,14 @@ class PangeoRuntime(LocalRuntime):
 
     @property
     def executor(self) -> Executor:
-        return LocalDaskExecutor(scheduler="processes")
+        return LocalDaskExecutor(
+            scheduler="processes",
+            cluster_kwargs={
+                'resources': {'TASKSLOTS': 1},
+                'n_workers': 31,
+                'threads_per_worker': 1,
+            },
+        )
 
     def _generate_env(self):
         return _threadsafe_env_vars

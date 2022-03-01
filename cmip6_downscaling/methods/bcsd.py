@@ -14,6 +14,7 @@ from cmip6_downscaling.workflows.utils import (
     rechunk_zarr_array,
     rechunk_zarr_array_with_caching,
     regrid_dataset,
+    regrid_ds,
     subset_dataset,
 )
 
@@ -54,7 +55,7 @@ def return_obs(
         variable[0],
         train_period,
         bbox,
-        chunking_schema={'time': 365, 'lat': 150, 'lon': 150},
+        # chunking_schema={'time': 365, 'lat': 150, 'lon': 150},
     )
     return obs_ds
 
@@ -106,9 +107,10 @@ def get_coarse_obs(
     gcm_subset = subset_dataset(gcm_ds_180, variable[0], train_period, bbox)
 
     # rechunk and regrid observation dataset to target gcm resolution
-    coarse_obs_ds, fine_obs_rechunked_path = regrid_dataset(
-        ds=obs_ds, ds_path=None, target_grid_ds=gcm_subset, variable=variable[0]
+    coarse_obs_ds = regrid_ds(
+        ds=obs_ds, target_grid_ds=gcm_subset.isel(time=0).load(), chunking_approach="full_space"
     )
+
     return coarse_obs_ds
 
 
@@ -281,7 +283,7 @@ def return_gcm_train_full_time(
         variable,
         train_period,
         bbox,
-        chunking_schema={'time': 365, 'lat': 150, 'lon': 150},
+        # chunking_schema={'time': 365, 'lat': 150, 'lon': 150},
     )
 
     # this call was to force the timestamps for the cmip data to use the friendlier era5 timestamps. (i forget which dataset used which time formats). i could picture this introducing a tricky bug though (for instance if gcm timestamp didn't align for some reason) so we could use another conversion system if that is better. Perhaps datetime equivilence test.

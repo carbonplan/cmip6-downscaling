@@ -88,7 +88,7 @@ def regrid(ds: xr.Dataset, levels: int = 2, uri: str = None, other_chunks: dict 
         # Question: Is this needed or will prefect handle this for us?
         if '.zmetadata' in mapper:
             return
-
+        ds = ds.chunk({'lat': -1, 'lon': -1})
         # create
         dt = pyramid_regrid(ds, target_pyramid=None, levels=levels)
 
