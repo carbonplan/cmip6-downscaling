@@ -1,3 +1,4 @@
+import pdb
 from typing import List, Union
 
 import xarray as xr
@@ -168,10 +169,10 @@ def get_spatial_anomalies(
         Spatial anomaly for each month (i.e. of shape (nlat, nlon, 12))
     """
     # Regrid coarse observation dataset to the spatial scale of the raw obs
-
+    pdb.set_trace()
     coarse_obs_interpolated = regrid_ds(ds=coarse_obs, target_grid_ds=obs_ds.isel(time=0))
 
-    coarse_obs_rechunked = rechunk_zarr_array_with_caching(
+    coarse_obs_interpolated_rechunked = rechunk_zarr_array_with_caching(
         coarse_obs_interpolated, chunking_approach='full_time', max_mem='1GB'
     )
     obs_rechunked = rechunk_zarr_array_with_caching(
@@ -182,7 +183,7 @@ def get_spatial_anomalies(
     # and the interpolated coarse obs this will be saved and added to the
     # spatially-interpolated coarse predictions to add the spatial heterogeneity back in.
 
-    spatial_anomalies = obs_rechunked - coarse_obs_rechunked
+    spatial_anomalies = obs_rechunked - coarse_obs_interpolated_rechunked
     seasonal_cycle_spatial_anomalies = spatial_anomalies.groupby("time.month").mean()
 
     return seasonal_cycle_spatial_anomalies

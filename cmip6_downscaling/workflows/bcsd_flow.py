@@ -35,8 +35,6 @@ from cmip6_downscaling.workflows.paths import (
     make_spatial_anomalies_path,
 )
 
-# storage_prefix = config.get("runtime.cloud.storage_prefix")
-
 runtime = runtimes.get_runtime()
 
 intermediate_cache_store = CacheStore(
@@ -181,7 +179,6 @@ with Flow(
     scenario = Parameter("scenario")
     variable = Parameter("variable")
 
-    # Note: bbox and train and predict period had to be encapsulated into tasks to prevent prefect from complaining about unused parameters.
     bbox = build_bbox(
         latmin=Parameter("latmin"),
         latmax=Parameter("latmax"),
