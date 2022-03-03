@@ -597,6 +597,23 @@ def make_spatial_anomalies_path(obs_identifier: str, gcm_grid_spec: str, **kwarg
     return f"spatial_anomalies/{obs_identifier}{gcm_grid_spec}.zarr"
 
 
+def make_spatial_anomalies_rechunked_full_time_path(
+    obs_identifier: str, gcm_grid_spec: str, **kwargs
+):
+    """
+        Parameters
+    ----------
+    obs_identifier : str
+        Output from build_obs_identifier. String to identify the observation dataset used
+
+    Returns
+    -------
+    spatial_anomalies_rechunked_full_time_path : str
+        Path to rechunked spatial anomalies file location
+    """
+    return f"spatial_anomalies_rechunked_full_time/{obs_identifier}{gcm_grid_spec}.zarr"
+
+
 def make_gcm_predict_path(gcm_identifier: str = None, **kwargs) -> str:
     """Build the path for the gcm predict dataset
 
@@ -675,6 +692,22 @@ def make_annual_summary_path(gcm_identifier: str = None, **kwargs) -> str:
         Path to annual bcsd output ds file location
     """
     return f"bcsd_output_annual/{gcm_identifier}.zarr"
+
+
+def make_interpolated_prediction_path_full_space(gcm_identifier: str = None, **kwargs) -> str:
+    """Build the path for the interpolated prediction in full space
+
+    Parameters
+    ----------
+    gcm_identifier : str
+        Output from build_gcm_identifier. String to identify the gcm dataset used
+
+    Returns
+    -------
+    make_interpolated_prediction_path_full_space_location : str
+        Path to interpolated obs full space ds file location
+    """
+    return f"make_interpolated_prediction_path_full_space/{gcm_identifier}.zarr"
 
 
 def get_notebook_paths(

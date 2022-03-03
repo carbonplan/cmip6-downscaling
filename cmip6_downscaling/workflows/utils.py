@@ -230,6 +230,7 @@ def make_rechunker_stores(
     if output_path is None:
         output_path = config.get('storage.temporary.uri') + "/{}.zarr".format(temp_file_name())
     target_store = fsspec.get_mapper(output_path, **storage_options)
+    print(f'this is temp_path: {path_tmp}. \n this is target_path: {output_path}')
     return temp_store, target_store, output_path
 
 
@@ -238,7 +239,7 @@ def rechunk_zarr_array(
     zarr_array_location: str,
     variable: str,
     chunk_dims: Union[Tuple, dict] = ("time",),
-    max_mem: str = "200MB",
+    max_mem: str = "8GB",
 ):
     """Use `rechunker` package to adjust chunks of dataset to a form
     conducive for your processing.
@@ -476,7 +477,7 @@ def rechunk_zarr_array_with_caching(
     chunking_approach: Optional[str] = None,
     template_chunk_array: Optional[xr.Dataset] = None,
     output_path: Optional[str] = None,
-    max_mem: str = "200MB",
+    max_mem: str = "8GB",
     overwrite: bool = False,
 ) -> xr.Dataset:
     """Use `rechunker` package to adjust chunks of dataset to a form
@@ -541,11 +542,9 @@ def rechunk_zarr_array_with_caching(
     if output_path is not None:
         output_path = config.get('storage.intermediate.uri') + '/' + output_path
     temp_store, target_store, target_path = make_rechunker_stores(output_path)
-    print(f'target path is {target_path}')
 
     # check and see if the output is empty, if there is content, check that it's chunked correctly
     if len(target_store) > 0:
-        print('checking the cache')
         output = xr.open_zarr(target_store)
         try:
             # if the content in target path is correctly chunked, return
@@ -561,42 +560,21 @@ def rechunk_zarr_array_with_caching(
                     'Either clear the output or enable overwrite by setting overwrite=True'
                 )
 
-    # process the input zarr array
-    delete_chunks_encoding(zarr_array)
     try:
-        print('checking the chunk')
         # now check if the input is already correctly chunked. If so, save to the output location and return
         target_schema.validate(zarr_array)
         zarr_array.to_zarr(target_store, mode='w', consolidated=True)
         return zarr_array
 
     except SchemaError:
-        print('rechunking')
-        try:
-            rechunk_plan = rechunk(
-                zarr_array,
-                chunks_dict,
-                max_mem,
-                target_store,
-                temp_store=temp_store,
-            )
-            rechunk_plan.execute(retries=5)
-        except ValueError:
-            print(
-                'WARNING: Failed to write zarr store, perhaps because of variable chunk sizes, trying to rechunk it'
-            )
-            # clearing the store because the target store has already been created in the try statement above
-            # and rechunker fails if there's already content at the target
-            target_store.clear()
-            zarr_array = zarr_array.chunk(chunks_dict[example_var])
-            rechunk_plan = rechunk(
-                zarr_array,
-                chunks_dict,
-                max_mem,
-                target_store,
-                temp_store=temp_store,
-            )
-            rechunk_plan.execute(retries=5)
+        rechunk_plan = rechunk(
+            zarr_array,
+            chunks_dict,
+            max_mem,
+            target_store,
+            temp_store=temp_store,
+        )
+        rechunk_plan.execute()
         rechunked_ds = xr.open_zarr(target_store)
         # remove any temp stores created by task
         remove_stores([temp_store])
@@ -635,15 +613,21 @@ def regrid_ds(
     target_schema = DatasetSchema(schema_dict)
 
     try:
+        target_schema.validate(target_grid_ds)
+    except SchemaError:
+        target_grid_ds = target_grid_ds.chunk({'lat': -1, 'lon': -1}).load()
+
+    try:
         target_schema.validate(ds)
         ds_rechunked = ds
     except SchemaError:
         ds_rechunked = rechunk_zarr_array_with_caching(
             zarr_array=ds,
             chunking_approach='full_space',
-            max_mem='1GB',
+            max_mem='8GB',
             output_path=rechunked_ds_path,
         )
     regridder = xe.Regridder(ds_rechunked, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
     ds_regridded = regridder(ds_rechunked)
+
     return ds_regridded

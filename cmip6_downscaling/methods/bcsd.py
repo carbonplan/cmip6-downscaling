@@ -1,4 +1,3 @@
-import pdb
 from typing import List, Union
 
 import xarray as xr
@@ -113,8 +112,8 @@ def get_coarse_obs(
 
 
 def get_spatial_anomalies(
-    coarse_obs: xr.Dataset,
     obs_ds: xr.Dataset,
+    interpolated_obs_ds: xr.Dataset,
     gcm: str,
     scenario: str,
     variable: str,
@@ -144,10 +143,10 @@ def get_spatial_anomalies(
 
     Parameters
     ----------
-    coarse_obs : xr.Dataset
-        Coarsened to a GCM resolution. Chunked along time.
     obs_ds : xr.Dataset
         Input observation dataset.
+    interpolated_obs_ds : xr.Dataset
+        Regridded interpolated obs dataset
     gcm : str
         Input GCM
     scenario: str
@@ -168,15 +167,13 @@ def get_spatial_anomalies(
     seasonal_cycle_spatial_anomalies : xr.Dataset
         Spatial anomaly for each month (i.e. of shape (nlat, nlon, 12))
     """
-    # Regrid coarse observation dataset to the spatial scale of the raw obs
-    pdb.set_trace()
-    coarse_obs_interpolated = regrid_ds(ds=coarse_obs, target_grid_ds=obs_ds.isel(time=0))
 
     coarse_obs_interpolated_rechunked = rechunk_zarr_array_with_caching(
-        coarse_obs_interpolated, chunking_approach='full_time', max_mem='1GB'
+        interpolated_obs_ds, chunking_approach='full_time', max_mem='8GB'
     )
+
     obs_rechunked = rechunk_zarr_array_with_caching(
-        obs_ds, chunking_approach='full_time', max_mem='1GB'
+        obs_ds, chunking_approach='full_time', max_mem='8GB'
     )
 
     # calculate the difference between the actual obs (with finer spatial heterogeneity)
@@ -187,6 +184,36 @@ def get_spatial_anomalies(
     seasonal_cycle_spatial_anomalies = spatial_anomalies.groupby("time.month").mean()
 
     return seasonal_cycle_spatial_anomalies
+
+
+def rechunk_spatial_anomalies_full_time(
+    seasonal_cycle_spatial_anomalies: xr.Dataset, **kwargs
+) -> xr.Dataset:
+    print(seasonal_cycle_spatial_anomalies)
+    print(seasonal_cycle_spatial_anomalies.chunks)
+
+    seasonal_cycle_spatial_anomalies.to_zarr(
+        'az://flow-outputs/temporary/seasonal_cycle_spatial_anomalies.zarr', consolidated=True
+    )
+    print('scsa saved')
+    scsa = xr.open_zarr('az://flow-outputs/temporary/seasonal_cycle_spatial_anomalies.zarr')
+    # print('scsa loaded after save')
+    # """Dimensions:  (lat: 721, lon: 1440, month: 12)
+    # Coordinates:
+    # * lat      (lat) float32 90.0 89.75 89.5 89.25 ... -89.25 -89.5 -89.75 -90.0
+    # * lon      (lon) float32 -180.0 -179.8 -179.5 -179.2 ... 179.2 179.5 179.8
+    # * month    (month) int64 1 2 3 4 5 6 7 8 9 10 11 12
+    # Data variables:
+    #     tasmax   (month, lat, lon) float32 dask.array<chunksize=(1, 17, 17), meta=np.ndarray>
+    # [2022-03-02 21:29:16+0000] INFO - prefect.TaskRunner | Frozen({'month': (1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1), 'lat': (17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 7), 'lon': (17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 12)})
+    # """
+
+    seasonal_cycle_spatial_anomalies_rechunked = rechunk_zarr_array_with_caching(
+        scsa, chunking_approach='full_time', max_mem='8GB'
+    )
+    print(seasonal_cycle_spatial_anomalies_rechunked)
+    print(seasonal_cycle_spatial_anomalies_rechunked.chunks)
+    return seasonal_cycle_spatial_anomalies_rechunked
 
 
 def return_coarse_obs_full_time(
@@ -230,7 +257,7 @@ def return_coarse_obs_full_time(
     coarse_obs_full_time_ds = rechunk_zarr_array_with_caching(
         coarse_obs_ds,
         chunking_approach='full_time',
-        max_mem='1GB',
+        max_mem='8GB',
     )
     return coarse_obs_full_time_ds
 
@@ -278,7 +305,7 @@ def return_gcm_train_full_time(
         variable,
         train_period,
         bbox,
-        chunking_schema={'time': 365, 'lat': 150, 'lon': 150},
+        # chunking_schema={'time': 365, 'lat': 150, 'lon': 150},
     )
 
     # this call was to force the timestamps for the cmip data to use the friendlier era5 timestamps. (i forget which dataset used which time formats). i could picture this introducing a tricky bug though (for instance if gcm timestamp didn't align for some reason) so we could use another conversion system if that is better. Perhaps datetime equivilence test.
@@ -287,7 +314,7 @@ def return_gcm_train_full_time(
     gcm_train_subset_full_time_ds = rechunk_zarr_array_with_caching(
         gcm_train_ds_subset,
         chunking_approach='full_time',
-        max_mem='1GB',
+        max_mem='8GB',
     )
     return gcm_train_subset_full_time_ds
 
@@ -343,21 +370,10 @@ def return_gcm_predict_rechunked(
         bbox,
     )
 
-    # validate that X_predict spatial chunks match those of X_train since the spatial chunks of predict data need
-    # to match when they get passed to the fit_and_predict utility
-    # if they are not, rechunk X_predict to match those spatial chunks specifically (don't just pass lat/lon as the chunking dims)
-    # matching_chunks_dict = {
-    #     variable: {
-    #         'time': gcm_train_subset_full_time_ds.chunks['time'][0],
-    #         'lat': gcm_train_subset_full_time_ds.chunks['lat'][0],
-    #         'lon': gcm_train_subset_full_time_ds.chunks['lon'][0],
-    #     }
-    # }
-
     gcm_predict_rechunked_ds = rechunk_zarr_array_with_caching(
         gcm_predict_ds_subset,
         template_chunk_array=gcm_train_subset_full_time_ds,
-        max_mem='1GB',
+        max_mem='8GB',
     )
 
     return gcm_predict_rechunked_ds
@@ -429,7 +445,7 @@ def fit_and_predict(
 
 
 def postprocess_bcsd(
-    bias_corrected_ds: xr.Dataset,
+    interpolated_prediction: xr.Dataset,
     spatial_anomalies_ds: xr.Dataset,
     gcm: str,
     scenario: str,
@@ -444,8 +460,8 @@ def postprocess_bcsd(
 
     Parameters
     ----------
-    bias_corrected_ds : xr.Dataset
-        bias-corrected dataset
+    interpolated_prediction : xr.Dataset
+        interpolated prediction dataset
     spatial_anomalies_ds : xr.Dataset
         spatial anomalies dataset
     gcm : str
@@ -468,9 +484,40 @@ def postprocess_bcsd(
         Final BCSD dataset
     """
 
-    y_predict_fine = regrid_ds(ds=bias_corrected_ds, target_grid_ds=spatial_anomalies_ds)
+    # print(interpolated_prediction)
+    # print(interpolated_prediction.chunks)
 
-    bcsd_results_ds = y_predict_fine.groupby("time.month") + spatial_anomalies_ds
+    # interpolated prediction is chunked in time
+    """Dimensions:  (lat: 721, lon: 1440, time: 43464)
+    Coordinates:
+    * lat      (lat) float32 90.0 89.75 89.5 89.25 ... -89.25 -89.5 -89.75 -90.0
+    * lon      (lon) float32 -180.0 -179.8 -179.5 -179.2 ... 179.2 179.5 179.8
+    * time     (time) datetime64[ns] 1981-01-01T12:00:00 ... 2099-12-31T12:00:00
+    Data variables:
+        tasmax   (time, lat, lon) float32 dask.array<chunksize=(96, 721, 1440), meta=np.ndarray>
+    Attributes:
+        regrid_method:  bilinear
+    [2022-03-02 18:15:30+0000] INFO - prefect.TaskRunner | Frozen({'time': (96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 72), 'lat': (721,), 'lon': (1440,)})
+    """
+
+    # print(spatial_anomalies_ds)
+    # print(spatial_anomalies_ds.chunks)
+    """Dimensions:  (lat: 721, lon: 1440, month: 12)
+    Coordinates:
+    * lat      (lat) float32 90.0 89.75 89.5 89.25 ... -89.25 -89.5 -89.75 -90.0
+    * lon      (lon) float32 -180.0 -179.8 -179.5 -179.2 ... 179.2 179.5 179.8
+    * month    (month) int64 1 2 3 4 5 6 7 8 9 10 11 12
+    Data variables:
+        tasmax   (month, lat, lon) float32 dask.array<chunksize=(1, 17, 17), meta=np.ndarray>
+    [2022-03-02 18:15:30+0000] INFO - prefect.TaskRunner | Frozen({'month': (1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1), 'lat': (17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 7), 'lon': (17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 12)})
+    """
+
+    rechunked_spatial_anomalies = rechunk_zarr_array_with_caching(
+        spatial_anomalies_ds, chunking_approach='full_time', max_mem='8GB'
+    )
+    print(rechunked_spatial_anomalies)
+    print(rechunked_spatial_anomalies.chunks)
+    bcsd_results_ds = interpolated_prediction.groupby("time.month") + spatial_anomalies_ds
     delete_chunks_encoding(bcsd_results_ds)
     bcsd_results_ds = bcsd_results_ds.chunk({'time': 30, 'lat': -1, 'lon': -1})
     return bcsd_results_ds

@@ -467,3 +467,8 @@ def bias_correct_gcm_task(
     ).to_dataset(dim="variable")
 
     return bias_corrected
+
+
+def target_grid_obs_ds_task(obs_ds: xr.Dataset) -> xr.Dataset:
+    target_grid_obs_ds = obs_ds.isel(time=0)
+    return target_grid_obs_ds
