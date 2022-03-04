@@ -31,6 +31,7 @@ from cmip6_downscaling.workflows.paths import (
     make_coarse_obs_path_full_time,
     make_gcm_predict_path,
     make_interpolated_obs_path,
+    make_interpolated_prediction_path_full_space,
     make_monthly_summary_path,
     make_rechunked_gcm_path,
     make_return_obs_path,
@@ -104,7 +105,7 @@ interpolated_prediction_task = task(
         serializer="xarray.zarr",
         serializer_dump_kwargs=serializer_dump_kwargs,
     ),
-    target="az://flow-outputs/tempoarary/make_interpolated_prediction_path_full_space_temp.zarr",  # make_interpolated_prediction_path_full_space,
+    target=make_interpolated_prediction_path_full_space,  # "az://flow-outputs/temporary/make_interpolated_prediction_path_full_space_temp.zarr",make_interpolated_prediction_path_full_space  #
 )
 
 get_spatial_anomalies_task = task(
@@ -118,7 +119,7 @@ get_spatial_anomalies_task = task(
         serializer="xarray.zarr",
         serializer_dump_kwargs=serializer_dump_kwargs,
     ),
-    target=make_spatial_anomalies_path,
+    target=make_spatial_anomalies_path,  # "az://flow-outputs/prefect_intermediates/spatial_anomalies_test/ERA5/tasmax/-90.0_90.0_-180.0_180.0/1981_2010/128x256_gridsize_14_14_llcorner_-88_-180.zarr",  # make_spatial_anomalies_path,
 )
 
 
@@ -340,9 +341,8 @@ with Flow(
     interpolated_prediction_ds = interpolated_prediction_task(
         ds=bias_corrected_ds,
         target_grid_ds=target_grid_obs_ds,
-        gcm_grid_spec=gcm_grid_spec,
-        chunking_approach='full_space',
         gcm_identifier=gcm_identifier,
+        gcm_grid_spec=gcm_grid_spec,
     )
 
     # postprocess_bcsd_task(s):
