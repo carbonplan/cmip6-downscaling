@@ -9,7 +9,6 @@ from cmip6_downscaling.data.cmip import get_gcm, load_cmip
 from cmip6_downscaling.data.observations import open_era5
 from cmip6_downscaling.workflows.utils import (
     BBox,
-    delete_chunks_encoding,
     lon_to_180,
     rechunk_zarr_array_with_caching,
     regrid_ds,
@@ -46,8 +45,9 @@ def return_obs(
         variable = [variable]
 
     obs_load = open_era5(variable, train_period)
+    print('180 to 180')
     obs_load_180 = lon_to_180(obs_load)
-
+    print('subset dataset')
     obs_ds = subset_dataset(
         obs_load_180,
         variable[0],
@@ -184,36 +184,6 @@ def get_spatial_anomalies(
     seasonal_cycle_spatial_anomalies = spatial_anomalies.groupby("time.month").mean()
 
     return seasonal_cycle_spatial_anomalies
-
-
-def rechunk_spatial_anomalies_full_time(
-    seasonal_cycle_spatial_anomalies: xr.Dataset, **kwargs
-) -> xr.Dataset:
-    print(seasonal_cycle_spatial_anomalies)
-    print(seasonal_cycle_spatial_anomalies.chunks)
-
-    seasonal_cycle_spatial_anomalies.to_zarr(
-        'az://flow-outputs/temporary/seasonal_cycle_spatial_anomalies.zarr', consolidated=True
-    )
-    print('scsa saved')
-    scsa = xr.open_zarr('az://flow-outputs/temporary/seasonal_cycle_spatial_anomalies.zarr')
-    # print('scsa loaded after save')
-    # """Dimensions:  (lat: 721, lon: 1440, month: 12)
-    # Coordinates:
-    # * lat      (lat) float32 90.0 89.75 89.5 89.25 ... -89.25 -89.5 -89.75 -90.0
-    # * lon      (lon) float32 -180.0 -179.8 -179.5 -179.2 ... 179.2 179.5 179.8
-    # * month    (month) int64 1 2 3 4 5 6 7 8 9 10 11 12
-    # Data variables:
-    #     tasmax   (month, lat, lon) float32 dask.array<chunksize=(1, 17, 17), meta=np.ndarray>
-    # [2022-03-02 21:29:16+0000] INFO - prefect.TaskRunner | Frozen({'month': (1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1), 'lat': (17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 7), 'lon': (17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 12)})
-    # """
-
-    seasonal_cycle_spatial_anomalies_rechunked = rechunk_zarr_array_with_caching(
-        scsa, chunking_approach='full_time', max_mem='8GB'
-    )
-    print(seasonal_cycle_spatial_anomalies_rechunked)
-    print(seasonal_cycle_spatial_anomalies_rechunked.chunks)
-    return seasonal_cycle_spatial_anomalies_rechunked
 
 
 def return_coarse_obs_full_time(
@@ -484,9 +454,6 @@ def postprocess_bcsd(
         Final BCSD dataset
     """
 
-    # print(interpolated_prediction)
-    # print(interpolated_prediction.chunks)
-
     # interpolated prediction is chunked in time
     """Dimensions:  (lat: 721, lon: 1440, time: 43464)
     Coordinates:
@@ -500,8 +467,6 @@ def postprocess_bcsd(
     [2022-03-02 18:15:30+0000] INFO - prefect.TaskRunner | Frozen({'time': (96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 72), 'lat': (721,), 'lon': (1440,)})
     """
 
-    # print(spatial_anomalies_ds)
-    # print(spatial_anomalies_ds.chunks)
     """Dimensions:  (lat: 721, lon: 1440, month: 12)
     Coordinates:
     * lat      (lat) float32 90.0 89.75 89.5 89.25 ... -89.25 -89.5 -89.75 -90.0
@@ -511,13 +476,29 @@ def postprocess_bcsd(
         tasmax   (month, lat, lon) float32 dask.array<chunksize=(1, 17, 17), meta=np.ndarray>
     [2022-03-02 18:15:30+0000] INFO - prefect.TaskRunner | Frozen({'month': (1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1), 'lat': (17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 7), 'lon': (17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 12)})
     """
+    print('spatial_anomalies_ds')
+    print(spatial_anomalies_ds)
 
+    print(spatial_anomalies_ds.chunks)
+    print('interpolated_prediction:')
+    print(interpolated_prediction)
+    print(interpolated_prediction.chunks)
+    rechunked_interpolated_prediction = rechunk_zarr_array_with_caching(
+        interpolated_prediction, chunking_approach='full_time', max_mem='8GB'
+    )
+    print('rechunked_interpolated_prediction:')
+
+    print(rechunked_interpolated_prediction)
+    print(rechunked_interpolated_prediction.chunks)
     rechunked_spatial_anomalies = rechunk_zarr_array_with_caching(
         spatial_anomalies_ds, chunking_approach='full_time', max_mem='8GB'
     )
+    print('rechunked_spatial_anomalies:')
+
     print(rechunked_spatial_anomalies)
     print(rechunked_spatial_anomalies.chunks)
-    bcsd_results_ds = interpolated_prediction.groupby("time.month") + spatial_anomalies_ds
-    delete_chunks_encoding(bcsd_results_ds)
-    bcsd_results_ds = bcsd_results_ds.chunk({'time': 30, 'lat': -1, 'lon': -1})
+    bcsd_results_ds = (
+        rechunked_interpolated_prediction.groupby("time.month") + rechunked_spatial_anomalies
+    )
+
     return bcsd_results_ds

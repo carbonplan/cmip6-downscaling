@@ -322,7 +322,8 @@ def rechunk_zarr_array(
             )
             rechunk_plan.execute(retries=5)
         rechunked_ds = xr.open_zarr(target_store)
-        remove_stores([temp_store])
+        # This function expects a filepath not a fsspec object
+        # remove_stores([temp_store])
 
         # ideally we want consolidated=True but it seems that functionality isn't offered in rechunker right now
         # we can just add a consolidate_metadata step here to do it after the fact (once rechunker is done) but only
@@ -575,7 +576,7 @@ def rechunk_zarr_array_with_caching(
             temp_store=temp_store,
         )
         rechunk_plan.execute()
-        rechunked_ds = xr.open_zarr(target_store)
+        rechunked_ds = xr.open_zarr(target_store, consolidated=True)
         # remove any temp stores created by task
         remove_stores([temp_store])
         # ideally we want consolidated=True but it seems that functionality isn't offered in rechunker right now

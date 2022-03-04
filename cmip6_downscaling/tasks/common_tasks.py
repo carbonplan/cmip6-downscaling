@@ -163,7 +163,7 @@ def rechunker_task(
     return rechunked
 
 
-@task
+@task(log_stdout=True)
 def path_builder_task(
     obs: str,
     gcm: str,
@@ -209,7 +209,6 @@ def path_builder_task(
         A string of parameters used to build the annual pyramid path.
     """
     gcm_grid_spec = get_gcm_grid_spec(gcm_name=gcm)
-
     obs_identifier = build_obs_identifier(
         obs=obs,
         variable=variable,

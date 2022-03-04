@@ -694,20 +694,24 @@ def make_annual_summary_path(gcm_identifier: str = None, **kwargs) -> str:
     return f"bcsd_output_annual/{gcm_identifier}.zarr"
 
 
-def make_interpolated_prediction_path_full_space(gcm_identifier: str = None, **kwargs) -> str:
+def make_interpolated_prediction_path_full_space(
+    gcm_identifier: str = None, gcm_grid_spec: str = None, **kwargs
+) -> str:
     """Build the path for the interpolated prediction in full space
 
     Parameters
     ----------
     gcm_identifier : str
         Output from build_gcm_identifier. String to identify the gcm dataset used
+    gcm_grid_spec: str
+        Output of get_gcm_grid_spec. String to identify the GCM grid
 
     Returns
     -------
-    make_interpolated_prediction_path_full_space_location : str
+    interpolated_prediction_path_full_space_location : str
         Path to interpolated obs full space ds file location
     """
-    return f"make_interpolated_prediction_path_full_space/{gcm_identifier}.zarr"
+    return f"interpolated_prediction_path_full_space/{gcm_identifier}_{gcm_grid_spec}.zarr"
 
 
 def get_notebook_paths(

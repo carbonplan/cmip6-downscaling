@@ -11,7 +11,6 @@ from cmip6_downscaling.methods.bcsd import (
     get_coarse_obs,
     get_spatial_anomalies,
     postprocess_bcsd,
-    rechunk_spatial_anomalies_full_time,
     return_coarse_obs_full_time,
     return_gcm_predict_rechunked,
     return_gcm_train_full_time,
@@ -32,12 +31,10 @@ from cmip6_downscaling.workflows.paths import (
     make_coarse_obs_path_full_time,
     make_gcm_predict_path,
     make_interpolated_obs_path,
-    make_interpolated_prediction_path_full_space,
     make_monthly_summary_path,
     make_rechunked_gcm_path,
     make_return_obs_path,
     make_spatial_anomalies_path,
-    make_spatial_anomalies_rechunked_full_time_path,
 )
 from cmip6_downscaling.workflows.utils import regrid_ds
 
@@ -100,14 +97,14 @@ interpolated_obs_task = task(
 interpolated_prediction_task = task(
     regrid_ds,
     tags=['dask-resource:TASKSLOTS=1'],
-    max_retries=10,
-    retry_delay=timedelta(seconds=10),
+    # max_retries=10,
+    # retry_delay=timedelta(seconds=10),
     result=XpersistResult(
         intermediate_cache_store,
         serializer="xarray.zarr",
         serializer_dump_kwargs=serializer_dump_kwargs,
     ),
-    target=make_interpolated_prediction_path_full_space,
+    target="az://flow-outputs/tempoarary/make_interpolated_prediction_path_full_space_temp.zarr",  # make_interpolated_prediction_path_full_space,
 )
 
 get_spatial_anomalies_task = task(
@@ -124,19 +121,7 @@ get_spatial_anomalies_task = task(
     target=make_spatial_anomalies_path,
 )
 
-rechunk_spatial_anomalies_full_time_task = task(
-    rechunk_spatial_anomalies_full_time,
-    log_stdout=True,
-    tags=['dask-resource:TASKSLOTS=1'],
-    # max_retries=10,
-    # retry_delay=timedelta(seconds=5),
-    result=XpersistResult(
-        intermediate_cache_store,
-        serializer="xarray.zarr",
-        serializer_dump_kwargs=serializer_dump_kwargs,
-    ),
-    target=make_spatial_anomalies_rechunked_full_time_path,
-)
+
 return_coarse_obs_full_time_task = task(
     return_coarse_obs_full_time,
     tags=['dask-resource:TASKSLOTS=1'],
@@ -180,6 +165,9 @@ return_gcm_predict_rechunked_task = task(
 fit_and_predict_task = task(
     fit_and_predict,
     log_stdout=True,
+    tags=['dask-resource:TASKSLOTS=1'],
+    max_retries=10,
+    retry_delay=timedelta(seconds=5),
     result=XpersistResult(
         intermediate_cache_store,
         serializer="xarray.zarr",
@@ -299,9 +287,6 @@ with Flow(
         obs_identifier=obs_identifier,
         gcm_grid_spec=gcm_grid_spec,
     )
-    rechunk_spatial_anomalies_full_time_ds = rechunk_spatial_anomalies_full_time_task(
-        spatial_anomalies_ds, obs_identifier=obs_identifier, gcm_grid_spec=gcm_grid_spec
-    )
 
     # the next three tasks prepare the inputs required by bcsd
     coarse_obs_full_time_ds = return_coarse_obs_full_time_task(
@@ -352,12 +337,17 @@ with Flow(
         gcm_identifier=gcm_identifier,
     )
 
-    interpolated_prediction = interpolated_prediction_task(
-        ds=bias_corrected_ds, target_grid_ds=spatial_anomalies_ds
+    interpolated_prediction_ds = interpolated_prediction_task(
+        ds=bias_corrected_ds,
+        target_grid_ds=target_grid_obs_ds,
+        gcm_grid_spec=gcm_grid_spec,
+        chunking_approach='full_space',
+        gcm_identifier=gcm_identifier,
     )
+
     # postprocess_bcsd_task(s):
     postprocess_bcsd_ds = postprocess_bcsd_task(
-        interpolated_prediction=interpolated_prediction,
+        interpolated_prediction=interpolated_prediction_ds,
         spatial_anomalies_ds=spatial_anomalies_ds,
         gcm=gcm,
         scenario=scenario,
