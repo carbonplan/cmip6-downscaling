@@ -234,103 +234,6 @@ def make_rechunker_stores(
     return temp_store, target_store, output_path
 
 
-def rechunk_zarr_array(
-    zarr_array: xr.Dataset,
-    zarr_array_location: str,
-    variable: str,
-    chunk_dims: Union[Tuple, dict] = ("time",),
-    max_mem: str = "8GB",
-):
-    """Use `rechunker` package to adjust chunks of dataset to a form
-    conducive for your processing.
-    Parameters
-    ----------
-    zarr_array : zarr or xarray dataset
-        Dataset you want to rechunk.
-    zarr_array_location: str
-        Path to where the input data is sitting. Only returned/used if zarr_array does not need to rechunked
-    chunk_dims : Union[Tuple, dict]
-        Information for chunking the ds. If a dict is passed, it will rechunk following sizes as specified. The dict should look like:
-            {variable: {'lat': chunk_size_lat,
-                        'lon': chunk_size_lon,
-                        'time': chunk_size_lon}
-            'lon': None,
-            'lat': None,
-            'time': None}.
-        If a tuple is passed, it is the dimension(s) along which you want to chunk ds, and the optimal chunk sizes will get calculated internally.
-    max_mem : str
-        The max memory you want to allow for a chunk. Probably want it to be around 100 MB, but that
-        is also controlled by the `calc_auspicious_chunk_sizes` calls.
-    Returns
-    -------
-    rechunked_ds, path_tgt : Tuple[xr.Dataset, str]
-        Rechunked dataset as well as string of location where it's stored.
-    """
-    if type(chunk_dims) == tuple:
-        chunks_dict = {
-            variable: calc_auspicious_chunks_dict(zarr_array, chunk_dims=chunk_dims),
-            "time": None,  # write None here because you don't want to rechunk this array
-            "lon": None,
-            "lat": None,
-        }
-    elif type(chunk_dims) == dict:
-        chunks_dict = chunk_dims
-        # ensure that the chunks_dict looks the way you want it to as {variable: {'lat': chunk_size_lat, 'lon': chunk_size_lon, 'time': chunk_size_lon}
-        # 'lon': None, 'lat': None, 'time': none}
-        assert variable in chunks_dict
-        for dim in ["lat", "lon", "time"]:
-            chunks_dict[dim] = None
-            assert dim in chunks_dict[variable]
-
-    # make the schema for what you want the rechunking routine to produce
-    # so that you can check whether what you passed in (zarr_array) already looks like that
-    # if it does, you'll skip the rechunking!
-    target_schema = DataArraySchema(chunks=chunks_dict[variable])
-    try:
-        # first confirm that you have a zarr_array_location
-        assert zarr_array_location is not None
-        target_schema.validate(zarr_array[variable])
-        # return back the dataset you introduced, and the path is None since you haven't created a new dataset
-        return zarr_array, zarr_array_location
-    except (SchemaError, AssertionError):
-        delete_chunks_encoding(zarr_array)
-        temp_store, target_store, path_tgt = make_rechunker_stores()
-        # delete_chunks_encoding(ds) # need to do this before since it wont work on zarr array
-        # for some reason doing this on zarr arrays is faster than on xr.open_zarr - it calls `copy_chunk` less.
-        # TODO: could switch this to a validation with xarray schema - confirm that the chunks are all uniform and
-        # if not, chunk them according to the spec provided by `calc_auspicious_chunks_dict`
-        try:
-            rechunk_plan = rechunk(
-                zarr_array, chunks_dict, max_mem, target_store, temp_store=temp_store
-            )
-            rechunk_plan.execute(retries=5)
-        except ValueError:
-            print(
-                "WARNING: Failed to write zarr store, perhaps because of variable chunk sizes, trying to rechunk it"
-            )
-            # make new stores in case it failed mid-write. alternatively could clean up that store but
-            # we don't have delete permission currently
-            temp_store, target_store, path_tgt = make_rechunker_stores()
-            delete_chunks_encoding(zarr_array)
-            # TODO: will always work but need to double check the result and if it's taking a long time
-            rechunk_plan = rechunk(
-                zarr_array.chunk(chunks_dict[variable]),
-                chunks_dict,
-                max_mem,
-                target_store,
-                temp_store=temp_store,
-            )
-            rechunk_plan.execute(retries=5)
-        rechunked_ds = xr.open_zarr(target_store)
-        # This function expects a filepath not a fsspec object
-        # remove_stores([temp_store])
-
-        # ideally we want consolidated=True but it seems that functionality isn't offered in rechunker right now
-        # we can just add a consolidate_metadata step here to do it after the fact (once rechunker is done) but only
-        # necessary if we'll reopen this rechukned_ds multiple times
-        return rechunked_ds, path_tgt
-
-
 def calc_auspicious_chunks_dict(
     da: Union[xr.DataArray, xr.Dataset],
     target_size: str = "100mb",
@@ -478,7 +381,7 @@ def rechunk_zarr_array_with_caching(
     chunking_approach: Optional[str] = None,
     template_chunk_array: Optional[xr.Dataset] = None,
     output_path: Optional[str] = None,
-    max_mem: str = "8GB",
+    max_mem: str = "2GB",
     overwrite: bool = False,
 ) -> xr.Dataset:
     """Use `rechunker` package to adjust chunks of dataset to a form
@@ -625,7 +528,7 @@ def regrid_ds(
         ds_rechunked = rechunk_zarr_array_with_caching(
             zarr_array=ds,
             chunking_approach='full_space',
-            max_mem='8GB',
+            max_mem='1GB',
             output_path=rechunked_ds_path,
         )
     regridder = xe.Regridder(ds_rechunked, target_grid_ds, "bilinear", extrap_method="nearest_s2d")

@@ -714,6 +714,46 @@ def make_interpolated_prediction_path_full_space(
     return f"interpolated_prediction_path_full_space/{gcm_identifier}_{gcm_grid_spec}.zarr"
 
 
+def make_interpolated_prediction_path_full_time(
+    gcm_identifier: str = None, gcm_grid_spec: str = None, **kwargs
+) -> str:
+    """Build the path for the interpolated prediction in full time
+
+    Parameters
+    ----------
+    gcm_identifier : str
+        Output from build_gcm_identifier. String to identify the gcm dataset used
+    gcm_grid_spec: str
+        Output of get_gcm_grid_spec. String to identify the GCM grid
+
+    Returns
+    -------
+    interpolated_prediction_path_full_time_location : str
+        Path to interpolated obs full time ds file location
+    """
+    return f"interpolated_prediction_path_full_time/{gcm_identifier}_{gcm_grid_spec}.zarr"
+
+
+def make_rechunked_spatial_anomalies_path_full_time(
+    gcm_identifier: str = None, gcm_grid_spec: str = None, **kwargs
+) -> str:
+    """Build the path for the rechunked spatial anomlaies in full time
+
+    Parameters
+    ----------
+    gcm_identifier : str
+        Output from build_gcm_identifier. String to identify the gcm dataset used
+    gcm_grid_spec: str
+        Output of get_gcm_grid_spec. String to identify the GCM grid
+
+    Returns
+    -------
+    make_rechunked_spatial_anomalies_path_full_time_location : str
+        Path to rechunked_spatial_anomalies full time ds file location
+    """
+    return f"rechunked_spatial_anomalies_path_full_time/{gcm_identifier}_{gcm_grid_spec}.zarr"
+
+
 def get_notebook_paths(
     identifier: str,
 ) -> Tuple[pathlib.PosixPath, pathlib.PosixPath, pathlib.PosixPath]:

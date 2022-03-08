@@ -231,6 +231,8 @@ def get_gcm(
         chunking_approach=chunking_approach,
         output_path=rechunked_path,
     )
+    print('ds_gcm_rechunked:')
+    print(ds_gcm_rechunked.chunks)
 
     return ds_gcm_rechunked
 
