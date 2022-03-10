@@ -14,7 +14,6 @@ from xarray_schema import DataArraySchema, DatasetSchema
 from xarray_schema.base import SchemaError
 
 from cmip6_downscaling import config
-from cmip6_downscaling.tasks.cleanup import remove_stores
 
 schema_maps_chunks = DataArraySchema(chunks={'lat': -1, 'lon': -1})
 
@@ -309,8 +308,7 @@ def regrid_dataset(
     -------
     ds_regridded : xr.Dataset
         Final regridded dataset
-    ds_rechunked_path : str
-        Path of original dataset rechunked along time (perhaps to be used by follow-on steps)
+
     """
     # use xarray_schema to check that the dataset is chunked into map space already
     # and if not rechunk it into map space (only do the rechunking if it's necessary)
@@ -318,7 +316,6 @@ def regrid_dataset(
     try:
         schema_maps_chunks.validate(ds[variable])
         ds_rechunked = ds
-        ds_rechunked_path = ds_path
     except SchemaError:
         print('Entering rechunking...')
         # assert ds_path is not None, 'Must pass path to dataset so that you can rechunk it'
@@ -330,66 +327,24 @@ def regrid_dataset(
     regridder = xe.Regridder(ds_rechunked, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
     ds_regridded = regridder(ds_rechunked)
 
-    return ds_regridded, ds_rechunked_path
-
-
-def get_spatial_anomalies(
-    coarse_obs_path: str,
-    fine_obs_rechunked_path: str,
-    variable: str,
-) -> xr.Dataset:
-    """Calculate the seasonal cycle (12 timesteps) spatial anomaly associated
-    with aggregating the fine_obs to a given coarsened scale and then reinterpolating
-    it back to the original spatial resolution. The outputs of this function are
-    dependent on three parameters:
-    * a grid (as opposed to a specific GCM since some GCMs run on the same grid)
-    * the time period which fine_obs (and by construct coarse_obs) cover
-    * the variable
-    Parameters
-    ----------
-    coarse_obs : xr.Dataset
-        Coarsened to a GCM resolution. Chunked along time.
-    fine_obs_rechunked_path : xr.Dataset
-        Original observation spatial resolution. Chunked along time.
-    variable: str
-        The variable included in the dataset.
-    Returns
-    -------
-    seasonal_cycle_spatial_anomalies : xr.Dataset
-        Spatial anomaly for each month (i.e. of shape (nlat, nlon, 12))
-    """
-    # interpolate coarse_obs back to the original scale
-    [coarse_obs, fine_obs_rechunked] = load_paths([coarse_obs_path, fine_obs_rechunked_path])
-
-    obs_interpolated = regrid_ds(ds=coarse_obs, target_grid_ds=fine_obs_rechunked.isel(time=0))
-
-    # use rechunked fine_obs from coarsening step above because that is in map chunks so it
-    # will play nice with the interpolated obs
-
-    schema_maps_chunks.validate(fine_obs_rechunked[variable])
-
-    # calculate difference between interpolated obs and the original obs
-    spatial_anomalies = obs_interpolated - fine_obs_rechunked
-
-    # calculate seasonal cycle (12 time points)
-    seasonal_cycle_spatial_anomalies = spatial_anomalies.groupby("time.month").mean()
-    return seasonal_cycle_spatial_anomalies
+    return ds_regridded
 
 
 def rechunk_zarr_array_with_caching(
-    zarr_array: xr.Dataset,
+    zarr_path: str,
     chunking_approach: Optional[str] = None,
     template_chunk_array: Optional[xr.Dataset] = None,
     output_path: Optional[str] = None,
     max_mem: str = "2GB",
     overwrite: bool = False,
-) -> xr.Dataset:
+    **kwargs,
+) -> str:
     """Use `rechunker` package to adjust chunks of dataset to a form
     conducive for your processing.
     Parameters
     ----------
-    zarr_array : zarr or xarray dataset
-        Dataset you want to rechunk.
+    zarr_path : str
+        path to zarr store
     output_path: str
         Path to where the output data is saved. If output path is not empty, the content would be loaded and the schema checked. If the schema check passed,
         the content will be returned without rechunking again (i.e. caching); else, the content can be overwritten (see overwrite option).
@@ -404,9 +359,13 @@ def rechunk_zarr_array_with_caching(
         Whether to overwrite the content saved at output_path if the content did not pass schema check.
     Returns
     -------
-    rechunked_ds : xr.Dataset
-        Rechunked dataset
+    target_path : str
+        Path to rechunked dataset
     """
+    # step
+    group = zarr.open_consolidated(zarr_path, mode='r')
+    ds = xr.open_zarr(zarr_path)
+
     # determine the chunking schema
     if template_chunk_array is None:
         if chunking_approach == 'full_space':
@@ -418,35 +377,34 @@ def rechunk_zarr_array_with_caching(
             )  # if we need full time series, chunk along the lat/lon dimensions
         else:
             raise NotImplementedError("chunking_approach must be in ['full_space', 'full_time']")
-        example_var = list(zarr_array.data_vars)[0]
-        chunk_def = calc_auspicious_chunks_dict(zarr_array[example_var], chunk_dims=chunk_dims)
+        example_var = list(ds.data_vars)[0]
+        chunk_def = calc_auspicious_chunks_dict(ds[example_var], chunk_dims=chunk_dims)
     else:
-        example_var = list(zarr_array.data_vars)[0]
+        example_var = list(ds.data_vars)[0]
         chunk_def = {
-            'time': min(template_chunk_array.chunks['time'][0], len(zarr_array.time)),
-            'lat': min(template_chunk_array.chunks['lat'][0], len(zarr_array.lat)),
-            'lon': min(template_chunk_array.chunks['lon'][0], len(zarr_array.lon)),
+            'time': min(template_chunk_array.chunks['time'][0], len(ds.time)),
+            'lat': min(template_chunk_array.chunks['lat'][0], len(ds.lat)),
+            'lon': min(template_chunk_array.chunks['lon'][0], len(ds.lon)),
         }
     chunks_dict = {
         'time': None,  # write None here because you don't want to rechunk this array
         'lon': None,
         'lat': None,
     }
-    for var in zarr_array.data_vars:
+    for var in ds.data_vars:
         chunks_dict[var] = chunk_def
 
     # make the schema for what you want the rechunking routine to produce
     # so that you can check whether what you passed in (zarr_array) already looks like that
     # if it does, you'll skip the rechunking!
     schema_dict = {}
-    for var in zarr_array.data_vars:
+    for var in ds.data_vars:
         schema_dict[var] = DataArraySchema(chunks=chunk_def)
     target_schema = DatasetSchema(schema_dict)
     # make storage patterns
     if output_path is not None:
         output_path = config.get('storage.intermediate.uri') + '/' + output_path
     temp_store, target_store, target_path = make_rechunker_stores(output_path)
-
     # check and see if the output is empty, if there is content, check that it's chunked correctly
     if len(target_store) > 0:
         output = xr.open_zarr(target_store)
@@ -466,30 +424,29 @@ def rechunk_zarr_array_with_caching(
 
     try:
         # now check if the input is already correctly chunked. If so, save to the output location and return
-        target_schema.validate(zarr_array)
-        zarr_array.to_zarr(target_store, mode='w', consolidated=True)
-        return zarr_array
+        target_schema.validate(ds)
+        return zarr_path
 
     except SchemaError:
         rechunk_plan = rechunk(
-            zarr_array,
+            group,
             chunks_dict,
             max_mem,
             target_store,
             temp_store=temp_store,
         )
+
         rechunk_plan.execute()
-        rechunked_ds = xr.open_zarr(target_store)
         # remove any temp stores created by task
-        remove_stores([temp_store])
+        # remove_stores([temp_store])
         # ideally we want consolidated=True but it seems that functionality isn't offered in rechunker right now
         # we can just add a consolidate_metadata step here to do it after the fact (once rechunker is done) but only
         # necessary if we'll reopen this rechukned_ds multiple times
-        return rechunked_ds
+        return target_path
 
 
 def regrid_ds(
-    ds: xr.Dataset,
+    ds_path: str,
     target_grid_ds: xr.Dataset,
     rechunked_ds_path: Optional[str] = None,
     **kwargs,
@@ -511,6 +468,9 @@ def regrid_ds(
     """
     # regridding requires ds to be contiguous in lat/lon, check if the input matches the
     # target_schema.
+    print(ds_path)
+    ds = xr.open_zarr(ds_path)
+
     schema_dict = {}
     for var in ds.data_vars:
         schema_dict[var] = schema_maps_chunks
@@ -525,12 +485,13 @@ def regrid_ds(
         target_schema.validate(ds)
         ds_rechunked = ds
     except SchemaError:
-        ds_rechunked = rechunk_zarr_array_with_caching(
-            zarr_array=ds,
+        ds_rechunked_path = rechunk_zarr_array_with_caching(
+            zarr_path=ds_path,
             chunking_approach='full_space',
             max_mem='1GB',
-            output_path=rechunked_ds_path,
+            output_path=rechunked_ds_path,  # default is None
         )
+    ds_rechunked = xr.open_zarr(ds_rechunked_path)
     regridder = xe.Regridder(ds_rechunked, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
     ds_regridded = regridder(ds_rechunked)
 

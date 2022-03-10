@@ -50,7 +50,6 @@ intermediate_cache_store = CacheStore(
     storage_options=config.get("storage.intermediate.storage_options"),
 )
 
-
 results_cache_store = CacheStore(
     config.get("storage.results.uri"),
     storage_options=config.get("storage.results.storage_options"),
@@ -69,6 +68,8 @@ return_obs_task = task(
     ),
     target=make_return_obs_path,
 )
+
+
 get_coarse_obs_task = task(
     get_coarse_obs,
     tags=['dask-resource:TASKSLOTS=1'],
@@ -90,8 +91,8 @@ target_grid_obs_ds_task = task(
 interpolated_obs_task = task(
     regrid_ds,
     tags=['dask-resource:TASKSLOTS=1'],
-    max_retries=5,
-    retry_delay=timedelta(seconds=5),
+    # max_retries=5,
+    # retry_delay=timedelta(seconds=5),
     result=XpersistResult(
         intermediate_cache_store,
         serializer="xarray.zarr",
@@ -119,7 +120,7 @@ rechunked_interpolated_prediciton_task_full_time_task = task(
     # retry_delay=timedelta(seconds=10),
     result=XpersistResult(
         intermediate_cache_store,
-        serializer="xarray.zarr",
+        serializer="xarrzay.zarr",
         serializer_dump_kwargs=serializer_dump_kwargs,
     ),
     target=make_interpolated_prediction_path_full_time,
@@ -128,15 +129,16 @@ rechunked_interpolated_prediciton_task_full_time_task = task(
 get_spatial_anomalies_task = task(
     get_spatial_anomalies,
     log_stdout=True,
-    # max_retries=10,
+    # max_retries=5,
     # retry_delay=timedelta(seconds=5),
     result=XpersistResult(
         intermediate_cache_store,
-        serializer="xarray.zarr",
+        serializer="zarr.zarr",
         serializer_dump_kwargs=serializer_dump_kwargs,
     ),
     target=make_spatial_anomalies_path,  # "flow-outputs/prefect_intermediates/spatial_anomalies_test/ERA5/tasmax/-90.0_90.0_-180.0_180.0/1981_2010/128x256_gridsize_14_14_llcorner_-88_-180.zarr"#make_spatial_anomalies_path"
 )
+
 
 rechunked_spatial_anomalies_full_time_task = task(
     rechunked_spatial_anomalies_full_time,
@@ -276,6 +278,7 @@ with Flow(
         cleanup.run_rsfip(gcm_identifier, obs_identifier)
 
     # preprocess_bcsd_tasks(s):
+
     obs_ds = return_obs_task(
         obs=obs,
         variable=variable,
@@ -285,7 +288,6 @@ with Flow(
     )
 
     coarse_obs_ds = get_coarse_obs_task(
-        obs_ds=obs_ds,
         gcm=gcm,
         scenario=scenario,
         variable=variable,
@@ -294,20 +296,18 @@ with Flow(
         bbox=bbox,
         obs_identifier=obs_identifier,
         chunking_approach='full_space',
-        gcm_grid_spec=gcm_grid_spec,
     )
 
-    target_grid_obs_ds = target_grid_obs_ds_task(obs_ds)
+    target_grid_obs_ds = target_grid_obs_ds_task(coarse_obs_ds)
     interpolated_obs_ds = interpolated_obs_task(
-        ds=coarse_obs_ds,
+        ds_path=coarse_obs_ds,
         target_grid_ds=target_grid_obs_ds,
         gcm_grid_spec=gcm_grid_spec,
         chunking_approach='full_space',
         obs_identifier=obs_identifier,
+        upstream_tasks=[coarse_obs_ds, target_grid_obs_ds],
     )
     spatial_anomalies_ds = get_spatial_anomalies_task(
-        obs_ds=obs_ds,
-        interpolated_obs_ds=interpolated_obs_ds,
         gcm=gcm,
         scenario=scenario,
         variable=variable,
@@ -316,6 +316,8 @@ with Flow(
         bbox=bbox,
         obs_identifier=obs_identifier,
         gcm_grid_spec=gcm_grid_spec,
+        chunking_approach='full_space',
+        upstream_tasks=[interpolated_obs_ds, obs_ds],
     )
 
     # the next three tasks prepare the inputs required by bcsd
