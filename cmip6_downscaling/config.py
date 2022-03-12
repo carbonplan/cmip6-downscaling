@@ -93,8 +93,8 @@ _defaults = {
         "pangeo": {
             "storage_prefix": "az://",
             "storage_options": {'directory': './'},
-            'n_workers': 16,  # 31
-            'threads_per_worker': 2,
+            'n_workers': 32,
+            'threads_per_worker': 1,
         },
     },
 }

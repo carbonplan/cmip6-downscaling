@@ -285,51 +285,6 @@ def calc_auspicious_chunks_dict(
     return chunks_dict
 
 
-def regrid_dataset(
-    ds: xr.Dataset,
-    ds_path: Union[str, None],
-    target_grid_ds: xr.Dataset,
-    variable: str,
-) -> Tuple[xr.Dataset, str]:
-    """Regrid a dataset to a target grid. For use in both coarsening or interpolating to finer resolution.
-    The function will check whether the dataset is chunked along time (into spatially-contiguous maps)
-    and if not it will rechunk it.
-    Parameters
-    ----------
-    ds : xr.Dataset
-        Dataset you want to regrid
-    ds_path: str
-        Path to where the dataset is stored. If None
-    target_grid_ds : xr.Dataset
-        Template dataset whose grid you'll match
-    variable : str
-        variable you're working with
-    Returns
-    -------
-    ds_regridded : xr.Dataset
-        Final regridded dataset
-
-    """
-    # use xarray_schema to check that the dataset is chunked into map space already
-    # and if not rechunk it into map space (only do the rechunking if it's necessary)
-    # we only have dataarray schema implemented now- can switch to datasets once that's done
-    try:
-        schema_maps_chunks.validate(ds[variable])
-        ds_rechunked = ds
-    except SchemaError:
-        print('Entering rechunking...')
-        # assert ds_path is not None, 'Must pass path to dataset so that you can rechunk it'
-        ds_rechunked = rechunk_zarr_array_with_caching(
-            zarr_array=ds, chunking_approach='full_time', max_mem='1GB'
-        )
-    print(ds_rechunked.chunks)
-    print(target_grid_ds.chunks)
-    regridder = xe.Regridder(ds_rechunked, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
-    ds_regridded = regridder(ds_rechunked)
-
-    return ds_regridded
-
-
 def rechunk_zarr_array_with_caching(
     zarr_path: str,
     chunking_approach: Optional[str] = None,
@@ -363,6 +318,7 @@ def rechunk_zarr_array_with_caching(
         Path to rechunked dataset
     """
     # step
+
     group = zarr.open_consolidated(zarr_path, mode='r')
     ds = xr.open_zarr(zarr_path)
 
@@ -402,6 +358,7 @@ def rechunk_zarr_array_with_caching(
         schema_dict[var] = DataArraySchema(chunks=chunk_def)
     target_schema = DatasetSchema(schema_dict)
     # make storage patterns
+
     if output_path is not None:
         output_path = config.get('storage.intermediate.uri') + '/' + output_path
     temp_store, target_store, target_path = make_rechunker_stores(output_path)
@@ -411,7 +368,7 @@ def rechunk_zarr_array_with_caching(
         try:
             # if the content in target path is correctly chunked, return
             target_schema.validate(output)
-            return output
+            return output_path
 
         except SchemaError:
             if overwrite:
@@ -425,7 +382,11 @@ def rechunk_zarr_array_with_caching(
     try:
         # now check if the input is already correctly chunked. If so, save to the output location and return
         target_schema.validate(ds)
-        return zarr_path
+        if output_path is not None:
+            ds.to_zarr(output_path)
+            return output_path
+        else:
+            return zarr_path
 
     except SchemaError:
         rechunk_plan = rechunk(
@@ -442,6 +403,7 @@ def rechunk_zarr_array_with_caching(
         # ideally we want consolidated=True but it seems that functionality isn't offered in rechunker right now
         # we can just add a consolidate_metadata step here to do it after the fact (once rechunker is done) but only
         # necessary if we'll reopen this rechukned_ds multiple times
+        zarr.consolidate_metadata(target_store)
         return target_path
 
 
@@ -468,7 +430,8 @@ def regrid_ds(
     """
     # regridding requires ds to be contiguous in lat/lon, check if the input matches the
     # target_schema.
-    print(ds_path)
+    # import pdb
+    # pdb.set_trace()
     ds = xr.open_zarr(ds_path)
 
     schema_dict = {}
@@ -484,12 +447,10 @@ def regrid_ds(
     try:
         target_schema.validate(ds)
         ds_rechunked = ds
+
     except SchemaError:
         ds_rechunked_path = rechunk_zarr_array_with_caching(
-            zarr_path=ds_path,
-            chunking_approach='full_space',
-            max_mem='1GB',
-            output_path=rechunked_ds_path,  # default is None
+            zarr_path=ds_path, chunking_approach='full_space', max_mem='1GB'
         )
     ds_rechunked = xr.open_zarr(ds_rechunked_path)
     regridder = xe.Regridder(ds_rechunked, target_grid_ds, "bilinear", extrap_method="nearest_s2d")

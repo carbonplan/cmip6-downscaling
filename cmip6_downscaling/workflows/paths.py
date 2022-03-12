@@ -135,7 +135,7 @@ def make_coarse_obs_path(
         Path to which coarsened observation defined by the parameters should be stored
     """
 
-    return f"coarsened_obs/{obs_identifier}{chunking_approach}_{gcm_grid_spec}.zarr"
+    return f"coarsened_obs/{obs_identifier}{chunking_approach}_{gcm_grid_spec}.spatialzarr"
 
 
 def make_coarse_obs_path_full_space(
@@ -614,6 +614,14 @@ def make_spatial_anomalies_rechunked_full_time_path(
     return f"spatial_anomalies_rechunked_full_time/{obs_identifier}{gcm_grid_spec}.zarr"
 
 
+def make_gcm_train_subset_path(gcm_identifier: str = None, **kwargs) -> str:
+    return f"gcm_train_subset/{gcm_identifier}.zarr"
+
+
+def make_gcm_predict_subset_path(gcm_identifier: str, **kwargs) -> str:
+    return f"gcm_predict_subset/{gcm_identifier}.zarr"
+
+
 def make_gcm_predict_path(gcm_identifier: str = None, **kwargs) -> str:
     """Build the path for the gcm predict dataset
 
@@ -731,7 +739,7 @@ def make_interpolated_prediction_path_full_time(
     interpolated_prediction_path_full_time_location : str
         Path to interpolated obs full time ds file location
     """
-    return f"interpolated_prediction_path_full_time/{gcm_identifier}_{gcm_grid_spec}.zarr"
+    return f"interpolated_prediction_full_time/{gcm_identifier}_{gcm_grid_spec}.zarr"
 
 
 def make_rechunked_spatial_anomalies_path_full_time(
@@ -751,7 +759,7 @@ def make_rechunked_spatial_anomalies_path_full_time(
     make_rechunked_spatial_anomalies_path_full_time_location : str
         Path to rechunked_spatial_anomalies full time ds file location
     """
-    return f"rechunked_spatial_anomalies_path_full_time/{gcm_identifier}_{gcm_grid_spec}.zarr"
+    return f"rechunked_spatial_anomalies_full_time/{gcm_identifier}_{gcm_grid_spec}.zarr"
 
 
 def get_notebook_paths(

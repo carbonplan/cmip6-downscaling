@@ -211,17 +211,16 @@ class PangeoRuntime(LocalRuntime):
 
     @property
     def executor(self) -> Executor:
-        return LocalExecutor()
+        return DaskExecutor(
+            cluster_kwargs={
+                'resources': {'TASKSLOTS': 1},
+                'n_workers': self._n_workers,
+                'threads_per_worker': self._threads_per_worker,
+            }
+        )
 
     # def executor(self) -> Executor:
-    #     return DaskExecutor(
-    #         cluster_kwargs={
-    #             'resources': {'TASKSLOTS': 1},
-    #             'n_workers': self._n_workers,
-    #             'threads_per_worker': self._threads_per_worker,
-    #         }
-    #     )
-
+    #     return LocalExecutor()
     def _generate_env(self):
         return _threadsafe_env_vars
 

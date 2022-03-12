@@ -8,7 +8,17 @@ from cmip6_downscaling import config
 from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
 from cmip6_downscaling.data.cmip import get_gcm, load_cmip
 from cmip6_downscaling.data.observations import open_era5
-from cmip6_downscaling.workflows.paths import make_interpolated_obs_path, make_return_obs_path
+from cmip6_downscaling.workflows.paths import (
+    make_bias_corrected_path,
+    make_coarse_obs_path,
+    make_gcm_predict_subset_path,
+    make_gcm_train_subset_path,
+    make_interpolated_obs_path,
+    make_interpolated_prediction_path_full_space,
+    make_interpolated_prediction_path_full_time,
+    make_return_obs_path,
+    make_spatial_anomalies_path,
+)
 from cmip6_downscaling.workflows.utils import (
     BBox,
     lon_to_180,
@@ -52,9 +62,7 @@ def return_obs(
         variable = [variable]
 
     obs_load = open_era5(variable, train_period)
-    print('180 to 180')
     obs_load_180 = lon_to_180(obs_load)
-    print('subset dataset')
     obs_ds = subset_dataset(
         obs_load_180,
         variable[0],
@@ -74,6 +82,8 @@ def get_coarse_obs(
     predict_period: slice,
     bbox: BBox,
     obs_identifier: str,
+    gcm_grid_spec: str,
+    chunking_approach: str,
     **kwargs
 ) -> xr.Dataset:
     """Regrids the observation dataset to match the GCM resolution
@@ -104,12 +114,12 @@ def get_coarse_obs(
     """
     # Load single slice of target cmip6 dataset for target grid dimensions
     # gcm_one_slice = load_cmip(return_type='xr', variable_ids=[variable]).isel(time=0)
+
     obs_ds_path = (
         config.get("storage.intermediate.uri")
         + '/'
         + make_return_obs_path(obs_identifier=obs_identifier)
     )
-
     if isinstance(variable, str):
         variable = [variable]
 
@@ -122,6 +132,19 @@ def get_coarse_obs(
     coarse_obs_ds = regrid_ds(ds_path=obs_ds_path, target_grid_ds=gcm_subset)
 
     return coarse_obs_ds
+
+
+def get_interpolated_obs(
+    target_grid_ds: xr.Dataset, gcm_grid_spec: str, chunking_approach: str, obs_identifier: str
+):
+
+    coarse_obs_ds_path = (
+        config.get("storage.intermediate.uri")
+        + '/'
+        + make_return_obs_path(obs_identifier=obs_identifier)
+    )
+    interpolated_obs = regrid_ds(ds_path=coarse_obs_ds_path, target_grid_ds=target_grid_ds)
+    return interpolated_obs
 
 
 def get_spatial_anomalies(
@@ -177,7 +200,6 @@ def get_spatial_anomalies(
     seasonal_cycle_spatial_anomalies : xr.Dataset
         Spatial anomaly for each month (i.e. of shape (nlat, nlon, 12))
     """
-    print(kwargs)
 
     interpolated_obs_path = (
         config.get("storage.intermediate.uri")
@@ -188,6 +210,7 @@ def get_spatial_anomalies(
             obs_identifier=obs_identifier,
         )
     )
+    # take interpolated obs and rechunk into full_time -- returns path
     coarse_obs_interpolated_rechunked_path = rechunk_zarr_array_with_caching(
         interpolated_obs_path, chunking_approach='full_time', max_mem='2GB'
     )
@@ -197,6 +220,7 @@ def get_spatial_anomalies(
         + '/'
         + make_return_obs_path(obs_identifier=obs_identifier)
     )
+    # original obs rechunked into full-time
     obs_rechunked_path = rechunk_zarr_array_with_caching(
         obs_path, chunking_approach='full_time', max_mem='2GB'
     )
@@ -214,13 +238,14 @@ def get_spatial_anomalies(
 
 
 def return_coarse_obs_full_time(
-    coarse_obs_ds: xr.Dataset,
     gcm: str,
     scenario: str,
     variable: str,
     train_period: slice,
     predict_period: slice,
     bbox: BBox,
+    obs_identifier: str,
+    gcm_grid_spec: str,
     **kwargs
 ) -> xr.Dataset:
 
@@ -230,8 +255,6 @@ def return_coarse_obs_full_time(
 
     Parameters
     ----------
-    coarse_obs_ds : xr.Dataset
-        Input coarse observation dataset
     gcm : str
         Input GCM
     scenario: str
@@ -251,30 +274,47 @@ def return_coarse_obs_full_time(
     xr.Dataset
         coarse_obs_full_time_ds rechunked dataset
     """
-    coarse_obs_full_time_ds = rechunk_zarr_array_with_caching(
-        coarse_obs_ds,
+    coarse_obs_path_full_space_path = (
+        config.get("storage.intermediate.uri")
+        + '/'
+        + make_coarse_obs_path(
+            obs_identifier=obs_identifier,
+            gcm_grid_spec=gcm_grid_spec,
+            chunking_approach='full_space',
+        )
+    )
+    # this is temp_path: az://flow-outputs/temporary/djnqgjlkbr.zarr. this is target_path: az://flow-outputs/test_intermediate_zarr/az://flow-outputs/test_intermediate_zarr/coarsened_obs/ERA5/tasmax/-90.0_90.0_-180.0_180.0/1990_1990/full_time_128x256_gridsize_14_14_llcorner_-88_-180.zarr
+    #    az://flow-outputs/test_intermediate_zarr/coarsened_obs/ERA5/tasmax/-90.0_90.0_-180.0_180.0/1990_1990/full_time_128x256_gridsize_14_14_llcorner_-88_-180.zarr
+    coarse_obs_path_full_time_path = make_coarse_obs_path(
+        obs_identifier=obs_identifier, gcm_grid_spec=gcm_grid_spec, chunking_approach='full_time'
+    )
+
+    coarse_obs_full_time_path = rechunk_zarr_array_with_caching(
+        coarse_obs_path_full_space_path,
+        output_path=coarse_obs_path_full_time_path,
         chunking_approach='full_time',
         max_mem='2GB',
     )
-    return coarse_obs_full_time_ds
+    return coarse_obs_full_time_path
 
 
 def return_gcm_train_full_time(
-    coarse_obs_full_time_ds: xr.Dataset,
+    coarse_obs_full_time_path: str,
     gcm: str,
     scenario: str,
     variable: str,
     train_period: slice,
     predict_period: slice,
     bbox: BBox,
+    gcm_identifier: str,
     **kwargs
 ) -> xr.Dataset:
     """Returns GCM training rechunked dataset in full time.
 
     Parameters
     ----------
-    coarse_obs_full_time_ds : xr.Dataset
-        Output coarse observation dataset rechunked in full_time
+    coarse_obs_full_time_path : str
+        Output coarse observation dataset path rechunked in full_time
     gcm : str
         Input GCM
     scenario: str
@@ -302,19 +342,29 @@ def return_gcm_train_full_time(
         variable,
         train_period,
         bbox,
+        # is the chunking schema needed?
         chunking_schema={'time': 365, 'lat': 150, 'lon': 150},
     )
     del gcm_train_ds_subset[variable].encoding['chunks']
 
     # this call was to force the timestamps for the cmip data to use the friendlier era5 timestamps. (i forget which dataset used which time formats). i could picture this introducing a tricky bug though (for instance if gcm timestamp didn't align for some reason) so we could use another conversion system if that is better. Perhaps datetime equivilence test.
+    coarse_obs_full_time_ds = xr.open_zarr(coarse_obs_full_time_path)
     gcm_train_ds_subset['time'] = coarse_obs_full_time_ds.time.values
+    gcm_train_subset_path = (
+        config.get("storage.intermediate.uri")
+        + '/'
+        + make_gcm_train_subset_path(gcm_identifier=gcm_identifier)
+    )
+    gcm_train_ds_subset.to_zarr(gcm_train_subset_path, mode='w')
 
-    gcm_train_subset_full_time_ds = rechunk_zarr_array_with_caching(
-        gcm_train_ds_subset,
+    gcm_train_subset_full_time_path = rechunk_zarr_array_with_caching(
+        gcm_train_subset_path,
         chunking_approach='full_time',
         max_mem='2GB',
     )
-    return gcm_train_subset_full_time_ds
+    gcm_train_ds_subset = xr.open_zarr(gcm_train_subset_full_time_path)
+
+    return gcm_train_ds_subset
 
 
 def return_gcm_predict_rechunked(
@@ -325,6 +375,7 @@ def return_gcm_predict_rechunked(
     train_period: slice,
     predict_period: slice,
     bbox: BBox,
+    gcm_identifier: str,
     **kwargs
 ) -> xr.Dataset:
     """Returns GCM prediction rechunked dataset in full time.  Chunks are matched to chunks of gcm train. In the current use case, this means in full_time.
@@ -374,19 +425,26 @@ def return_gcm_predict_rechunked(
     )
 
     del gcm_predict_ds_subset[variable].encoding['chunks']
-    gcm_predict_rechunked_ds = rechunk_zarr_array_with_caching(
-        gcm_predict_ds_subset.chunk({'time': 1500}),
+
+    gcm_predict_ds_subset_path = (
+        config.get("storage.intermediate.uri")
+        + '/'
+        + make_gcm_predict_subset_path(gcm_identifier=gcm_identifier)
+    )
+    gcm_predict_ds_subset.chunk({'time': 1500}).to_zarr(gcm_predict_ds_subset_path, mode='w')
+
+    gcm_predict_rechunked_path = rechunk_zarr_array_with_caching(
+        gcm_predict_ds_subset_path,
         # note: predict dataset might need to match the spatial chunking of the training dataset -- time chunking can be differant.
         template_chunk_array=gcm_train_subset_full_time_ds,
         max_mem='2GB',
     )
-
+    gcm_predict_rechunked_ds = xr.open_zarr(gcm_predict_rechunked_path)
     return gcm_predict_rechunked_ds
 
 
 def fit_and_predict(
     gcm_train_subset_full_time_ds: xr.Dataset,
-    coarse_obs_full_time_ds: xr.Dataset,
     gcm_predict_rechunked_ds: xr.Dataset,
     gcm: str,
     scenario: str,
@@ -394,6 +452,10 @@ def fit_and_predict(
     train_period: slice,
     predict_period: slice,
     bbox: BBox,
+    chunking_approach: str,
+    obs_identifier: str,
+    gcm_grid_spec: str,
+    gcm_identifier: str,
     dim: str = "time",
     **kwargs
 ) -> xr.Dataset:
@@ -404,8 +466,6 @@ def fit_and_predict(
     ----------
     gcm_train_subset_full_time_ds : xr.Dataset
         GCM training dataset chunked along space
-    coarse_obs_full_time_ds : xr.Dataset
-        Obs training dataset chunked along space
     gcm_predict_rechunked_ds : xr.Dataset
         GCM prediction dataset chunked along space.
     gcm : str
@@ -435,10 +495,20 @@ def fit_and_predict(
         bcsd_model = BcsdPrecipitation(return_anoms=False)
 
     pointwise_model = PointWiseDownscaler(model=bcsd_model, dim=dim)
-
-    coarse_obs_rechunked_validated_ds = rechunk_zarr_array_with_caching(
-        coarse_obs_full_time_ds, template_chunk_array=gcm_train_subset_full_time_ds
+    coarse_obs_full_time_path = (
+        config.get("storage.intermediate.uri")
+        + '/'
+        + make_coarse_obs_path(
+            chunking_approach=chunking_approach,
+            obs_identifier=obs_identifier,
+            gcm_grid_spec=gcm_grid_spec,
+        )
     )
+    coarse_obs_rechunked_validated_path = rechunk_zarr_array_with_caching(
+        coarse_obs_full_time_path, template_chunk_array=gcm_train_subset_full_time_ds
+    )
+    coarse_obs_rechunked_validated_ds = xr.open_zarr(coarse_obs_rechunked_validated_path)
+
     pointwise_model.fit(
         gcm_train_subset_full_time_ds[variable], coarse_obs_rechunked_validated_ds[variable]
     )
@@ -449,39 +519,71 @@ def fit_and_predict(
     return bias_corrected_ds
 
 
-def rechunked_interpolated_prediciton_task_full_time(
-    interpolated_prediction_ds: xr.Dataset, **kwargs
+def get_interpolated_prediction(
+    target_grid_obs_ds: xr.Dataset, gcm_grid_spec: str, gcm_identifier: str
 ) -> xr.Dataset:
-    # note: rechunk_zarr_with_caching writes a output store, then xpersist also writes a store.
-    rechunked_interpolated_prediction_ds = rechunk_zarr_array_with_caching(
-        interpolated_prediction_ds, chunking_approach='full_time', max_mem='2GB'
+
+    bias_corrected_path = (
+        config.get("storage.intermediate.uri")
+        + '/'
+        + make_bias_corrected_path(gcm_identifier=gcm_identifier)
     )
-    print('rechunked_interpolated_prediction:')
-    print(rechunked_interpolated_prediction_ds)
-    print(rechunked_interpolated_prediction_ds.chunks)
-    return rechunked_interpolated_prediction_ds
 
-
-def rechunked_spatial_anomalies_full_time(spatial_anomalies_ds: xr.Dataset, **kwargs) -> xr.Dataset:
-
-    rechunked_spatial_anomalies = rechunk_zarr_array_with_caching(
-        spatial_anomalies_ds, chunking_approach='full_time', max_mem='2GB'
+    # az://flow-outputs/test_intermediate_zarr/coarsened_obs/ERA5/tasmax/-90.0_90.0_-180.0_180.0/1990_1990/full_space_128x256_gridsize_14_14_llcorner_-88_-180.zarr
+    interpolated_prediction_ds = regrid_ds(
+        ds_path=bias_corrected_path, target_grid_ds=target_grid_obs_ds
     )
-    print('rechunked_spatial_anomalies:')
-    print(rechunked_spatial_anomalies)
-    print(rechunked_spatial_anomalies.chunks)
-    return rechunked_spatial_anomalies
+    return interpolated_prediction_ds
+
+
+def rechunked_interpolated_prediciton_task_full_time(
+    gcm_identifier: str, gcm_grid_spec: str, **kwargs
+) -> str:
+
+    interpolated_prediction_path = (
+        config.get("storage.intermediate.uri")
+        + '/'
+        + make_interpolated_prediction_path_full_space(
+            gcm_identifier=gcm_identifier, gcm_grid_spec=gcm_grid_spec
+        )
+    )
+    rechunked_interpolated_prediction_path = make_interpolated_prediction_path_full_time(
+        gcm_identifier=gcm_identifier, gcm_grid_spec=gcm_grid_spec
+    )
+
+    rechunked_interpolated_prediction_path = rechunk_zarr_array_with_caching(
+        interpolated_prediction_path,
+        output_path=rechunked_interpolated_prediction_path,
+        chunking_approach='full_time',
+        max_mem='2GB',
+    )
+
+    return rechunked_interpolated_prediction_path
+
+
+# def rechunked_spatial_anomalies_full_time(obs_identifier:str, gcm_identifier:str,gcm_grid_spec:str, **kwargs) -> str:
+
+#     spatial_anomalies_path = config.get("storage.intermediate.uri") + '/' + make_spatial_anomalies_path(obs_identifier=obs_identifier,gcm_grid_spec=gcm_grid_spec)
+#     rechunked_spatial_anomalies_path = make_spatial_anomalies_rechunked_full_time_path(obs_identifier=obs_identifier, gcm_grid_spec=gcm_grid_spec)
+#     print(spatial_anomalies_path)
+#     print(rechunked_spatial_anomalies_path)
+#     rechunked_spatial_anomalies_path = rechunk_zarr_array_with_caching(
+#         spatial_anomalies_path, output_path = rechunked_spatial_anomalies_path, chunking_approach='full_time', max_mem='2GB'
+#     )
+
+#     return rechunked_spatial_anomalies_path
 
 
 def postprocess_bcsd(
-    rechunked_interpolated_prediction_ds: xr.Dataset,
-    rechunked_spatial_anomalies_ds: xr.Dataset,
     gcm: str,
     scenario: str,
     variable: str,
     train_period: slice,
     predict_period: slice,
     bbox: BBox,
+    obs_identifier: str,
+    gcm_identifier: str,
+    gcm_grid_spec: str,
     **kwargs
 ) -> xr.Dataset:
     """Downscale the bias-corrected data by interpolating and then
@@ -489,10 +591,6 @@ def postprocess_bcsd(
 
     Parameters
     ----------
-    rechunked_interpolated_prediction : xr.Dataset
-        interpolated prediction dataset chunked in full_time
-    rechunked_spatial_anomalies_ds : xr.Dataset
-        spatial anomalies dataset rechunked in full_time
     gcm : str
         Input GCM
     scenario: str
@@ -513,44 +611,28 @@ def postprocess_bcsd(
         Final BCSD dataset
     """
 
-    print('rechunked_spatial_anomalies_ds')
-    print(rechunked_spatial_anomalies_ds)
-    print(rechunked_spatial_anomalies_ds.chunks)
+    spatial_anomalies_path = (
+        config.get("storage.intermediate.uri")
+        + '/'
+        + make_spatial_anomalies_path(obs_identifier=obs_identifier, gcm_grid_spec=gcm_grid_spec)
+    )
+    rechunked_interpolated_prediction_path = (
+        config.get("storage.intermediate.uri")
+        + '/'
+        + make_interpolated_prediction_path_full_time(
+            gcm_identifier=gcm_identifier, gcm_grid_spec=gcm_grid_spec
+        )
+    )
 
-    print('rechunked_interpolated_prediction_ds:')
-    print(rechunked_interpolated_prediction_ds)
-    print(rechunked_interpolated_prediction_ds.chunks)
+    spatial_anomalies_ds = xr.open_zarr(spatial_anomalies_path)
+    rechunked_interpolated_prediction_ds = xr.open_zarr(rechunked_interpolated_prediction_path)
 
     bcsd_results_ds = (
-        rechunked_interpolated_prediction_ds.groupby("time.month") + rechunked_spatial_anomalies_ds
+        rechunked_interpolated_prediction_ds.groupby("time.month") + spatial_anomalies_ds
     )
     del bcsd_results_ds['month'].encoding['chunks']
 
-    print('bcsd_results_ds:')
-    print(bcsd_results_ds)
-    print(bcsd_results_ds.chunks)
-    """[2022-03-05 05:45:09+0000] INFO - prefect.TaskRunner | <xarray.Dataset>
-    Dimensions:  (lat: 721, lon: 1440, time: 43464)
-    Coordinates:
-    * lat      (lat) float32 90.0 89.75 89.5 89.25 ... -89.25 -89.5 -89.75 -90.0
-    * lon      (lon) float32 -180.0 -179.8 -179.5 -179.2 ... 179.2 179.5 179.8
-    * time     (time) datetime64[ns] 1981-01-01T12:00:00 ... 2099-12-31T12:00:00
-        month    (time) int64 1 1 1 1 1 1 1 1 1 1 ... 12 12 12 12 12 12 12 12 12 12
-    Data variables:
-        tasmax   (time, lat, lon) float32 dask.array<chunksize=(31, 9, 9), meta=np.ndarray>
-    [2022-03-05 05:45:09+0000] INFO - prefect.TaskRunner | Frozen({'time': (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31), 'lat': (9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 7, 2, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 1), 'lon': (9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 7, 2, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 5, 4, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9)}) """
-    # This chunking mimics era5 chunks
-    rechunked_bcsd_results_ds = bcsd_results_ds.chunk({'time': 365, 'lat': 150, 'lon': 150})
-    # Update this to something in between space time (ERA5 chunking?)-- better for following steps
-
-    # rechunked_bcsd_results_ds = rechunk_zarr_array_with_caching(
-    #     bcsd_results_ds, chunking_approach='full_time', max_mem='2GB'
-    # )
-    print('rechunked_bcsd_results_ds:')
-    print(rechunked_bcsd_results_ds)
-    print(rechunked_bcsd_results_ds.chunks)
-    """
-    [2022-03-04 22:31:39+0000] ERROR - prefect.TaskRunner | Unexpected error: ValueError("Zarr requires uniform chunk sizes except for final chunk. Variable named 'tasmax' has incompatible dask chunks: ((31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31), (9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 7, 2, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 1), (9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 7, 2, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 5, 4, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9)). Consider rechunking using `chunk()`.")
-    """
+    # failes without .chunk: #ValueError: Zarr requires uniform chunk sizes except for final chunk. Variable named 'tasmax' has incompatible dask chunks: ((31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31), (93, 93, 93, 93, 93, 93, 93, 70), (93, 93, 93, 93, 93, 93, 93, 93, 93, 93, 93, 93, 93, 93, 93, 45)). Consider rechunking using `chunk()`.
+    rechunked_bcsd_results_ds = bcsd_results_ds.chunk({'time': 365, 'lat': -1, 'lon': -1})
 
     return rechunked_bcsd_results_ds
