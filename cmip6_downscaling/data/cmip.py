@@ -244,9 +244,10 @@ def get_gcm_grid_spec(
     with dask.config.set(**{'array.slicing.split_large_chunks': False}):
 
         if gcm_ds is None:
-            # Silences the /srv/conda/envs/notebook/lib/python3.9/site-packages/xarray/core/indexing.py:1228: PerformanceWarning: Slicing is producing a large chunk. To accept the large
-            # chunk and silence this warning, set the option >>> with dask.config.set(**{'array.slicing.split_large_chunks': False}):"""
-            assert gcm_name is not None, 'one of gcm_ds or gcm_name has to be not empty'
+            """Silences the /srv/conda/envs/notebook/lib/python3.9/site-packages/xarray/core/indexing.py:1228: PerformanceWarning: Slicing is producing a large chunk. To accept the large
+            chunk and silence this warning, set the option >>> with dask.config.set(**{'array.slicing.split_large_chunks': False}):"""
+            if gcm_name is not None:
+                raise ValueError('one of gcm_ds or gcm_name has to be not empty')
             gcm_grid = load_cmip(
                 source_ids=gcm_name,
                 return_type='xr',

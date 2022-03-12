@@ -227,9 +227,9 @@ def get_spatial_anomalies(
     coarse_obs_interpolated_rechunked_ds = xr.open_zarr(coarse_obs_interpolated_rechunked_path)
     obs_rechunked_ds = xr.open_zarr(obs_rechunked_path)
 
-    # # calculate the difference between the actual obs (with finer spatial heterogeneity)
-    # # and the interpolated coarse obs this will be saved and added to the
-    # # spatially-interpolated coarse predictions to add the spatial heterogeneity back in.
+    # calculate the difference between the actual obs (with finer spatial heterogeneity)
+    # and the interpolated coarse obs this will be saved and added to the
+    # spatially-interpolated coarse predictions to add the spatial heterogeneity back in.
 
     spatial_anomalies = obs_rechunked_ds - coarse_obs_interpolated_rechunked_ds
     seasonal_cycle_spatial_anomalies = spatial_anomalies.groupby("time.month").mean()
@@ -411,12 +411,7 @@ def return_gcm_predict_rechunked(
         predict_period=predict_period,
         bbox=bbox,
     )
-    # opts
-    """
-    Q:'s What are the chunks of gcm_train_subset_full_time_ds? Should this just be full_time instead?
-    1. rechunk try: L353
-    2. time part of subset_dataset, after rechunking. Time slicing from subset_dataset func has to happen post-rechunker.
-    """
+
     gcm_predict_ds_subset = subset_dataset(
         gcm_predict_ds,
         variable,
@@ -431,6 +426,7 @@ def return_gcm_predict_rechunked(
         + '/'
         + make_gcm_predict_subset_path(gcm_identifier=gcm_identifier)
     )
+    # Note: Explain why this .chunk is needed!
     gcm_predict_ds_subset.chunk({'time': 1500}).to_zarr(gcm_predict_ds_subset_path, mode='w')
 
     gcm_predict_rechunked_path = rechunk_zarr_array_with_caching(
@@ -529,7 +525,6 @@ def get_interpolated_prediction(
         + make_bias_corrected_path(gcm_identifier=gcm_identifier)
     )
 
-    # az://flow-outputs/test_intermediate_zarr/coarsened_obs/ERA5/tasmax/-90.0_90.0_-180.0_180.0/1990_1990/full_space_128x256_gridsize_14_14_llcorner_-88_-180.zarr
     interpolated_prediction_ds = regrid_ds(
         ds_path=bias_corrected_path, target_grid_ds=target_grid_obs_ds
     )
@@ -559,19 +554,6 @@ def rechunked_interpolated_prediciton_task_full_time(
     )
 
     return rechunked_interpolated_prediction_path
-
-
-# def rechunked_spatial_anomalies_full_time(obs_identifier:str, gcm_identifier:str,gcm_grid_spec:str, **kwargs) -> str:
-
-#     spatial_anomalies_path = config.get("storage.intermediate.uri") + '/' + make_spatial_anomalies_path(obs_identifier=obs_identifier,gcm_grid_spec=gcm_grid_spec)
-#     rechunked_spatial_anomalies_path = make_spatial_anomalies_rechunked_full_time_path(obs_identifier=obs_identifier, gcm_grid_spec=gcm_grid_spec)
-#     print(spatial_anomalies_path)
-#     print(rechunked_spatial_anomalies_path)
-#     rechunked_spatial_anomalies_path = rechunk_zarr_array_with_caching(
-#         spatial_anomalies_path, output_path = rechunked_spatial_anomalies_path, chunking_approach='full_time', max_mem='2GB'
-#     )
-
-#     return rechunked_spatial_anomalies_path
 
 
 def postprocess_bcsd(
