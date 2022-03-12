@@ -117,7 +117,10 @@ def make_rechunked_obs_path(
 
 
 def make_coarse_obs_path(
-    chunking_approach: str, obs_identifier: str, gcm_grid_spec: str, **kwargs
+    chunking_approach: Optional[str] = '',
+    obs_identifier: Optional[str] = '',
+    gcm_grid_spec: Optional[str] = '',
+    **kwargs,
 ) -> str:
     """Build the path for coarsened observation
 
@@ -132,7 +135,45 @@ def make_coarse_obs_path(
         Path to which coarsened observation defined by the parameters should be stored
     """
 
-    return f"coarsened_obs/{obs_identifier}{chunking_approach}_{gcm_grid_spec}.zarr"
+    return f"coarsened_obs/{obs_identifier}{chunking_approach}_{gcm_grid_spec}.spatialzarr"
+
+
+def make_coarse_obs_path_full_space(
+    obs_identifier: Optional[str] = '', gcm_grid_spec: Optional[str] = '', **kwargs
+) -> str:
+    """Build the path for coarsened observation for full_time
+
+    Parameters
+    ----------
+    obs_identifier : str
+        Output from build_obs_identifier. String to identify the observation dataset used
+
+    Returns
+    -------
+    coarse_obs_path: str
+        Path to which coarsened observation defined by the parameters should be stored
+    """
+
+    return f"coarsened_obs/{obs_identifier}full_space_{gcm_grid_spec}.zarr"
+
+
+def make_coarse_obs_path_full_time(
+    obs_identifier: Optional[str] = '', gcm_grid_spec: Optional[str] = '', **kwargs
+) -> str:
+    """Build the path for coarsened observation for full_time
+
+    Parameters
+    ----------
+    obs_identifier : str
+        Output from build_obs_identifier. String to identify the observation dataset used
+
+    Returns
+    -------
+    coarse_obs_path: str
+        Path to which coarsened observation defined by the parameters should be stored
+    """
+
+    return f"coarsened_obs/{obs_identifier}full_time_{gcm_grid_spec}.zarr"
 
 
 def make_interpolated_obs_path(
@@ -556,6 +597,31 @@ def make_spatial_anomalies_path(obs_identifier: str, gcm_grid_spec: str, **kwarg
     return f"spatial_anomalies/{obs_identifier}{gcm_grid_spec}.zarr"
 
 
+def make_spatial_anomalies_rechunked_full_time_path(
+    obs_identifier: str, gcm_grid_spec: str, **kwargs
+):
+    """
+        Parameters
+    ----------
+    obs_identifier : str
+        Output from build_obs_identifier. String to identify the observation dataset used
+
+    Returns
+    -------
+    spatial_anomalies_rechunked_full_time_path : str
+        Path to rechunked spatial anomalies file location
+    """
+    return f"spatial_anomalies_rechunked_full_time/{obs_identifier}{gcm_grid_spec}.zarr"
+
+
+def make_gcm_train_subset_path(gcm_identifier: str = None, **kwargs) -> str:
+    return f"gcm_train_subset/{gcm_identifier}.zarr"
+
+
+def make_gcm_predict_subset_path(gcm_identifier: str, **kwargs) -> str:
+    return f"gcm_predict_subset/{gcm_identifier}.zarr"
+
+
 def make_gcm_predict_path(gcm_identifier: str = None, **kwargs) -> str:
     """Build the path for the gcm predict dataset
 
@@ -634,6 +700,66 @@ def make_annual_summary_path(gcm_identifier: str = None, **kwargs) -> str:
         Path to annual bcsd output ds file location
     """
     return f"bcsd_output_annual/{gcm_identifier}.zarr"
+
+
+def make_interpolated_prediction_path_full_space(
+    gcm_identifier: str = None, gcm_grid_spec: str = None, **kwargs
+) -> str:
+    """Build the path for the interpolated prediction in full space
+
+    Parameters
+    ----------
+    gcm_identifier : str
+        Output from build_gcm_identifier. String to identify the gcm dataset used
+    gcm_grid_spec: str
+        Output of get_gcm_grid_spec. String to identify the GCM grid
+
+    Returns
+    -------
+    interpolated_prediction_path_full_space_location : str
+        Path to interpolated obs full space ds file location
+    """
+    return f"interpolated_prediction_path_full_space/{gcm_identifier}_{gcm_grid_spec}.zarr"
+
+
+def make_interpolated_prediction_path_full_time(
+    gcm_identifier: str = None, gcm_grid_spec: str = None, **kwargs
+) -> str:
+    """Build the path for the interpolated prediction in full time
+
+    Parameters
+    ----------
+    gcm_identifier : str
+        Output from build_gcm_identifier. String to identify the gcm dataset used
+    gcm_grid_spec: str
+        Output of get_gcm_grid_spec. String to identify the GCM grid
+
+    Returns
+    -------
+    interpolated_prediction_path_full_time_location : str
+        Path to interpolated obs full time ds file location
+    """
+    return f"interpolated_prediction_full_time/{gcm_identifier}_{gcm_grid_spec}.zarr"
+
+
+def make_rechunked_spatial_anomalies_path_full_time(
+    gcm_identifier: str = None, gcm_grid_spec: str = None, **kwargs
+) -> str:
+    """Build the path for the rechunked spatial anomlaies in full time
+
+    Parameters
+    ----------
+    gcm_identifier : str
+        Output from build_gcm_identifier. String to identify the gcm dataset used
+    gcm_grid_spec: str
+        Output of get_gcm_grid_spec. String to identify the GCM grid
+
+    Returns
+    -------
+    make_rechunked_spatial_anomalies_path_full_time_location : str
+        Path to rechunked_spatial_anomalies full time ds file location
+    """
+    return f"rechunked_spatial_anomalies_full_time/{gcm_identifier}_{gcm_grid_spec}.zarr"
 
 
 def get_notebook_paths(

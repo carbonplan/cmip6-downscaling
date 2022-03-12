@@ -1,5 +1,6 @@
 from typing import List, Optional, Union
 
+import dask
 import numpy as np
 import xarray as xr
 import zarr
@@ -57,49 +58,50 @@ def load_cmip(
     ds : xr.Dataset or zarr group
         Dataset or zarr group with CMIP data
     """
+    with dask.config.set(**{'array.slicing.split_large_chunks': False}):
 
-    if isinstance(variable_ids, str):
-        variable_ids = [variable_ids]
+        if isinstance(variable_ids, str):
+            variable_ids = [variable_ids]
 
-    col = cat.cmip6()
+        col = cat.cmip6()
 
-    for i, var in enumerate(variable_ids):
-        stores = (
-            col.search(
-                activity_id=activity_ids,
-                experiment_id=experiment_ids,
-                member_id=member_ids,
-                source_id=source_ids,
-                table_id=table_ids,
-                grid_label=grid_labels,
-                variable_id=[var],
+        for i, var in enumerate(variable_ids):
+            stores = (
+                col.search(
+                    activity_id=activity_ids,
+                    experiment_id=experiment_ids,
+                    member_id=member_ids,
+                    source_id=source_ids,
+                    table_id=table_ids,
+                    grid_label=grid_labels,
+                    variable_id=[var],
+                )
+                .df['zstore']
+                .to_list()
             )
-            .df['zstore']
-            .to_list()
-        )
 
-        storage_options = config.get('data_catalog.era5.storage_options')
-        if len(stores) > 1:
-            raise ValueError('can only get 1 store at a time')
-        if return_type == 'zarr':
-            ds = zarr.open_consolidated(stores[0], mode='r', storage_options=storage_options)
-        elif return_type == 'xr':
-            ds = xr.open_zarr(stores[0], consolidated=True, storage_options=storage_options)
+            storage_options = config.get('data_catalog.era5.storage_options')
+            if len(stores) > 1:
+                raise ValueError('can only get 1 store at a time')
+            if return_type == 'zarr':
+                ds = zarr.open_consolidated(stores[0], mode='r', storage_options=storage_options)
+            elif return_type == 'xr':
+                ds = xr.open_zarr(stores[0], consolidated=True, storage_options=storage_options)
 
-        # flip the lats if necessary and drop the extra dims/vars like bnds
-        ds = gcm_munge(ds)
-        ds = lon_to_180(ds)
+            # flip the lats if necessary and drop the extra dims/vars like bnds
+            ds = gcm_munge(ds)
+            ds = lon_to_180(ds)
 
-        # convert to mm/day - helpful to prevent rounding errors from very tiny numbers
-        if var == 'pr':
-            ds['pr'] *= 86400
+            # convert to mm/day - helpful to prevent rounding errors from very tiny numbers
+            if var == 'pr':
+                ds['pr'] *= 86400
 
-        if i == 0:
-            ds_out = ds
-        else:
-            ds_out[var] = ds[var]
+            if i == 0:
+                ds_out = ds
+            else:
+                ds_out[var] = ds[var]
 
-    return ds_out
+        return ds_out
 
 
 def convert_to_360(lon: Union[float, int]) -> Union[float, int]:
@@ -230,6 +232,8 @@ def get_gcm(
         chunking_approach=chunking_approach,
         output_path=rechunked_path,
     )
+    print('ds_gcm_rechunked:')
+    print(ds_gcm_rechunked.chunks)
 
     return ds_gcm_rechunked
 
@@ -237,14 +241,19 @@ def get_gcm(
 def get_gcm_grid_spec(
     gcm_name: Optional[str] = None, gcm_ds: Optional[Union[xr.Dataset, xr.DataArray]] = None
 ) -> str:
-    if gcm_ds is None:
-        assert gcm_name is not None, 'one of gcm_ds or gcm_name has to be not empty'
-        gcm_grid = load_cmip(
-            source_ids=gcm_name,
-            return_type='xr',
-        ).isel(time=0)
-    else:
-        gcm_grid = gcm_ds.isel(time=0)
+    with dask.config.set(**{'array.slicing.split_large_chunks': False}):
+
+        if gcm_ds is None:
+            """Silences the /srv/conda/envs/notebook/lib/python3.9/site-packages/xarray/core/indexing.py:1228: PerformanceWarning: Slicing is producing a large chunk. To accept the large
+            chunk and silence this warning, set the option >>> with dask.config.set(**{'array.slicing.split_large_chunks': False}):"""
+            if gcm_name is not None:
+                raise ValueError('one of gcm_ds or gcm_name has to be not empty')
+            gcm_grid = load_cmip(
+                source_ids=gcm_name,
+                return_type='xr',
+            ).isel(time=0)
+        else:
+            gcm_grid = gcm_ds.isel(time=0)
 
     nlat = len(gcm_grid.lat)
     nlon = len(gcm_grid.lon)

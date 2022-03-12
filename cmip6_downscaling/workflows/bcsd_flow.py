@@ -9,8 +9,11 @@ from cmip6_downscaling.analysis.analysis import annual_summary, monthly_summary,
 from cmip6_downscaling.methods.bcsd import (
     fit_and_predict,
     get_coarse_obs,
+    get_interpolated_obs,
+    get_interpolated_prediction,
     get_spatial_anomalies,
     postprocess_bcsd,
+    rechunked_interpolated_prediciton_task_full_time,
     return_coarse_obs_full_time,
     return_gcm_predict_rechunked,
     return_gcm_train_full_time,
@@ -21,6 +24,7 @@ from cmip6_downscaling.tasks.common_tasks import (
     build_bbox,
     build_time_period_slices,
     path_builder_task,
+    target_grid_obs_ds_task,
 )
 from cmip6_downscaling.workflows.paths import (
     make_annual_summary_path,
@@ -28,13 +32,13 @@ from cmip6_downscaling.workflows.paths import (
     make_bias_corrected_path,
     make_coarse_obs_path,
     make_gcm_predict_path,
+    make_interpolated_obs_path,
+    make_interpolated_prediction_path_full_space,
     make_monthly_summary_path,
     make_rechunked_gcm_path,
     make_return_obs_path,
     make_spatial_anomalies_path,
 )
-
-# storage_prefix = config.get("runtime.cloud.storage_prefix")
 
 runtime = runtimes.get_runtime()
 
@@ -42,7 +46,6 @@ intermediate_cache_store = CacheStore(
     config.get("storage.intermediate.uri"),
     storage_options=config.get("storage.intermediate.storage_options"),
 )
-
 
 results_cache_store = CacheStore(
     config.get("storage.results.uri"),
@@ -62,11 +65,13 @@ return_obs_task = task(
     ),
     target=make_return_obs_path,
 )
+
+
 get_coarse_obs_task = task(
     get_coarse_obs,
     tags=['dask-resource:TASKSLOTS=1'],
-    max_retries=10,
-    retry_delay=timedelta(seconds=10),
+    max_retries=5,
+    retry_delay=timedelta(seconds=5),
     result=XpersistResult(
         intermediate_cache_store,
         serializer="xarray.zarr",
@@ -74,10 +79,50 @@ get_coarse_obs_task = task(
     ),
     target=make_coarse_obs_path,
 )
+
+target_grid_obs_ds_task = task(
+    target_grid_obs_ds_task,
+)
+
+
+interpolated_obs_task = task(
+    get_interpolated_obs,
+    tags=['dask-resource:TASKSLOTS=1'],
+    max_retries=5,
+    retry_delay=timedelta(seconds=5),
+    result=XpersistResult(
+        intermediate_cache_store,
+        serializer="xarray.zarr",
+        serializer_dump_kwargs=serializer_dump_kwargs,
+    ),
+    target=make_interpolated_obs_path,
+)
+
+
+interpolated_prediction_task = task(
+    get_interpolated_prediction,
+    tags=['dask-resource:TASKSLOTS=1'],
+    max_retries=5,
+    retry_delay=timedelta(seconds=5),
+    result=XpersistResult(
+        intermediate_cache_store,
+        serializer="xarray.zarr",
+        serializer_dump_kwargs=serializer_dump_kwargs,
+    ),
+    target=make_interpolated_prediction_path_full_space,
+)
+
+rechunked_interpolated_prediciton_task_full_time_task = task(
+    rechunked_interpolated_prediciton_task_full_time,
+    tags=['dask-resource:TASKSLOTS=1'],
+    max_retries=5,
+    retry_delay=timedelta(seconds=5),
+)
+
 get_spatial_anomalies_task = task(
     get_spatial_anomalies,
-    tags=['dask-resource:TASKSLOTS=1'],
-    max_retries=10,
+    log_stdout=True,
+    max_retries=5,
     retry_delay=timedelta(seconds=5),
     result=XpersistResult(
         intermediate_cache_store,
@@ -86,23 +131,20 @@ get_spatial_anomalies_task = task(
     ),
     target=make_spatial_anomalies_path,
 )
+
+
 return_coarse_obs_full_time_task = task(
     return_coarse_obs_full_time,
     tags=['dask-resource:TASKSLOTS=1'],
-    max_retries=10,
+    max_retries=5,
     retry_delay=timedelta(seconds=5),
-    result=XpersistResult(
-        intermediate_cache_store,
-        serializer="xarray.zarr",
-        serializer_dump_kwargs=serializer_dump_kwargs,
-    ),
-    target=make_coarse_obs_path,  # is this right? to have the same target? maybe supposed to be make_rechunked_obs_path
 )
+
 
 return_gcm_train_full_time_task = task(
     return_gcm_train_full_time,
     tags=['dask-resource:TASKSLOTS=1'],
-    max_retries=10,
+    max_retries=5,
     retry_delay=timedelta(seconds=5),
     result=XpersistResult(
         intermediate_cache_store,
@@ -115,7 +157,7 @@ return_gcm_train_full_time_task = task(
 return_gcm_predict_rechunked_task = task(
     return_gcm_predict_rechunked,
     tags=['dask-resource:TASKSLOTS=1'],
-    max_retries=10,
+    max_retries=5,
     retry_delay=timedelta(seconds=5),
     result=XpersistResult(
         intermediate_cache_store,
@@ -128,6 +170,9 @@ return_gcm_predict_rechunked_task = task(
 fit_and_predict_task = task(
     fit_and_predict,
     log_stdout=True,
+    tags=['dask-resource:TASKSLOTS=1'],
+    max_retries=5,
+    retry_delay=timedelta(seconds=5),
     result=XpersistResult(
         intermediate_cache_store,
         serializer="xarray.zarr",
@@ -135,11 +180,10 @@ fit_and_predict_task = task(
     ),
     target=make_bias_corrected_path,
 )
-
 postprocess_bcsd_task = task(
     postprocess_bcsd,
     tags=['dask-resource:TASKSLOTS=1'],
-    max_retries=10,
+    max_retries=5,
     retry_delay=timedelta(seconds=5),
     log_stdout=True,
     result=XpersistResult(
@@ -154,7 +198,7 @@ monthly_summary_task = task(
     result=XpersistResult(
         results_cache_store, serializer="xarray.zarr", serializer_dump_kwargs=serializer_dump_kwargs
     ),
-    target=make_monthly_summary_path,  # TODO: replace with the paradigm from PR #84 once it's merged (also pull that)
+    target=make_monthly_summary_path,
 )
 
 annual_summary_task = task(
@@ -166,7 +210,7 @@ annual_summary_task = task(
 )
 
 
-# Main Flow -----------------------------------------------------------
+# # Main Flow -----------------------------------------------------------
 
 with Flow(
     name="bcsd",
@@ -179,7 +223,6 @@ with Flow(
     scenario = Parameter("scenario")
     variable = Parameter("variable")
 
-    # Note: bbox and train and predict period had to be encapsulated into tasks to prevent prefect from complaining about unused parameters.
     bbox = build_bbox(
         latmin=Parameter("latmin"),
         latmax=Parameter("latmax"),
@@ -218,7 +261,6 @@ with Flow(
     )
 
     coarse_obs_ds = get_coarse_obs_task(
-        obs_ds=obs_ds,
         gcm=gcm,
         scenario=scenario,
         variable=variable,
@@ -226,13 +268,22 @@ with Flow(
         predict_period=predict_period,
         bbox=bbox,
         obs_identifier=obs_identifier,
-        chunking_approach='full_space',
         gcm_grid_spec=gcm_grid_spec,
+        chunking_approach='full_space',
+        upstream_tasks=[obs_ds],
+    )
+
+    target_grid_obs_ds = target_grid_obs_ds_task(obs_ds)
+
+    interpolated_obs_ds = interpolated_obs_task(
+        target_grid_ds=target_grid_obs_ds,
+        gcm_grid_spec=gcm_grid_spec,
+        chunking_approach='full_space',
+        obs_identifier=obs_identifier,
+        upstream_tasks=[coarse_obs_ds, target_grid_obs_ds],
     )
 
     spatial_anomalies_ds = get_spatial_anomalies_task(
-        coarse_obs=coarse_obs_ds,
-        obs_ds=obs_ds,
         gcm=gcm,
         scenario=scenario,
         variable=variable,
@@ -241,11 +292,12 @@ with Flow(
         bbox=bbox,
         obs_identifier=obs_identifier,
         gcm_grid_spec=gcm_grid_spec,
+        chunking_approach='full_space',
+        upstream_tasks=[interpolated_obs_ds, obs_ds],
     )
 
     # the next three tasks prepare the inputs required by bcsd
-    coarse_obs_full_time_ds = return_coarse_obs_full_time_task(
-        coarse_obs_ds=coarse_obs_ds,
+    coarse_obs_full_time_path = return_coarse_obs_full_time_task(
         gcm=gcm,
         scenario=scenario,
         variable=variable,
@@ -253,12 +305,12 @@ with Flow(
         predict_period=predict_period,
         bbox=bbox,
         obs_identifier=obs_identifier,
-        chunking_approach='full_time',
         gcm_grid_spec=gcm_grid_spec,
+        upstream_tasks=[coarse_obs_ds],
     )
 
     gcm_train_subset_full_time_ds = return_gcm_train_full_time_task(
-        coarse_obs_full_time_ds=coarse_obs_full_time_ds,
+        coarse_obs_full_time_path=coarse_obs_full_time_path,
         gcm=gcm,
         scenario=scenario,
         variable=variable,
@@ -266,6 +318,7 @@ with Flow(
         predict_period=predict_period,
         bbox=bbox,
         gcm_identifier=gcm_identifier,
+        upstream_tasks=[coarse_obs_full_time_path],
     )
 
     gcm_predict_rechunked_ds = return_gcm_predict_rechunked_task(
@@ -277,12 +330,12 @@ with Flow(
         predict_period=predict_period,
         bbox=bbox,
         gcm_identifier=gcm_identifier,
+        upstream_tasks=[gcm_train_subset_full_time_ds],
     )
 
     # fit and predict tasks(s):
     bias_corrected_ds = fit_and_predict_task(
         gcm_train_subset_full_time_ds=gcm_train_subset_full_time_ds,
-        coarse_obs_full_time_ds=coarse_obs_full_time_ds,
         gcm_predict_rechunked_ds=gcm_predict_rechunked_ds,
         gcm=gcm,
         scenario=scenario,
@@ -290,25 +343,39 @@ with Flow(
         train_period=train_period,
         predict_period=predict_period,
         bbox=bbox,
+        chunking_approach='full_time',
+        obs_identifier=obs_identifier,
+        gcm_grid_spec=gcm_grid_spec,
         gcm_identifier=gcm_identifier,
+        upstream_tasks=[gcm_train_subset_full_time_ds, gcm_predict_rechunked_ds],
     )
-    # postprocess_bcsd_task(s):
+
+    interpolated_prediction_ds = interpolated_prediction_task(
+        target_grid_obs_ds=target_grid_obs_ds,
+        gcm_identifier=gcm_identifier,
+        gcm_grid_spec=gcm_grid_spec,
+        upstream_tasks=[bias_corrected_ds, target_grid_obs_ds],
+    )
+
+    rechunked_interpolated_prediction_path = rechunked_interpolated_prediciton_task_full_time_task(
+        interpolated_prediction_ds=interpolated_prediction_ds,
+        gcm_identifier=gcm_identifier,
+        gcm_grid_spec=gcm_grid_spec,
+        upstream_tasks=[interpolated_prediction_ds],
+    )
+
+    # # postprocess_bcsd_task(s):
     postprocess_bcsd_ds = postprocess_bcsd_task(
-        bias_corrected_ds=bias_corrected_ds,
-        spatial_anomalies_ds=spatial_anomalies_ds,
         gcm=gcm,
         scenario=scenario,
         variable=variable,
         train_period=train_period,
         predict_period=predict_period,
         bbox=bbox,
+        obs_identifier=obs_identifier,
         gcm_identifier=gcm_identifier,
-    )
-    # regrid(ds: xr.Dataset, levels: int = 2, uri: str = None, other_chunks: dict = None)
-    # format naming w/ prefect context
-    pyramid_location_daily = pyramid.regrid(
-        postprocess_bcsd_ds,
-        uri=config.get('storage.results.uri') + pyramid_path_daily,
+        gcm_grid_spec=gcm_grid_spec,
+        upstream_tasks=[spatial_anomalies_ds, rechunked_interpolated_prediction_path],
     )
 
     monthly_summary_ds = monthly_summary_task(
@@ -333,18 +400,11 @@ with Flow(
         gcm_identifier=gcm_identifier,
     )
 
-    pyramid_location_monthly = pyramid.regrid(
-        monthly_summary_ds, uri=config.get('storage.results.uri') + pyramid_path_monthly
-    )
-
-    pyramid_location_annual = pyramid.regrid(
-        annual_summary_ds, uri=config.get('storage.results.uri') + pyramid_path_annual
-    )
-
     analysis_location = run_analyses(
         {
             'gcm_identifier': gcm_identifier,
             'obs_identifier': obs_identifier,
+            'gcm_grid_spec': gcm_grid_spec,
             'result_dir': config.get('storage.results.uri'),
             'intermediate_dir': config.get('storage.intermediate.uri'),
             'var': variable,
@@ -356,4 +416,16 @@ with Flow(
         train_period=train_period,
         predict_period=predict_period,
         upstream_tasks=[postprocess_bcsd_ds],
+    )
+
+    pyramid_location_daily = pyramid.regrid(
+        postprocess_bcsd_ds, uri=config.get('storage.results.uri') + pyramid_path_daily, levels=4
+    )
+
+    pyramid_location_monthly = pyramid.regrid(
+        monthly_summary_ds, uri=config.get('storage.results.uri') + pyramid_path_monthly, levels=4
+    )
+
+    pyramid_location_annual = pyramid.regrid(
+        annual_summary_ds, uri=config.get('storage.results.uri') + pyramid_path_annual, levels=4
     )

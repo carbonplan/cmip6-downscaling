@@ -84,7 +84,6 @@ def regrid(ds: xr.Dataset, levels: int = 2, uri: str = None, other_chunks: dict 
     other_chunks : dict
         Chunks for non-spatial dims
     '''
-
     with dask.config.set(scheduler='single-threaded'):
 
         ds.coords['date_str'] = ds['time'].dt.strftime('%Y-%m-%d').astype('S10')
@@ -97,12 +96,12 @@ def regrid(ds: xr.Dataset, levels: int = 2, uri: str = None, other_chunks: dict 
             return
 
         # create
-        dt = pyramid_regrid(ds, target_pyramid=None, levels=levels)
+        dta = pyramid_regrid(ds, target_pyramid=None, levels=levels)
 
         # postprocess
-        dt = _postprocess(dt, levels, other_chunks=other_chunks)
+        dta = _postprocess(dta, levels, other_chunks=other_chunks)
 
         # write to uri
-        dt.to_zarr(mapper, mode='w')
+        dta.to_zarr(mapper, mode='w')
 
     return uri

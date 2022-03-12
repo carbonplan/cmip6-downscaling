@@ -219,6 +219,8 @@ class PangeoRuntime(LocalRuntime):
             }
         )
 
+    # def executor(self) -> Executor:
+    #     return LocalExecutor()
     def _generate_env(self):
         return _threadsafe_env_vars
 
@@ -243,6 +245,6 @@ def get_runtime(**kwargs):
         print("PangeoRuntime selected from os.environ")
     else:
         raise ValueError(
-            "Name not in ['ci', 'local', 'prefect-cloud', 'pangeo'] and environment variable not found for: [CI, PREFECT__BACKEND, PANGEO__BACKEND or TEST]"
+            "Name not in ['ci', 'local', 'cloud', 'pangeo'] and environment variable not found for: [CI, PREFECT__BACKEND, PANGEO__BACKEND or TEST]"
         )
     return runtime
