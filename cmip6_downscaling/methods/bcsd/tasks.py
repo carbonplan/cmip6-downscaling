@@ -1,10 +1,12 @@
 from dataclasses import asdict
 
+import xarray as xr
 from prefect import task
 from upath import UPath
 
 from cmip6_downscaling import config
 from cmip6_downscaling.methods.common.containers import RunParameters
+from cmip6_downscaling.methods.common.utils import regrid_ds
 
 intermediate_dir = UPath(config.get("storage.intermediate.uri"))
 
@@ -21,8 +23,8 @@ def coarsen_obs(obs_path: UPath, experiment_path: UPath, run_parameters: RunPara
             **asdict(run_parameters)
         )
     )
-    if use_cache and (target / '.zmetadata').exists():
-        print(f'found existing target: {target}')
+    if use_cache and (target / ".zmetadata").exists():
+        print(f"found existing target: {target}")
         return target
 
     # experiment_ds = xr.open_zarr(experiment_path)
@@ -44,13 +46,14 @@ def interpolate_obs(
             **asdict(run_parameters)
         )
     )
-    if use_cache and (target / '.zmetadata').exists():
-        print(f'found existing target: {target}')
+    if use_cache and (target / ".zmetadata").exists():
+        print(f"found existing target: {target}")
         return target
 
-    # TODO
+    obs_ds = xr.open_zarr(obs_path).isel(time=0)
+    interpolated_obs_ds = regrid_ds(ds_path=coarse_obs_path, target_grid_ds=obs_ds)
 
-    # interpolated_obs_ds.to_zarr(target, mode='w')
+    interpolated_obs_ds.to_zarr(target, mode="w")
     return target
 
 
@@ -65,8 +68,8 @@ def calc_spacial_anomalies(
             **asdict(run_parameters)
         )
     )
-    if use_cache and (target / '.zmetadata').exists():
-        print(f'found existing target: {target}')
+    if use_cache and (target / ".zmetadata").exists():
+        print(f"found existing target: {target}")
         return target
 
     # TODO
@@ -83,8 +86,8 @@ def fit_and_predict(
 ) -> UPath:
 
     target = intermediate_dir / "fit_and_predict" / run_parameters.run_id
-    if use_cache and (target / '.zmetadata').exists():
-        print(f'found existing target: {target}')
+    if use_cache and (target / ".zmetadata").exists():
+        print(f"found existing target: {target}")
         return target
 
     # TODO
@@ -99,8 +102,8 @@ def interpolate_prediction(
 ) -> UPath:
 
     target = intermediate_dir / "interpolate_prediction" / run_parameters.run_id
-    if use_cache and (target / '.zmetadata').exists():
-        print(f'found existing target: {target}')
+    if use_cache and (target / ".zmetadata").exists():
+        print(f"found existing target: {target}")
         return target
 
     # TODO
@@ -117,8 +120,8 @@ def postprocess_bcsd(
 ) -> UPath:
 
     target = intermediate_dir / "interpolate_prediction" / run_parameters.run_id
-    if use_cache and (target / '.zmetadata').exists():
-        print(f'found existing target: {target}')
+    if use_cache and (target / ".zmetadata").exists():
+        print(f"found existing target: {target}")
         return target
 
     # TODO
