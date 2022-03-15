@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
@@ -12,7 +11,6 @@ from xpersist.prefect.result import XpersistResult
 
 from cmip6_downscaling import config
 from cmip6_downscaling.data.cmip import get_gcm, get_gcm_grid_spec
-from cmip6_downscaling.data.observations import get_obs
 from cmip6_downscaling.methods.bcsd import get_coarse_obs, return_obs
 from cmip6_downscaling.methods.bias_correction import (
     bias_correct_gcm_by_method,
@@ -30,51 +28,6 @@ from cmip6_downscaling.workflows.paths import (
     make_monthly_pyramid_path,
 )
 from cmip6_downscaling.workflows.utils import BBox, rechunk_zarr_array_with_caching, regrid_ds
-
-get_obs_task = task(get_obs)
-get_gcm_task = task(get_gcm)
-
-
-@task
-def build_bbox(latmin: str, latmax: str, lonmin: str, lonmax: str) -> dataclass:
-    """Build bounding box out of lat/lon inputs using BBox data class defined in /utils.py
-
-    Args:
-    Paramters
-    ---------
-    latmin : float
-         Minimum latitude
-    latmax : float
-         Maximum latitude
-    lonmin : float
-         Minimum longitude
-    lonmax : float
-        Maximum longitude
-
-    Returns
-    -------
-    BBox
-    """
-
-    return BBox(
-        latmin=float(latmin), latmax=float(latmax), lonmin=float(lonmin), lonmax=float(lonmax)
-    )
-
-
-@task
-def build_time_period_slices(time_period: list) -> slice:
-    """Return slice from list containing two time strings
-
-    Parameters
-    ----------
-    time_period : list
-        Input time period list. Ex. ['1990','1991']
-
-    Returns
-    -------
-    slice
-    """
-    return slice(*time_period)
 
 
 @task
@@ -178,9 +131,9 @@ def path_builder_task(
     strings will then be used to identify cached files.
     Parameters
     ----------
-    obs: str
+    obs : str
         Name of obs dataset
-    gcm: str
+    gcm : str
         Name of gcm model
     scenario: str
         Name of future emission scenario
@@ -251,25 +204,27 @@ def coarsen_and_interpolate_obs_task(
     """
     Coarsen the observation dataset to the grid of the GCM model specified in inputs then
     interpolate back into the observation grid. Rechunk the final output according to chunking approach.
+
     Parameters
     ----------
-    obs: str
+    obs : str
         Name of obs dataset
-    gcm: str
+    gcm : str
         Name of GCM model
-    training_period_start: str
+    training_period_start : str
         Start year of training/historical period
-    training_period_end: str
+    training_period_end : str
         End year of training/historical period
-    variables: List[str]
+    variables : List[str]
         List of variables to get in obs dataset
-    chunking_approach: str
+    chunking_approach : str
         'full_space', 'full_time', or None
-    **kwargs: Dict
+    **kwargs : dict
         Other arguments to be used in generating the target path
+
     Returns
     -------
-    ds_obs_interpolated_rechunked: xr.Dataset
+    ds_obs_interpolated_rechunked : xr.Dataset
         An observation dataset that has been coarsened, interpolated back to original grid, and then rechunked.
     """
     # get obs
@@ -325,11 +280,12 @@ def interpolate_gcm_task(
     """
     Interpolate the GCM dataset to the grid of the observation dataset.
     Rechunk the final output according to chunking approach.
+
     Parameters
     ----------
-    obs: str
+    obs : str
         Name of obs dataset
-    gcm: str
+    gcm : str
         Name of the GCM model
     scenario: str
         Name of the emission scenario
@@ -337,14 +293,14 @@ def interpolate_gcm_task(
         Training/historical period bounds
     predict_period: slice
         Prediction (historical and/or future) period bounds
-    variables: List[str]
+    variables : List[str]
         List of variables to get in obs dataset
-    chunking_approach: str
+    chunking_approach : str
         'full_space', 'full_time', or None
 
     Returns
     -------
-    ds_gcm_interpolated_rechunked: xr.Dataset
+    ds_gcm_interpolated_rechunked : xr.Dataset
         The GCM dataset that has been interpolated to the obs grid then rechunked.
     """
     # get gcm in full space chunks

@@ -4,7 +4,6 @@ import xarray as xr
 from skdownscale.pointwise_models import PointWiseDownscaler
 from skdownscale.pointwise_models.bcsd import BcsdPrecipitation, BcsdTemperature
 
-from cmip6_downscaling import config
 from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
 from cmip6_downscaling.data.cmip import get_gcm, load_cmip
 from cmip6_downscaling.data.observations import open_era5
@@ -42,16 +41,16 @@ def return_obs(
     ----------
     obs : str
         Input obs
-    variable: str
+    variable : str
         The variable included in the dataset.
-    train_period: slice
+    train_period : slice
         Start and end year slice of training/historical period. Ex: slice('1990','1990')
-    predict_period: slice
+    predict_period : slice
         Start and end year slice of predict period. Ex: slice('2020','2020')
     bbox : BBox
         Bounding box including latmin,latmax,lonmin,lonmax.
     **kwargs : dict, optional
-            Other arguments to be used in generating the target path
+        Other arguments to be used in generating the target path
 
     Returns
     -------
@@ -93,33 +92,26 @@ def get_coarse_obs(
 
     gcm : str
         Input GCM
-    scenario: str
+    scenario : str
         Input GCM scenario
-    variable: str
+    variable : str
         The variable included in the dataset.
-    train_period: slice
+    train_period : slice
         Start and end year slice of training/historical period. Ex: slice('1990','1990')
-    predict_period: slice
+    predict_period : slice
         Start and end year slice of predict period. Ex: slice('2020','2020')
     bbox : BBox
         Bounding box including latmin,latmax,lonmin,lonmax.
-
     **kwargs : dict, optional
-            Other arguments to be used in generating the target path
+        Other arguments to be used in generating the target path
 
     Returns
     -------
     xr.Dataset
         observation dataset at coarse resolution
     """
-    # Load single slice of target cmip6 dataset for target grid dimensions
-    # gcm_one_slice = load_cmip(return_type='xr', variable_ids=[variable]).isel(time=0)
+    obs_ds_path = make_return_obs_path(obs_identifier=obs_identifier)
 
-    obs_ds_path = (
-        config.get("storage.intermediate.uri")
-        + '/'
-        + make_return_obs_path(obs_identifier=obs_identifier)
-    )
     if isinstance(variable, str):
         variable = [variable]
 
@@ -138,11 +130,7 @@ def get_interpolated_obs(
     target_grid_ds: xr.Dataset, gcm_grid_spec: str, chunking_approach: str, obs_identifier: str
 ):
 
-    coarse_obs_ds_path = (
-        config.get("storage.intermediate.uri")
-        + '/'
-        + make_return_obs_path(obs_identifier=obs_identifier)
-    )
+    coarse_obs_ds_path = make_return_obs_path(obs_identifier=obs_identifier)
     interpolated_obs = regrid_ds(ds_path=coarse_obs_ds_path, target_grid_ds=target_grid_ds)
     return interpolated_obs
 
@@ -182,13 +170,13 @@ def get_spatial_anomalies(
     ----------
     gcm : str
         Input GCM
-    scenario: str
+    scenario : str
         Input GCM scenario
-    variable: str
+    variable : str
         The variable included in the dataset.
-    train_period: slice
+    train_period : slice
         Start and end year slice of training/historical period. Ex: slice('1990','1990')
-    predict_period: slice
+    predict_period : slice
         Start and end year slice of predict period. Ex: slice('2020','2020')
     bbox : BBox
         Bounding box including latmin,latmax,lonmin,lonmax.
@@ -201,25 +189,19 @@ def get_spatial_anomalies(
         Spatial anomaly for each month (i.e. of shape (nlat, nlon, 12))
     """
 
-    interpolated_obs_path = (
-        config.get("storage.intermediate.uri")
-        + '/'
-        + make_interpolated_obs_path(
-            gcm_grid_spec=gcm_grid_spec,
-            chunking_approach=chunking_approach,
-            obs_identifier=obs_identifier,
-        )
+    interpolated_obs_path = make_interpolated_obs_path(
+        gcm_grid_spec=gcm_grid_spec,
+        chunking_approach=chunking_approach,
+        obs_identifier=obs_identifier,
     )
+
     # take interpolated obs and rechunk into full_time -- returns path
     coarse_obs_interpolated_rechunked_path = rechunk_zarr_array_with_caching(
         interpolated_obs_path, chunking_approach='full_time', max_mem='2GB'
     )
 
-    obs_path = (
-        config.get("storage.intermediate.uri")
-        + '/'
-        + make_return_obs_path(obs_identifier=obs_identifier)
-    )
+    obs_path = make_return_obs_path(obs_identifier=obs_identifier)
+
     # original obs rechunked into full-time
     obs_rechunked_path = rechunk_zarr_array_with_caching(
         obs_path, chunking_approach='full_time', max_mem='2GB'
@@ -257,13 +239,13 @@ def return_coarse_obs_full_time(
     ----------
     gcm : str
         Input GCM
-    scenario: str
+    scenario : str
         Input GCM scenario
-    variable: str
+    variable : str
         The variable included in the dataset.
-    train_period: slice
+    train_period : slice
         Start and end year slice of training/historical period. Ex: slice('1990','1990')
-    predict_period: slice
+    predict_period : slice
         Start and end year slice of predict period. Ex: slice('2020','2020')
     bbox : BBox
         Bounding box including latmin,latmax,lonmin,lonmax.
@@ -274,17 +256,10 @@ def return_coarse_obs_full_time(
     xr.Dataset
         coarse_obs_full_time_ds rechunked dataset
     """
-    coarse_obs_path_full_space_path = (
-        config.get("storage.intermediate.uri")
-        + '/'
-        + make_coarse_obs_path(
-            obs_identifier=obs_identifier,
-            gcm_grid_spec=gcm_grid_spec,
-            chunking_approach='full_space',
-        )
+    coarse_obs_path_full_space_path = make_coarse_obs_path(
+        obs_identifier=obs_identifier, gcm_grid_spec=gcm_grid_spec, chunking_approach='full_space'
     )
-    # this is temp_path: az://flow-outputs/temporary/djnqgjlkbr.zarr. this is target_path: az://flow-outputs/test_intermediate_zarr/az://flow-outputs/test_intermediate_zarr/coarsened_obs/ERA5/tasmax/-90.0_90.0_-180.0_180.0/1990_1990/full_time_128x256_gridsize_14_14_llcorner_-88_-180.zarr
-    #    az://flow-outputs/test_intermediate_zarr/coarsened_obs/ERA5/tasmax/-90.0_90.0_-180.0_180.0/1990_1990/full_time_128x256_gridsize_14_14_llcorner_-88_-180.zarr
+
     coarse_obs_path_full_time_path = make_coarse_obs_path(
         obs_identifier=obs_identifier, gcm_grid_spec=gcm_grid_spec, chunking_approach='full_time'
     )
@@ -317,13 +292,13 @@ def return_gcm_train_full_time(
         Output coarse observation dataset path rechunked in full_time
     gcm : str
         Input GCM
-    scenario: str
+    scenario : str
         Input GCM scenario
-    variable: str
+    variable : str
         The variable included in the dataset.
-    train_period: slice
+    train_period : slice
         Start and end year slice of training/historical period. Ex: slice('1990','1990')
-    predict_period: slice
+    predict_period : slice
         Start and end year slice of predict period. Ex: slice('2020','2020')
     bbox : BBox
         Bounding box including latmin,latmax,lonmin,lonmax.
@@ -350,11 +325,7 @@ def return_gcm_train_full_time(
     # this call was to force the timestamps for the cmip data to use the friendlier era5 timestamps. (i forget which dataset used which time formats). i could picture this introducing a tricky bug though (for instance if gcm timestamp didn't align for some reason) so we could use another conversion system if that is better. Perhaps datetime equivilence test.
     coarse_obs_full_time_ds = xr.open_zarr(coarse_obs_full_time_path)
     gcm_train_ds_subset['time'] = coarse_obs_full_time_ds.time.values
-    gcm_train_subset_path = (
-        config.get("storage.intermediate.uri")
-        + '/'
-        + make_gcm_train_subset_path(gcm_identifier=gcm_identifier)
-    )
+    gcm_train_subset_path = make_gcm_train_subset_path(gcm_identifier=gcm_identifier)
     gcm_train_ds_subset.to_zarr(gcm_train_subset_path, mode='w')
 
     gcm_train_subset_full_time_path = rechunk_zarr_array_with_caching(
@@ -386,13 +357,13 @@ def return_gcm_predict_rechunked(
         Input gcm training rechunked dataset
     gcm : str
         Input GCM
-    scenario: str
+    scenario : str
         Input GCM scenario
-    variable: str
+    variable : str
         The variable included in the dataset.
-    train_period: slice
+    train_period : slice
         Start and end year slice of training/historical period. Ex: slice('1990','1990')
-    predict_period: slice
+    predict_period : slice
         Start and end year slice of predict period. Ex: slice('2020','2020')
     bbox : BBox
         Bounding box including latmin,latmax,lonmin,lonmax.
@@ -421,12 +392,9 @@ def return_gcm_predict_rechunked(
 
     del gcm_predict_ds_subset[variable].encoding['chunks']
 
-    gcm_predict_ds_subset_path = (
-        config.get("storage.intermediate.uri")
-        + '/'
-        + make_gcm_predict_subset_path(gcm_identifier=gcm_identifier)
-    )
-    # Note: Explain why this .chunk is needed!
+    gcm_predict_ds_subset_path = make_gcm_predict_subset_path(gcm_identifier=gcm_identifier)
+
+    # TODO: Explain why this .chunk is needed
     gcm_predict_ds_subset.chunk({'time': 1500}).to_zarr(gcm_predict_ds_subset_path, mode='w')
 
     gcm_predict_rechunked_path = rechunk_zarr_array_with_caching(
@@ -466,13 +434,13 @@ def fit_and_predict(
         GCM prediction dataset chunked along space.
     gcm : str
         Input GCM
-    scenario: str
+    scenario : str
         Input GCM scenario
-    variable: str
+    variable : str
         The variable included in the dataset.
-    train_period: slice
+    train_period : slice
         Start and end year slice of training/historical period. Ex: slice('1990','1990')
-    predict_period: slice
+    predict_period : slice
         Start and end year slice of predict period. Ex: slice('2020','2020')
     bbox : BBox
         Bounding box including latmin,latmax,lonmin,lonmax.
@@ -491,14 +459,10 @@ def fit_and_predict(
         bcsd_model = BcsdPrecipitation(return_anoms=False)
 
     pointwise_model = PointWiseDownscaler(model=bcsd_model, dim=dim)
-    coarse_obs_full_time_path = (
-        config.get("storage.intermediate.uri")
-        + '/'
-        + make_coarse_obs_path(
-            chunking_approach=chunking_approach,
-            obs_identifier=obs_identifier,
-            gcm_grid_spec=gcm_grid_spec,
-        )
+    coarse_obs_full_time_path = make_coarse_obs_path(
+        chunking_approach=chunking_approach,
+        obs_identifier=obs_identifier,
+        gcm_grid_spec=gcm_grid_spec,
     )
     coarse_obs_rechunked_validated_path = rechunk_zarr_array_with_caching(
         coarse_obs_full_time_path, template_chunk_array=gcm_train_subset_full_time_ds
@@ -519,11 +483,7 @@ def get_interpolated_prediction(
     target_grid_obs_ds: xr.Dataset, gcm_grid_spec: str, gcm_identifier: str
 ) -> xr.Dataset:
 
-    bias_corrected_path = (
-        config.get("storage.intermediate.uri")
-        + '/'
-        + make_bias_corrected_path(gcm_identifier=gcm_identifier)
-    )
+    bias_corrected_path = make_bias_corrected_path(gcm_identifier=gcm_identifier)
 
     interpolated_prediction_ds = regrid_ds(
         ds_path=bias_corrected_path, target_grid_ds=target_grid_obs_ds
@@ -535,12 +495,8 @@ def rechunked_interpolated_prediciton_task_full_time(
     gcm_identifier: str, gcm_grid_spec: str, **kwargs
 ) -> str:
 
-    interpolated_prediction_path = (
-        config.get("storage.intermediate.uri")
-        + '/'
-        + make_interpolated_prediction_path_full_space(
-            gcm_identifier=gcm_identifier, gcm_grid_spec=gcm_grid_spec
-        )
+    interpolated_prediction_path = make_interpolated_prediction_path_full_space(
+        gcm_identifier=gcm_identifier, gcm_grid_spec=gcm_grid_spec
     )
     rechunked_interpolated_prediction_path = make_interpolated_prediction_path_full_time(
         gcm_identifier=gcm_identifier, gcm_grid_spec=gcm_grid_spec
@@ -575,9 +531,9 @@ def postprocess_bcsd(
     ----------
     gcm : str
         Input GCM
-    scenario: str
+    scenario : str
         Input GCM scenario
-    variable: str
+    variable : str
         The variable included in the dataset.
     train_period : slice
         Start and end year slice of training/historical period. Ex: slice('1990', '1990')
@@ -593,17 +549,11 @@ def postprocess_bcsd(
         Final BCSD dataset
     """
 
-    spatial_anomalies_path = (
-        config.get("storage.intermediate.uri")
-        + '/'
-        + make_spatial_anomalies_path(obs_identifier=obs_identifier, gcm_grid_spec=gcm_grid_spec)
+    spatial_anomalies_path = make_spatial_anomalies_path(
+        obs_identifier=obs_identifier, gcm_grid_spec=gcm_grid_spec
     )
-    rechunked_interpolated_prediction_path = (
-        config.get("storage.intermediate.uri")
-        + '/'
-        + make_interpolated_prediction_path_full_time(
-            gcm_identifier=gcm_identifier, gcm_grid_spec=gcm_grid_spec
-        )
+    rechunked_interpolated_prediction_path = make_interpolated_prediction_path_full_time(
+        gcm_identifier=gcm_identifier, gcm_grid_spec=gcm_grid_spec
     )
 
     spatial_anomalies_ds = xr.open_zarr(spatial_anomalies_path)

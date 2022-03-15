@@ -6,12 +6,7 @@ import xarray as xr
 import zarr
 
 from cmip6_downscaling import config
-from cmip6_downscaling.workflows.paths import make_rechunked_gcm_path
-from cmip6_downscaling.workflows.utils import (
-    lon_to_180,
-    rechunk_zarr_array_with_caching,
-    subset_dataset,
-)
+from cmip6_downscaling.methods.common.utils import lon_to_180, subset_dataset
 
 from . import cat
 
@@ -216,26 +211,27 @@ def get_gcm(
     if chunking_approach is None:
         return ds_gcm
 
-    if cache_within_rechunk:
-        path_dict = {
-            'gcm': gcm,
-            'scenario': scenario,
-            'train_period': train_period,
-            'predict_period': predict_period,
-            'variables': variables,
-        }
-        rechunked_path = make_rechunked_gcm_path(chunking_approach=chunking_approach, **path_dict)
-    else:
-        rechunked_path = None
-    ds_gcm_rechunked = rechunk_zarr_array_with_caching(
-        zarr_array=ds_gcm,
-        chunking_approach=chunking_approach,
-        output_path=rechunked_path,
-    )
-    print('ds_gcm_rechunked:')
-    print(ds_gcm_rechunked.chunks)
+    # TODO: move rechunking out of this step
+    # if cache_within_rechunk:
+    #     path_dict = {
+    #         'gcm': gcm,
+    #         'scenario': scenario,
+    #         'train_period': train_period,
+    #         'predict_period': predict_period,
+    #         'variables': variables,
+    #     }
+    #     rechunked_path = make_rechunked_gcm_path(chunking_approach=chunking_approach, **path_dict)
+    # else:
+    #     rechunked_path = None
+    # ds_gcm_rechunked = rechunk_zarr_array_with_caching(
+    #     zarr_array=ds_gcm,
+    #     chunking_approach=chunking_approach,
+    #     output_path=rechunked_path,
+    # )
+    # print('ds_gcm_rechunked:')
+    # print(ds_gcm_rechunked.chunks)
 
-    return ds_gcm_rechunked
+    # return ds_gcm_rechunked
 
 
 def get_gcm_grid_spec(

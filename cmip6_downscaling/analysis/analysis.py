@@ -1,22 +1,11 @@
-import os
 from typing import Tuple
 
 import cartopy.crs as ccrs
-import fsspec
 import matplotlib.pyplot as plt
 import pandas as pd
-import papermill as pm
 import xarray as xr
-from azure.storage.blob import BlobServiceClient, ContentSettings
-from prefect import task
-
-from cmip6_downscaling.workflows.paths import get_notebook_paths
-from cmip6_downscaling.workflows.utils import BBox
 
 from .qaqc import make_qaqc_ds
-
-connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
-fs = fsspec.filesystem('az', connection_string=connection_string)
 
 
 def qaqc_checks(ds: xr.Dataset) -> Tuple[xr.Dataset, xr.Dataset]:
@@ -39,125 +28,6 @@ def qaqc_checks(ds: xr.Dataset) -> Tuple[xr.Dataset, xr.Dataset]:
     annual_qaqc_ts = qaqc_ds.groupby('time.year').sum().sum(dim=['lat', 'lon']).to_dataframe()
     qaqc_maps = qaqc_ds.sum(dim='time')
     return annual_qaqc_ts, qaqc_maps
-
-
-def monthly_summary(ds: xr.Dataset, **kwargs) -> xr.Dataset:
-    """Creates an monthly summary dataset.
-
-    Parameters
-    ----------
-    ds : xr.Dataset
-        Downscaled dataset at daily timestep
-
-    Returns
-    ----------
-    xr.Dataset
-        Downscaled dataset at monthly timestep
-    """
-    out_ds = xr.Dataset()
-    for var in ds:
-        if var in ['tasmax', 'tasmin']:
-            out_ds[var] = ds[var].resample(time='1MS').mean(dim='time')
-        elif var in ['pr']:
-            out_ds[var] = ds[var].resample(time='1MS').sum(dim='time')
-        else:
-            print(f'{var} not implemented')
-
-    return out_ds
-
-
-def annual_summary(ds: xr.Dataset, **kwargs) -> xr.Dataset:
-    """Creates an annual summary dataset.
-
-    Parameters
-    ----------
-    ds : xr.Dataset
-        Downscaled dataset at daily timestep
-
-    Returns
-    ----------
-    xr.Dataset
-        Downscaled dataset at annual timestep
-    """
-    out_ds = xr.Dataset()
-    for var in ds:
-        if var in ['tasmax', 'tasmin']:
-            out_ds[var] = ds[var].resample(time='YS').mean()
-        elif var in ['pr']:
-            out_ds[var] = ds[var].resample(time='YS').sum()
-        else:
-            print(f'{var} not implemented')
-
-    return out_ds
-
-
-@task(log_stdout=True, tags=['dask-resource:TASKSLOTS=1'])
-def run_analyses(
-    parameters: dict, bbox: BBox, train_period: slice, predict_period: slice, web_blob: str
-) -> str:
-    """Prefect task to run the analyses on results from a downscaling run.
-
-    Parameters
-    ----------
-    parameters : dict
-        Parameters provided from the downscaling run to uniquely identify
-        the output dataset (e.g. gcm, training period, obs dataset, etc.)
-    bbox : BBox
-        The bounding box over which you are running.
-    train_period : slice
-        Training period (e.g. slice('1981', '2010'))
-    predict_period : slice
-        Prediction period (e.g. slice('1981', '2099')). Currently this assumes
-        that the downscaled dataset has the historical and future timeseries all
-        in one file.
-    web_blob : str
-        The location in the web bucket where you want these files to go. Likely
-        specified in a yaml file in your local setup.
-
-    Returns
-    -------
-    str
-        The local location of an executed notebook path.
-    """
-    gcm_identifier = parameters['gcm_identifier']
-    template_path, executed_notebook_path, executed_html_path = get_notebook_paths(
-        gcm_identifier.replace('/', '_')
-    )
-
-    parameters['train_period_start'] = train_period.start
-    parameters['train_period_end'] = train_period.stop
-    parameters['predict_period_start'] = predict_period.start
-    parameters['predict_period_end'] = predict_period.stop
-    parameters['latmax'] = bbox.lat_slice.start
-    parameters['latmin'] = bbox.lat_slice.stop
-    parameters['lonmin'] = bbox.lon_slice.start
-    parameters['lonmax'] = bbox.lon_slice.stop
-    pm.execute_notebook(template_path, executed_notebook_path, parameters=parameters)
-    # convert from ipynb to html
-    os.system(f"jupyter nbconvert {executed_notebook_path} --to html")
-    connection_string = os.getenv('AZURE_STORAGE_CONNECTION_STRING', None)
-    if connection_string is not None:
-        # if you have a connection_string, copy the html to azure, if not just return
-        # because it is already in your local machine
-        blob_service_client = BlobServiceClient.from_connection_string(connection_string)
-        # TODO: fix b/c the run_id has slashes now!!!
-        blob_name = web_blob + gcm_identifier + 'analyses.html'
-        blob_client = blob_service_client.get_blob_client(container='$web', blob=blob_name)
-        # clean up before writing
-        try:
-            blob_client.delete_blob()
-        except:
-            pass
-
-        #  need to specify html content type so that it will render and not download
-        with open(executed_html_path, "rb") as data:
-            blob_client.upload_blob(
-                data, content_settings=ContentSettings(content_type='text/html')
-            )
-        print(
-            f'**** Your notebook is hosted here! *****\nhttps://cmip6downscaling.z6.web.core.windows.net/{blob_name}'
-        )
-    return executed_notebook_path
 
 
 def load_top_cities(

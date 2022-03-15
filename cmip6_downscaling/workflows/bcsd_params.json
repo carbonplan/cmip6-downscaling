@@ -1,6 +1,7 @@
 {
+  "method": "bcsd",
   "obs": "ERA5",
-  "gcm": "MIROC6",
+  "model": "MIROC6",
   "scenario": "ssp370",
   "variable": "tasmax",
   "train_period": [
