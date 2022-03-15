@@ -19,6 +19,7 @@ from cmip6_downscaling.methods.common.tasks import (
     rechunk,
     run_analyses,
 )
+from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching
 
 runtime = runtimes.get_runtime()
 print(runtime)
@@ -53,8 +54,12 @@ with Flow(
     spatial_anomalies_path = calc_spacial_anomalies(obs_path, interpolated_obs_path, run_parameters)
 
     # TODO: add spatial_chunks to config and do all full_time rechunks according to that pattern
-    coarse_obs_full_time_path = rechunk(coarse_obs_path, pattern='full_time')
-    experiment_full_time_path = rechunk(experiment_path, pattern='full_time')
+    coarse_obs_full_time_path = rechunk_zarr_array_with_caching(
+        zarr_store=coarse_obs_path, chunking_approach='full_time'
+    )
+    experiment_full_time_path = rechunk_zarr_array_with_caching(
+        zarr_store=experiment_path, chunking_approach='full_time'
+    )
 
     bias_corrected_path = fit_and_predict(
         experiment_full_time_path, coarse_obs_full_time_path, run_parameters
