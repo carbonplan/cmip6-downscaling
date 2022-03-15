@@ -1,10 +1,12 @@
 from dataclasses import asdict
 
+import xarray as xr
 from prefect import task
 from upath import UPath
 
 from cmip6_downscaling import config
 from cmip6_downscaling.methods.common.containers import RunParameters
+from cmip6_downscaling.methods.common.utils import rechunk_zarr_array_with_caching
 
 intermediate_dir = UPath(config.get("storage.intermediate.uri"))
 
@@ -21,8 +23,8 @@ def coarsen_obs(obs_path: UPath, experiment_path: UPath, run_parameters: RunPara
             **asdict(run_parameters)
         )
     )
-    if use_cache and (target / '.zmetadata').exists():
-        print(f'found existing target: {target}')
+    if use_cache and (target / ".zmetadata").exists():
+        print(f"found existing target: {target}")
         return target
 
     # experiment_ds = xr.open_zarr(experiment_path)
@@ -44,8 +46,8 @@ def interpolate_obs(
             **asdict(run_parameters)
         )
     )
-    if use_cache and (target / '.zmetadata').exists():
-        print(f'found existing target: {target}')
+    if use_cache and (target / ".zmetadata").exists():
+        print(f"found existing target: {target}")
         return target
 
     # TODO
@@ -60,18 +62,36 @@ def calc_spacial_anomalies(
 ) -> UPath:
     target = (
         intermediate_dir
-        / "interpolate_obs"
+        / "spatial_anomalies"
         / "{obs}_{model}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}".format(
             **asdict(run_parameters)
         )
     )
-    if use_cache and (target / '.zmetadata').exists():
-        print(f'found existing target: {target}')
+    if use_cache and (target / ".zmetadata").exists():
+        print(f"found existing target: {target}")
         return target
 
-    # TODO
+    # take interpolated obs and rechunk into full_time
+    coarse_obs_interpolated_rechunked_path = rechunk_zarr_array_with_caching(
+        interpolated_obs_path, chunking_approach="full_time", max_mem="2GB"
+    )
 
-    # spatial_anomalies.to_zarr(target, mode='w')
+    # original obs rechunked into full-time
+    obs_rechunked_path = rechunk_zarr_array_with_caching(
+        obs_path, chunking_approach="full_time", max_mem="2GB"
+    )
+    coarse_obs_interpolated_rechunked_ds = xr.open_zarr(coarse_obs_interpolated_rechunked_path)
+    obs_rechunked_ds = xr.open_zarr(obs_rechunked_path)
+
+    # calculate the difference between the actual obs (with finer spatial heterogeneity)
+    # and the interpolated coarse obs this will be saved and added to the
+    # spatially-interpolated coarse predictions to add the spatial heterogeneity back in.
+
+    spatial_anomalies = obs_rechunked_ds - coarse_obs_interpolated_rechunked_ds
+    seasonal_cycle_spatial_anomalies = spatial_anomalies.groupby("time.month").mean()
+
+    seasonal_cycle_spatial_anomalies.to_zarr(target, mode="w")
+
     return target
 
 
@@ -83,8 +103,8 @@ def fit_and_predict(
 ) -> UPath:
 
     target = intermediate_dir / "fit_and_predict" / run_parameters.run_id
-    if use_cache and (target / '.zmetadata').exists():
-        print(f'found existing target: {target}')
+    if use_cache and (target / ".zmetadata").exists():
+        print(f"found existing target: {target}")
         return target
 
     # TODO
@@ -99,8 +119,8 @@ def interpolate_prediction(
 ) -> UPath:
 
     target = intermediate_dir / "interpolate_prediction" / run_parameters.run_id
-    if use_cache and (target / '.zmetadata').exists():
-        print(f'found existing target: {target}')
+    if use_cache and (target / ".zmetadata").exists():
+        print(f"found existing target: {target}")
         return target
 
     # TODO
@@ -117,8 +137,8 @@ def postprocess_bcsd(
 ) -> UPath:
 
     target = intermediate_dir / "interpolate_prediction" / run_parameters.run_id
-    if use_cache and (target / '.zmetadata').exists():
-        print(f'found existing target: {target}')
+    if use_cache and (target / ".zmetadata").exists():
+        print(f"found existing target: {target}")
         return target
 
     # TODO
