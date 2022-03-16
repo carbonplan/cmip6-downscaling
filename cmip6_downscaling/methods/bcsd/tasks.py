@@ -6,7 +6,6 @@ from upath import UPath
 
 from cmip6_downscaling import config
 from cmip6_downscaling.methods.common.containers import RunParameters
-from cmip6_downscaling.methods.common.utils import rechunk_zarr_array_with_caching
 
 intermediate_dir = UPath(config.get("storage.intermediate.uri"))
 
@@ -58,7 +57,7 @@ def interpolate_obs(
 
 @task
 def calc_spacial_anomalies(
-    obs_path: UPath, interpolated_obs_path: UPath, run_parameters: RunParameters
+    obs_full_time_path: UPath, interpolated_obs_full_time_path: UPath, run_parameters: RunParameters
 ) -> UPath:
     target = (
         intermediate_dir
@@ -71,23 +70,14 @@ def calc_spacial_anomalies(
         print(f"found existing target: {target}")
         return target
 
-    # take interpolated obs and rechunk into full_time
-    coarse_obs_interpolated_rechunked_path = rechunk_zarr_array_with_caching(
-        interpolated_obs_path, chunking_approach="full_time", max_mem="2GB"
-    )
-
-    # original obs rechunked into full-time
-    obs_rechunked_path = rechunk_zarr_array_with_caching(
-        obs_path, chunking_approach="full_time", max_mem="2GB"
-    )
-    coarse_obs_interpolated_rechunked_ds = xr.open_zarr(coarse_obs_interpolated_rechunked_path)
-    obs_rechunked_ds = xr.open_zarr(obs_rechunked_path)
+    interpolated_obs_full_time_ds = xr.open_zarr(interpolated_obs_full_time_path)
+    obs_full_time_ds = xr.open_zarr(obs_full_time_path)
 
     # calculate the difference between the actual obs (with finer spatial heterogeneity)
     # and the interpolated coarse obs this will be saved and added to the
     # spatially-interpolated coarse predictions to add the spatial heterogeneity back in.
 
-    spatial_anomalies = obs_rechunked_ds - coarse_obs_interpolated_rechunked_ds
+    spatial_anomalies = obs_full_time_ds - interpolated_obs_full_time_ds
     seasonal_cycle_spatial_anomalies = spatial_anomalies.groupby("time.month").mean()
 
     seasonal_cycle_spatial_anomalies.to_zarr(target, mode="w")

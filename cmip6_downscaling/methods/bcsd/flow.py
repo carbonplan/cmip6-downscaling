@@ -47,10 +47,15 @@ with Flow(
     experiment_path = get_experiment(run_parameters)
 
     coarse_obs_path = coarsen_obs(obs_path, experiment_path, run_parameters)
-
     interpolated_obs_path = interpolate_obs(obs_path, coarse_obs_path, run_parameters)
 
-    spatial_anomalies_path = calc_spacial_anomalies(obs_path, interpolated_obs_path, run_parameters)
+    interpolated_obs_full_time_path = rechunk(
+        path=interpolated_obs_path, pattern="full_time", run_parameters=run_parameters
+    )
+    obs_full_time_path = rechunk(path=obs_path, pattern="full_time", run_parameters=run_parameters)
+    spatial_anomalies_path = calc_spacial_anomalies(
+        obs_full_time_path, interpolated_obs_full_time_path, run_parameters
+    )
 
     # TODO: add spatial_chunks to config and do all full_time rechunks according to that pattern
     coarse_obs_full_time_path = rechunk(coarse_obs_path, pattern='full_time')
