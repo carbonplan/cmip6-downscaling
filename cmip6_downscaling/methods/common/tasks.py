@@ -74,13 +74,43 @@ def get_experiment(run_parameters: RunParameters) -> UPath:
         source_ids=run_parameters.model, return_type='xr', variable_ids=run_parameters.variable
     ).pipe(lon_to_180)
 
-    subset = subset_dataset(
-        ds, run_parameters.variable, run_parameters.train_period.time_slice, run_parameters.bbox
-    )
-    subset = subset.chunk({'time': 365})  # TODO: do better here
-    del subset[run_parameters.variable].encoding['chunks']
+    # subset = subset_dataset(
+    #     ds, run_parameters.variable, run_parameters.train_period.time_slice, run_parameters.bbox
+    # )
+    ds = ds.chunk({'time': 365})  # TODO: do better here
+    del ds[run_parameters.variable].encoding['chunks']
 
-    subset.to_zarr(target, mode='w')
+    ds.to_zarr(target, mode='w')
+    return target
+
+
+@task
+def get_experiment_training(run_parameters: RunParameters) -> UPath:
+
+    # TODO: get train and predict data here
+
+    target = (
+        intermediate_dir
+        / "get_experiment"
+        / "{model}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}_{predict_dates[0]}_{predict_dates[1]}".format(
+            **asdict(run_parameters)
+        )
+    )
+    if use_cache and (target / '.zmetadata').exists():
+        print(f'found existing target: {target}')
+        return target
+
+    ds = load_cmip(
+        source_ids=run_parameters.model, return_type='xr', variable_ids=run_parameters.variable
+    ).pipe(lon_to_180)
+
+    # subset = subset_dataset(
+    #     ds, run_parameters.variable, run_parameters.train_period.time_slice, run_parameters.bbox
+    # )
+    ds = ds.chunk({'time': 365})  # TODO: do better here
+    del ds[run_parameters.variable].encoding['chunks']
+
+    ds.to_zarr(target, mode='w')
     return target
 
 

@@ -79,7 +79,9 @@ def calc_spatial_anomalies(
 
 @task
 def fit_and_predict(
-    experiment_full_time_path: UPath,
+    # inputs: gcm_train_subset_full_time_path, coarse_obs_rechunked_validated_path, gcm_predict_rechunked_path
+    experiment_train_full_time_path: UPath,
+    experiment_predict_full_time_path: UPath,
     coarse_obs_full_time_path: UPath,
     run_parameters: RunParameters,
 ) -> UPath:
@@ -90,25 +92,34 @@ def fit_and_predict(
         return target
 
     # # TODO
-    # if run_parameters.variable in ABSOLUTE_VARS:
-    #     bcsd_model = BcsdTemperature(return_anoms=False)
-    # elif run_parameters.variable in RELATIVE_VARS:
-    #     bcsd_model = BcsdPrecipitation(return_anoms=False)
+    if run_parameters.variable in ABSOLUTE_VARS:
+        bcsd_model = BcsdTemperature(return_anoms=False)
+    elif run_parameters.variable in RELATIVE_VARS:
+        bcsd_model = BcsdPrecipitation(return_anoms=False)
 
-    # pointwise_model = PointWiseDownscaler(model=bcsd_model, dim="time")
+    pointwise_model = PointWiseDownscaler(model=bcsd_model, dim="time")
 
+    # #move outside
     # coarse_obs_rechunked_validated_path = rechunk_zarr_array_with_caching(
     #     coarse_obs_full_time_path, template_chunk_array=gcm_train_subset_full_time_ds
     # )
-    # coarse_obs_rechunked_validated_ds = xr.open_zarr(coarse_obs_rechunked_validated_path)
+    # used to be called: coarse_obs_rechunked_validated_ds
+    coarse_obs_full_time_ds = xr.open_zarr(coarse_obs_full_time_path)
+    # gcm_train_subset_full_time_ds
+    experiment_train_full_time_ds = xr.open_zarr(experiment_train_full_time_path)
+    # gcm_predict_rechunked_ds
+    # Need input path here..
+    experiment_predict_full_time_ds = xr.open_zarr(experiment_predict_full_time_path)
 
-    # pointwise_model.fit(
-    #     gcm_train_subset_full_time_ds[run_parameters.variable], coarse_obs_rechunked_validated_ds[variable]
-    # )
-    # bias_corrected_da = pointwise_model.predict(gcm_predict_rechunked_ds[run_parameters.variable])
+    pointwise_model.fit(
+        experiment_full_time_ds[run_parameters.variable], coarse_obs_full_time_ds[variable]
+    )
+    bias_corrected_da = pointwise_model.predict(
+        experiment_predict_full_time_ds[run_parameters.variable]
+    )
 
-    # bias_corrected_ds = bias_corrected_da.astype('float32').to_dataset(name=run_parameters.variable)
-    # bias_corrected_ds.to_zarr(target, mode='w')
+    bias_corrected_ds = bias_corrected_da.astype('float32').to_dataset(name=run_parameters.variable)
+    bias_corrected_ds.to_zarr(target, mode='w')
     return target
 
 

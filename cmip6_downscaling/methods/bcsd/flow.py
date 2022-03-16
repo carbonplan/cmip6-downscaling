@@ -44,7 +44,9 @@ with Flow(
 
     # input datasets
     obs_path = get_obs(run_parameters)
-    experiment_path = get_experiment(run_parameters)
+    experiment_path = get_experiment(run_parameters) # Note: This gcm is subset for train_period
+    # experiment_train_path =
+    # experiment_predict_path =
 
     coarse_obs_path = coarsen_obs(obs_path, experiment_path, run_parameters)
 
@@ -54,7 +56,9 @@ with Flow(
 
     # TODO: add spatial_chunks to config and do all full_time rechunks according to that pattern
     coarse_obs_full_time_path = rechunk(coarse_obs_path, pattern='full_time')
-    experiment_full_time_path = rechunk(experiment_path, pattern='full_time')
+    experiment_train_full_time_path = rechunk(experiment_path, pattern='full_time')
+    experiment_predict_full_time_path =
+
 
     bias_corrected_path = fit_and_predict(
         experiment_full_time_path, coarse_obs_full_time_path, run_parameters
