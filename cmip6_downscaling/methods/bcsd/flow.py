@@ -2,7 +2,7 @@ from prefect import Flow, Parameter
 
 from cmip6_downscaling import runtimes
 from cmip6_downscaling.methods.bcsd.tasks import (
-    calc_spacial_anomalies,
+    calc_spatial_anomalies,
     coarsen_obs,
     fit_and_predict,
     interpolate_obs,
@@ -50,7 +50,7 @@ with Flow(
 
     interpolated_obs_path = interpolate_obs(obs_path, coarse_obs_path, run_parameters)
 
-    spatial_anomalies_path = calc_spacial_anomalies(obs_path, interpolated_obs_path, run_parameters)
+    spatial_anomalies_path = calc_spatial_anomalies(obs_path, interpolated_obs_path, run_parameters)
 
     # TODO: add spatial_chunks to config and do all full_time rechunks according to that pattern
     coarse_obs_full_time_path = rechunk(coarse_obs_path, pattern='full_time')
@@ -67,7 +67,6 @@ with Flow(
     bias_corrected_fine_full_time_path = rechunk(
         bias_corrected_fine_full_space_path, pattern='full_time'
     )
-
     postprocess_bcsd_path = postprocess_bcsd(
         bias_corrected_fine_full_time_path, spatial_anomalies_path, run_parameters
     )  # fine-scale maps (full_space) (time: 365)

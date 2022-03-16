@@ -4,6 +4,8 @@ from prefect import task
 from upath import UPath
 
 from cmip6_downscaling import config
+
+# from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
 from cmip6_downscaling.methods.common.containers import RunParameters
 
 intermediate_dir = UPath(config.get("storage.intermediate.uri"))
@@ -55,7 +57,7 @@ def interpolate_obs(
 
 
 @task
-def calc_spacial_anomalies(
+def calc_spatial_anomalies(
     obs_path: UPath, interpolated_obs_path: UPath, run_parameters: RunParameters
 ) -> UPath:
     target = (
@@ -87,9 +89,26 @@ def fit_and_predict(
         print(f'found existing target: {target}')
         return target
 
-    # TODO
+    # # TODO
+    # if run_parameters.variable in ABSOLUTE_VARS:
+    #     bcsd_model = BcsdTemperature(return_anoms=False)
+    # elif run_parameters.variable in RELATIVE_VARS:
+    #     bcsd_model = BcsdPrecipitation(return_anoms=False)
 
-    # bias_corrected.to_zarr(target, mode='w')
+    # pointwise_model = PointWiseDownscaler(model=bcsd_model, dim="time")
+
+    # coarse_obs_rechunked_validated_path = rechunk_zarr_array_with_caching(
+    #     coarse_obs_full_time_path, template_chunk_array=gcm_train_subset_full_time_ds
+    # )
+    # coarse_obs_rechunked_validated_ds = xr.open_zarr(coarse_obs_rechunked_validated_path)
+
+    # pointwise_model.fit(
+    #     gcm_train_subset_full_time_ds[run_parameters.variable], coarse_obs_rechunked_validated_ds[variable]
+    # )
+    # bias_corrected_da = pointwise_model.predict(gcm_predict_rechunked_ds[run_parameters.variable])
+
+    # bias_corrected_ds = bias_corrected_da.astype('float32').to_dataset(name=run_parameters.variable)
+    # bias_corrected_ds.to_zarr(target, mode='w')
     return target
 
 
