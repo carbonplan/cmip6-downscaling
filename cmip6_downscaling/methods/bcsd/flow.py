@@ -2,12 +2,12 @@ from prefect import Flow, Parameter
 
 from cmip6_downscaling import runtimes
 from cmip6_downscaling.methods.bcsd.tasks import (
-    calc_spacial_anomalies,
     coarsen_obs,
     fit_and_predict,
     interpolate_obs,
     interpolate_prediction,
     postprocess_bcsd,
+    spatial_anomalies,
 )
 from cmip6_downscaling.methods.common.tasks import (
     annual_summary,
@@ -53,7 +53,7 @@ with Flow(
         path=interpolated_obs_path, pattern="full_time", run_parameters=run_parameters
     )
     obs_full_time_path = rechunk(path=obs_path, pattern="full_time", run_parameters=run_parameters)
-    spatial_anomalies_path = calc_spacial_anomalies(
+    spatial_anomalies_path = spatial_anomalies(
         obs_full_time_path, interpolated_obs_full_time_path, run_parameters
     )
 

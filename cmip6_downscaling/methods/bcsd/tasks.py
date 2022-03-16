@@ -56,7 +56,7 @@ def interpolate_obs(
 
 
 @task
-def calc_spacial_anomalies(
+def spatial_anomalies(
     obs_full_time_path: UPath, interpolated_obs_full_time_path: UPath, run_parameters: RunParameters
 ) -> UPath:
     target = (
