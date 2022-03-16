@@ -163,16 +163,9 @@ def pyramid(
 
 
 @task
-def regrid(source_path: UPath, target_grid_path: UPath, run_parameters: RunParameters) -> UPath:
+def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
 
-    target = (
-        intermediate_dir
-        / "regrid"
-        / "_{model}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}_{predict_dates[0]}_{predict_dates[1]}".format(
-            **asdict(run_parameters)
-        )
-        / run_parameters.run_id
-    )
+    target = intermediate_dir / "regrid" / source_path / target_grid_path
 
     if use_cache and (target / '.zmetadata').exists():
         print(f'found existing target: {target}')

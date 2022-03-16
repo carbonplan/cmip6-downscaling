@@ -48,9 +48,7 @@ with Flow(
 
     coarse_obs_path = coarsen_obs(obs_path, experiment_path, run_parameters)
 
-    interpolated_obs_path = regrid(
-        source_path=obs_path, target_grid_path=obs_path, run_parameters=run_parameters
-    )
+    interpolated_obs_path = regrid(source_path=obs_path, target_grid_path=obs_path)
 
     spatial_anomalies_path = calc_spacial_anomalies(obs_path, interpolated_obs_path, run_parameters)
 
