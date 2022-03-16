@@ -4,6 +4,7 @@ from pathlib import PosixPath
 
 import papermill as pm
 import xarray as xr
+import xesmf as xe
 from azure.storage.blob import BlobServiceClient, ContentSettings
 from prefect import task
 from upath import UPath
@@ -157,6 +158,32 @@ def pyramid(
         return target
 
     # TODO
+
+    return target
+
+
+@task
+def regrid(source_path: UPath, target_grid_path: UPath, run_parameters: RunParameters) -> UPath:
+
+    target = (
+        intermediate_dir
+        / "regrid"
+        / "_{model}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}_{predict_dates[0]}_{predict_dates[1]}".format(
+            **asdict(run_parameters)
+        )
+        / run_parameters.run_id
+    )
+
+    if use_cache and (target / '.zmetadata').exists():
+        print(f'found existing target: {target}')
+        return target
+
+    source_ds = xr.open_zarr(source_path)
+    target_grid_ds = xr.open_zarr(target_grid_path).isel(time=0)
+
+    regridder = xe.Regridder(source_ds, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
+    regridded_ds = regridder(source_ds)
+    regridded_ds.to_zarr(target, mode='w')
 
     return target
 

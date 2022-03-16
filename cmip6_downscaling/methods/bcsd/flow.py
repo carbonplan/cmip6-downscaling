@@ -5,7 +5,6 @@ from cmip6_downscaling.methods.bcsd.tasks import (
     calc_spacial_anomalies,
     coarsen_obs,
     fit_and_predict,
-    interpolate_obs,
     interpolate_prediction,
     postprocess_bcsd,
 )
@@ -17,6 +16,7 @@ from cmip6_downscaling.methods.common.tasks import (
     monthly_summary,
     pyramid,
     rechunk,
+    regrid,
     run_analyses,
 )
 
@@ -48,11 +48,14 @@ with Flow(
 
     coarse_obs_path = coarsen_obs(obs_path, experiment_path, run_parameters)
 
-    interpolated_obs_path = interpolate_obs(obs_path, coarse_obs_path, run_parameters)
+    interpolated_obs_path = regrid(
+        source_path=obs_path, target_grid_path=obs_path, run_parameters=run_parameters
+    )
 
     spatial_anomalies_path = calc_spacial_anomalies(obs_path, interpolated_obs_path, run_parameters)
 
     # TODO: add spatial_chunks to config and do all full_time rechunks according to that pattern
+
     coarse_obs_full_time_path = rechunk(coarse_obs_path, pattern='full_time')
     experiment_full_time_path = rechunk(experiment_path, pattern='full_time')
 
