@@ -162,7 +162,7 @@ def pyramid(
     return target
 
 
-@task
+@task(tags=['dask-resource:TASKSLOTS=1'])
 def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
 
     target = intermediate_dir / "regrid" / source_path / target_grid_path
