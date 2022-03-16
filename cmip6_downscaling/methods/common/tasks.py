@@ -3,7 +3,9 @@ from dataclasses import asdict
 from pathlib import PosixPath
 
 import papermill as pm
+import rechunker
 import xarray as xr
+import zarr
 from azure.storage.blob import BlobServiceClient, ContentSettings
 from prefect import task
 from upath import UPath
@@ -11,7 +13,12 @@ from upath import UPath
 from cmip6_downscaling import config
 from cmip6_downscaling.data.cmip import load_cmip
 from cmip6_downscaling.data.observations import open_era5
-from cmip6_downscaling.methods.common.utils import lon_to_180, subset_dataset
+from cmip6_downscaling.methods.common.utils import (
+    calc_auspicious_chunks_dict,
+    lon_to_180,
+    make_rechunker_stores,
+    subset_dataset,
+)
 
 from .containers import RunParameters
 
@@ -85,20 +92,43 @@ def get_experiment(run_parameters: RunParameters) -> UPath:
 
 
 @task
-def rechunk(path: UPath, pattern: str = None) -> UPath:
+def rechunk(path: UPath, pattern: str, run_parameters: RunParameters) -> UPath:
+    target = (
+        intermediate_dir
+        / "rechunked_stores_"
+        / pattern
+        / "_{model}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}_{predict_dates[0]}_{predict_dates[1]}".format(
+            **asdict(run_parameters)
+        )
+    )
 
     # TODO: think about how to cache this result
-    target = intermediate_dir / "rechunk" / "todo"
     if use_cache and (target / '.zmetadata').exists():
         print(f'found existing target: {target}')
         return target
 
-    # TODO
+    chunk_dims = config.get(f"chunk_dims.{pattern}")
 
-    return target
+    group = zarr.open_consolidated(path)
+    ds = xr.open_dataset(path)
+    chunks_dict = calc_auspicious_chunks_dict(ds, chunk_dims)
+
+    temp_store, target_store, target_path = make_rechunker_stores(target)
+    rechunk_plan = rechunker.rechunk(
+        group,
+        chunks_dict,
+        "2GB",
+        target_store,
+        temp_store,
+    )
+
+    rechunk_plan.execute()
+    zarr.consolidate_metadata(target_store)
+
+    return target_path
 
 
-# @task
+@task
 def monthly_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
 
     target = intermediate_dir / "monthly_summary" / run_parameters.run_id
