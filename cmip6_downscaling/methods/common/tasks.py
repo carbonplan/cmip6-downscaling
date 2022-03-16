@@ -172,7 +172,7 @@ def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
         return target
 
     source_ds = xr.open_zarr(source_path)
-    target_grid_ds = xr.open_zarr(target_grid_path).isel(time=0)
+    target_grid_ds = xr.open_zarr(target_grid_path)
 
     regridder = xe.Regridder(source_ds, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
     regridded_ds = regridder(source_ds)
