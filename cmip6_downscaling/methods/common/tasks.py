@@ -2,6 +2,7 @@ import os
 from dataclasses import asdict
 from pathlib import PosixPath
 
+import fsspec
 import papermill as pm
 import rechunker
 import xarray as xr
@@ -16,7 +17,6 @@ from cmip6_downscaling.data.observations import open_era5
 from cmip6_downscaling.methods.common.utils import (
     calc_auspicious_chunks_dict,
     lon_to_180,
-    make_rechunker_stores,
     subset_dataset,
 )
 
@@ -92,16 +92,12 @@ def get_experiment(run_parameters: RunParameters) -> UPath:
 
 
 @task
-def rechunk(path: UPath, pattern: str, run_parameters: RunParameters) -> UPath:
-    target = (
-        intermediate_dir
-        / "rechunked_stores_"
-        / pattern
-        / "_{model}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}_{predict_dates[0]}_{predict_dates[1]}".format(
-            **asdict(run_parameters)
-        )
-    )
-
+def rechunk(
+    path: UPath,
+    pattern: str,
+) -> UPath:
+    target = intermediate_dir / "rechunk" / pattern + path.path.replace("/", "_")
+    path_tmp = intermediate_dir / "scratch_rechunk" / pattern + path.path.replace("/", "_")
     # TODO: think about how to cache this result
     if use_cache and (target / '.zmetadata').exists():
         print(f'found existing target: {target}')
@@ -113,19 +109,22 @@ def rechunk(path: UPath, pattern: str, run_parameters: RunParameters) -> UPath:
     ds = xr.open_dataset(path)
     chunks_dict = calc_auspicious_chunks_dict(ds, chunk_dims)
 
-    temp_store, target_store, target_path = make_rechunker_stores(target)
+    target_store = fsspec.get_mapper(target)
+    temp_store = fsspec.get_mapper(path_tmp)
+
     rechunk_plan = rechunker.rechunk(
-        group,
-        chunks_dict,
-        "2GB",
-        target_store,
-        temp_store,
+        source=group,
+        target_chunks=chunks_dict,
+        max_mem="2GB",
+        target_store=target_store,
+        temp_store=temp_store,
     )
 
     rechunk_plan.execute()
     zarr.consolidate_metadata(target_store)
+    temp_store.clear()
 
-    return target_path
+    return target
 
 
 @task
