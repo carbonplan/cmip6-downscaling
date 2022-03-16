@@ -17,7 +17,7 @@ from .containers import RunParameters
 
 intermediate_dir = UPath(config.get("storage.intermediate.uri"))
 
-use_cache = False  # TODO: this should be a config option
+use_cache = config.get('run_options.use_cache')
 
 
 @task
