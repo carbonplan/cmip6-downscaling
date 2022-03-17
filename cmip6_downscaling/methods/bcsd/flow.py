@@ -1,4 +1,3 @@
-import dask
 from prefect import Flow, Parameter
 
 from cmip6_downscaling import runtimes
@@ -21,7 +20,6 @@ from cmip6_downscaling.methods.common.tasks import (
     run_analyses,
 )
 
-dask.config.set({'temporary_directory': '/tmp/dask'})
 runtime = runtimes.get_runtime()
 print(runtime)
 

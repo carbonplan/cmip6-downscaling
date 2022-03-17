@@ -1,6 +1,7 @@
 import os
 from abc import abstractmethod
 
+import dask
 from dask_kubernetes import KubeCluster, make_pod_spec
 from prefect.executors import DaskExecutor, Executor, LocalDaskExecutor, LocalExecutor
 from prefect.run_configs import KubernetesRun, LocalRun, RunConfig
@@ -137,6 +138,9 @@ class CIRuntime(LocalRuntime):
 
 
 class PangeoRuntime(LocalRuntime):
+    def __init__(self):
+        dask.config.set({'temporary_directory': '/tmp/dask'})
+
     @property
     def storage(self) -> Storage:
         return Local(**config.get("runtime.pangeo.storage_options"))
