@@ -98,7 +98,7 @@ def rechunk(
     pattern: str,
 ) -> UPath:
     target = intermediate_dir / "rechunk" / pattern + path.path.replace("/", "_")
-    path_tmp = scratch_dir / "scratch_rechunk" / pattern + path.path.replace("/", "_")
+    path_tmp = scratch_dir / "rechunk" / pattern + path.path.replace("/", "_")
 
     if use_cache and (target / '.zmetadata').exists():
         print(f'found existing target: {target}')
