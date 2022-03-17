@@ -17,7 +17,7 @@ from .containers import RunParameters
 
 intermediate_dir = UPath(config.get("storage.intermediate.uri"))
 
-use_cache = False  # TODO: this should be a config option
+use_cache = True  # TODO: this should be a config option
 
 
 @task
@@ -55,13 +55,12 @@ def get_obs(run_parameters: RunParameters) -> UPath:
 
 
 @task
-def get_experiment(run_parameters: RunParameters) -> UPath:
-
-    # TODO: get train and predict data here
+def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
 
     target = (
         intermediate_dir
         / "get_experiment"
+        / time_subset
         / "{model}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}_{predict_dates[0]}_{predict_dates[1]}".format(
             **asdict(run_parameters)
         )
@@ -69,15 +68,20 @@ def get_experiment(run_parameters: RunParameters) -> UPath:
     if use_cache and (target / '.zmetadata').exists():
         print(f'found existing target: {target}')
         return target
-
+    print(target)
     ds = load_cmip(
         source_ids=run_parameters.model, return_type='xr', variable_ids=run_parameters.variable
     ).pipe(lon_to_180)
 
-    subset = subset_dataset(
-        ds, run_parameters.variable, run_parameters.train_period.time_slice, run_parameters.bbox
-    )
-    subset = subset.chunk({'time': 365})  # TODO: do better here
+    if time_subset == 'train_period':
+        time_period = run_parameters.train_period.time_slice
+    elif time_subset == 'predict_period':
+        time_period = run_parameters.predict_period.time_slice
+    else:
+        raise ValueError('time_subset arg is not train_period or predict_period.')
+    subset = subset_dataset(ds, run_parameters.variable, time_period, run_parameters.bbox)
+    # Note: dataset is chunked into time:365 chunks to standardize leap-year chunking.
+    subset = subset.chunk({'time': 365})
     del subset[run_parameters.variable].encoding['chunks']
 
     subset.to_zarr(target, mode='w')

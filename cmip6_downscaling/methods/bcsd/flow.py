@@ -1,3 +1,4 @@
+import dask
 from prefect import Flow, Parameter
 
 from cmip6_downscaling import runtimes
@@ -20,6 +21,7 @@ from cmip6_downscaling.methods.common.tasks import (
     run_analyses,
 )
 
+dask.config.set({'temporary_directory': '/tmp/dask'})
 runtime = runtimes.get_runtime()
 print(runtime)
 
@@ -44,7 +46,7 @@ with Flow(
 
     # input datasets
     obs_path = get_obs(run_parameters)
-    experiment_path = get_experiment(run_parameters)
+    experiment_path = get_experiment(run_parameters, time_subset='train_period')
 
     coarse_obs_path = coarsen_obs(obs_path, experiment_path, run_parameters)
 
