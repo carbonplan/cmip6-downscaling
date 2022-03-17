@@ -165,7 +165,7 @@ def pyramid(
 @task(tags=['dask-resource:TASKSLOTS=1'])
 def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
 
-    target = intermediate_dir / "regrid" / source_path / target_grid_path
+    target = intermediate_dir / "regrid" / source_path.path.replace('/', '_') + '_' + target_grid_path.path.replace('/', '_')
 
     if use_cache and (target / '.zmetadata').exists():
         print(f'found existing target: {target}')
