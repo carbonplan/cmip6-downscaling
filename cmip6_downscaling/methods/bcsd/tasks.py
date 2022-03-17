@@ -81,7 +81,6 @@ def calc_spatial_anomalies(
 
 @task
 def fit_and_predict(
-    # inputs: gcm_train_subset_full_time_path, coarse_obs_rechunked_validated_path, gcm_predict_rechunked_path
     experiment_train_full_time_path: UPath,
     experiment_predict_full_time_path: UPath,
     coarse_obs_full_time_path: UPath,
