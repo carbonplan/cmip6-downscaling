@@ -67,7 +67,7 @@ _defaults = {
             'storage_options': {"account_name": "cmip6downscaling"},
         },
     },
-    'run_options': {'runtime': None, 'cleanup_flag': True},
+    'run_options': {'runtime': None, 'cleanup_flag': True, 'use_cache': True},
     "runtime": {
         "cloud": {
             "storage_prefix": "az://",

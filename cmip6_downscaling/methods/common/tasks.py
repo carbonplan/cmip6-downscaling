@@ -25,7 +25,7 @@ from .containers import RunParameters
 intermediate_dir = UPath(config.get("storage.intermediate.uri"))
 scratch_dir = UPath(config.get("storage.scratch.uri"))
 
-use_cache = False  # TODO: this should be a config option
+use_cache = config.get('run_options.use_cache')
 
 
 @task
@@ -85,7 +85,7 @@ def get_experiment(run_parameters: RunParameters) -> UPath:
     subset = subset_dataset(
         ds, run_parameters.variable, run_parameters.train_period.time_slice, run_parameters.bbox
     )
-    subset = subset.chunk({'time': 365})  # TODO: do better here
+    subset = subset.chunk({'time': 365})
     del subset[run_parameters.variable].encoding['chunks']
 
     subset.to_zarr(target, mode='w')
