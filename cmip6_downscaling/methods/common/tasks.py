@@ -23,6 +23,7 @@ from cmip6_downscaling.methods.common.utils import (
 from .containers import RunParameters
 
 intermediate_dir = UPath(config.get("storage.intermediate.uri"))
+scratch_dir = UPath(config.get("storage.scratch.uri"))
 
 use_cache = False  # TODO: this should be a config option
 
@@ -96,8 +97,8 @@ def rechunk(
     path: UPath,
     pattern: str,
 ) -> UPath:
-    target = intermediate_dir / "rechunk" / pattern + path.path.replace("/", "_")
-    path_tmp = intermediate_dir / "scratch_rechunk" / pattern + path.path.replace("/", "_")
+    target = scratch_dir / "rechunk" / pattern + path.path.replace("/", "_")
+    path_tmp = scratch_dir / "scratch_rechunk" / pattern + path.path.replace("/", "_")
 
     if use_cache and (target / '.zmetadata').exists():
         print(f'found existing target: {target}')

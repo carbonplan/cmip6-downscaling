@@ -85,7 +85,7 @@ def subset_dataset(
 
 def calc_auspicious_chunks_dict(
     da: Union[xr.DataArray, xr.Dataset],
-    target_size: str = "100mb",
+    target_size_bytes: float = 100e6,
     chunk_dims: Tuple = ("lat", "lon"),
 ) -> dict:
     """Figure out a chunk size that, given the size of the dataset, the dimension(s) you want to chunk on
@@ -95,7 +95,7 @@ def calc_auspicious_chunks_dict(
     ----------
     da : Union[xr.DataArray, xr.Dataset]
         Dataset or data array you're wanting to chunk
-    target_size : str, optional
+    target_size_bytes : float, optional
         Target size for chunk- dask recommends 100mb, by default '100mb'
     chunk_dims : tuple, optional
         Dimension(s) you want to chunk along, by default ('lat', 'lon')
@@ -104,13 +104,14 @@ def calc_auspicious_chunks_dict(
     chunks_dict : dict
         Dictionary of chunk sizes
     """
-    assert target_size == "100mb", "Apologies, but not implemented for anything but 100m right now!"
-    assert (
-        type(chunk_dims) == tuple
-    ), "Your chunk_dims likely includes one string but needs a comma after it! to be a tuple!"
-    if type(da) == xr.Dataset:
+
+    if type(chunk_dims) != tuple:
+        raise ValueError(
+            "Your chunk_dims likely includes one string but needs a comma after it! to be a tuple!"
+        )
+    if isinstance(da, xr.Dataset):
         da = da.to_array().squeeze()
-    target_size_bytes = 100e6
+
     array_dims = dict(zip(da.dims, da.shape))
     chunks_dict = {}
     # dims not in chunk_dims should be one chunk (length -1)
@@ -131,3 +132,5 @@ def calc_auspicious_chunks_dict(
     perfect_chunk_length = int(np.ceil(perfect_chunk ** (1 / len(chunk_dims))))
     for dim in chunk_dims:
         chunks_dict[dim] = min(perfect_chunk_length, array_dims[dim])
+
+    return chunks_dict
