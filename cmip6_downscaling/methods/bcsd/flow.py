@@ -4,7 +4,6 @@ from cmip6_downscaling import runtimes
 from cmip6_downscaling.methods.bcsd.tasks import (
     coarsen_obs,
     fit_and_predict,
-    interpolate_obs,
     interpolate_prediction,
     postprocess_bcsd,
     spatial_anomalies,
@@ -17,6 +16,7 @@ from cmip6_downscaling.methods.common.tasks import (
     monthly_summary,
     pyramid,
     rechunk,
+    regrid,
     run_analyses,
 )
 
@@ -49,7 +49,7 @@ with Flow(
 
     coarse_obs_path = coarsen_obs(obs_path, experiment_train_path, run_parameters)
 
-    interpolated_obs_path = interpolate_obs(obs_path, coarse_obs_path, run_parameters)
+    interpolated_obs_path = regrid(source_path=obs_path, target_grid_path=obs_path)
 
     interpolated_obs_full_time_path = rechunk(
         path=interpolated_obs_path, pattern="full_time", run_parameters=run_parameters
