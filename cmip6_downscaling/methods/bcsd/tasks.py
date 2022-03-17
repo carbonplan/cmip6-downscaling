@@ -1,5 +1,6 @@
 from dataclasses import asdict
 
+import xarray as xr
 from prefect import task
 from upath import UPath
 
@@ -8,7 +9,7 @@ from cmip6_downscaling.methods.common.containers import RunParameters
 
 intermediate_dir = UPath(config.get("storage.intermediate.uri"))
 
-use_cache = False  # TODO: this should be a config option
+use_cache = config.get('run_options.use_cache')
 
 
 @task
@@ -34,8 +35,9 @@ def coarsen_obs(obs_path: UPath, experiment_path: UPath, run_parameters: RunPara
 
 
 @task
-def calc_spacial_anomalies(
-    obs_path: UPath, interpolated_obs_path: UPath, run_parameters: RunParameters
+
+def interpolate_obs(
+    obs_path: UPath, coarse_obs_path: UPath, run_parameters: RunParameters
 ) -> UPath:
     target = (
         intermediate_dir
@@ -50,7 +52,37 @@ def calc_spacial_anomalies(
 
     # TODO
 
-    # spatial_anomalies.to_zarr(target, mode='w')
+    # interpolated_obs_ds.to_zarr(target, mode='w')
+    return target
+
+
+@task
+def spatial_anomalies(
+    obs_full_time_path: UPath, interpolated_obs_full_time_path: UPath, run_parameters: RunParameters
+) -> UPath:
+    target = (
+        intermediate_dir
+        / "spatial_anomalies"
+        / "{obs}_{model}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}".format(
+            **asdict(run_parameters)
+        )
+    )
+    if use_cache and (target / ".zmetadata").exists():
+        print(f"found existing target: {target}")
+        return target
+
+    interpolated_obs_full_time_ds = xr.open_zarr(interpolated_obs_full_time_path)
+    obs_full_time_ds = xr.open_zarr(obs_full_time_path)
+
+    # calculate the difference between the actual obs (with finer spatial heterogeneity)
+    # and the interpolated coarse obs this will be saved and added to the
+    # spatially-interpolated coarse predictions to add the spatial heterogeneity back in.
+
+    spatial_anomalies = obs_full_time_ds - interpolated_obs_full_time_ds
+    seasonal_cycle_spatial_anomalies = spatial_anomalies.groupby("time.month").mean()
+
+    seasonal_cycle_spatial_anomalies.to_zarr(target, mode="w")
+
     return target
 
 
