@@ -101,11 +101,8 @@ def fit_and_predict(
 
     pointwise_model = PointWiseDownscaler(model=bcsd_model, dim="time")
 
-    # coarse_obs_rechunked_validated_ds
     coarse_obs_full_time_ds = xr.open_zarr(coarse_obs_full_time_path)
-    # gcm_train_subset_full_time_ds
     experiment_train_full_time_ds = xr.open_zarr(experiment_train_full_time_path)
-    # gcm_predict_rechunked_ds
     experiment_predict_full_time_ds = xr.open_zarr(experiment_predict_full_time_path)
 
     pointwise_model.fit(
