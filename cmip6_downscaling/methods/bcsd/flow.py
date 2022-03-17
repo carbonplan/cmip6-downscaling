@@ -49,8 +49,6 @@ with Flow(
 
     coarse_obs_path = coarsen_obs(obs_path, experiment_train_path, run_parameters)
 
-    coarse_obs_path = coarsen_obs(obs_path, experiment_path, run_parameters)
-
     interpolated_obs_path = regrid(source_path=obs_path, target_grid_path=obs_path)
 
     interpolated_obs_full_time_path = rechunk(
