@@ -44,9 +44,11 @@ with Flow(
 
     # input datasets
     obs_path = get_obs(run_parameters)
-    experiment_path = get_experiment(run_parameters)
+    experiment_train_path = get_experiment(run_parameters, time_subset='train_period')
+    experiment_predict_path = get_experiment(run_parameters, time_subset='predict_period')
 
-    coarse_obs_path = coarsen_obs(obs_path, experiment_path, run_parameters)
+    coarse_obs_path = coarsen_obs(obs_path, experiment_train_path, run_parameters)
+
     interpolated_obs_path = interpolate_obs(obs_path, coarse_obs_path, run_parameters)
 
     interpolated_obs_full_time_path = rechunk(
@@ -57,12 +59,16 @@ with Flow(
         obs_full_time_path, interpolated_obs_full_time_path, run_parameters
     )
 
-    # TODO: add spatial_chunks to config and do all full_time rechunks according to that pattern
     coarse_obs_full_time_path = rechunk(coarse_obs_path, pattern='full_time')
-    experiment_full_time_path = rechunk(experiment_path, pattern='full_time')
+
+    experiment_train_full_time_path = rechunk(experiment_train_path, pattern='full_time')
+    experiment_predict_full_time_path = rechunk(experiment_predict_path, pattern='full_time')
 
     bias_corrected_path = fit_and_predict(
-        experiment_full_time_path, coarse_obs_full_time_path, run_parameters
+        experiment_train_full_time_path=experiment_train_full_time_path,
+        experiment_predict_full_time_path=experiment_predict_full_time_path,
+        coarse_obs_full_time_path=coarse_obs_full_time_path,
+        run_parameters=run_parameters,
     )
 
     bias_corrected_fine_full_space_path = interpolate_prediction(
@@ -72,7 +78,6 @@ with Flow(
     bias_corrected_fine_full_time_path = rechunk(
         bias_corrected_fine_full_space_path, pattern='full_time'
     )
-
     postprocess_bcsd_path = postprocess_bcsd(
         bias_corrected_fine_full_time_path, spatial_anomalies_path, run_parameters
     )  # fine-scale maps (full_space) (time: 365)
