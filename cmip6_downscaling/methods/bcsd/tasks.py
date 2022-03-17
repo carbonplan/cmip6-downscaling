@@ -1,11 +1,13 @@
 from dataclasses import asdict
 
+import xarray as xr
 from prefect import task
+from skdownscale.pointwise_models import PointWiseDownscaler
+from skdownscale.pointwise_models.bcsd import BcsdPrecipitation, BcsdTemperature
 from upath import UPath
 
 from cmip6_downscaling import config
-
-# from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
+from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
 from cmip6_downscaling.methods.common.containers import RunParameters
 
 intermediate_dir = UPath(config.get("storage.intermediate.uri"))
@@ -99,20 +101,16 @@ def fit_and_predict(
 
     pointwise_model = PointWiseDownscaler(model=bcsd_model, dim="time")
 
-    # #move outside
-    # coarse_obs_rechunked_validated_path = rechunk_zarr_array_with_caching(
-    #     coarse_obs_full_time_path, template_chunk_array=gcm_train_subset_full_time_ds
-    # )
-    # used to be called: coarse_obs_rechunked_validated_ds
+    # coarse_obs_rechunked_validated_ds
     coarse_obs_full_time_ds = xr.open_zarr(coarse_obs_full_time_path)
     # gcm_train_subset_full_time_ds
     experiment_train_full_time_ds = xr.open_zarr(experiment_train_full_time_path)
     # gcm_predict_rechunked_ds
-    # Need input path here..
     experiment_predict_full_time_ds = xr.open_zarr(experiment_predict_full_time_path)
 
     pointwise_model.fit(
-        experiment_full_time_ds[run_parameters.variable], coarse_obs_full_time_ds[variable]
+        experiment_train_full_time_ds[run_parameters.variable],
+        coarse_obs_full_time_ds[run_parameters.variable],
     )
     bias_corrected_da = pointwise_model.predict(
         experiment_predict_full_time_ds[run_parameters.variable]
