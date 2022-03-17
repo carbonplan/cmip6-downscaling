@@ -98,6 +98,8 @@ def fit_and_predict(
         bcsd_model = BcsdTemperature(return_anoms=False)
     elif run_parameters.variable in RELATIVE_VARS:
         bcsd_model = BcsdPrecipitation(return_anoms=False)
+    else:
+        raise ValueError('variable not found in ABSOLUTE_VARS OR RELATIVE_VARS.')
 
     pointwise_model = PointWiseDownscaler(model=bcsd_model, dim="time")
 
