@@ -12,7 +12,7 @@ from cmip6_downscaling.methods.common.containers import RunParameters
 
 intermediate_dir = UPath(config.get("storage.intermediate.uri"))
 
-use_cache = False  # TODO: this should be a config option
+use_cache = config.get('run_options.use_cache')
 
 
 @task
@@ -25,8 +25,8 @@ def coarsen_obs(obs_path: UPath, experiment_path: UPath, run_parameters: RunPara
             **asdict(run_parameters)
         )
     )
-    if use_cache and (target / '.zmetadata').exists():
-        print(f'found existing target: {target}')
+    if use_cache and (target / ".zmetadata").exists():
+        print(f"found existing target: {target}")
         return target
 
     # experiment_ds = xr.open_zarr(experiment_path)
@@ -48,8 +48,8 @@ def interpolate_obs(
             **asdict(run_parameters)
         )
     )
-    if use_cache and (target / '.zmetadata').exists():
-        print(f'found existing target: {target}')
+    if use_cache and (target / ".zmetadata").exists():
+        print(f"found existing target: {target}")
         return target
 
     # TODO
@@ -59,23 +59,33 @@ def interpolate_obs(
 
 
 @task
-def calc_spatial_anomalies(
-    obs_path: UPath, interpolated_obs_path: UPath, run_parameters: RunParameters
+
+def spatial_anomalies(
+    obs_full_time_path: UPath, interpolated_obs_full_time_path: UPath, run_parameters: RunParameters
 ) -> UPath:
     target = (
         intermediate_dir
-        / "interpolate_obs"
+        / "spatial_anomalies"
         / "{obs}_{model}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}".format(
             **asdict(run_parameters)
         )
     )
-    if use_cache and (target / '.zmetadata').exists():
-        print(f'found existing target: {target}')
+    if use_cache and (target / ".zmetadata").exists():
+        print(f"found existing target: {target}")
         return target
 
-    # TODO
+    interpolated_obs_full_time_ds = xr.open_zarr(interpolated_obs_full_time_path)
+    obs_full_time_ds = xr.open_zarr(obs_full_time_path)
 
-    # spatial_anomalies.to_zarr(target, mode='w')
+    # calculate the difference between the actual obs (with finer spatial heterogeneity)
+    # and the interpolated coarse obs this will be saved and added to the
+    # spatially-interpolated coarse predictions to add the spatial heterogeneity back in.
+
+    spatial_anomalies = obs_full_time_ds - interpolated_obs_full_time_ds
+    seasonal_cycle_spatial_anomalies = spatial_anomalies.groupby("time.month").mean()
+
+    seasonal_cycle_spatial_anomalies.to_zarr(target, mode="w")
+
     return target
 
 
@@ -88,8 +98,8 @@ def fit_and_predict(
 ) -> UPath:
 
     target = intermediate_dir / "fit_and_predict" / run_parameters.run_id
-    if use_cache and (target / '.zmetadata').exists():
-        print(f'found existing target: {target}')
+    if use_cache and (target / ".zmetadata").exists():
+        print(f"found existing target: {target}")
         return target
 
     # # TODO
@@ -125,8 +135,8 @@ def interpolate_prediction(
 ) -> UPath:
 
     target = intermediate_dir / "interpolate_prediction" / run_parameters.run_id
-    if use_cache and (target / '.zmetadata').exists():
-        print(f'found existing target: {target}')
+    if use_cache and (target / ".zmetadata").exists():
+        print(f"found existing target: {target}")
         return target
 
     # TODO
@@ -143,8 +153,8 @@ def postprocess_bcsd(
 ) -> UPath:
 
     target = intermediate_dir / "interpolate_prediction" / run_parameters.run_id
-    if use_cache and (target / '.zmetadata').exists():
-        print(f'found existing target: {target}')
+    if use_cache and (target / ".zmetadata").exists():
+        print(f"found existing target: {target}")
         return target
 
     # TODO
