@@ -4,6 +4,7 @@ from pathlib import PosixPath
 
 import papermill as pm
 import xarray as xr
+import xesmf as xe
 from azure.storage.blob import BlobServiceClient, ContentSettings
 from prefect import task
 from upath import UPath
@@ -17,7 +18,8 @@ from .containers import RunParameters
 
 intermediate_dir = UPath(config.get("storage.intermediate.uri"))
 
-use_cache = True  # TODO: this should be a config option
+
+use_cache = config.get('run_options.use_cache')
 
 
 @task
@@ -75,6 +77,7 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
 
     subset = subset_dataset(ds, run_parameters.variable, time_period, run_parameters.bbox)
     # Note: dataset is chunked into time:365 chunks to standardize leap-year chunking.
+
     subset = subset.chunk({'time': 365})
     del subset[run_parameters.variable].encoding['chunks']
 
@@ -96,7 +99,7 @@ def rechunk(path: UPath, pattern: str = None) -> UPath:
     return target
 
 
-# @task
+@task
 def monthly_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
 
     target = intermediate_dir / "monthly_summary" / run_parameters.run_id
@@ -155,6 +158,29 @@ def pyramid(
         return target
 
     # TODO
+
+    return target
+
+
+@task(tags=['dask-resource:TASKSLOTS=1'])
+def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
+
+    target = (
+        intermediate_dir / "regrid" / source_path.path.replace('/', '_')
+        + '_'
+        + target_grid_path.path.replace('/', '_')
+    )
+
+    if use_cache and (target / '.zmetadata').exists():
+        print(f'found existing target: {target}')
+        return target
+
+    source_ds = xr.open_zarr(source_path)
+    target_grid_ds = xr.open_zarr(target_grid_path)
+
+    regridder = xe.Regridder(source_ds, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
+    regridded_ds = regridder(source_ds)
+    regridded_ds.to_zarr(target, mode='w')
 
     return target
 
