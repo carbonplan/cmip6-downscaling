@@ -35,7 +35,6 @@ def coarsen_obs(obs_path: UPath, experiment_path: UPath, run_parameters: RunPara
 
 
 @task
-
 def interpolate_obs(
     obs_path: UPath, coarse_obs_path: UPath, run_parameters: RunParameters
 ) -> UPath:

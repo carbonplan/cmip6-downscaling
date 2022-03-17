@@ -50,7 +50,6 @@ with Flow(
 
     interpolated_obs_path = regrid(source_path=obs_path, target_grid_path=obs_path)
 
-
     interpolated_obs_full_time_path = rechunk(
         path=interpolated_obs_path, pattern="full_time", run_parameters=run_parameters
     )
