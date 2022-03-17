@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from cmip6_downscaling.workflows.utils import lon_to_180
+from cmip6_downscaling.methods.common.utils import lon_to_180
 
 
 def create_test_ds(xname, yname, zname, xlen, ylen, zlen):
