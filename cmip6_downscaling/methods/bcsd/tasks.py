@@ -2,9 +2,12 @@ from dataclasses import asdict
 
 import xarray as xr
 from prefect import task
+from skdownscale.pointwise_models import PointWiseDownscaler
+from skdownscale.pointwise_models.bcsd import BcsdPrecipitation, BcsdTemperature
 from upath import UPath
 
 from cmip6_downscaling import config
+from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
 from cmip6_downscaling.methods.common.containers import RunParameters
 
 intermediate_dir = UPath(config.get("storage.intermediate.uri"))
@@ -87,7 +90,8 @@ def spatial_anomalies(
 
 @task
 def fit_and_predict(
-    experiment_full_time_path: UPath,
+    experiment_train_full_time_path: UPath,
+    experiment_predict_full_time_path: UPath,
     coarse_obs_full_time_path: UPath,
     run_parameters: RunParameters,
 ) -> UPath:
@@ -97,9 +101,30 @@ def fit_and_predict(
         print(f"found existing target: {target}")
         return target
 
-    # TODO
+    # # TODO
+    if run_parameters.variable in ABSOLUTE_VARS:
+        bcsd_model = BcsdTemperature(return_anoms=False)
+    elif run_parameters.variable in RELATIVE_VARS:
+        bcsd_model = BcsdPrecipitation(return_anoms=False)
+    else:
+        raise ValueError('variable not found in ABSOLUTE_VARS OR RELATIVE_VARS.')
 
-    # bias_corrected.to_zarr(target, mode='w')
+    pointwise_model = PointWiseDownscaler(model=bcsd_model, dim="time")
+
+    coarse_obs_full_time_ds = xr.open_zarr(coarse_obs_full_time_path)
+    experiment_train_full_time_ds = xr.open_zarr(experiment_train_full_time_path)
+    experiment_predict_full_time_ds = xr.open_zarr(experiment_predict_full_time_path)
+
+    pointwise_model.fit(
+        experiment_train_full_time_ds[run_parameters.variable],
+        coarse_obs_full_time_ds[run_parameters.variable],
+    )
+    bias_corrected_da = pointwise_model.predict(
+        experiment_predict_full_time_ds[run_parameters.variable]
+    )
+
+    bias_corrected_ds = bias_corrected_da.astype('float32').to_dataset(name=run_parameters.variable)
+    bias_corrected_ds.to_zarr(target, mode='w')
     return target
 
 

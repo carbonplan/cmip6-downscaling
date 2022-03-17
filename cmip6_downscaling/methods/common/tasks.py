@@ -78,7 +78,7 @@ def get_experiment(run_parameters: RunParameters) -> UPath:
     subset = subset_dataset(
         ds, run_parameters.variable, run_parameters.train_period.time_slice, run_parameters.bbox
     )
-    subset = subset.chunk({'time': 365})  # TODO: do better here
+    subset = subset.chunk({'time': 365})
     del subset[run_parameters.variable].encoding['chunks']
 
     subset.to_zarr(target, mode='w')
@@ -99,7 +99,7 @@ def rechunk(path: UPath, pattern: str = None) -> UPath:
     return target
 
 
-# @task
+@task
 def monthly_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
 
     target = intermediate_dir / "monthly_summary" / run_parameters.run_id
