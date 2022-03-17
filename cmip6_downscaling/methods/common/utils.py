@@ -1,19 +1,12 @@
-import random
 import re
-import string
 from typing import Tuple, Union
 
-import fsspec
 import numpy as np
 import xarray as xr
 from xarray_schema import DataArraySchema
 from xarray_schema.base import SchemaError
 
-from cmip6_downscaling import config
-
 from .containers import BBox
-
-schema_maps_chunks = DataArraySchema(chunks={'lat': -1, 'lon': -1})
 
 
 def lon_to_180(ds):
@@ -88,33 +81,6 @@ def subset_dataset(
             subset_ds = subset_ds.chunk(chunking_schema)
 
     return subset_ds
-
-
-def temp_file_name():
-    letters = string.ascii_lowercase
-    return "".join(random.choice(letters) for i in range(10))
-
-
-def make_rechunker_stores(
-    output_path: str,
-) -> Tuple[fsspec.FSMap, fsspec.FSMap, str]:
-    """Initialize two stores for rechunker to use as temporary and final rechunked locations
-    Parameters
-    ----------
-    output_path : str, optional
-        Output path for rechunker stores
-    Returns
-    -------
-    temp_store, target_store, path_tgt : tuple[fsspec.mapping.FSmap, fsspec.mapping.FSmap, string]
-        Stores where rechunker will write and the path to the target store
-    """
-    storage_options = config.get('storage.temporary.storage_options')
-    path_tmp = config.get('storage.scratch.uri') + "/{}.zarr".format(temp_file_name())
-
-    temp_store = fsspec.get_mapper(path_tmp, **storage_options)
-    target_store = fsspec.get_mapper(output_path, **storage_options)
-    print(f'this is temp_path: {path_tmp}. \n this is target_path: {output_path}')
-    return temp_store, target_store, output_path
 
 
 def calc_auspicious_chunks_dict(
