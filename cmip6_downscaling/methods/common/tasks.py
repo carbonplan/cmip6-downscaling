@@ -65,7 +65,6 @@ def get_obs(run_parameters: RunParameters) -> UPath:
     )
     del subset[run_parameters.variable].encoding['chunks']
 
-
     subset.attrs.update(**get_cf_global_attrs(version=version))
     subset.to_zarr(target, mode='w')
     print(subset)
@@ -253,7 +252,6 @@ def annual_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
     out_ds.to_zarr(target, mode='w')
 
     return target
-
 
 
 @task(tags=['dask-resource:TASKSLOTS=1'], log_stdout=True)
