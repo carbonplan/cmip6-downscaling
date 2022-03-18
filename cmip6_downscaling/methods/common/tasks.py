@@ -99,23 +99,25 @@ def get_experiment(run_parameters: RunParameters) -> UPath:
 def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: str = "2GB") -> UPath:
     """Use `rechunker` package to adjust chunks of dataset to a form
     conducive for your processing.
+
     Parameters
     ----------
     path : UPath
         path to zarr store
-    chunking_pattern: str or xr.Dataset
+    chunking_pattern : str or UPath
         The pattern of chunking you want to use.
-    max_mem: str
+    max_mem : str
         The memory available for rechunking steps. Must look like "2GB". Optional, default is 2GB.
+
     Returns
     -------
     target : UPath
         Path to rechunked dataset
     """
 
-    if type(chunking_pattern) == str:
+    if isinstance(chunking_pattern, str):
         pattern_string = chunking_pattern
-    elif type(chunking_pattern) == UPath:
+    elif isinstance(chunking_pattern, UPath):
         # when you pass a dataset the chunking will match the chunking of that dataset
         # so we'll call it "matched". this is ambiguous - like it could be chunked to match
         # any number of patterns but it is sufficient for this implementation.
@@ -144,11 +146,11 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
     example_var = list(ds.data_vars)[0]
     # based upon whether you want to chunk along space or time, take the dataset and calculate
     # an optimal chunking schema for processing.
-    if type(chunking_pattern) == str:
+    if isinstance(chunking_pattern, str):
         chunk_dims = config.get(f"chunk_dims.{chunking_pattern}")
         chunk_def = calc_auspicious_chunks_dict(ds[example_var], chunk_dims=chunk_dims)
 
-    elif type(chunking_pattern) == UPath:
+    elif isinstance(chunking_pattern, UPath):
         template_ds = xr.open_dataset(chunking_pattern)
         # define the chunk definition
         chunk_def = {

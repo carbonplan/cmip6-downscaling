@@ -90,12 +90,14 @@ def calc_auspicious_chunks_dict(
     """Figure out a chunk size that, given the size of the dataset, the dimension(s) you want to chunk on
     and the data type, will fit under the target_size. Currently only works for 100mb which
     is the recommended chunk size for dask processing.
+
     Parameters
     ----------
-    da : Union[xr.DataArray, xr.Dataset]
+    da : xr.DataArray
         Dataset or data array you're wanting to chunk
     chunk_dims : tuple, optional
         Dimension(s) you want to chunk along, by default ('lat', 'lon')
+
     Returns
     -------
     chunks_dict : dict
@@ -103,9 +105,10 @@ def calc_auspicious_chunks_dict(
         length of that dimension (avoiding the shorthand -1 in order to play nice
         with rechunker)
     """
-    assert (
-        type(chunk_dims) == tuple
-    ), "Your chunk_dims likely includes one string but needs a comma after it! to be a tuple!"
+    if not isinstance(chunk_dims, tuple):
+        raise TypeError(
+            "Your chunk_dims likely includes one string but needs a comma after it! to be a tuple!"
+        )
     # setting target_size_bytes to the 100mb chunksize recommended by dask. could modify in future.
     target_size_bytes = 100e6
     dim_sizes = dict(zip(da.dims, da.shape))
