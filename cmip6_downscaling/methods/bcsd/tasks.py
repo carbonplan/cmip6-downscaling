@@ -129,22 +129,6 @@ def fit_and_predict(
 
 
 @task
-def interpolate_prediction(
-    bias_corrected_path: UPath, obs_path: UPath, run_parameters: RunParameters
-) -> UPath:
-
-    target = intermediate_dir / "interpolate_prediction" / run_parameters.run_id
-    if use_cache and (target / ".zmetadata").exists():
-        print(f"found existing target: {target}")
-        return target
-
-    # TODO
-
-    # bias_corrected_fine_full_space.to_zarr(target, mode='w')
-    return target
-
-
-@task
 def postprocess_bcsd(
     bias_corrected_fine_full_time_path: UPath,
     spatial_anomalies_path: UPath,

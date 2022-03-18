@@ -4,7 +4,6 @@ from cmip6_downscaling import runtimes
 from cmip6_downscaling.methods.bcsd.tasks import (
     coarsen_obs,
     fit_and_predict,
-    interpolate_prediction,
     postprocess_bcsd,
     spatial_anomalies,
 )
@@ -74,9 +73,9 @@ with Flow(
         run_parameters=run_parameters,
     )
 
-    bias_corrected_fine_full_space_path = interpolate_prediction(
-        bias_corrected_path, obs_path, run_parameters
-    )  # rechunks to full_space
+    bias_corrected_fine_full_space_path = regrid(
+        source_path=bias_corrected_path, target_grid_path=obs_path
+    )
 
     bias_corrected_fine_full_time_path = rechunk(
         bias_corrected_fine_full_space_path, pattern='full_time'
