@@ -1,4 +1,5 @@
 import os
+import warnings
 from dataclasses import asdict
 from pathlib import PosixPath
 from typing import Union
@@ -25,6 +26,12 @@ from cmip6_downscaling.data.observations import open_era5
 from cmip6_downscaling.methods.common.utils import calc_auspicious_chunks_dict, subset_dataset
 
 from .containers import RunParameters
+
+warnings.filterwarnings(
+    "ignore",
+    "(.*) filesystem path not explicitly implemented. falling back to default implementation. This filesystem may not be tested",
+    category=UserWarning,
+)
 
 PIXELS_PER_TILE = 128
 
@@ -145,6 +152,8 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
         return target
     # if a cached target isn't found we'll go through the rechunking step
     # open the zarr group
+    target_store.clear()
+    temp_store.clear()
     group = zarr.open_consolidated(path)
     # open the dataset to access the coordinates
     ds = xr.open_zarr(path)
@@ -186,22 +195,23 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
         target_schema.validate(ds)
         return path
     except SchemaError:
+        pass
 
-        rechunk_plan = rechunker.rechunk(
-            source=group,
-            target_chunks=chunks_dict,
-            max_mem=max_mem,
-            target_store=target_store,
-            temp_store=temp_store,
-        )
+    rechunk_plan = rechunker.rechunk(
+        source=group,
+        target_chunks=chunks_dict,
+        max_mem=max_mem,
+        target_store=target_store,
+        temp_store=temp_store,
+    )
 
-        rechunk_plan.execute()
+    rechunk_plan.execute()
 
-        # consolidate_metadata here since when it comes out of rechunker it isn't consolidated.
-        zarr.consolidate_metadata(target_store)
-        temp_store.clear()
+    # consolidate_metadata here since when it comes out of rechunker it isn't consolidated.
+    zarr.consolidate_metadata(target_store)
+    temp_store.clear()
 
-        return target
+    return target
 
 
 @task

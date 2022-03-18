@@ -1,3 +1,5 @@
+import warnings
+
 from prefect import Flow, Parameter
 
 from cmip6_downscaling import runtimes
@@ -16,6 +18,12 @@ from cmip6_downscaling.methods.common.tasks import (
     rechunk,
     regrid,
     run_analyses,
+)
+
+warnings.filterwarnings(
+    "ignore",
+    "(.*) filesystem path not explicitly implemented. falling back to default implementation. This filesystem may not be tested",
+    category=UserWarning,
 )
 
 runtime = runtimes.get_runtime()
