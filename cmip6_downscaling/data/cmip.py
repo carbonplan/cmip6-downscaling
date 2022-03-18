@@ -6,6 +6,7 @@ import xarray as xr
 from xarray.core.types import T_Xarray
 
 from cmip6_downscaling import config
+from cmip6_downscaling.methods.common.containers import BBox
 
 from . import cat
 from .utils import lon_to_180, subset_dataset
@@ -131,8 +132,7 @@ def get_gcm(
     variables: Union[str, List[str]],
     train_period: slice,
     predict_period: slice,
-    bbox,
-    cache_within_rechunk: bool = True,
+    bbox: BBox,
 ) -> xr.Dataset:
     """
     Load and combine historical and future GCM into one dataset.
@@ -153,6 +153,8 @@ def get_gcm(
         Start year of predict/future period
     predict_period_end : str
         End year of predict/future period
+    bbox : BBox
+        Bounding box for subset
 
     Returns
     -------

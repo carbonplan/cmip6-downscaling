@@ -16,28 +16,6 @@ use_cache = config.get('run_options.use_cache')
 
 
 @task
-def coarsen_obs(obs_path: UPath, experiment_path: UPath, run_parameters: RunParameters) -> UPath:
-    # Q: for coarsen_obs and interpolate_obs, should we split the task into a separate tasks for regridding and rechunking?
-    target = (
-        intermediate_dir
-        / "coarsen_obs"
-        / "{obs}_{model}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}".format(
-            **asdict(run_parameters)
-        )
-    )
-    if use_cache and (target / ".zmetadata").exists():
-        print(f"found existing target: {target}")
-        return target
-
-    # experiment_ds = xr.open_zarr(experiment_path)
-
-    # coarse_obs_ds = regrid_ds(ds_path=obs_path, target_grid_ds=experiment_ds)
-
-    # coarse_obs_ds.to_zarr(target, mode='w')
-    return target
-
-
-@task
 def interpolate_obs(
     obs_path: UPath, coarse_obs_path: UPath, run_parameters: RunParameters
 ) -> UPath:
@@ -140,7 +118,14 @@ def postprocess_bcsd(
         print(f"found existing target: {target}")
         return target
 
-    # TODO
+    bias_corrected_fine_full_time_ds = xr.open_zarr(bias_corrected_fine_full_time_path)
+    spatial_anomalies_ds = xr.open_zarr(spatial_anomalies_path)
+    bcsd_results_ds = bias_corrected_fine_full_time_ds.groupby("time.month") + spatial_anomalies_ds
+    del bcsd_results_ds['month'].encoding['chunks']
 
-    # results.to_zarr(target, mode='w')
+    # The groupby operation above results in inconsistent chunking (# of days per month)
+    # This manual chunk step returns the chunking scheme to that of the input dataset
+    rechunked_bcsd_results_ds = bcsd_results_ds.chunk(bias_corrected_fine_full_time_ds.chunks)
+
+    rechunked_bcsd_results_ds.to_zarr(target, mode='w')
     return target

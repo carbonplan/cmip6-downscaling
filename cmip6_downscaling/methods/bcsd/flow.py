@@ -2,7 +2,6 @@ from prefect import Flow, Parameter
 
 from cmip6_downscaling import runtimes
 from cmip6_downscaling.methods.bcsd.tasks import (
-    coarsen_obs,
     fit_and_predict,
     postprocess_bcsd,
     spatial_anomalies,
@@ -47,23 +46,23 @@ with Flow(
     experiment_train_path = get_experiment(run_parameters, time_subset='train_period')
     experiment_predict_path = get_experiment(run_parameters, time_subset='predict_period')
 
-    coarse_obs_path = coarsen_obs(obs_path, experiment_train_path, run_parameters)
+    coarse_obs_path = regrid(obs_path, experiment_train_path)
 
-    interpolated_obs_path = regrid(source_path=obs_path, target_grid_path=obs_path)
+    interpolated_obs_path = regrid(source_path=coarse_obs_path, target_grid_path=obs_path)
 
     interpolated_obs_full_time_path = rechunk(
-        path=interpolated_obs_path, pattern="full_time", run_parameters=run_parameters
+        path=interpolated_obs_path, chunking_pattern="full_time"
     )
-    obs_full_time_path = rechunk(path=obs_path, pattern="full_time", run_parameters=run_parameters)
+    obs_full_time_path = rechunk(path=obs_path, chunking_pattern="full_time")
     spatial_anomalies_path = spatial_anomalies(
         obs_full_time_path, interpolated_obs_full_time_path, run_parameters
     )
-    coarse_obs_full_time_path = rechunk(coarse_obs_path, pattern='full_time')
+    coarse_obs_full_time_path = rechunk(coarse_obs_path, chunking_pattern='full_time')
     experiment_train_full_time_path = rechunk(
-        experiment_train_path, pattern=coarse_obs_full_time_path
+        experiment_train_path, chunking_pattern=coarse_obs_full_time_path
     )
     experiment_predict_full_time_path = rechunk(
-        experiment_predict_path, pattern=coarse_obs_full_time_path
+        experiment_predict_path, chunking_pattern=coarse_obs_full_time_path
     )
 
     bias_corrected_path = fit_and_predict(
@@ -78,7 +77,7 @@ with Flow(
     )
 
     bias_corrected_fine_full_time_path = rechunk(
-        bias_corrected_fine_full_space_path, pattern='full_time'
+        bias_corrected_fine_full_space_path, chunking_pattern='full_time'
     )
     postprocess_bcsd_path = postprocess_bcsd(
         bias_corrected_fine_full_time_path, spatial_anomalies_path, run_parameters
@@ -96,5 +95,5 @@ with Flow(
     monthly_pyramid_path = pyramid(monthly_summary_path, levels=4)
     annual_pyramid_path = pyramid(annual_summary_path, levels=4)
 
-    # if config.get('run_options.cleanup_flag') is True:
-    #     cleanup.run_rsfip(gcm_identifier, obs_identifier)
+    # # if config.get('run_options.cleanup_flag') is True:
+    # #     cleanup.run_rsfip(gcm_identifier, obs_identifier)
