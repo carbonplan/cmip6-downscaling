@@ -140,7 +140,13 @@ def postprocess_bcsd(
         print(f"found existing target: {target}")
         return target
 
-    # TODO
+    bias_corrected_fine_full_time_ds = xr.open_zarr(bias_corrected_fine_full_time_path)
+    spatial_anomalies_ds = xr.open_zarr(spatial_anomalies_path)
+    bcsd_results_ds = bias_corrected_fine_full_time_ds.groupby("time.month") + spatial_anomalies_ds
+    del bcsd_results_ds['month'].encoding['chunks']
 
-    # results.to_zarr(target, mode='w')
+    # fails without .chunk: #ValueError: Zarr requires uniform chunk sizes except for final chunk. Variable named 'tasmax' has incompatible dask chunks: ((31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31), (93, 93, 93, 93, 93, 93, 93, 70), (93, 93, 93, 93, 93, 93, 93, 93, 93, 93, 93, 93, 93, 93, 93, 45)). Consider rechunking using `chunk()`.
+    rechunked_bcsd_results_ds = bcsd_results_ds.chunk({'time': 365, 'lat': -1, 'lon': -1})
+
+    rechunked_bcsd_results_ds.to_zarr(target, mode='w')
     return target
