@@ -70,11 +70,10 @@ def get_obs(run_parameters: RunParameters) -> UPath:
 @task
 def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     time_period = getattr(run_parameters, time_subset)
-
     target = (
         intermediate_dir
         / "get_experiment"
-        / "{model}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{time_period[0]}_{time_period[1]}".format(
+        / "{model}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{time_period.start}_{time_period.stop}".format(
             time_period=time_period, **asdict(run_parameters)
         )
     )
@@ -86,7 +85,9 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
         source_ids=run_parameters.model, return_type='xr', variable_ids=run_parameters.variable
     ).pipe(lon_to_180)
 
-    subset = subset_dataset(ds, run_parameters.variable, time_period, run_parameters.bbox)
+    subset = subset_dataset(
+        ds, run_parameters.variable, time_period.time_slice, run_parameters.bbox
+    )
     # Note: dataset is chunked into time:365 chunks to standardize leap-year chunking.
 
     subset = subset.chunk({'time': 365})
