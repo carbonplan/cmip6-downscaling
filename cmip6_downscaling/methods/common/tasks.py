@@ -1,22 +1,33 @@
 import os
 from dataclasses import asdict
 from pathlib import PosixPath
+from typing import Union
 
+import fsspec
 import papermill as pm
+import rechunker
 import xarray as xr
 import xesmf as xe
+import zarr
 from azure.storage.blob import BlobServiceClient, ContentSettings
 from prefect import task
 from upath import UPath
+from xarray_schema import DataArraySchema, DatasetSchema
+from xarray_schema.base import SchemaError
 
 from cmip6_downscaling import config
 from cmip6_downscaling.data.cmip import load_cmip
 from cmip6_downscaling.data.observations import open_era5
-from cmip6_downscaling.methods.common.utils import lon_to_180, subset_dataset
+from cmip6_downscaling.methods.common.utils import (
+    calc_auspicious_chunks_dict,
+    lon_to_180,
+    subset_dataset,
+)
 
 from .containers import RunParameters
 
 intermediate_dir = UPath(config.get("storage.intermediate.uri"))
+scratch_dir = UPath(config.get("storage.scratch.uri"))
 
 
 use_cache = config.get('run_options.use_cache')
@@ -86,17 +97,107 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
 
 
 @task
-def rechunk(path: UPath, pattern: str = None) -> UPath:
+def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: str = "2GB") -> UPath:
+    """Use `rechunker` package to adjust chunks of dataset to a form
+    conducive for your processing.
 
-    # TODO: think about how to cache this result
-    target = intermediate_dir / "rechunk" / "todo"
+    Parameters
+    ----------
+    path : UPath
+        path to zarr store
+    chunking_pattern : str or UPath
+        The pattern of chunking you want to use.
+    max_mem : str
+        The memory available for rechunking steps. Must look like "2GB". Optional, default is 2GB.
+
+    Returns
+    -------
+    target : UPath
+        Path to rechunked dataset
+    """
+
+    if isinstance(chunking_pattern, str):
+        pattern_string = chunking_pattern
+    elif isinstance(chunking_pattern, UPath):
+        # when you pass a dataset the chunking will match the chunking of that dataset
+        # so we'll call it "matched". this is ambiguous - like it could be chunked to match
+        # any number of patterns but it is sufficient for this implementation.
+        pattern_string = 'matched'
+    else:
+        raise NotImplementedError(
+            "Not a valid chunking approach. Try passing either `full_space` or `full_time`, or a template chunked dataset."
+        )
+    target = intermediate_dir / "rechunk" / pattern_string + path.path.replace("/", "_")
+    path_tmp = scratch_dir / "rechunk" / pattern_string + path.path.replace("/", "_")
+    target_store = fsspec.get_mapper(target)
+    temp_store = fsspec.get_mapper(path_tmp)
+
     if use_cache and (target / '.zmetadata').exists():
         print(f'found existing target: {target}')
+        # if we wanted to check that it was chunked correctly we could put this down below where
+        # the target_schema is validated. but that requires us going through the development
+        # of the schema would just hurt performance likely unnecessarily.
+        # nevertheless, as future note: if we encounter chunk issues i suggest putting a schema check here
         return target
+    # if a cached target isn't found we'll go through the rechunking step
+    # open the zarr group
+    group = zarr.open_consolidated(path)
+    # open the dataset to access the coordinates
+    ds = xr.open_zarr(path)
+    example_var = list(ds.data_vars)[0]
+    # based upon whether you want to chunk along space or time, take the dataset and calculate
+    # an optimal chunking schema for processing.
+    if isinstance(chunking_pattern, str):
+        chunk_dims = config.get(f"chunk_dims.{chunking_pattern}")
+        chunk_def = calc_auspicious_chunks_dict(ds[example_var], chunk_dims=chunk_dims)
 
-    # TODO
+    elif isinstance(chunking_pattern, UPath):
+        template_ds = xr.open_dataset(chunking_pattern)
+        # define the chunk definition
+        chunk_def = {
+            'time': min(template_ds.chunks['time'][0], len(ds.time)),
+            'lat': min(template_ds.chunks['lat'][0], len(ds.lat)),
+            'lon': min(template_ds.chunks['lon'][0], len(ds.lon)),
+        }
+    # initialize the chunks_dict that you'll pass in, filling the coordinates with
+    # `None`` because you don't want to rechunk the coordinate arrays
+    chunks_dict = {
+        'time': None,
+        'lon': None,
+        'lat': None,
+    }
 
-    return target
+    for var in ds.data_vars:
+        chunks_dict[var] = chunk_def
+    # now that you have your chunks_dict you can check that the dataset at `path`
+    # you're passing in doesn't already match that schema. because if so, we don't
+    # need to bother with rechunking and we'll skip it!
+    schema_dict = {}
+    for var in ds.data_vars:
+        schema_dict[var] = DataArraySchema(chunks=chunk_def)
+    target_schema = DatasetSchema(schema_dict)
+    try:
+        # check to see if the initial dataset already matches the schema, in which case just
+        # return the initial path and work with that
+        target_schema.validate(ds)
+        return path
+    except SchemaError:
+
+        rechunk_plan = rechunker.rechunk(
+            source=group,
+            target_chunks=chunks_dict,
+            max_mem=max_mem,
+            target_store=target_store,
+            temp_store=temp_store,
+        )
+
+        rechunk_plan.execute()
+
+        # consolidate_metadata here since when it comes out of rechunker it isn't consolidated.
+        zarr.consolidate_metadata(target_store)
+        temp_store.clear()
+
+        return target
 
 
 @task

@@ -59,11 +59,13 @@ with Flow(
     spatial_anomalies_path = spatial_anomalies(
         obs_full_time_path, interpolated_obs_full_time_path, run_parameters
     )
-
     coarse_obs_full_time_path = rechunk(coarse_obs_path, pattern='full_time')
-
-    experiment_train_full_time_path = rechunk(experiment_train_path, pattern='full_time')
-    experiment_predict_full_time_path = rechunk(experiment_predict_path, pattern='full_time')
+    experiment_train_full_time_path = rechunk(
+        experiment_train_path, pattern=coarse_obs_full_time_path
+    )
+    experiment_predict_full_time_path = rechunk(
+        experiment_predict_path, pattern=coarse_obs_full_time_path
+    )
 
     bias_corrected_path = fit_and_predict(
         experiment_train_full_time_path=experiment_train_full_time_path,
