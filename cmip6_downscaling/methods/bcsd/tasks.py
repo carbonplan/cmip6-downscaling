@@ -9,10 +9,10 @@ from upath import UPath
 from cmip6_downscaling import config
 from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
 from cmip6_downscaling.methods.common.containers import RunParameters
+from cmip6_downscaling.methods.common.utils import zmetadata_exists
 
 intermediate_dir = UPath(config.get("storage.intermediate.uri"))
 results_dir = UPath(config.get("storage.results.uri"))
-
 use_cache = config.get('run_options.use_cache')
 
 
@@ -27,7 +27,7 @@ def spatial_anomalies(
             **asdict(run_parameters)
         )
     )
-    if use_cache and (target / ".zmetadata").exists():
+    if use_cache and zmetadata_exists(target):
         print(f"found existing target: {target}")
         return target
 
@@ -54,7 +54,7 @@ def fit_and_predict(
 ) -> UPath:
 
     target = intermediate_dir / "fit_and_predict" / run_parameters.run_id
-    if use_cache and (target / ".zmetadata").exists():
+    if use_cache and zmetadata_exists(target):
         print(f"found existing target: {target}")
         return target
 
@@ -92,7 +92,7 @@ def postprocess_bcsd(
 ) -> UPath:
 
     target = results_dir / "interpolate_prediction" / run_parameters.run_id
-    if use_cache and (target / ".zmetadata").exists():
+    if use_cache and zmetadata_exists(target):
         print(f"found existing target: {target}")
         return target
 
