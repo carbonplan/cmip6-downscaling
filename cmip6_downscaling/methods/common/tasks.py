@@ -7,6 +7,7 @@ import fsspec
 import papermill as pm
 import rechunker
 import xarray as xr
+import xesmf as xe
 import zarr
 from azure.storage.blob import BlobServiceClient, ContentSettings
 from prefect import task
@@ -27,6 +28,7 @@ from .containers import RunParameters
 
 intermediate_dir = UPath(config.get("storage.intermediate.uri"))
 scratch_dir = UPath(config.get("storage.scratch.uri"))
+
 
 use_cache = config.get('run_options.use_cache')
 
@@ -66,15 +68,14 @@ def get_obs(run_parameters: RunParameters) -> UPath:
 
 
 @task
-def get_experiment(run_parameters: RunParameters) -> UPath:
-
-    # TODO: get train and predict data here
+def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
+    time_period = getattr(run_parameters, time_subset)
 
     target = (
         intermediate_dir
         / "get_experiment"
-        / "{model}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}_{predict_dates[0]}_{predict_dates[1]}".format(
-            **asdict(run_parameters)
+        / "{model}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{time_period[0]}_{time_period[1]}".format(
+            time_period=time_period, **asdict(run_parameters)
         )
     )
     if use_cache and (target / '.zmetadata').exists():
@@ -85,9 +86,9 @@ def get_experiment(run_parameters: RunParameters) -> UPath:
         source_ids=run_parameters.model, return_type='xr', variable_ids=run_parameters.variable
     ).pipe(lon_to_180)
 
-    subset = subset_dataset(
-        ds, run_parameters.variable, run_parameters.train_period.time_slice, run_parameters.bbox
-    )
+    subset = subset_dataset(ds, run_parameters.variable, time_period, run_parameters.bbox)
+    # Note: dataset is chunked into time:365 chunks to standardize leap-year chunking.
+
     subset = subset.chunk({'time': 365})
     del subset[run_parameters.variable].encoding['chunks']
 
@@ -258,6 +259,29 @@ def pyramid(
         return target
 
     # TODO
+
+    return target
+
+
+@task(tags=['dask-resource:TASKSLOTS=1'])
+def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
+
+    target = (
+        intermediate_dir / "regrid" / source_path.path.replace('/', '_')
+        + '_'
+        + target_grid_path.path.replace('/', '_')
+    )
+
+    if use_cache and (target / '.zmetadata').exists():
+        print(f'found existing target: {target}')
+        return target
+
+    source_ds = xr.open_zarr(source_path)
+    target_grid_ds = xr.open_zarr(target_grid_path)
+
+    regridder = xe.Regridder(source_ds, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
+    regridded_ds = regridder(source_ds)
+    regridded_ds.to_zarr(target, mode='w')
 
     return target
 
