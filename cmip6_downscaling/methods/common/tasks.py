@@ -3,6 +3,7 @@ from dataclasses import asdict
 from pathlib import PosixPath
 from typing import Union
 
+import datatree as dt
 import fsspec
 import papermill as pm
 import rechunker
@@ -10,20 +11,26 @@ import xarray as xr
 import xesmf as xe
 import zarr
 from azure.storage.blob import BlobServiceClient, ContentSettings
+from carbonplan_data.metadata import get_cf_global_attrs
+from carbonplan_data.utils import set_zarr_encoding
+from ndpyramid import pyramid_regrid
 from prefect import task
 from upath import UPath
 from xarray_schema import DataArraySchema, DatasetSchema
 from xarray_schema.base import SchemaError
 
-from cmip6_downscaling import config
+from cmip6_downscaling import config, version
 from cmip6_downscaling.data.cmip import load_cmip
 from cmip6_downscaling.data.observations import open_era5
 from cmip6_downscaling.methods.common.utils import calc_auspicious_chunks_dict, subset_dataset
 
 from .containers import RunParameters
 
-intermediate_dir = UPath(config.get("storage.intermediate.uri"))
+PIXELS_PER_TILE = 128
+
 scratch_dir = UPath(config.get("storage.scratch.uri"))
+intermediate_dir = UPath(config.get("storage.intermediate.uri"))
+results_dir = UPath(config.get("storage.results.uri"))
 use_cache = config.get('run_options.use_cache')
 
 
@@ -57,6 +64,9 @@ def get_obs(run_parameters: RunParameters) -> UPath:
         chunking_schema={'time': 365, 'lat': 150, 'lon': 150},
     )
     del subset[run_parameters.variable].encoding['chunks']
+
+
+    subset.attrs.update(**get_cf_global_attrs(version=version))
     subset.to_zarr(target, mode='w')
     print(subset)
     return target
@@ -84,6 +94,8 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     # Note: dataset is chunked into time:365 chunks to standardize leap-year chunking.
     subset = subset.chunk({'time': 365})
     del subset[run_parameters.variable].encoding['chunks']
+
+    subset.attrs.update(**get_cf_global_attrs(version=version))
     subset.to_zarr(target, mode='w')
     return target
 
@@ -121,7 +133,7 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
         )
     target = intermediate_dir / "rechunk" / (pattern_string + path.path.replace("/", "_"))
     path_tmp = scratch_dir / "rechunk" / (pattern_string + path.path.replace("/", "_"))
-    print(target)
+
     target_store = fsspec.get_mapper(str(target))
     temp_store = fsspec.get_mapper(str(path_tmp))
 
@@ -196,7 +208,7 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
 @task
 def monthly_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
 
-    target = intermediate_dir / "monthly_summary" / run_parameters.run_id
+    target = results_dir / "monthly_summary" / run_parameters.run_id
     if use_cache and (target / '.zmetadata').exists():
         print(f'found existing target: {target}')
         return target
@@ -212,6 +224,7 @@ def monthly_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
         else:
             print(f'{var} not implemented')
 
+    out_ds.attrs.update(**get_cf_global_attrs(version=version))
     out_ds.to_zarr(target, mode='w')
 
     return target
@@ -220,7 +233,7 @@ def monthly_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
 @task
 def annual_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
 
-    target = intermediate_dir / "annual_summary" / run_parameters.run_id
+    target = results_dir / "annual_summary" / run_parameters.run_id
     if use_cache and (target / '.zmetadata').exists():
         print(f'found existing target: {target}')
         return target
@@ -236,27 +249,14 @@ def annual_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
         else:
             print(f'{var} not implemented')
 
+    out_ds.attrs.update(**get_cf_global_attrs(version=version))
     out_ds.to_zarr(target, mode='w')
 
     return target
 
 
-@task
-def pyramid(
-    ds_path: UPath, run_parameters: RunParameters, key: str = 'daily', levels: int = 4
-) -> UPath:
 
-    target = intermediate_dir / "pyramid" / run_parameters.run_id
-    if use_cache and (target / '.zmetadata').exists():
-        print(f'found existing target: {target}')
-        return target
-
-    # TODO
-
-    return target
-
-
-@task(tags=['dask-resource:TASKSLOTS=1'])
+@task(tags=['dask-resource:TASKSLOTS=1'], log_stdout=True)
 def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
 
     target = (
@@ -274,8 +274,103 @@ def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
 
     regridder = xe.Regridder(source_ds, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
     regridded_ds = regridder(source_ds)
+    regridded_ds.attrs.update(**get_cf_global_attrs(version=version))
     regridded_ds.to_zarr(target, mode='w')
 
+    return target
+
+
+def _load_coords(ds: xr.Dataset) -> xr.Dataset:
+    '''Helper function to explicitly load all dataset coordinates'''
+    for var, da in ds.coords.items():
+        ds[var] = da.load()
+    return ds
+
+
+def _pyramid_postprocess(dt: dt.DataTree, levels: int, other_chunks: dict = None) -> dt.DataTree:
+    '''Postprocess data pyramid
+
+    Adds multiscales metadata and sets Zarr encoding
+
+    Parameters
+    ----------
+    dt : dt.DataTree
+        Input data pyramid
+    levels : int
+        Number of levels in pyramid
+    other_chunks : dict
+        Chunks for non-spatial dims
+
+    Returns
+    -------
+    dt.DataTree
+        Updated data pyramid with metadata / encoding set
+    '''
+    chunks = {"x": PIXELS_PER_TILE, "y": PIXELS_PER_TILE}
+    if other_chunks is not None:
+        chunks.update(other_chunks)
+
+    for level in range(levels):
+        slevel = str(level)
+        dt.ds.attrs['multiscales'][0]['datasets'][level]['pixels_per_tile'] = PIXELS_PER_TILE
+
+        # set dataset chunks
+        dt[slevel].ds = dt[slevel].ds.chunk(chunks)
+        if 'date_str' in dt[slevel].ds:
+            dt[slevel].ds['date_str'] = dt[slevel].ds['date_str'].chunk(-1)
+
+        # set dataset encoding
+        dt[slevel].ds = set_zarr_encoding(
+            dt[slevel].ds, codec_config={"id": "zlib", "level": 1}, float_dtype="float32"
+        )
+        for var in ['time', 'time_bnds']:
+            if var in dt[slevel].ds:
+                dt[slevel].ds[var].encoding['dtype'] = 'int32'
+
+    # set global metadata
+    dt.ds.attrs.update(**get_cf_global_attrs(version=version))
+    return dt
+
+
+@task(log_stdout=True, tags=['dask-resource:TASKSLOTS=1'])
+def pyramid(ds_path: UPath, levels: int = 2, other_chunks: dict = None) -> UPath:
+    '''Task to create a data pyramid from an xarray Dataset
+
+    Parameters
+    ----------
+    ds_path : UPath
+        Path to input dataset
+    levels : int, optional
+        Number of levels in pyramid, by default 2
+    uri : str, optional
+        Path to write output data pyamid to, by default None
+    other_chunks : dict
+        Chunks for non-spatial dims
+
+    Returns
+    -------
+    target : UPath
+    '''
+
+    target = results_dir / "pyramid" / ds_path.path.replace('/', '_')
+
+    if use_cache and (target / '.zmetadata').exists():
+        print(f'found existing target: {target}')
+        return target
+
+    ds = xr.open_zarr(ds_path).pipe(_load_coords)
+
+    ds.coords['date_str'] = ds['time'].dt.strftime('%Y-%m-%d').astype('S10')
+
+    # create pyramid
+    dta = pyramid_regrid(ds, target_pyramid=None, levels=levels)
+
+    # postprocess
+    dta = _pyramid_postprocess(dta, levels, other_chunks=other_chunks)
+
+    # write to target
+    mapper = fsspec.get_mapper(target)
+    dta.to_zarr(mapper, mode='w')
     return target
 
 

@@ -11,29 +11,9 @@ from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
 from cmip6_downscaling.methods.common.containers import RunParameters
 
 intermediate_dir = UPath(config.get("storage.intermediate.uri"))
+results_dir = UPath(config.get("storage.results.uri"))
 
 use_cache = config.get('run_options.use_cache')
-
-
-@task
-def interpolate_obs(
-    obs_path: UPath, coarse_obs_path: UPath, run_parameters: RunParameters
-) -> UPath:
-    target = (
-        intermediate_dir
-        / "interpolate_obs"
-        / "{obs}_{model}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}".format(
-            **asdict(run_parameters)
-        )
-    )
-    if use_cache and (target / ".zmetadata").exists():
-        print(f"found existing target: {target}")
-        return target
-
-    # TODO
-
-    # interpolated_obs_ds.to_zarr(target, mode='w')
-    return target
 
 
 @task
@@ -57,7 +37,6 @@ def spatial_anomalies(
     # calculate the difference between the actual obs (with finer spatial heterogeneity)
     # and the interpolated coarse obs this will be saved and added to the
     # spatially-interpolated coarse predictions to add the spatial heterogeneity back in.
-
     spatial_anomalies = obs_full_time_ds - interpolated_obs_full_time_ds
     seasonal_cycle_spatial_anomalies = spatial_anomalies.groupby("time.month").mean()
 
@@ -79,7 +58,6 @@ def fit_and_predict(
         print(f"found existing target: {target}")
         return target
 
-    # # TODO
     if run_parameters.variable in ABSOLUTE_VARS:
         bcsd_model = BcsdTemperature(return_anoms=False)
     elif run_parameters.variable in RELATIVE_VARS:
@@ -113,7 +91,7 @@ def postprocess_bcsd(
     run_parameters: RunParameters,
 ) -> UPath:
 
-    target = intermediate_dir / "interpolate_prediction" / run_parameters.run_id
+    target = results_dir / "interpolate_prediction" / run_parameters.run_id
     if use_cache and (target / ".zmetadata").exists():
         print(f"found existing target: {target}")
         return target
