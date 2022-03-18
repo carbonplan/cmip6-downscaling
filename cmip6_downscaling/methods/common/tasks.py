@@ -268,9 +268,11 @@ def pyramid(
 def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
 
     target = (
-        intermediate_dir / "regrid" / source_path.path.replace('/', '_')
-        + '_'
-        + target_grid_path.path.replace('/', '_')
+        intermediate_dir
+        / "regrid"
+        / source_path.path.replace('/', '_')
+        / '_'
+        / target_grid_path.path.replace('/', '_')
     )
 
     if use_cache and (target / '.zmetadata').exists():
