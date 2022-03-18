@@ -65,11 +65,10 @@ def get_obs(run_parameters: RunParameters) -> UPath:
 @task
 def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     time_period = getattr(run_parameters, time_subset)
-
     target = (
         intermediate_dir
         / "get_experiment"
-        / "{model}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{time_period[0]}_{time_period[1]}".format(
+        / "{model}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{time_period.start}_{time_period.stop}".format(
             time_period=time_period, **asdict(run_parameters)
         )
     )
@@ -259,9 +258,11 @@ def pyramid(
 def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
 
     target = (
-        intermediate_dir / "regrid" / source_path.path.replace('/', '_')
-        + '_'
-        + target_grid_path.path.replace('/', '_')
+        intermediate_dir
+        / "regrid"
+        / source_path.path.replace('/', '_')
+        / '_'
+        / target_grid_path.path.replace('/', '_')
     )
 
     if use_cache and (target / '.zmetadata').exists():
