@@ -128,10 +128,11 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
         raise NotImplementedError(
             "Not a valid chunking approach. Try passing either `full_space` or `full_time`, or a template chunked dataset."
         )
-    target = intermediate_dir / "rechunk" / pattern_string + path.path.replace("/", "_")
-    path_tmp = scratch_dir / "rechunk" / pattern_string + path.path.replace("/", "_")
-    target_store = fsspec.get_mapper(target)
-    temp_store = fsspec.get_mapper(path_tmp)
+    target = intermediate_dir / "rechunk" / (pattern_string + path.path.replace("/", "_"))
+    path_tmp = scratch_dir / "rechunk" / (pattern_string + path.path.replace("/", "_"))
+    print(target)
+    target_store = fsspec.get_mapper(str(target))
+    temp_store = fsspec.get_mapper(str(path_tmp))
 
     if use_cache and (target / '.zmetadata').exists():
         print(f'found existing target: {target}')
