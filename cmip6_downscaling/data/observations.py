@@ -3,6 +3,7 @@ from typing import List, Union
 import xarray as xr
 
 from . import cat
+from .utils import lon_to_180
 
 variable_name_dict = {
     "tasmax": "air_temperature_at_2_metres_1hour_Maximum",
@@ -36,4 +37,7 @@ def open_era5(variables: Union[str, List[str]], time_period: slice) -> xr.Datase
     if 'pr' in variables:
         # convert to mm/day - helpful to prevent rounding errors from very tiny numbers
         ds['pr'] *= 86400
+
+    ds = lon_to_180(ds)
+
     return ds

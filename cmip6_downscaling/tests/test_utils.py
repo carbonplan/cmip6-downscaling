@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from cmip6_downscaling.methods.common.utils import lon_to_180
+from cmip6_downscaling.data.utils import lon_to_180, to_standard_calendar
 
 
 def create_test_ds(xname, yname, zname, xlen, ylen, zlen):
@@ -21,6 +21,16 @@ def create_test_ds(xname, yname, zname, xlen, ylen, zlen):
     else:
         ds = ds.assign_coords(longitude=lon, latitude=lat)
     return ds
+
+
+@pytest.fixture
+def da_noleap(val=1.0):
+    time = xr.cftime_range(start='2020-01-01', end='2020-12-31', freq='1D', calendar='noleap')
+    return xr.DataArray(
+        val,
+        dims=['lat', 'lon', 'time'],
+        coords={'lat': np.arange(19, 56, 1), 'lon': np.arange(-133, -61, 2), 'time': time},
+    )
 
 
 @pytest.mark.parametrize(
@@ -42,3 +52,11 @@ def test_lon_to_180(shift):
     assert ds_lon_corrected.lon.min() < -1
     assert ds_lon_corrected.lon.max() <= 180
     assert (ds_lon_corrected.lon.diff(dim='lon') > 0).all()
+
+
+def test_to_standard_calendar(da_noleap):
+
+    da_std = to_standard_calendar(da_noleap)
+    assert da_noleap.sizes['time'] == 365
+    assert da_std.sizes['time'] == 366
+    assert not da_std.isnull().any().item()

@@ -18,18 +18,13 @@ from xarray_schema.base import SchemaError
 from cmip6_downscaling import config
 from cmip6_downscaling.data.cmip import load_cmip
 from cmip6_downscaling.data.observations import open_era5
-from cmip6_downscaling.methods.common.utils import (
-    calc_auspicious_chunks_dict,
-    lon_to_180,
-    subset_dataset,
-)
+from cmip6_downscaling.data.utils import subset_dataset
+from cmip6_downscaling.methods.common.utils import calc_auspicious_chunks_dict
 
 from .containers import RunParameters
 
 intermediate_dir = UPath(config.get("storage.intermediate.uri"))
 scratch_dir = UPath(config.get("storage.scratch.uri"))
-
-
 use_cache = config.get('run_options.use_cache')
 
 
@@ -53,7 +48,7 @@ def get_obs(run_parameters: RunParameters) -> UPath:
         print(f'found existing target: {target}')
         return target
 
-    ds = open_era5(run_parameters.variable, run_parameters.train_period).pipe(lon_to_180)
+    ds = open_era5(run_parameters.variable, run_parameters.train_period)
     subset = subset_dataset(
         ds,
         run_parameters.variable,
@@ -81,13 +76,8 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
         print(f'found existing target: {target}')
         return target
 
-    ds = load_cmip(
-        source_ids=run_parameters.model, return_type='xr', variable_ids=run_parameters.variable
-    ).pipe(lon_to_180)
-
-    subset = subset_dataset(
-        ds, run_parameters.variable, time_period.time_slice, run_parameters.bbox
-    )
+    ds = load_cmip(source_ids=run_parameters.model, variable_ids=run_parameters.variable)
+    subset = subset_dataset(ds, run_parameters.variable, time_period, run_parameters.bbox)
     # Note: dataset is chunked into time:365 chunks to standardize leap-year chunking.
 
     subset = subset.chunk({'time': 365})
