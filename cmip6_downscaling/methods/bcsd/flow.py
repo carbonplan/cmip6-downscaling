@@ -91,9 +91,9 @@ with Flow(
     analysis_location = run_analyses(postprocess_bcsd_path, run_parameters)
 
     # pyramids
-    daily_pyramid_path = pyramid(postprocess_bcsd_path, run_parameters, key='daily', levels=4)
-    monthly_pyramid_path = pyramid(monthly_summary_path, run_parameters, key='monthly', levels=4)
-    annual_pyramid_path = pyramid(annual_summary_path, run_parameters, key='annual', levels=4)
+    daily_pyramid_path = pyramid(postprocess_bcsd_path, levels=4)
+    monthly_pyramid_path = pyramid(monthly_summary_path, levels=4)
+    annual_pyramid_path = pyramid(annual_summary_path, levels=4)
 
     # # if config.get('run_options.cleanup_flag') is True:
     # #     cleanup.run_rsfip(gcm_identifier, obs_identifier)
