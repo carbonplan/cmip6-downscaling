@@ -7,9 +7,10 @@ from xarray.core.types import T_Xarray
 
 from cmip6_downscaling import config
 from cmip6_downscaling.methods.common.containers import BBox
+from cmip6_downscaling.methods.common.utils import subset_dataset
 
 from . import cat
-from .utils import lon_to_180, subset_dataset
+from .utils import lon_to_180
 
 
 def postprocess(ds: xr.Dataset) -> xr.Dataset:
@@ -19,6 +20,7 @@ def postprocess(ds: xr.Dataset) -> xr.Dataset:
     - Drops height variable (if present)
     - Squeezes length 1 dimensions (if present)
     - Standardizes longitude convention to [-180, 180]
+    - Reorders latitudes to [-90, 90]
 
     Parameters
     ----------
@@ -48,6 +50,10 @@ def postprocess(ds: xr.Dataset) -> xr.Dataset:
 
     # standardize longitude convention
     ds = lon_to_180(ds)
+
+    # Reorders latitudes to [-90, 90]
+    if ds.lat[0] < ds.lat[-1]:
+        ds = ds.reindex({"lat": ds.lat[::-1]})
 
     return ds
 

@@ -22,8 +22,7 @@ from xarray_schema.base import SchemaError
 from cmip6_downscaling import config, version
 from cmip6_downscaling.data.cmip import load_cmip
 from cmip6_downscaling.data.observations import open_era5
-from cmip6_downscaling.data.utils import subset_dataset
-from cmip6_downscaling.methods.common.utils import calc_auspicious_chunks_dict
+from cmip6_downscaling.methods.common.utils import calc_auspicious_chunks_dict, subset_dataset
 
 from .containers import RunParameters
 
@@ -41,7 +40,7 @@ def make_run_parameters(**kwargs) -> RunParameters:
     return RunParameters(**kwargs)
 
 
-@task
+@task(log_stdout=True)
 def get_obs(run_parameters: RunParameters) -> UPath:
 
     target = (
@@ -56,6 +55,7 @@ def get_obs(run_parameters: RunParameters) -> UPath:
         return target
 
     ds = open_era5(run_parameters.variable, run_parameters.train_period)
+
     subset = subset_dataset(
         ds,
         run_parameters.variable,
@@ -67,6 +67,7 @@ def get_obs(run_parameters: RunParameters) -> UPath:
 
     subset.attrs.update(**get_cf_global_attrs(version=version))
     subset.to_zarr(target, mode='w')
+    print(subset)
     return target
 
 
@@ -85,9 +86,11 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
         return target
 
     ds = load_cmip(source_ids=run_parameters.model, variable_ids=run_parameters.variable)
-    subset = subset_dataset(ds, run_parameters.variable, time_period, run_parameters.bbox)
-    # Note: dataset is chunked into time:365 chunks to standardize leap-year chunking.
 
+    subset = subset_dataset(
+        ds, run_parameters.variable, time_period.time_slice, run_parameters.bbox
+    )
+    # Note: dataset is chunked into time:365 chunks to standardize leap-year chunking.
     subset = subset.chunk({'time': 365})
     del subset[run_parameters.variable].encoding['chunks']
 
@@ -263,6 +266,7 @@ def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
     if use_cache and (target / '.zmetadata').exists():
         print(f'found existing target: {target}')
         return target
+
     source_ds = xr.open_zarr(source_path)
     target_grid_ds = xr.open_zarr(target_grid_path)
 
