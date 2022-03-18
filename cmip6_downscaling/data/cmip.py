@@ -1,23 +1,53 @@
-from typing import List, Optional, Union
+from typing import List, Union
 
 import dask
 import numpy as np
 import xarray as xr
-import zarr
+from xarray.core.types import T_Xarray
 
 from cmip6_downscaling import config
-from cmip6_downscaling.methods.common.utils import lon_to_180, subset_dataset
 
 from . import cat
+from .utils import lon_to_180, subset_dataset
 
 
-def maybe_drop_band_vars(ds):
+def postprocess(ds: xr.Dataset) -> xr.Dataset:
+    """Post process input experiment
+
+    - Drops band variables (if present)
+    - Drops height variable (if present)
+    - Squeezes length 1 dimensions (if present)
+    - Standardizes longitude convention to [-180, 180]
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset
+
+    Returns
+    -------
+    ds : xr.Dataset
+        Post processed dataset
+    """
+
+    # drop band variables
     if ('lat_bnds' in ds) or ('lat_bnds' in ds.coords):
         ds = ds.drop('lat_bnds')
     if ('lon_bnds' in ds) or ('lon_bnds' in ds.coords):
         ds = ds.drop('lon_bnds')
     if ('time_bnds' in ds) or ('time_bnds' in ds.coords):
         ds = ds.drop('time_bnds')
+
+    # drop height variable
+    if 'height' in ds:
+        ds = ds.drop('height')
+
+    # squeeze length 1 dimensions
+    ds = ds.squeeze(drop=True)
+
+    # standardize longitude convention
+    ds = lon_to_180(ds)
+
     return ds
 
 
@@ -29,9 +59,9 @@ def load_cmip(
     table_ids: str = "day",
     grid_labels: str = "gn",
     variable_ids: List[str] = ["tasmax"],
-    return_type: str = 'zarr',
 ) -> xr.Dataset:
     """Loads CMIP6 GCM dataset based on input criteria.
+
     Parameters
     ----------
     activity_ids : list, optional
@@ -48,9 +78,10 @@ def load_cmip(
         grid_labels in CMIP6 catalog, by default ["gn"]
     variable_ids : list, optional
         variable_ids in CMIP6 catalog, by default ['tasmax']
+
     Returns
     -------
-    ds : xr.Dataset or zarr group
+    ds : xr.Dataset
         Dataset or zarr group with CMIP data
     """
     with dask.config.set(**{'array.slicing.split_large_chunks': False}):
@@ -75,17 +106,12 @@ def load_cmip(
                 .to_list()
             )
 
+            # Q: why are we using the era5 storage_options
             storage_options = config.get('data_catalog.era5.storage_options')
             if len(stores) > 1:
                 raise ValueError('can only get 1 store at a time')
-            if return_type == 'zarr':
-                ds = zarr.open_consolidated(stores[0], mode='r', storage_options=storage_options)
-            elif return_type == 'xr':
-                ds = xr.open_zarr(stores[0], consolidated=True, storage_options=storage_options)
 
-            # flip the lats if necessary and drop the extra dims/vars like bnds
-            ds = gcm_munge(ds)
-            ds = lon_to_180(ds)
+            ds = xr.open_zarr(stores[0], storage_options=storage_options).pipe(postprocess)
 
             # convert to mm/day - helpful to prevent rounding errors from very tiny numbers
             if var == 'pr':
@@ -99,46 +125,6 @@ def load_cmip(
         return ds_out
 
 
-def convert_to_360(lon: Union[float, int]) -> Union[float, int]:
-    """Convert lons to 0-360 basis.
-    Parameters
-    ----------
-    lon : float or int
-        Longitude on -180 to 180 basis
-    Returns
-    -------
-    lon : float or int
-        Longitude on 0 to 360 basis
-    """
-    if lon > 0:
-        return lon
-    elif lon < 0:
-        return 360 + lon
-
-
-def gcm_munge(ds: xr.Dataset) -> xr.Dataset:
-    """Clean up GCM dataset by swapping lats if necessary to match ERA5 and
-    deleting unnecessary variables (e.g. height).
-    Parameters
-    ----------
-    ds : xr.Dataset
-        GCM dataset direct from catalog (though perhaps subsetted temporally)
-    Returns
-    -------
-    ds : xr.Dataset
-        Super clean GCM dataset
-    """
-    # TODO: check if we need to flip this to > now that we have a preprocessed version of ERA5
-    # TODO: for other gcm grids check the lons
-    if ds.lat[0] < ds.lat[-1]:
-        ds = ds.reindex({"lat": ds.lat[::-1]})
-    ds = maybe_drop_band_vars(ds)
-    if 'height' in ds:
-        ds = ds.drop('height')
-    ds = ds.squeeze(drop=True)
-    return ds
-
-
 def get_gcm(
     gcm: str,
     scenario: str,
@@ -146,32 +132,31 @@ def get_gcm(
     train_period: slice,
     predict_period: slice,
     bbox,
-    chunking_approach: Optional[str] = None,
-    cache_within_rechunk: Optional[bool] = True,
+    cache_within_rechunk: bool = True,
 ) -> xr.Dataset:
     """
     Load and combine historical and future GCM into one dataset.
+
     Parameters
     ----------
-    gcm: str
+    gcm : str
         Name of GCM
-    scenario: str
+    scenario : str
         Name of scenario
-    variables: str or list
+    variables : str or list
         Name of variable(s) to load
-    train_period_start: str
+    train_period_start : str
         Start year of train/historical period
-    train_period_end: str
+    train_period_end : str
         End year of train/historical period
-    predict_period_start: str
+    predict_period_start : str
         Start year of predict/future period
-    predict_period_end: str
+    predict_period_end : str
         End year of predict/future period
-    chunking_approach: Optional[str]
-        'full_space', 'full_time', or None
+
     Returns
     -------
-    ds_gcm: xr.Dataset
+    ds_gcm : xr.Dataset
         A dataset containing both historical and future period of GCM data
     """
     historical_gcm = load_cmip(
@@ -179,7 +164,6 @@ def get_gcm(
         experiment_ids='historical',
         source_ids=gcm,
         variable_ids=variables,
-        return_type='xr',
     )
 
     future_gcm = load_cmip(
@@ -187,7 +171,6 @@ def get_gcm(
         experiment_ids=scenario,
         source_ids=gcm,
         variable_ids=variables,
-        return_type='xr',
     )
 
     ds_gcm = xr.combine_by_coords([historical_gcm, future_gcm], combine_attrs='drop_conflicts')
@@ -208,45 +191,19 @@ def get_gcm(
     ds_gcm = xr.combine_by_coords([ds_gcm_train, ds_gcm_predict], combine_attrs='drop_conflicts')
     ds_gcm = ds_gcm.reindex(time=sorted(ds_gcm.time.values))
 
-    if chunking_approach is None:
-        return ds_gcm
-
-    # TODO: move rechunking out of this step
-    # if cache_within_rechunk:
-    #     path_dict = {
-    #         'gcm': gcm,
-    #         'scenario': scenario,
-    #         'train_period': train_period,
-    #         'predict_period': predict_period,
-    #         'variables': variables,
-    #     }
-    #     rechunked_path = make_rechunked_gcm_path(chunking_approach=chunking_approach, **path_dict)
-    # else:
-    #     rechunked_path = None
-    # ds_gcm_rechunked = rechunk_zarr_array_with_caching(
-    #     zarr_array=ds_gcm,
-    #     chunking_approach=chunking_approach,
-    #     output_path=rechunked_path,
-    # )
-    # print('ds_gcm_rechunked:')
-    # print(ds_gcm_rechunked.chunks)
-
-    # return ds_gcm_rechunked
+    return ds_gcm
 
 
-def get_gcm_grid_spec(
-    gcm_name: Optional[str] = None, gcm_ds: Optional[Union[xr.Dataset, xr.DataArray]] = None
-) -> str:
+def get_gcm_grid_spec(gcm_name: str = None, gcm_ds: T_Xarray = None) -> str:
     with dask.config.set(**{'array.slicing.split_large_chunks': False}):
 
         if gcm_ds is None:
-            """Silences the /srv/conda/envs/notebook/lib/python3.9/site-packages/xarray/core/indexing.py:1228: PerformanceWarning: Slicing is producing a large chunk. To accept the large
-            chunk and silence this warning, set the option >>> with dask.config.set(**{'array.slicing.split_large_chunks': False}):"""
+            # Silences the /srv/conda/envs/notebook/lib/python3.9/site-packages/xarray/core/indexing.py:1228: PerformanceWarning: Slicing is producing a large chunk. To accept the large
+            # chunk and silence this warning, set the option >>> with dask.config.set(**{'array.slicing.split_large_chunks': False}):
             if gcm_name is not None:
                 raise ValueError('one of gcm_ds or gcm_name has to be not empty')
             gcm_grid = load_cmip(
                 source_ids=gcm_name,
-                return_type='xr',
             ).isel(time=0)
         else:
             gcm_grid = gcm_ds.isel(time=0)
