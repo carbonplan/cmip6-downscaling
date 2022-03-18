@@ -3,10 +3,16 @@ from typing import Tuple
 
 import numpy as np
 import xarray as xr
+from upath import UPath
 from xarray_schema import DataArraySchema
 from xarray_schema.base import SchemaError
 
 from .containers import BBox
+
+
+def zmetadata_exists(path: UPath):
+    '''temporary workaround untile path.exists() works'''
+    return path.fs.exists(str(path / '.zmetadata'))
 
 
 def subset_dataset(

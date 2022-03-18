@@ -22,7 +22,11 @@ from xarray_schema.base import SchemaError
 from cmip6_downscaling import config, version
 from cmip6_downscaling.data.cmip import load_cmip
 from cmip6_downscaling.data.observations import open_era5
-from cmip6_downscaling.methods.common.utils import calc_auspicious_chunks_dict, subset_dataset
+from cmip6_downscaling.methods.common.utils import (
+    calc_auspicious_chunks_dict,
+    subset_dataset,
+    zmetadata_exists,
+)
 
 from .containers import RunParameters
 
@@ -50,7 +54,7 @@ def get_obs(run_parameters: RunParameters) -> UPath:
             **asdict(run_parameters)
         )
     )
-    if use_cache and (target / '.zmetadata').exists():
+    if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
         return target
 
@@ -81,7 +85,7 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
             time_period=time_period, **asdict(run_parameters)
         )
     )
-    if use_cache and (target / '.zmetadata').exists():
+    if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
         return target
 
@@ -136,7 +140,7 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
     target_store = fsspec.get_mapper(str(target))
     temp_store = fsspec.get_mapper(str(path_tmp))
 
-    if use_cache and (target / '.zmetadata').exists():
+    if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
         # if we wanted to check that it was chunked correctly we could put this down below where
         # the target_schema is validated. but that requires us going through the development
@@ -208,7 +212,7 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
 def monthly_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
 
     target = results_dir / "monthly_summary" / run_parameters.run_id
-    if use_cache and (target / '.zmetadata').exists():
+    if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
         return target
 
@@ -233,7 +237,7 @@ def monthly_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
 def annual_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
 
     target = results_dir / "annual_summary" / run_parameters.run_id
-    if use_cache and (target / '.zmetadata').exists():
+    if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
         return target
 
@@ -263,7 +267,7 @@ def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
         / (source_path.path.replace('/', '_') + '_' + target_grid_path.path.replace('/', '_'))
     )
 
-    if use_cache and (target / '.zmetadata').exists():
+    if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
         return target
 
@@ -352,7 +356,7 @@ def pyramid(ds_path: UPath, levels: int = 2, other_chunks: dict = None) -> UPath
 
     target = results_dir / "pyramid" / ds_path.path.replace('/', '_')
 
-    if use_cache and (target / '.zmetadata').exists():
+    if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
         return target
 
