@@ -40,4 +40,8 @@ def open_era5(variables: Union[str, List[str]], time_period: slice) -> xr.Datase
 
     ds = lon_to_180(ds)
 
+    # Reorders latitudes to [-90, 90]
+    if ds.lat[0] < ds.lat[-1]:
+        ds = ds.reindex({"lat": ds.lat[::-1]})
+
     return ds

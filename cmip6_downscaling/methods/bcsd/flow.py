@@ -42,11 +42,11 @@ with Flow(
 
     # input datasets
     obs_path = get_obs(run_parameters)
-
+    obs_full_space_path = rechunk(path=obs_path, chunking_pattern='full_space')
     experiment_train_path = get_experiment(run_parameters, time_subset='train_period')
     experiment_predict_path = get_experiment(run_parameters, time_subset='predict_period')
 
-    coarse_obs_path = regrid(obs_path, experiment_train_path)
+    coarse_obs_path = regrid(obs_full_space_path, experiment_train_path)
 
     interpolated_obs_path = regrid(source_path=coarse_obs_path, target_grid_path=obs_path)
 
