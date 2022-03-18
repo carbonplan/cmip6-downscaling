@@ -11,7 +11,7 @@ from .containers import BBox
 
 
 def zmetadata_exists(path: UPath):
-    '''temporary workaround untile path.exists() works'''
+    '''temporary workaround until path.exists() works'''
     return path.fs.exists(str(path / '.zmetadata'))
 
 
