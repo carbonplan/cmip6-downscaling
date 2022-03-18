@@ -29,8 +29,9 @@ from .containers import RunParameters
 
 PIXELS_PER_TILE = 128
 
-intermediate_dir = UPath(config.get("storage.intermediate.uri"))
 scratch_dir = UPath(config.get("storage.scratch.uri"))
+intermediate_dir = UPath(config.get("storage.intermediate.uri"))
+results_dir = UPath(config.get("storage.results.uri"))
 use_cache = config.get('run_options.use_cache')
 
 
@@ -128,7 +129,7 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
         )
     target = intermediate_dir / "rechunk" / (pattern_string + path.path.replace("/", "_"))
     path_tmp = scratch_dir / "rechunk" / (pattern_string + path.path.replace("/", "_"))
-    print(target)
+
     target_store = fsspec.get_mapper(str(target))
     temp_store = fsspec.get_mapper(str(path_tmp))
 
@@ -203,7 +204,7 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
 @task
 def monthly_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
 
-    target = intermediate_dir / "monthly_summary" / run_parameters.run_id
+    target = results_dir / "monthly_summary" / run_parameters.run_id
     if use_cache and (target / '.zmetadata').exists():
         print(f'found existing target: {target}')
         return target
@@ -228,7 +229,7 @@ def monthly_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
 @task
 def annual_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
 
-    target = intermediate_dir / "annual_summary" / run_parameters.run_id
+    target = results_dir / "annual_summary" / run_parameters.run_id
     if use_cache and (target / '.zmetadata').exists():
         print(f'found existing target: {target}')
         return target
@@ -345,7 +346,7 @@ def pyramid(ds_path: UPath, levels: int = 2, other_chunks: dict = None) -> UPath
     target : UPath
     '''
 
-    target = intermediate_dir / "pyramid" / ds_path.path.replace('/', '_')
+    target = results_dir / "pyramid" / ds_path.path.replace('/', '_')
 
     if use_cache and (target / '.zmetadata').exists():
         print(f'found existing target: {target}')
