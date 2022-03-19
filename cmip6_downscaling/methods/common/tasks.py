@@ -110,7 +110,7 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     return target
 
 
-@task
+@task(log_stdout=True)
 def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: str = "2GB") -> UPath:
     """Use `rechunker` package to adjust chunks of dataset to a form
     conducive for your processing.
@@ -160,6 +160,7 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
     temp_store.clear()
     group = zarr.open_consolidated(path)
     # open the dataset to access the coordinates
+    print(path)
     ds = xr.open_zarr(path)
     example_var = list(ds.data_vars)[0]
     # based upon whether you want to chunk along space or time, take the dataset and calculate
@@ -169,7 +170,7 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
         chunk_def = calc_auspicious_chunks_dict(ds[example_var], chunk_dims=chunk_dims)
 
     elif isinstance(chunking_pattern, UPath):
-        template_ds = xr.open_dataset(chunking_pattern)
+        template_ds = xr.open_zarr(chunking_pattern)
         # define the chunk definition
         chunk_def = {
             'time': min(template_ds.chunks['time'][0], len(ds.time)),
@@ -179,9 +180,9 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
     # initialize the chunks_dict that you'll pass in, filling the coordinates with
     # `None`` because you don't want to rechunk the coordinate arrays
     chunks_dict = {
-        'time': None,
-        'lon': None,
-        'lat': None,
+        # 'time': None,
+        # 'lon': None,
+        # 'lat': None,
     }
 
     for var in ds.data_vars:
@@ -200,7 +201,8 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
         return path
     except SchemaError:
         pass
-
+    print(chunks_dict)
+    print(group)
     rechunk_plan = rechunker.rechunk(
         source=group,
         target_chunks=chunks_dict,
