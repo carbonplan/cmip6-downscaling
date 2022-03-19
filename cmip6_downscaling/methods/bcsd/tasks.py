@@ -1,3 +1,4 @@
+import warnings
 from dataclasses import asdict
 
 import xarray as xr
@@ -10,6 +11,13 @@ from cmip6_downscaling import config
 from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
 from cmip6_downscaling.methods.common.containers import RunParameters
 from cmip6_downscaling.methods.common.utils import zmetadata_exists
+
+warnings.filterwarnings(
+    "ignore",
+    "(.*) filesystem path not explicitly implemented. falling back to default implementation. This filesystem may not be tested",
+    category=UserWarning,
+)
+
 
 intermediate_dir = UPath(config.get("storage.intermediate.uri"))
 results_dir = UPath(config.get("storage.results.uri"))
