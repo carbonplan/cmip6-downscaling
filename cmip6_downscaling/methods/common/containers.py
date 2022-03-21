@@ -19,7 +19,7 @@ class BBox:
         return slice(float(self.lonmin), float(self.lonmax))
 
     def __str__(self) -> str:
-        return f'BBox([{self.latmin}, {self.latmax}, {self.lonmin}, {self.lonmax}])'
+        return f"BBox([{self.latmin}, {self.latmax}, {self.lonmin}, {self.lonmax}])"
 
 
 @dataclass
@@ -34,7 +34,7 @@ class TimePeriod:
         return slice(self.start, self.stop)
 
     def __str__(self) -> str:
-        return f'TimePeriod([{self.start}, {self.stop}])'
+        return f"TimePeriod([{self.start}, {self.stop}])"
 
 
 @dataclass
@@ -54,27 +54,32 @@ class RunParameters:
     model: str
     scenario: str
     variable: str
-    latmin: str
-    latmax: str
-    lonmin: str
-    lonmax: str
+    latmin: float
+    latmax: float
+    lonmin: float
+    lonmax: float
     train_dates: list
     predict_dates: list
 
     @property
     def bbox(self) -> BBox:
-        return BBox(latmin=self.latmin, latmax=self.latmax, lonmin=self.lonmin, lonmax=self.lonmax)
+        return BBox(
+            latmin=self.latmin,
+            latmax=self.latmax,
+            lonmin=self.lonmin,
+            lonmax=self.lonmax,
+        )
 
     @property
     def train_period(self) -> TimePeriod:
         if len(self.train_dates) != 2:
-            raise ValueError('expected train_dates to be a list of length 2')
+            raise ValueError("expected train_dates to be a list of length 2")
         return TimePeriod(start=self.train_dates[0], stop=self.train_dates[1])
 
     @property
     def predict_period(self) -> TimePeriod:
         if len(self.predict_dates) != 2:
-            raise ValueError('expected predict_dates to be a list of length 2')
+            raise ValueError("expected predict_dates to be a list of length 2")
         return TimePeriod(start=self.predict_dates[0], stop=self.predict_dates[1])
 
     @property
