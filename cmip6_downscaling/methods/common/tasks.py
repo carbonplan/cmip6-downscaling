@@ -209,12 +209,16 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
             'lat': min(template_ds.chunks['lat'][0], len(ds.lat)),
             'lon': min(template_ds.chunks['lon'][0], len(ds.lon)),
         }
+    # Note:
+    # for rechunker v 0.3.3:
     # initialize the chunks_dict that you'll pass in, filling the coordinates with
-    # `None`` because you don't want to rechunk the coordinate arrays
+    # `None`` because you don't want to rechunk the coordinate arrays. this works with
+    # for rechunker v 0.4.2:
+    # initialize chunks_dict using the `chunk_def`` above
     chunks_dict = {
-        'time': None,
-        'lon': None,
-        'lat': None,
+        'time': (chunk_def['time'],),
+        'lon': (chunk_def['lon'],),
+        'lat': (chunk_def['lat'],),
     }
 
     for var in ds.data_vars:
