@@ -455,8 +455,7 @@ def pyramid(ds_path: UPath, levels: int = 2, other_chunks: dict = None) -> UPath
     dta = _pyramid_postprocess(dta, levels, other_chunks=other_chunks)
 
     # write to target
-    mapper = fsspec.get_mapper(target)
-    dta.to_zarr(mapper, mode='w')
+    dta.to_zarr(target, mode='w')
     return target
 
 
@@ -484,7 +483,7 @@ def run_analyses(ds_path: UPath, run_parameters: RunParameters) -> UPath:
     executed_html_path = root.parent / f'analyses_{run_parameters.run_id}.html'
 
     parameters = asdict(run_parameters)
-
+    parameters['run_id'] = run_parameters.run_id
     # TODO: figure out how to unpack these fields in the notebook
     # asdict will return lists for train_dates and predict_dates
     # parameters['train_period_start'] = train_period.start
