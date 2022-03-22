@@ -1,8 +1,6 @@
 import dask
 import xarray as xr
 
-from cmip6_downscaling.methods.common.containers import BBox
-
 from . import cat
 from .utils import lon_to_180
 
@@ -117,8 +115,6 @@ def get_gcm(
     grid_label: str,
     source_id: str,
     variable: str,
-    experiment_ids: list,
-    bbox: BBox,
 ) -> xr.Dataset:
     """
     Load and combine historical and future GCM into one dataset.
