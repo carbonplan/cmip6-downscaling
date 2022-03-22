@@ -44,7 +44,7 @@ def postprocess(ds: xr.Dataset) -> xr.Dataset:
     ds = lon_to_180(ds)
 
     # Reorders latitudes to [-90, 90]
-    if ds.lat[0] < ds.lat[-1]:
+    if ds.lat[0] > ds.lat[-1]:
         ds = ds.reindex({"lat": ds.lat[::-1]})
 
     return ds
