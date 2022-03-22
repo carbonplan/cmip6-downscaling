@@ -128,8 +128,6 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
         grid_label=run_parameters.grid_label,
         source_id=run_parameters.model,
         variable=run_parameters.variable,
-        experiment_ids=run_parameters.scenario,
-        bbox=run_parameters.bbox,
     )
 
     subset = subset_dataset(
