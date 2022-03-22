@@ -53,6 +53,18 @@ def make_run_parameters(**kwargs) -> RunParameters:
 
 @task(log_stdout=True)
 def get_obs(run_parameters: RunParameters) -> UPath:
+    """Task to return observation data subset from input parameters.
+
+    Parameters
+    ----------
+    run_parameters : RunParameters
+        RunParameter dataclass defined in common/conatiners.py. Constructed from prefect parameters.
+
+    Returns
+    -------
+    UPath
+        Path to subset observation dataset.
+    """
 
     target = (
         intermediate_dir
@@ -83,6 +95,20 @@ def get_obs(run_parameters: RunParameters) -> UPath:
 
 @task()
 def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
+    """Prefect task that returns cmip GCM data from input run parameters.
+
+    Parameters
+    ----------
+    run_parameters : RunParameters
+        RunParameter dataclass defined in common/conatiners.py. Constructed from prefect parameters.
+    time_subset : str
+        String describing time subset request. Either 'train_period' or 'predict_period'
+
+    Returns
+    -------
+    UPath
+        UPath to experiment dataset.
+    """
     time_period = getattr(run_parameters, time_subset)
     target = (
         intermediate_dir
@@ -228,6 +254,20 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
 
 @task
 def monthly_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
+    """Prefect task to create monthly resampled data. Takes mean of `tasmax` and `tasmin` and sum of `pr`.
+
+    Parameters
+    ----------
+    ds_path : UPath
+        UPath to input zarr store at daily timestep
+    run_parameters : RunParameters
+        prefect run parameters
+
+    Returns
+    -------
+    UPath
+        Path to resampled dataset.
+    """
 
     target = results_dir / "monthly_summary" / run_parameters.run_id
     if use_cache and zmetadata_exists(target):
@@ -253,6 +293,20 @@ def monthly_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
 
 @task
 def annual_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
+    """Prefect task to create yearly resampled data. Takes mean of `tasmax` and `tasmin` and sum of `pr`.
+
+    Parameters
+    ----------
+    ds_path : UPath
+        UPath to input zarr store at daily timestep
+    run_parameters : RunParameters
+        prefect run parameters
+
+    Returns
+    -------
+    UPath
+        Path to resampled dataset.
+    """
 
     target = results_dir / "annual_summary" / run_parameters.run_id
     if use_cache and zmetadata_exists(target):
@@ -278,7 +332,20 @@ def annual_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
 
 @task(tags=['dask-resource:TASKSLOTS=1'], log_stdout=True)
 def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
+    """Task to regrid a dataset to target grid.
 
+    Parameters
+    ----------
+    source_path : UPath
+        Path to dataset that will be regridded
+    target_grid_path : UPath
+        Path to template grid dataset
+
+    Returns
+    -------
+    UPath
+        Path to regridded output dataset.
+    """
     target = (
         intermediate_dir
         / "regrid"
