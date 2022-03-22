@@ -253,7 +253,7 @@ def monthly_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
     Parameters
     ----------
     ds_path : UPath
-        UPath to input zarr store
+        UPath to input zarr store at daily timestep
     run_parameters : RunParameters
         prefect run parameters
 
