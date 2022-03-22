@@ -53,13 +53,13 @@ def postprocess(ds: xr.Dataset) -> xr.Dataset:
 
 
 def load_cmip(
-    activity_ids: str,
-    experiment_ids: str,
-    member_ids: str,
-    source_ids: str,
-    table_ids: str,
-    grid_labels: str,
-    variable_ids: str,
+    activity_ids: str = None,
+    experiment_ids: str = None,
+    member_ids: str = None,
+    source_ids: str = None,
+    table_ids: str = None,
+    grid_labels: str = None,
+    variable_ids: list[str] = None,
 ) -> xr.Dataset:
     """Loads CMIP6 GCM dataset based on input criteria.
 
@@ -97,13 +97,14 @@ def load_cmip(
             grid_label=grid_labels,
             variable_id=variable_ids,
         )
-        if len(col_subset.keys()) > 1:
-            raise ValueError('More than one search result exist in intak-esm search')
+        keys = list(col_subset.keys())
+        if len(keys) != 1:
+            raise ValueError(f'intake-esm search returned {len(keys)}, expected exactly 1.')
 
-        ds = col_subset[list(col_subset.keys())[0]].to_dask().pipe(postprocess)
+        ds = col_subset[keys[0]].to_dask().pipe(postprocess)
 
         # convert to mm/day - helpful to prevent rounding errors from very tiny numbers
-        if variable_ids == 'pr':
+        if 'pr' in ds:
             ds['pr'] *= 86400
 
         return ds
@@ -116,8 +117,6 @@ def get_gcm(
     grid_label: str,
     source_id: str,
     variable: str,
-    train_period: slice,
-    predict_period: slice,
     experiment_ids: list,
     bbox: BBox,
 ) -> xr.Dataset:
@@ -138,14 +137,6 @@ def get_gcm(
         Name of source_id
     variable : str
         Name of variable to load
-    train_period_start : str
-        Start year of train/historical period
-    train_period_end : str
-        End year of train/historical period
-    predict_period_start : str
-        Start year of predict/future period
-    predict_period_end : str
-        End year of predict/future period
     bbox : BBox
         Bounding box for subset
 

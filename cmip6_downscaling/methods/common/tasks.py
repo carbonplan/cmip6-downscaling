@@ -102,8 +102,6 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
         grid_label=run_parameters.grid_label,
         source_id=run_parameters.model,
         variable=run_parameters.variable,
-        train_period=run_parameters.train_period,
-        predict_period=run_parameters.predict_period,
         experiment_ids=run_parameters.scenario,
         bbox=run_parameters.bbox,
     )
@@ -190,9 +188,9 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
     # initialize the chunks_dict that you'll pass in, filling the coordinates with
     # `None`` because you don't want to rechunk the coordinate arrays
     chunks_dict = {
-        # 'time': None,
-        # 'lon': None,
-        # 'lat': None,
+        'time': None,
+        'lon': None,
+        'lat': None,
     }
 
     for var in ds.data_vars:
@@ -211,7 +209,6 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
         return path
     except SchemaError:
         pass
-
     rechunk_plan = rechunker.rechunk(
         source=group,
         target_chunks=chunks_dict,
@@ -291,7 +288,6 @@ def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
         return target
-
     source_ds = xr.open_zarr(source_path)
     target_grid_ds = xr.open_zarr(target_grid_path)
 
