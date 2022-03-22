@@ -52,6 +52,9 @@ class RunParameters:
     method: str
     obs: str
     model: str
+    member: str
+    grid_label: str
+    table_id: str
     scenario: str
     variable: str
     latmin: float

@@ -21,7 +21,7 @@ from xarray_schema import DataArraySchema, DatasetSchema
 from xarray_schema.base import SchemaError
 
 from cmip6_downscaling import config, version
-from cmip6_downscaling.data.cmip import load_cmip
+from cmip6_downscaling.data.cmip import get_gcm
 from cmip6_downscaling.data.observations import open_era5
 from cmip6_downscaling.methods.common.utils import (
     calc_auspicious_chunks_dict,
@@ -78,11 +78,10 @@ def get_obs(run_parameters: RunParameters) -> UPath:
 
     subset.attrs.update(**get_cf_global_attrs(version=version))
     subset.to_zarr(target, mode='w')
-    print(subset)
     return target
 
 
-@task
+@task()
 def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     time_period = getattr(run_parameters, time_subset)
     target = (
@@ -96,11 +95,21 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
         print(f'found existing target: {target}')
         return target
 
-    ds = load_cmip(source_ids=run_parameters.model, variable_ids=run_parameters.variable)
+    ds = get_gcm(
+        scenario=run_parameters.scenario,
+        member_id=run_parameters.member,
+        table_id=run_parameters.table_id,
+        grid_label=run_parameters.grid_label,
+        source_id=run_parameters.model,
+        variable=run_parameters.variable,
+        experiment_ids=run_parameters.scenario,
+        bbox=run_parameters.bbox,
+    )
 
     subset = subset_dataset(
         ds, run_parameters.variable, time_period.time_slice, run_parameters.bbox
     )
+
     # Note: dataset is chunked into time:365 chunks to standardize leap-year chunking.
     subset = subset.chunk({'time': 365})
     del subset[run_parameters.variable].encoding['chunks']
@@ -160,7 +169,6 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
     temp_store.clear()
     group = zarr.open_consolidated(path)
     # open the dataset to access the coordinates
-    print(path)
     ds = xr.open_zarr(path)
     example_var = list(ds.data_vars)[0]
     # based upon whether you want to chunk along space or time, take the dataset and calculate
@@ -180,9 +188,9 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
     # initialize the chunks_dict that you'll pass in, filling the coordinates with
     # `None`` because you don't want to rechunk the coordinate arrays
     chunks_dict = {
-        # 'time': None,
-        # 'lon': None,
-        # 'lat': None,
+        'time': None,
+        'lon': None,
+        'lat': None,
     }
 
     for var in ds.data_vars:
@@ -201,8 +209,6 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
         return path
     except SchemaError:
         pass
-    print(chunks_dict)
-    print(group)
     rechunk_plan = rechunker.rechunk(
         source=group,
         target_chunks=chunks_dict,
@@ -282,7 +288,6 @@ def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
         return target
-
     source_ds = xr.open_zarr(source_path)
     target_grid_ds = xr.open_zarr(target_grid_path)
 
