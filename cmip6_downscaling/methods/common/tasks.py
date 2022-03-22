@@ -9,7 +9,6 @@ import fsspec
 import papermill as pm
 import rechunker
 import xarray as xr
-import xesmf as xe
 import zarr
 from azure.storage.blob import BlobServiceClient, ContentSettings
 from carbonplan_data.metadata import get_cf_global_attrs
@@ -272,6 +271,8 @@ def annual_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
 
 @task(tags=['dask-resource:TASKSLOTS=1'], log_stdout=True)
 def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
+
+    import xesmf as xe
 
     target = (
         intermediate_dir
