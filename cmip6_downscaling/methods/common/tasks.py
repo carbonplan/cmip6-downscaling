@@ -248,7 +248,7 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
 
 @task
 def monthly_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
-    """Prefect task to create monthly resampled data.
+    """Prefect task to create monthly resampled data. Takes mean of `tasmax` and `tasmin` and sum of `pr`.
 
     Parameters
     ----------
