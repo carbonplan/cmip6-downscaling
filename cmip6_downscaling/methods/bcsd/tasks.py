@@ -133,7 +133,7 @@ def fit_and_predict(
     coarse_obs_full_time_ds = xr.open_zarr(coarse_obs_full_time_path)
     experiment_train_full_time_ds = xr.open_zarr(experiment_train_full_time_path)
     experiment_predict_full_time_ds = xr.open_zarr(experiment_predict_full_time_path)
-
+    experiment_train_full_time_ds['time'] = coarse_obs_full_time_ds.time.values
     pointwise_model.fit(
         experiment_train_full_time_ds[run_parameters.variable],
         coarse_obs_full_time_ds[run_parameters.variable],
@@ -171,7 +171,7 @@ def postprocess_bcsd(
         UPath to post-processed dataset.
     """
 
-    target = results_dir / "interpolate_prediction" / run_parameters.run_id
+    target = results_dir / "daily" / run_parameters.run_id
     if use_cache and zmetadata_exists(target):
         print(f"found existing target: {target}")
         return target
