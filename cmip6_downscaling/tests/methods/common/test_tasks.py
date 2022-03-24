@@ -61,16 +61,6 @@ def test_make_run_parameters(params):
     assert asdict(rps) == params
 
 
-@pytest.fixture(scope="module")
-def regrid_input(tmp_path):
-
-    ds = xr.tutorial.open_dataset('air_temperature').chunk({'time': 10, 'lat': -1, 'lon': -1})
-    target = tmp_path / 'regrid_input.zarr'
-    ds.to_zarr(target)
-
-    return target
-
-
 def check_global_attrs(ds):
     for key in ['history', 'hostname', 'institution', 'source', 'tilte', 'username', 'version']:
         assert key in ds.attrs
