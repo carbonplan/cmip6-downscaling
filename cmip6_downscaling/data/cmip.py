@@ -49,7 +49,7 @@ def postprocess(ds: xr.Dataset) -> xr.Dataset:
         ds = ds.reindex({"lat": ds.lat[::-1]})
 
     # Shifts time from Noon (12:00) start to Midnight (00:00) start to match with Obs
-    ds['time'] = ds['time'] - np.timedelta64(12, 'h')
+    ds['time'] = ds['time'].resample(time='1D').first()
     return ds
 
 
