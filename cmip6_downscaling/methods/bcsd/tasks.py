@@ -129,6 +129,8 @@ def fit_and_predict(
     coarse_obs_full_time_ds = xr.open_zarr(coarse_obs_full_time_path)
     experiment_train_full_time_ds = xr.open_zarr(experiment_train_full_time_path)
     experiment_predict_full_time_ds = xr.open_zarr(experiment_predict_full_time_path)
+    # make times on the gcm data (all with a noon timestamp) align with the obs times (all with a midnight timestamp)
+    # TODO: instead add to gcm munging step to make timestamps all start of day
     experiment_train_full_time_ds['time'] = coarse_obs_full_time_ds.time.values
     with warnings.catch_warnings():
         warnings.simplefilter('ignore', DataConversionWarning)
