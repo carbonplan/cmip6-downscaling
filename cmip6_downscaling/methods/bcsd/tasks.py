@@ -119,9 +119,7 @@ def fit_and_predict(
     ValueError
         ValueError checking validity of input variables.
     """
-    print(experiment_train_full_time_path)
-    print(experiment_predict_full_time_path)
-    print(coarse_obs_full_time_path)
+
     target = intermediate_dir / "fit_and_predict" / run_parameters.run_id
     if use_cache and zmetadata_exists(target):
         print(f"found existing target: {target}")
