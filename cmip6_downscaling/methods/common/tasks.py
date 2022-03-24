@@ -2,7 +2,6 @@ import os
 import warnings
 from dataclasses import asdict
 from pathlib import PosixPath
-from typing import Union
 
 import datatree as dt
 import fsspec
@@ -144,7 +143,12 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
 
 
 @task(log_stdout=True)
-def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: str = "2GB") -> UPath:
+def rechunk(
+    path: UPath,
+    chunking_pattern: str = None,
+    chunking_template_file: UPath = None,
+    max_mem: str = "2GB",
+) -> UPath:
     """Use `rechunker` package to adjust chunks of dataset to a form
     conducive for your processing.
 
@@ -152,8 +156,13 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
     ----------
     path : UPath
         path to zarr store
-    chunking_pattern : str or UPath
-        The pattern of chunking you want to use.
+    chunking_pattern : str
+        The pattern of chunking you want to use. If used together with `chunking_template_file` it will override the template
+        to ensure that the final dataset truly follows that `full_space` or `full_time` spec. This matters when you are passing
+        a template that is either a shorter time length or a template that is a coarser grid (and thus a shorter lat/lon chunksize)
+    chunking_template_file : UPath
+        The path to the file you want to use as a chunking template. The utility will grab the chunk sizes and use them as the chunk
+        target to feed to rechunker.
     max_mem : str
         The memory available for rechunking steps. Must look like "2GB". Optional, default is 2GB.
 
@@ -162,21 +171,20 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
     target : UPath
         Path to rechunked dataset
     """
-
-    if isinstance(chunking_pattern, str):
-        pattern_string = chunking_pattern
-    elif isinstance(chunking_pattern, UPath):
-        # when you pass a dataset the chunking will match the chunking of that dataset
-        # so we'll call it "matched". this is ambiguous - like it could be chunked to match
-        # any number of patterns but it is sufficient for this implementation.
+    # print('rechunking dataset at {}'.format(path))
+    # if both defined then you'll take the spatial part of template and override one dimension with the specified pattern
+    if chunking_template_file is not None:
         pattern_string = 'matched'
-    else:
-        raise NotImplementedError(
-            "Not a valid chunking approach. Try passing either `full_space` or `full_time`, or a template chunked dataset."
-        )
+        if chunking_pattern is not None:
+            pattern_string += '_' + chunking_pattern
+    # if only chunking_pattern specified then use that pattern
+    elif chunking_pattern is not None:
+        pattern_string = chunking_pattern
+    print('using template of {}'.format(chunking_template_file))
+    print(pattern_string)
     target = intermediate_dir / "rechunk" / (pattern_string + path.path.replace("/", "_"))
     path_tmp = scratch_dir / "rechunk" / (pattern_string + path.path.replace("/", "_"))
-
+    print('writing rechunked dataset to {}'.format(target))
     target_store = fsspec.get_mapper(str(target))
     temp_store = fsspec.get_mapper(str(path_tmp))
 
@@ -194,21 +202,40 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
     group = zarr.open_consolidated(path)
     # open the dataset to access the coordinates
     ds = xr.open_zarr(path)
+    print('this is the input chunks')
+    print(ds.chunks)
     example_var = list(ds.data_vars)[0]
-    # based upon whether you want to chunk along space or time, take the dataset and calculate
-    # an optimal chunking schema for processing.
-    if isinstance(chunking_pattern, str):
-        chunk_dims = config.get(f"chunk_dims.{chunking_pattern}")
-        chunk_def = calc_auspicious_chunks_dict(ds[example_var], chunk_dims=chunk_dims)
-
-    elif isinstance(chunking_pattern, UPath):
-        template_ds = xr.open_zarr(chunking_pattern)
+    # if you have defined a chunking_template then use the chunks of that template
+    # to form the desired chunk definition
+    if chunking_template_file is not None:
+        template_ds = xr.open_zarr(chunking_template_file)
         # define the chunk definition
         chunk_def = {
             'time': min(template_ds.chunks['time'][0], len(ds.time)),
             'lat': min(template_ds.chunks['lat'][0], len(ds.lat)),
             'lon': min(template_ds.chunks['lon'][0], len(ds.lon)),
         }
+        print(chunk_def)
+        print('we have a template')
+        # if you have also defined a chunking_pattern then override the dimension you've specified there
+        if chunking_pattern is not None:
+            # the chunking pattern will return the dimensions that you'll chunk along
+            # so `full_time` will return `('lat', 'lon')`
+            chunk_dims = config.get(f"chunk_dims.{chunking_pattern}")
+            for dim in chunk_def.keys():
+                if dim not in chunk_dims:
+                    print('correcting dim')
+                    # override the chunksize of those unchunked dimensions to be the complete length (like passing chunksize=-1
+                    chunk_def[dim] = len(ds[dim])
+            print('we also got a pattern')
+            print(chunk_def)
+    # if you don't have a target template then you'll just use the `full_time` or `full_space` approach
+    elif chunking_pattern is not None:
+        chunk_dims = config.get(f"chunk_dims.{chunking_pattern}")
+        chunk_def = calc_auspicious_chunks_dict(ds[example_var], chunk_dims=chunk_dims)
+    else:
+        raise AttributeError('must either define chunking pattern or template')
+    print(chunk_def)
     # Note:
     # for rechunker v 0.3.3:
     # initialize the chunks_dict that you'll pass in, filling the coordinates with
@@ -220,7 +247,6 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
         'lon': (chunk_def['lon'],),
         'lat': (chunk_def['lat'],),
     }
-
     for var in ds.data_vars:
         chunks_dict[var] = chunk_def
     # now that you have your chunks_dict you can check that the dataset at `path`

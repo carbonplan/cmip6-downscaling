@@ -57,8 +57,12 @@ with Flow(
     experiment_train_path = get_experiment(run_parameters, time_subset='train_period')
     experiment_predict_path = get_experiment(run_parameters, time_subset='predict_period')
 
+    # after regridding coarse_obs will have smaller array size in space but still
+    # be chunked finely along time. but that's good to get it for regridding back to
+    # the interpolated obs in next task
     coarse_obs_path = regrid(obs_full_space_path, experiment_train_path)
 
+    # interpolated obs should have same exact chunking schema as ds at `obs_full_space_path`
     interpolated_obs_path = regrid(source_path=coarse_obs_path, target_grid_path=obs_path)
 
     interpolated_obs_full_time_path = rechunk(
@@ -69,21 +73,23 @@ with Flow(
         obs_full_time_path, interpolated_obs_full_time_path, run_parameters
     )
     coarse_obs_full_time_path = rechunk(coarse_obs_path, chunking_pattern='full_time')
-    experiment_train_full_time_path = rechunk(
-        experiment_train_path, chunking_pattern=coarse_obs_full_time_path
-    )
+    experiment_train_full_time_path = rechunk(experiment_train_path, chunking_pattern='full_time')
     experiment_predict_full_time_path = rechunk(
-        experiment_predict_path, chunking_pattern=coarse_obs_full_time_path
+        experiment_predict_path,
+        chunking_pattern='full_time',
+        chunking_template_file=coarse_obs_full_time_path,
     )
-
     bias_corrected_path = fit_and_predict(
         experiment_train_full_time_path=experiment_train_full_time_path,
         experiment_predict_full_time_path=experiment_predict_full_time_path,
         coarse_obs_full_time_path=coarse_obs_full_time_path,
         run_parameters=run_parameters,
     )
-    bias_corrected_full_space_path = rechunk(bias_corrected_path, chunking_pattern='full_space')
-
+    bias_corrected_full_space_path = rechunk(
+        bias_corrected_path,
+        chunking_pattern='full_space',
+        chunking_template_file=obs_full_space_path,
+    )
     bias_corrected_fine_full_space_path = regrid(
         source_path=bias_corrected_full_space_path, target_grid_path=obs_path
     )
