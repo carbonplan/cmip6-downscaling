@@ -7,6 +7,7 @@ from skdownscale.pointwise_models import PointWiseDownscaler
 from skdownscale.pointwise_models.bcsd import BcsdPrecipitation, BcsdTemperature
 from upath import UPath
 
+import cmip6_downscaling
 from cmip6_downscaling import config
 from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
 from cmip6_downscaling.methods.common.containers import RunParameters
@@ -19,8 +20,10 @@ warnings.filterwarnings(
 )
 
 
-intermediate_dir = UPath(config.get("storage.intermediate.uri"))
-results_dir = UPath(config.get("storage.results.uri"))
+code_version = cmip6_downscaling.__version__
+scratch_dir = UPath(config.get("storage.scratch.uri"))
+intermediate_dir = UPath(config.get("storage.intermediate.uri")) / cmip6_downscaling.__version__
+results_dir = UPath(config.get("storage.results.uri")) / cmip6_downscaling.__version__
 use_cache = config.get('run_options.use_cache')
 
 
@@ -85,7 +88,7 @@ def spatial_anomalies(
     return target
 
 
-@task
+@task(log_stdout=True)
 def fit_and_predict(
     experiment_train_full_time_path: UPath,
     experiment_predict_full_time_path: UPath,
@@ -116,6 +119,9 @@ def fit_and_predict(
     ValueError
         ValueError checking validity of input variables.
     """
+    print(experiment_train_full_time_path)
+    print(experiment_predict_full_time_path)
+    print(coarse_obs_full_time_path)
     target = intermediate_dir / "fit_and_predict" / run_parameters.run_id
     if use_cache and zmetadata_exists(target):
         print(f"found existing target: {target}")

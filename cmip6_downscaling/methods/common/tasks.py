@@ -20,6 +20,7 @@ from upath import UPath
 from xarray_schema import DataArraySchema, DatasetSchema
 from xarray_schema.base import SchemaError
 
+import cmip6_downscaling
 from cmip6_downscaling import config, version
 from cmip6_downscaling.data.cmip import get_gcm
 from cmip6_downscaling.data.observations import open_era5
@@ -38,10 +39,10 @@ warnings.filterwarnings(
 )
 
 PIXELS_PER_TILE = 128
-
+code_version = cmip6_downscaling.__version__
 scratch_dir = UPath(config.get("storage.scratch.uri"))
-intermediate_dir = UPath(config.get("storage.intermediate.uri"))
-results_dir = UPath(config.get("storage.results.uri"))
+intermediate_dir = UPath(config.get("storage.intermediate.uri")) / cmip6_downscaling.__version__
+results_dir = UPath(config.get("storage.results.uri")) / cmip6_downscaling.__version__
 use_cache = config.get('run_options.use_cache')
 
 
@@ -176,8 +177,9 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
         raise NotImplementedError(
             "Not a valid chunking approach. Try passing either `full_space` or `full_time`, or a template chunked dataset."
         )
-    target = intermediate_dir / "rechunk" / (pattern_string + path.path.replace("/", "_"))
-    path_tmp = scratch_dir / "rechunk" / (pattern_string + path.path.replace("/", "_"))
+
+    target = intermediate_dir / ("rechunk_" + pattern_string) / (path.path.split("/")[-1])
+    path_tmp = scratch_dir / ("rechunk_" + pattern_string) / (path.path.split("/")[-1])
 
     target_store = fsspec.get_mapper(str(target))
     temp_store = fsspec.get_mapper(str(path_tmp))
@@ -346,10 +348,14 @@ def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
     UPath
         Path to regridded output dataset.
     """
+
     target = (
         intermediate_dir
         / "regrid"
-        / (source_path.path.replace('/', '_') + '_' + target_grid_path.path.replace('/', '_'))
+        / "source_path"
+        / (source_path.path.split("/")[-1])
+        / "target_path"
+        / (target_grid_path.path.split("/")[-1])
     )
 
     if use_cache and zmetadata_exists(target):
