@@ -5,19 +5,13 @@ import xarray as xr
 from prefect import task
 from skdownscale.pointwise_models import PointWiseDownscaler
 from skdownscale.pointwise_models.bcsd import BcsdPrecipitation, BcsdTemperature
+from sklearn.exceptions import DataConversionWarning
 from upath import UPath
 
 from cmip6_downscaling import config
 from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
 from cmip6_downscaling.methods.common.containers import RunParameters
 from cmip6_downscaling.methods.common.utils import zmetadata_exists
-
-warnings.filterwarnings(
-    "ignore",
-    "(.*) filesystem path not explicitly implemented. falling back to default implementation. This filesystem may not be tested",
-    category=UserWarning,
-)
-
 
 intermediate_dir = UPath(config.get("storage.intermediate.uri"))
 results_dir = UPath(config.get("storage.results.uri"))
@@ -78,6 +72,7 @@ def spatial_anomalies(
     # and the interpolated coarse obs this will be saved and added to the
     # spatially-interpolated coarse predictions to add the spatial heterogeneity back in.
     spatial_anomalies = obs_full_time_ds - interpolated_obs_full_time_ds
+    print(spatial_anomalies.chunks)
     seasonal_cycle_spatial_anomalies = spatial_anomalies.groupby("time.month").mean()
 
     seasonal_cycle_spatial_anomalies.to_zarr(target, mode="w")
@@ -116,6 +111,7 @@ def fit_and_predict(
     ValueError
         ValueError checking validity of input variables.
     """
+
     target = intermediate_dir / "fit_and_predict" / run_parameters.run_id
     if use_cache and zmetadata_exists(target):
         print(f"found existing target: {target}")
@@ -134,15 +130,16 @@ def fit_and_predict(
     experiment_train_full_time_ds = xr.open_zarr(experiment_train_full_time_path)
     experiment_predict_full_time_ds = xr.open_zarr(experiment_predict_full_time_path)
     experiment_train_full_time_ds['time'] = coarse_obs_full_time_ds.time.values
-    pointwise_model.fit(
-        experiment_train_full_time_ds[run_parameters.variable],
-        coarse_obs_full_time_ds[run_parameters.variable],
-    )
-    bias_corrected_da = pointwise_model.predict(
-        experiment_predict_full_time_ds[run_parameters.variable]
-    )
-
-    bias_corrected_ds = bias_corrected_da.astype('float32').to_dataset(name=run_parameters.variable)
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore', DataConversionWarning)
+        pointwise_model.fit(
+            experiment_train_full_time_ds[run_parameters.variable],
+            coarse_obs_full_time_ds[run_parameters.variable],
+        )
+        bias_corrected_da = pointwise_model.predict(
+            experiment_predict_full_time_ds[run_parameters.variable]
+        )
+    bias_corrected_ds = bias_corrected_da.to_dataset(name=run_parameters.variable)
     bias_corrected_ds.to_zarr(target, mode='w')
     return target
 
