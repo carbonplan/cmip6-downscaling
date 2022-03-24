@@ -128,8 +128,6 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
         grid_label=run_parameters.grid_label,
         source_id=run_parameters.model,
         variable=run_parameters.variable,
-        experiment_ids=run_parameters.scenario,
-        bbox=run_parameters.bbox,
     )
 
     subset = subset_dataset(
@@ -211,12 +209,16 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
             'lat': min(template_ds.chunks['lat'][0], len(ds.lat)),
             'lon': min(template_ds.chunks['lon'][0], len(ds.lon)),
         }
+    # Note:
+    # for rechunker v 0.3.3:
     # initialize the chunks_dict that you'll pass in, filling the coordinates with
-    # `None`` because you don't want to rechunk the coordinate arrays
+    # `None`` because you don't want to rechunk the coordinate arrays. this works with
+    # for rechunker v 0.4.2:
+    # initialize chunks_dict using the `chunk_def`` above
     chunks_dict = {
-        'time': None,
-        'lon': None,
-        'lat': None,
+        'time': (chunk_def['time'],),
+        'lon': (chunk_def['lon'],),
+        'lat': (chunk_def['lat'],),
     }
 
     for var in ds.data_vars:
@@ -455,8 +457,7 @@ def pyramid(ds_path: UPath, levels: int = 2, other_chunks: dict = None) -> UPath
     dta = _pyramid_postprocess(dta, levels, other_chunks=other_chunks)
 
     # write to target
-    mapper = fsspec.get_mapper(target)
-    dta.to_zarr(mapper, mode='w')
+    dta.to_zarr(target, mode='w')
     return target
 
 
@@ -484,7 +485,7 @@ def run_analyses(ds_path: UPath, run_parameters: RunParameters) -> UPath:
     executed_html_path = root.parent / f'analyses_{run_parameters.run_id}.html'
 
     parameters = asdict(run_parameters)
-
+    parameters['run_id'] = run_parameters.run_id
     # TODO: figure out how to unpack these fields in the notebook
     # asdict will return lists for train_dates and predict_dates
     # parameters['train_period_start'] = train_period.start

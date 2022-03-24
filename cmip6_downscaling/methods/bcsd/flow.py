@@ -82,29 +82,38 @@ with Flow(
         coarse_obs_full_time_path=coarse_obs_full_time_path,
         run_parameters=run_parameters,
     )
+    bias_corrected_full_space_path = rechunk(bias_corrected_path, chunking_pattern='full_space')
 
     bias_corrected_fine_full_space_path = regrid(
-        source_path=bias_corrected_path, target_grid_path=obs_path
+        source_path=bias_corrected_full_space_path, target_grid_path=obs_path
     )
 
     bias_corrected_fine_full_time_path = rechunk(
         bias_corrected_fine_full_space_path, chunking_pattern='full_time'
     )
-    postprocess_bcsd_path = postprocess_bcsd(
+    final_bcsd_full_time_path = postprocess_bcsd(
         bias_corrected_fine_full_time_path, spatial_anomalies_path, run_parameters
     )  # fine-scale maps (full_space) (time: 365)
 
-    # temporary aggregations
-    monthly_summary_path = monthly_summary(postprocess_bcsd_path, run_parameters)
-    annual_summary_path = annual_summary(postprocess_bcsd_path, run_parameters)
+    # temporary aggregations - these come out in full time
+    monthly_summary_path = monthly_summary(final_bcsd_full_time_path, run_parameters)
+    annual_summary_path = annual_summary(final_bcsd_full_time_path, run_parameters)
 
     # analysis notebook
-    analysis_location = run_analyses(postprocess_bcsd_path, run_parameters)
+    analysis_location = run_analyses(final_bcsd_full_time_path, run_parameters)
+
+    # since pyramids require full space we now rechunk everything into full
+    # space before passing into pyramid step. we probably want to add a cleanup
+    # to this step in particular since otherwise we will have an exact
+    # duplicate of the daily, monthly, and annual datasets
+    final_bcsd_full_space_path = rechunk(final_bcsd_full_time_path, chunking_pattern='full_space')
+    monthly_summary_full_space_path = rechunk(monthly_summary_path, chunking_pattern='full_space')
+    annual_summary_full_space_path = rechunk(annual_summary_path, chunking_pattern='full_space')
 
     # pyramids
-    daily_pyramid_path = pyramid(postprocess_bcsd_path, levels=4)
-    monthly_pyramid_path = pyramid(monthly_summary_path, levels=4)
-    annual_pyramid_path = pyramid(annual_summary_path, levels=4)
+    daily_pyramid_path = pyramid(final_bcsd_full_space_path, levels=4)
+    monthly_pyramid_path = pyramid(monthly_summary_full_space_path, levels=4)
+    annual_pyramid_path = pyramid(annual_summary_full_space_path, levels=4)
 
     # # if config.get('run_options.cleanup_flag') is True:
     # #     cleanup.run_rsfip(gcm_identifier, obs_identifier)

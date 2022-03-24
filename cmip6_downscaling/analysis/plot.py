@@ -6,17 +6,6 @@ import seaborn as sns
 import xarray as xr
 from carbonplan import styles
 
-from cmip6_downscaling.workflows.paths import (
-    make_bcsd_output_path,
-    make_bias_corrected_path,
-    make_coarse_obs_path_full_space,
-    make_coarse_obs_path_full_time,
-    make_gcm_predict_path,
-    make_rechunked_gcm_path,
-    make_return_obs_path,
-    make_spatial_anomalies_path,
-)
-
 styles.mpl.set_theme(style='carbonplan_light')
 
 
@@ -244,70 +233,6 @@ def plot_seasonal(ds1: xr.Dataset, ds2: xr.Dataset) -> mpl.figure.Figure:
         for i, season in enumerate(seasons):
             ds.sel(season=season).plot(ax=axarr[j, i], cmap=cmaps[j])
             axarr[j, i].coastlines()
-    plt.tight_layout()
-    plt.close()
-    return fig
-
-
-def plot_each_step_bcsd(
-    gcm_identifier: str,
-    obs_identifier: str,
-    gcm_grid_spec: str,
-    result_dir: str,
-    intermediate_dir: str,
-    train_period: slice,
-    var: str,
-) -> mpl.figure.Figure:
-    """Plot the training period mean of each intermediary and output file in the
-     bcsd process. For the spatial anomalies it just plots the first month.
-
-    Parameters
-    ----------
-    gcm_identifier : str
-        unique identifier for a run
-    obs_identifier : str
-        unique identifier for the obs used in training
-    result_dir : str
-        Location of the final results
-    intermediate_dir : str
-        Location of intermediate files
-    train_period : slice
-        Period used for training
-    var : str
-        Variable of interest
-
-    Returns
-    -------
-    mpl.figure.Figure
-        Figure
-    """
-    steps = [
-        make_return_obs_path(obs_identifier),
-        make_coarse_obs_path_full_time(obs_identifier=obs_identifier, gcm_grid_spec=gcm_grid_spec),
-        make_coarse_obs_path_full_space(obs_identifier=obs_identifier, gcm_grid_spec=gcm_grid_spec),
-        make_spatial_anomalies_path(obs_identifier=obs_identifier, gcm_grid_spec=gcm_grid_spec),
-        make_rechunked_gcm_path(gcm_identifier),
-        make_gcm_predict_path(gcm_identifier),
-        make_bias_corrected_path(gcm_identifier),
-        make_bcsd_output_path(gcm_identifier),
-    ]
-
-    fig, axarr = plt.subplots(ncols=len(steps), figsize=(20, 3))
-    for i, path in enumerate(steps):
-        prefix = path.split('/')[0]
-        print(prefix)
-
-        if prefix == 'bcsd_output':
-            data_location = result_dir
-        else:
-            data_location = intermediate_dir
-        print('/'.join([data_location, path]))
-        ds = xr.open_zarr('/'.join([data_location, path]))
-        if prefix == 'spatial_anomalies':
-            ds[var].isel(month=0).plot(ax=axarr[i])
-        else:
-            ds[var].sel(time=train_period).mean(dim='time').plot(ax=axarr[i])
-        axarr[i].set_title(prefix)
     plt.tight_layout()
     plt.close()
     return fig

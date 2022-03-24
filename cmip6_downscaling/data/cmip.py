@@ -1,8 +1,6 @@
 import dask
 import xarray as xr
 
-from cmip6_downscaling.methods.common.containers import BBox
-
 from . import cat
 from .utils import lon_to_180
 
@@ -46,7 +44,7 @@ def postprocess(ds: xr.Dataset) -> xr.Dataset:
     ds = lon_to_180(ds)
 
     # Reorders latitudes to [-90, 90]
-    if ds.lat[0] < ds.lat[-1]:
+    if ds.lat[0] > ds.lat[-1]:
         ds = ds.reindex({"lat": ds.lat[::-1]})
 
     return ds
@@ -117,8 +115,6 @@ def get_gcm(
     grid_label: str,
     source_id: str,
     variable: str,
-    experiment_ids: list,
-    bbox: BBox,
 ) -> xr.Dataset:
     """
     Load and combine historical and future GCM into one dataset.
