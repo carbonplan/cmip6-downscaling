@@ -15,10 +15,9 @@ config.set(
         'storage.results.uri': '/tmp/cmip6_downscaling_tests/results',
     }
 )
-print(config.config)
 
 from cmip6_downscaling.methods.common.containers import RunParameters
-from cmip6_downscaling.methods.common.tasks import get_obs, make_run_parameters
+from cmip6_downscaling.methods.common.tasks import get_obs, make_run_parameters, rechunk, regrid
 
 params = [
     {
@@ -62,13 +61,19 @@ def test_make_run_parameters(params):
     assert asdict(rps) == params
 
 
+@pytest.fixture(scope="module")
+def regrid_input(tmp_path):
+
+    ds = xr.tutorial.open_dataset('air_temperature').chunk({'time': 10, 'lat': -1, 'lon': -1})
+    target = tmp_path / 'regrid_input.zarr'
+    ds.to_zarr(target)
+
+    return target
+
+
 def check_global_attrs(ds):
     for key in ['history', 'hostname', 'institution', 'source', 'tilte', 'username', 'version']:
         assert key in ds.attrs
-
-
-def check_dataset_schema(ds, schema):
-    schema.validate(ds)
 
 
 def test_get_obs(run_parameters):
@@ -84,4 +89,44 @@ def test_get_obs(run_parameters):
             )
         }
     )
-    check_dataset_schema(ds, schema)
+    schema.validate(ds)
+
+
+def test_regrid(tmp_path):
+
+    pytest.importorskip('xesmf')
+
+    ds = xr.tutorial.open_dataset('air_temperature').chunk({'time': 10, 'lat': -1, 'lon': -1})
+    source_path = tmp_path / 'regrid_source.zarr'
+    ds.to_zarr(source_path)
+
+    target_ds = ds.isel(time=0).coarsen(lat=4, lon=4, boundary='trim').mean()
+    target_grid_path = tmp_path / 'regrid_target.zarr'
+    target_ds.to_zarr(target_grid_path)
+
+    actual_path = regrid.run(source_path, target_grid_path)
+    actual_ds = xr.open_zarr(actual_path)
+
+    check_global_attrs(ds)
+    expected_shape = (ds.dims['time'], target_ds.dims['latitude'], target_ds.dims['longitude'])
+    schema = DatasetSchema(
+        {
+            'air': DataArraySchema(
+                dtype=np.floating, name='air', dims=['time', 'lat', 'lon'], shape=expected_shape
+            )
+        }
+    )
+    schema.validate(actual_ds)
+
+
+def test_rechunk(tmp_path):
+
+    ds = xr.tutorial.open_dataset('air_temperature').chunk({'time': 10, 'lat': -1, 'lon': -1})
+    source_path = tmp_path / 'rechunk.zarr'
+    ds.to_zarr(source_path)
+
+    actual_path = rechunk(
+        source_path,
+        chunking_pattern='full_time',
+    )
+    actual_ds = xr.open_zarr(actual_path)
