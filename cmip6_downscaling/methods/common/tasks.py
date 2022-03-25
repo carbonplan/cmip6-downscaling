@@ -202,8 +202,6 @@ def rechunk(
     group = zarr.open_consolidated(path)
     # open the dataset to access the coordinates
     ds = xr.open_zarr(path)
-    print('this is the input chunks')
-    print(ds.chunks)
     example_var = list(ds.data_vars)[0]
     # if you have defined a chunking_template then use the chunks of that template
     # to form the desired chunk definition
@@ -215,8 +213,6 @@ def rechunk(
             'lat': min(template_ds.chunks['lat'][0], len(ds.lat)),
             'lon': min(template_ds.chunks['lon'][0], len(ds.lon)),
         }
-        print(chunk_def)
-        print('we have a template')
         # if you have also defined a chunking_pattern then override the dimension you've specified there
         if chunking_pattern is not None:
             # the chunking pattern will return the dimensions that you'll chunk along
@@ -227,15 +223,12 @@ def rechunk(
                     print('correcting dim')
                     # override the chunksize of those unchunked dimensions to be the complete length (like passing chunksize=-1
                     chunk_def[dim] = len(ds[dim])
-            print('we also got a pattern')
-            print(chunk_def)
     # if you don't have a target template then you'll just use the `full_time` or `full_space` approach
     elif chunking_pattern is not None:
         chunk_dims = config.get(f"chunk_dims.{chunking_pattern}")
         chunk_def = calc_auspicious_chunks_dict(ds[example_var], chunk_dims=chunk_dims)
     else:
         raise AttributeError('must either define chunking pattern or template')
-    print(chunk_def)
     # Note:
     # for rechunker v 0.3.3:
     # initialize the chunks_dict that you'll pass in, filling the coordinates with
