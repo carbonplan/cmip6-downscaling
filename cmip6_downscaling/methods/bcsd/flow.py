@@ -95,7 +95,9 @@ with Flow(
     )
 
     bias_corrected_fine_full_time_path = rechunk(
-        bias_corrected_fine_full_space_path, chunking_pattern='full_time'
+        bias_corrected_fine_full_space_path,
+        chunking_pattern='full_time',
+        chunking_template_file=obs_full_time_path,
     )
     final_bcsd_full_time_path = postprocess_bcsd(
         bias_corrected_fine_full_time_path, spatial_anomalies_path, run_parameters
@@ -113,6 +115,8 @@ with Flow(
     # to this step in particular since otherwise we will have an exact
     # duplicate of the daily, monthly, and annual datasets
     final_bcsd_full_space_path = rechunk(final_bcsd_full_time_path, chunking_pattern='full_space')
+
+    # make temporal summaries
     monthly_summary_full_space_path = rechunk(monthly_summary_path, chunking_pattern='full_space')
     annual_summary_full_space_path = rechunk(annual_summary_path, chunking_pattern='full_space')
 
