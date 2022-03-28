@@ -351,7 +351,7 @@ def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
         Path to dataset that will be regridded
     target_grid_path : UPath
         Path to template grid dataset
-        
+
     Returns
     -------
     UPath
@@ -364,7 +364,6 @@ def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
         "regrid"
         + "/"
         + (str(source_path).replace('/', '_') + '_' + str(target_grid_path).replace('/', '_'))
- 
     )
     target = str(intermediate_dir) + "/" + ds_name
 
