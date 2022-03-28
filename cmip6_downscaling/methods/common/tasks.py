@@ -146,8 +146,8 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
 @task(log_stdout=True)
 def rechunk(
     path: UPath,
-    chunking_pattern: str = None,
-    chunking_template_file: UPath = None,
+    pattern: str = None,
+    template: UPath = None,
     max_mem: str = "2GB",
 ) -> UPath:
     """Use `rechunker` package to adjust chunks of dataset to a form
