@@ -179,9 +179,8 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
             "Not a valid chunking approach. Try passing either `full_space` or `full_time`, or a template chunked dataset."
         )
 
-
-    target = intermediate_dir / ("rechunk_" + pattern_string) / str(path).split("/")[-1])
-    path_tmp = scratch_dir / ("rechunk_" + pattern_string) / str(path).split("/")[-1])
+    target = intermediate_dir / ("rechunk_" + pattern_string) / (str(path).split("/")[-1])
+    path_tmp = scratch_dir / ("rechunk_" + pattern_string) / (str(path).split("/")[-1])
 
     target_store = fsspec.get_mapper(str(target))
     temp_store = fsspec.get_mapper(str(path_tmp))
@@ -365,9 +364,9 @@ def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
     ds_name = (
         "regrid"
         / "source_path"
-        / str(source_path).split("/")[-1])
+        / (str(source_path).split("/")[-1])
         / "target_path"
-        / str(target_grid_path).split("/")[-1])
+        / (str(target_grid_path).split("/")[-1])
     )
     target = str(intermediate_dir) + "/" + ds_name
 
