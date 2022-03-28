@@ -95,7 +95,7 @@ def get_obs(run_parameters: RunParameters) -> UPath:
     return target
 
 
-@task()
+@task(log_stdout=True)
 def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     """Prefect task that returns cmip GCM data from input run parameters.
 

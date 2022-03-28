@@ -29,12 +29,12 @@ from cmip6_downscaling.methods.common.tasks import (
 params = [
     {
         'method': 'bcsd',
-        'obs': 'era5',
-        'model': 'canesm',
-        "member": "r1i1p1f1",
-        "grid_label": "gn",
-        "table_id": "day",
-        'scenario': 'historical',
+        'obs': 'ERA5',
+        'model': 'MIROC6',
+        'member': 'r1i1p1f1',
+        'grid_label': 'gn',
+        'table_id': 'day',
+        'scenario': 'ssp370',
         'variable': 'tasmax',
         'latmin': '-2',
         'latmax': '2',
@@ -45,12 +45,12 @@ params = [
     },
     {
         'method': 'gard',
-        'obs': 'era5',
-        'model': 'canesm',
-        "member": "r1i1p1f1",
-        "grid_label": "gn",
-        "table_id": "day",
-        'scenario': 'historical',
+        'obs': 'ERA5',
+        'model': 'MIROC6',
+        'member': 'r1i1p1f1',
+        'grid_label': 'gn',
+        'table_id': 'day',
+        'scenario': 'ssp370',
         'variable': 'tasmax',
         'latmin': '-2',
         'latmax': '2',
@@ -103,7 +103,7 @@ def test_get_obs(run_parameters):
 
 # NOTE: 🚧 work-in-progress 🚧
 def test_get_experiment(run_parameters):
-    get_experiment_path = get_experiment.run(run_parameters, time_subset='train_dates')
+    get_experiment_path = get_experiment.run(run_parameters, time_subset='train_period')
 
     ds = xr.open_zarr(get_experiment_path)
     check_global_attrs(ds)
