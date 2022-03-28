@@ -20,7 +20,7 @@ from xarray_schema import DataArraySchema, DatasetSchema
 from xarray_schema.base import SchemaError
 
 from cmip6_downscaling import config, version
-from cmip6_downscaling.data.cmip import load_cmip
+from cmip6_downscaling.data.cmip import get_gcm
 from cmip6_downscaling.data.observations import open_era5
 from cmip6_downscaling.methods.common.utils import (
     calc_auspicious_chunks_dict,
@@ -52,6 +52,18 @@ def make_run_parameters(**kwargs) -> RunParameters:
 
 @task(log_stdout=True)
 def get_obs(run_parameters: RunParameters) -> UPath:
+    """Task to return observation data subset from input parameters.
+
+    Parameters
+    ----------
+    run_parameters : RunParameters
+        RunParameter dataclass defined in common/conatiners.py. Constructed from prefect parameters.
+
+    Returns
+    -------
+    UPath
+        Path to subset observation dataset.
+    """
 
     ds_name = (
         "get_obs"
@@ -79,12 +91,25 @@ def get_obs(run_parameters: RunParameters) -> UPath:
 
     subset.attrs.update({'title': ds_name}, **get_cf_global_attrs(version=version))
     subset.to_zarr(target, mode='w')
-    print(subset)
     return target
 
 
-@task
+@task()
 def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
+    """Prefect task that returns cmip GCM data from input run parameters.
+
+    Parameters
+    ----------
+    run_parameters : RunParameters
+        RunParameter dataclass defined in common/conatiners.py. Constructed from prefect parameters.
+    time_subset : str
+        String describing time subset request. Either 'train_period' or 'predict_period'
+
+    Returns
+    -------
+    UPath
+        UPath to experiment dataset.
+    """
     time_period = getattr(run_parameters, time_subset)
     ds_name = (
         "get_experiment"
@@ -99,11 +124,19 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
         print(f'found existing target: {target}')
         return target
 
-    ds = load_cmip(source_ids=run_parameters.model, variable_ids=run_parameters.variable)
+    ds = get_gcm(
+        scenario=run_parameters.scenario,
+        member_id=run_parameters.member,
+        table_id=run_parameters.table_id,
+        grid_label=run_parameters.grid_label,
+        source_id=run_parameters.model,
+        variable=run_parameters.variable,
+    )
 
     subset = subset_dataset(
         ds, run_parameters.variable, time_period.time_slice, run_parameters.bbox
     )
+
     # Note: dataset is chunked into time:365 chunks to standardize leap-year chunking.
     subset = subset.chunk({'time': 365})
     del subset[run_parameters.variable].encoding['chunks']
@@ -164,7 +197,6 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
     temp_store.clear()
     group = zarr.open_consolidated(path)
     # open the dataset to access the coordinates
-    print(path)
     ds = xr.open_zarr(path)
     example_var = list(ds.data_vars)[0]
     # based upon whether you want to chunk along space or time, take the dataset and calculate
@@ -181,12 +213,16 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
             'lat': min(template_ds.chunks['lat'][0], len(ds.lat)),
             'lon': min(template_ds.chunks['lon'][0], len(ds.lon)),
         }
+    # Note:
+    # for rechunker v 0.3.3:
     # initialize the chunks_dict that you'll pass in, filling the coordinates with
-    # `None`` because you don't want to rechunk the coordinate arrays
+    # `None`` because you don't want to rechunk the coordinate arrays. this works with
+    # for rechunker v 0.4.2:
+    # initialize chunks_dict using the `chunk_def`` above
     chunks_dict = {
-        # 'time': None,
-        # 'lon': None,
-        # 'lat': None,
+        'time': (chunk_def['time'],),
+        'lon': (chunk_def['lon'],),
+        'lat': (chunk_def['lat'],),
     }
 
     for var in ds.data_vars:
@@ -205,8 +241,6 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
         return path
     except SchemaError:
         pass
-    print(chunks_dict)
-    print(group)
     rechunk_plan = rechunker.rechunk(
         source=group,
         target_chunks=chunks_dict,
@@ -226,6 +260,20 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
 
 @task
 def monthly_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
+    """Prefect task to create monthly resampled data. Takes mean of `tasmax` and `tasmin` and sum of `pr`.
+
+    Parameters
+    ----------
+    ds_path : UPath
+        UPath to input zarr store at daily timestep
+    run_parameters : RunParameters
+        prefect run parameters
+
+    Returns
+    -------
+    UPath
+        Path to resampled dataset.
+    """
 
     ds_name = "monthly_summary" + "/" + str(run_parameters.run_id)
     target = str(results_dir) + "/" + ds_name
@@ -254,6 +302,20 @@ def monthly_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
 
 @task
 def annual_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
+    """Prefect task to create yearly resampled data. Takes mean of `tasmax` and `tasmin` and sum of `pr`.
+
+    Parameters
+    ----------
+    ds_path : UPath
+        UPath to input zarr store at daily timestep
+    run_parameters : RunParameters
+        prefect run parameters
+
+    Returns
+    -------
+    UPath
+        Path to resampled dataset.
+    """
 
     ds_name = "annual_summary" + "/" + str(run_parameters.run_id)
     target = str(results_dir) + "/" + ds_name
@@ -281,6 +343,20 @@ def annual_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
 
 @task(tags=['dask-resource:TASKSLOTS=1'], log_stdout=True)
 def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
+    """Task to regrid a dataset to target grid.
+
+    Parameters
+    ----------
+    source_path : UPath
+        Path to dataset that will be regridded
+    target_grid_path : UPath
+        Path to template grid dataset
+        
+    Returns
+    -------
+    UPath
+        Path to regridded output dataset.
+    """
 
     import xesmf as xe
 
@@ -288,13 +364,13 @@ def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
         "regrid"
         + "/"
         + (str(source_path).replace('/', '_') + '_' + str(target_grid_path).replace('/', '_'))
+ 
     )
     target = str(intermediate_dir) + "/" + ds_name
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
         return target
-
     source_ds = xr.open_zarr(source_path)
     target_grid_ds = xr.open_zarr(target_grid_path)
 
@@ -398,8 +474,7 @@ def pyramid(ds_path: UPath, levels: int = 2, other_chunks: dict = None) -> UPath
     dta = _pyramid_postprocess(dta, levels, other_chunks=other_chunks, ds_name=ds_name)
 
     # write to target
-    mapper = fsspec.get_mapper(target)
-    dta.to_zarr(mapper, mode='w')
+    dta.to_zarr(target, mode='w')
     return target
 
 
@@ -427,7 +502,7 @@ def run_analyses(ds_path: UPath, run_parameters: RunParameters) -> UPath:
     executed_html_path = root.parent / f'analyses_{run_parameters.run_id}.html'
 
     parameters = asdict(run_parameters)
-
+    parameters['run_id'] = run_parameters.run_id
     # TODO: figure out how to unpack these fields in the notebook
     # asdict will return lists for train_dates and predict_dates
     # parameters['train_period_start'] = train_period.start

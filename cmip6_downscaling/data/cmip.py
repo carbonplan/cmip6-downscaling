@@ -1,13 +1,6 @@
-from typing import List, Union
-
 import dask
 import numpy as np
 import xarray as xr
-from xarray.core.types import T_Xarray
-
-from cmip6_downscaling import config
-from cmip6_downscaling.methods.common.containers import BBox
-from cmip6_downscaling.methods.common.utils import subset_dataset
 
 from . import cat
 from .utils import lon_to_180
@@ -52,20 +45,22 @@ def postprocess(ds: xr.Dataset) -> xr.Dataset:
     ds = lon_to_180(ds)
 
     # Reorders latitudes to [-90, 90]
-    if ds.lat[0] < ds.lat[-1]:
+    if ds.lat[0] > ds.lat[-1]:
         ds = ds.reindex({"lat": ds.lat[::-1]})
 
+    # Shifts time from Noon (12:00) start to Midnight (00:00) start to match with Obs
+    ds['time'] = ds['time'].resample(time='1D').first()
     return ds
 
 
 def load_cmip(
-    activity_ids: str = "CMIP",
-    experiment_ids: str = "historical",
-    member_ids: str = "r1i1p1f1",
-    source_ids: str = "MIROC6",
-    table_ids: str = "day",
-    grid_labels: str = "gn",
-    variable_ids: List[str] = ["tasmax"],
+    activity_ids: str = None,
+    experiment_ids: str = None,
+    member_ids: str = None,
+    source_ids: str = None,
+    table_ids: str = None,
+    grid_labels: str = None,
+    variable_ids: list[str] = None,
 ) -> xr.Dataset:
     """Loads CMIP6 GCM dataset based on input criteria.
 
@@ -93,72 +88,54 @@ def load_cmip(
     """
     with dask.config.set(**{'array.slicing.split_large_chunks': False}):
 
-        if isinstance(variable_ids, str):
-            variable_ids = [variable_ids]
-
         col = cat.cmip6()
+        col_subset = col.search(
+            activity_id=activity_ids,
+            experiment_id=experiment_ids,
+            member_id=member_ids,
+            source_id=source_ids,
+            table_id=table_ids,
+            grid_label=grid_labels,
+            variable_id=variable_ids,
+        )
+        keys = list(col_subset.keys())
+        if len(keys) != 1:
+            raise ValueError(f'intake-esm search returned {len(keys)}, expected exactly 1.')
 
-        for i, var in enumerate(variable_ids):
-            stores = (
-                col.search(
-                    activity_id=activity_ids,
-                    experiment_id=experiment_ids,
-                    member_id=member_ids,
-                    source_id=source_ids,
-                    table_id=table_ids,
-                    grid_label=grid_labels,
-                    variable_id=[var],
-                )
-                .df['zstore']
-                .to_list()
-            )
+        ds = col_subset[keys[0]].to_dask().pipe(postprocess)
 
-            # Q: why are we using the era5 storage_options
-            storage_options = config.get('data_catalog.era5.storage_options')
-            if len(stores) > 1:
-                raise ValueError('can only get 1 store at a time')
+        # convert to mm/day - helpful to prevent rounding errors from very tiny numbers
+        if 'pr' in ds:
+            ds['pr'] *= 86400
 
-            ds = xr.open_zarr(stores[0], storage_options=storage_options).pipe(postprocess)
-
-            # convert to mm/day - helpful to prevent rounding errors from very tiny numbers
-            if var == 'pr':
-                ds['pr'] *= 86400
-
-            if i == 0:
-                ds_out = ds
-            else:
-                ds_out[var] = ds[var]
-
-        return ds_out
+        return ds
 
 
 def get_gcm(
-    gcm: str,
     scenario: str,
-    variables: Union[str, List[str]],
-    train_period: slice,
-    predict_period: slice,
-    bbox: BBox,
+    member_id: str,
+    table_id: str,
+    grid_label: str,
+    source_id: str,
+    variable: str,
 ) -> xr.Dataset:
     """
     Load and combine historical and future GCM into one dataset.
 
     Parameters
     ----------
-    gcm : str
-        Name of GCM
     scenario : str
         Name of scenario
-    variables : str or list
-        Name of variable(s) to load
-    train_period_start : str
-        Start year of train/historical period
-    train_period_end : str
-        End year of train/historical period
-    predict_period_start : str
-        Start year of predict/future period
-    predict_period_end : str
-        End year of predict/future period
+    member_id : str
+        Name of member ID
+    table_id : str
+        Name of table ID
+    grid_label : str
+        Name of grid_label
+    source_id : str
+        Name of source_id
+    variable : str
+        Name of variable to load
     bbox : BBox
         Bounding box for subset
 
@@ -167,60 +144,29 @@ def get_gcm(
     ds_gcm : xr.Dataset
         A dataset containing both historical and future period of GCM data
     """
+
     historical_gcm = load_cmip(
         activity_ids='CMIP',
         experiment_ids='historical',
-        source_ids=gcm,
-        variable_ids=variables,
+        member_ids=member_id,
+        table_ids=table_id,
+        grid_labels=grid_label,
+        source_ids=source_id,
+        variable_ids=variable,
     )
 
     future_gcm = load_cmip(
         activity_ids='ScenarioMIP',
         experiment_ids=scenario,
-        source_ids=gcm,
-        variable_ids=variables,
+        member_ids=member_id,
+        table_ids=table_id,
+        grid_labels=grid_label,
+        source_ids=source_id,
+        variable_ids=variable,
     )
 
     ds_gcm = xr.combine_by_coords([historical_gcm, future_gcm], combine_attrs='drop_conflicts')
 
-    ds_gcm_train = subset_dataset(
-        ds=ds_gcm,
-        variable=variables[0],
-        time_period=train_period,
-        bbox=bbox,
-    )
-    ds_gcm_predict = subset_dataset(
-        ds=ds_gcm,
-        variable=variables[0],
-        time_period=predict_period,
-        bbox=bbox,
-    )
-
-    ds_gcm = xr.combine_by_coords([ds_gcm_train, ds_gcm_predict], combine_attrs='drop_conflicts')
     ds_gcm = ds_gcm.reindex(time=sorted(ds_gcm.time.values))
 
     return ds_gcm
-
-
-def get_gcm_grid_spec(gcm_name: str = None, gcm_ds: T_Xarray = None) -> str:
-    with dask.config.set(**{'array.slicing.split_large_chunks': False}):
-
-        if gcm_ds is None:
-            # Silences the /srv/conda/envs/notebook/lib/python3.9/site-packages/xarray/core/indexing.py:1228: PerformanceWarning: Slicing is producing a large chunk. To accept the large
-            # chunk and silence this warning, set the option >>> with dask.config.set(**{'array.slicing.split_large_chunks': False}):
-            if gcm_name is not None:
-                raise ValueError('one of gcm_ds or gcm_name has to be not empty')
-            gcm_grid = load_cmip(
-                source_ids=gcm_name,
-            ).isel(time=0)
-        else:
-            gcm_grid = gcm_ds.isel(time=0)
-
-    nlat = len(gcm_grid.lat)
-    nlon = len(gcm_grid.lon)
-    lat_spacing = int(np.round(abs(gcm_grid.lat[0] - gcm_grid.lat[1]), 1) * 10)
-    lon_spacing = int(np.round(abs(gcm_grid.lon[0] - gcm_grid.lon[1]), 1) * 10)
-    min_lat = int(np.round(gcm_grid.lat.min(), 1))
-    min_lon = int(np.round(gcm_grid.lon.min(), 1))
-
-    return f'{nlat:d}x{nlon:d}_gridsize_{lat_spacing:d}_{lon_spacing:d}_llcorner_{min_lat:d}_{min_lon:d}'

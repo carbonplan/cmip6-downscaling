@@ -28,6 +28,38 @@ use_cache = config.get('run_options.use_cache')
 def spatial_anomalies(
     obs_full_time_path: UPath, interpolated_obs_full_time_path: UPath, run_parameters: RunParameters
 ) -> UPath:
+    """Returns spatial anomalies
+    Calculate the seasonal cycle (12 timesteps) spatial anomaly associated
+    with aggregating the fine_obs to a given coarsened scale and then reinterpolating
+    it back to the original spatial resolution. The outputs of this function are
+    dependent on three parameters:
+    * a grid (as opposed to a specific GCM since some GCMs run on the same grid)
+    * the time period which fine_obs (and by construct coarse_obs) cover
+    * the variable
+    We will save these anomalies to use them in the post-processing. We will add them to the
+    spatially-interpolated coarse predictions to add the spatial heterogeneity back in.
+    Conceptually, this step figures out, for example, how much colder a finer-scale pixel
+    containing Mt. Rainier is compared to the coarse pixel where it exists. By saving those anomalies,
+    we can then preserve the fact that "Mt Rainier is x degrees colder than the pixels around it"
+    for the prediction. It is important to note that that spatial anomaly is the same for every month of the
+    year and the same for every day. So, if in January a finescale pixel was on average 4 degrees colder than
+    the neighboring pixel to the west, in every day in the prediction (historic or future) that pixel
+    will also be 4 degrees colder.
+
+    Parameters
+    ----------
+    obs_full_time_path : UPath
+        UPath to observation dataset chunked in full_time.
+    interpolated_obs_full_time_path : UPath
+        UPath to observation dataset interpolated to gcm grid and chunked in full time.
+    run_parameters : RunParameters
+        Prefect run parameters
+
+    Returns
+    -------
+    UPath
+        Path to spatial anomalies dataset.  (shape (nlat, nlon, 12))
+    """
     target = (
         intermediate_dir
         / "spatial_anomalies"
@@ -60,7 +92,30 @@ def fit_and_predict(
     coarse_obs_full_time_path: UPath,
     run_parameters: RunParameters,
 ) -> UPath:
+    """Fit bcsd model on prepared CMIP data with obs at corresponding spatial scale.
+    Then predict for a set of CMIP data (likely future).
 
+    Parameters
+    ----------
+    experiment_train_full_time_path : UPath
+        UPath to experiment training dataset chunked in full time
+    experiment_predict_full_time_path : UPath
+        UPath to experiment prediction dataset chunked in full time
+    coarse_obs_full_time_path : UPath
+        UPath to coarse observation dataset chunked in full time
+    run_parameters : RunParameters
+        Prefect run parameters
+
+    Returns
+    -------
+    UPath
+        UPath to prediction results dataset.
+
+    Raises
+    ------
+    ValueError
+        ValueError checking validity of input variables.
+    """
     target = intermediate_dir / "fit_and_predict" / run_parameters.run_id
     if use_cache and zmetadata_exists(target):
         print(f"found existing target: {target}")
@@ -98,8 +153,25 @@ def postprocess_bcsd(
     spatial_anomalies_path: UPath,
     run_parameters: RunParameters,
 ) -> UPath:
+    """Downscale the bias-corrected data (fit_and_predict results) by interpolating and then
+    adding the spatial anomalies back in.
 
-    target = results_dir / "interpolate_prediction" / run_parameters.run_id
+    Parameters
+    ----------
+    bias_corrected_fine_full_time_path : UPath
+        UPath to output dataset from the fit_and_predict task.
+    spatial_anomalies_path : UPath
+        UPath to the output of the spatial_anomalies task.
+    run_parameters : RunParameters
+        Prefect run parameters.
+
+    Returns
+    -------
+    UPath
+        UPath to post-processed dataset.
+    """
+
+    target = results_dir / "daily" / run_parameters.run_id
     if use_cache and zmetadata_exists(target):
         print(f"found existing target: {target}")
         return target
