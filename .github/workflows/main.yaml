@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     container:
-      image: carbonplan/cmip6-downscaling-prefect:2022.02.05
+      image: carbonplan/cmip6-downscaling-prefect:latest
       options: --user root
     steps:
       - uses: actions/checkout@v2

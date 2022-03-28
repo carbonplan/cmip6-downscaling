@@ -63,8 +63,11 @@ params = [
 
 
 rechunk_params = [
-    {'chunking_method': 'full_time', 'chunking_schema': {'time': -1, 'lat': 25, 'lon': 53}},
-    {'chunking_method': 'full_space', 'chunking_schema': {'time': 2920, 'lat': -1, 'lon': 1}},
+    {
+        'chunking_method': 'full_space',
+        'chunking_schema': {'time': (2359, 561), 'lat': -1, 'lon': -1},
+    },
+    {'chunking_method': 'full_time', 'chunking_schema': {'time': -1, 'lat': 25, 'lon': (33, 20)}},
 ]
 
 
@@ -101,7 +104,6 @@ def test_get_obs(run_parameters):
     schema.validate(ds)
 
 
-# NOTE: 🚧 work-in-progress 🚧
 def test_get_experiment(run_parameters):
     get_experiment_path = get_experiment.run(run_parameters, time_subset='train_period')
 
@@ -131,8 +133,6 @@ def test_regrid(tmp_path):
 
     actual_path = regrid.run(source_path, target_grid_path)
     actual_ds = xr.open_zarr(actual_path)
-    print(actual_ds)
-    print(actual_ds.attrs.keys())
 
     check_global_attrs(actual_ds)
     expected_shape = (ds.dims['time'], target_ds.dims['lat'], target_ds.dims['lon'])
@@ -146,12 +146,9 @@ def test_regrid(tmp_path):
     schema.validate(actual_ds)
 
 
-# NOTE: 🚧 work-in-progress 🚧
-
-
 @pytest.mark.parametrize('rechunk_params', rechunk_params)
 def test_rechunk(rechunk_params, tmp_path):
-    # TODO Add testing parameterization to check full_space, full_time and template match
+    # TODO Add testing parameterization to check full_space (done), full_time (done) and template match
     ds = xr.tutorial.open_dataset('air_temperature').chunk({'time': 10, 'lat': -1, 'lon': -1})
     source_path = str(tmp_path) + "/" + 'rechunk.zarr'
     ds.to_zarr(source_path, mode='w')
@@ -170,4 +167,5 @@ def test_rechunk(rechunk_params, tmp_path):
             )
         }
     )
+
     schema.validate(actual_ds)
