@@ -3,6 +3,7 @@ import warnings
 from dataclasses import asdict
 from pathlib import PosixPath
 
+import dask
 import datatree as dt
 import fsspec
 import papermill as pm
@@ -297,14 +298,12 @@ def monthly_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
 
     ds = xr.open_zarr(ds_path)
 
-    out_ds = xr.Dataset()
-    for var in ds:
-        if var in ['tasmax', 'tasmin']:
-            out_ds[var] = ds[var].resample(time='1MS').mean(dim='time')
-        elif var in ['pr']:
-            out_ds[var] = ds[var].resample(time='1MS').sum(dim='time')
-        else:
-            print(f'{var} not implemented')
+    if run_parameters.variable in ['tasmax', 'tasmin']:
+        out_ds = ds.resample(time='1MS').mean(dim='time')
+    elif run_parameters.variable in ['pr']:
+        out_ds = ds.resample(time='1MS').sum(dim='time')
+    else:
+        print(f'{run_parameters.variable} not implemented')
 
     out_ds.attrs.update(**get_cf_global_attrs(version=version))
     out_ds.to_zarr(target, mode='w')
@@ -336,14 +335,12 @@ def annual_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
 
     ds = xr.open_zarr(ds_path)
 
-    out_ds = xr.Dataset()
-    for var in ds:
-        if var in ['tasmax', 'tasmin']:
-            out_ds[var] = ds[var].resample(time='YS').mean()
-        elif var in ['pr']:
-            out_ds[var] = ds[var].resample(time='YS').sum()
-        else:
-            print(f'{var} not implemented')
+    if run_parameters.variable in ['tasmax', 'tasmin']:
+        out_ds = ds.resample(time='YS').mean(dim='time')
+    elif run_parameters.variable in ['pr']:
+        out_ds = ds.resample(time='YS').sum(dim='time')
+    else:
+        print(f'{run_parameters.variable} not implemented')
 
     out_ds.attrs.update(**get_cf_global_attrs(version=version))
     out_ds.to_zarr(target, mode='w')
@@ -468,15 +465,16 @@ def pyramid(ds_path: UPath, levels: int = 2, other_chunks: dict = None) -> UPath
     ds = xr.open_zarr(ds_path).pipe(_load_coords)
 
     ds.coords['date_str'] = ds['time'].dt.strftime('%Y-%m-%d').astype('S10')
+    # note: this worked when 8 processors and 4 cores
+    with dask.config.set(scheduler='threads'):
+        # create pyramid
+        dta = pyramid_regrid(ds, target_pyramid=None, levels=levels)
 
-    # create pyramid
-    dta = pyramid_regrid(ds, target_pyramid=None, levels=levels)
+        # postprocess
+        dta = _pyramid_postprocess(dta, levels, other_chunks=other_chunks)
 
-    # postprocess
-    dta = _pyramid_postprocess(dta, levels, other_chunks=other_chunks)
-
-    # write to target
-    dta.to_zarr(target, mode='w')
+        # write to target
+        dta.to_zarr(target, mode='w')
     return target
 
 
