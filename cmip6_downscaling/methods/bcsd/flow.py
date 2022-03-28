@@ -53,7 +53,7 @@ with Flow(
 
     # input datasets
     obs_path = get_obs(run_parameters)
-    obs_full_space_path = rechunk(path=obs_path, chunking_pattern='full_space')
+    obs_full_space_path = rechunk(path=obs_path, pattern='full_space')
     experiment_train_path = get_experiment(run_parameters, time_subset='train_period')
     experiment_predict_path = get_experiment(run_parameters, time_subset='predict_period')
 
@@ -66,18 +66,18 @@ with Flow(
     interpolated_obs_path = regrid(source_path=coarse_obs_path, target_grid_path=obs_path)
 
     interpolated_obs_full_time_path = rechunk(
-        path=interpolated_obs_path, chunking_pattern="full_time"
+        path=interpolated_obs_path, pattern="full_time"
     )
-    obs_full_time_path = rechunk(path=obs_path, chunking_pattern="full_time")
+    obs_full_time_path = rechunk(path=obs_path, pattern="full_time")
     spatial_anomalies_path = spatial_anomalies(
         obs_full_time_path, interpolated_obs_full_time_path, run_parameters
     )
-    coarse_obs_full_time_path = rechunk(coarse_obs_path, chunking_pattern='full_time')
-    experiment_train_full_time_path = rechunk(experiment_train_path, chunking_pattern='full_time')
+    coarse_obs_full_time_path = rechunk(coarse_obs_path, pattern='full_time')
+    experiment_train_full_time_path = rechunk(experiment_train_path, pattern='full_time')
     experiment_predict_full_time_path = rechunk(
         experiment_predict_path,
-        chunking_pattern='full_time',
-        chunking_template_file=coarse_obs_full_time_path,
+        pattern='full_time',
+        template=coarse_obs_full_time_path,
     )
     bias_corrected_path = fit_and_predict(
         experiment_train_full_time_path=experiment_train_full_time_path,
@@ -87,8 +87,8 @@ with Flow(
     )
     bias_corrected_full_space_path = rechunk(
         bias_corrected_path,
-        chunking_pattern='full_space',
-        chunking_template_file=obs_full_space_path,
+        pattern='full_space',
+        template=obs_full_space_path,
     )
     bias_corrected_fine_full_space_path = regrid(
         source_path=bias_corrected_full_space_path, target_grid_path=obs_path
@@ -96,8 +96,8 @@ with Flow(
 
     bias_corrected_fine_full_time_path = rechunk(
         bias_corrected_fine_full_space_path,
-        chunking_pattern='full_time',
-        chunking_template_file=obs_full_time_path,
+        pattern='full_time',
+        template=obs_full_time_path,
     )
     final_bcsd_full_time_path = postprocess_bcsd(
         bias_corrected_fine_full_time_path, spatial_anomalies_path, run_parameters
@@ -114,11 +114,11 @@ with Flow(
     # space before passing into pyramid step. we probably want to add a cleanup
     # to this step in particular since otherwise we will have an exact
     # duplicate of the daily, monthly, and annual datasets
-    final_bcsd_full_space_path = rechunk(final_bcsd_full_time_path, chunking_pattern='full_space')
+    final_bcsd_full_space_path = rechunk(final_bcsd_full_time_path, pattern='full_space')
 
     # make temporal summaries
-    monthly_summary_full_space_path = rechunk(monthly_summary_path, chunking_pattern='full_space')
-    annual_summary_full_space_path = rechunk(annual_summary_path, chunking_pattern='full_space')
+    monthly_summary_full_space_path = rechunk(monthly_summary_path, pattern='full_space')
+    annual_summary_full_space_path = rechunk(annual_summary_path, pattern='full_space')
 
     # pyramids
     daily_pyramid_path = pyramid(final_bcsd_full_space_path, levels=4)

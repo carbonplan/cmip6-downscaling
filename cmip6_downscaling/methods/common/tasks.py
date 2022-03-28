@@ -146,8 +146,8 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
 @task(log_stdout=True)
 def rechunk(
     path: UPath,
-    chunking_pattern: str = None,
-    chunking_template_file: UPath = None,
+    pattern: str = None,
+    template: UPath = None,
     max_mem: str = "2GB",
 ) -> UPath:
     """Use `rechunker` package to adjust chunks of dataset to a form
@@ -157,11 +157,11 @@ def rechunk(
     ----------
     path : UPath
         path to zarr store
-    chunking_pattern : str
-        The pattern of chunking you want to use. If used together with `chunking_template_file` it will override the template
+    pattern : str
+        The pattern of chunking you want to use. If used together with `template` it will override the template
         to ensure that the final dataset truly follows that `full_space` or `full_time` spec. This matters when you are passing
         a template that is either a shorter time length or a template that is a coarser grid (and thus a shorter lat/lon chunksize)
-    chunking_template_file : UPath
+    template : UPath
         The path to the file you want to use as a chunking template. The utility will grab the chunk sizes and use them as the chunk
         target to feed to rechunker.
     max_mem : str
@@ -174,15 +174,13 @@ def rechunk(
     """
     # print('rechunking dataset at {}'.format(path))
     # if both defined then you'll take the spatial part of template and override one dimension with the specified pattern
-    if chunking_template_file is not None:
+    if template is not None:
         pattern_string = 'matched'
-        if chunking_pattern is not None:
-            pattern_string += '_' + chunking_pattern
-    # if only chunking_pattern specified then use that pattern
-    elif chunking_pattern is not None:
-        pattern_string = chunking_pattern
-    print('using template of {}'.format(chunking_template_file))
-    print(pattern_string)
+        if pattern is not None:
+            pattern_string += '_' + pattern
+    # if only pattern specified then use that pattern
+    elif pattern is not None:
+        pattern_string = pattern
     target = intermediate_dir / "rechunk" / (pattern_string + path.path.replace("/", "_"))
     path_tmp = scratch_dir / "rechunk" / (pattern_string + path.path.replace("/", "_"))
     print('writing rechunked dataset to {}'.format(target))
@@ -204,29 +202,29 @@ def rechunk(
     # open the dataset to access the coordinates
     ds = xr.open_zarr(path)
     example_var = list(ds.data_vars)[0]
-    # if you have defined a chunking_template then use the chunks of that template
+    # if you have defined a template then use the chunks of that template
     # to form the desired chunk definition
-    if chunking_template_file is not None:
-        template_ds = xr.open_zarr(chunking_template_file)
+    if template is not None:
+        template_ds = xr.open_zarr(template)
         # define the chunk definition
         chunk_def = {
             'time': min(template_ds.chunks['time'][0], len(ds.time)),
             'lat': min(template_ds.chunks['lat'][0], len(ds.lat)),
             'lon': min(template_ds.chunks['lon'][0], len(ds.lon)),
         }
-        # if you have also defined a chunking_pattern then override the dimension you've specified there
-        if chunking_pattern is not None:
+        # if you have also defined a pattern then override the dimension you've specified there
+        if pattern is not None:
             # the chunking pattern will return the dimensions that you'll chunk along
             # so `full_time` will return `('lat', 'lon')`
-            chunk_dims = config.get(f"chunk_dims.{chunking_pattern}")
+            chunk_dims = config.get(f"chunk_dims.{pattern}")
             for dim in chunk_def.keys():
                 if dim not in chunk_dims:
                     print('correcting dim')
                     # override the chunksize of those unchunked dimensions to be the complete length (like passing chunksize=-1
                     chunk_def[dim] = len(ds[dim])
     # if you don't have a target template then you'll just use the `full_time` or `full_space` approach
-    elif chunking_pattern is not None:
-        chunk_dims = config.get(f"chunk_dims.{chunking_pattern}")
+    elif pattern is not None:
+        chunk_dims = config.get(f"chunk_dims.{pattern}")
         chunk_def = calc_auspicious_chunks_dict(ds[example_var], chunk_dims=chunk_dims)
     else:
         raise AttributeError('must either define chunking pattern or template')

@@ -97,54 +97,25 @@ def calc_auspicious_chunks_dict(
             # rechunker doesn't like the the shorthand of -1 meaning the full length
             # so we'll always just give it the full length of the dimension
             chunks_dict[dim] = dim_sizes[dim]
-    print(chunks_dict)
     # calculate the bytesize given the dtype bitsize and divide by 8
     data_bytesize = int(re.findall(r"\d+", str(da.dtype))[0]) / 8
-    print('data size is {}'.format(data_bytesize))
     # calculate the size of the smallest minimum chunk based upon dtype and the
     # length of the unchunked dim(s). chunks_dict currently only has unchunked dims right now
     smallest_size_one_chunk = data_bytesize * np.prod(
         [dim_sizes[dim] for dim in chunks_dict.keys()]
     )
-    print('smallest_size_one_chunk size is {}'.format(smallest_size_one_chunk))
 
     # the dims in chunk_dims should be of an array size (as in number of elements in the array)
     # that creates ~100 mb. `perfect_chunk` is the how many of the smallest_size_chunks you can
     # handle at once while still staying below the `target_size_bytes`
     perfect_chunk = target_size_bytes / smallest_size_one_chunk
-    print('perfect_chunk size is {}'.format(perfect_chunk))
 
     # then make reasonable chunk size by rounding up (avoids corner case of it rounding down to 0...)
     # but if the array is oblong it might get big (? is logic right there- might it get small??)
     perfect_chunk_length = int(np.ceil(perfect_chunk ** (1 / len(chunk_dims))))
-    print('perfect_chunk_length size is {}'.format(perfect_chunk_length))
-    print('before the calculation the chunk dict looked like this:')
-    print(chunks_dict)
     for dim in chunk_dims:
         # check that the rounding up as part of the `perfect_chunk_length` calculation
         # didn't make the chunk sizes bigger than the array itself, and if so
         # clip it to that size
         chunks_dict[dim] = min(perfect_chunk_length, dim_sizes[dim])
-    print('now the chunk dict looks like this')
-    print(chunks_dict)
     return chunks_dict
-
-
-def reconstruct_finescale(ds: xr.Dataset, spatial_anomaly: xr.Dataset = None):
-    """Add the spatial anomalies back into the interpolated fine scale dataset.
-
-    Parameters
-    ----------
-    ds : xr.Dataset
-        Dataset or data array you're wanting to chunk. With dimensions ('month', 'lat', 'lon')
-    spatial_anomaly : xr.Dataset, optional
-        The dataset of monthly spatial anomalies resulting from taking the difference between
-        the fine scale obs and the interpolated obs. With dimensions ('month', 'lat', 'lon')
-
-    Returns
-    -------
-    reconstructed : xr.Dataset
-        Finescale dataset with spatial heterogeneity added back in
-    """
-    reconstructed = ds.groupby('time.month') + spatial_anomaly
-    return reconstructed
