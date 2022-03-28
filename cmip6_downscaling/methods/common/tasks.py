@@ -363,10 +363,14 @@ def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
 
     ds_name = (
         "regrid"
-        / "source_path"
-        / (str(source_path).split("/")[-1])
-        / "target_path"
-        / (str(target_grid_path).split("/")[-1])
+        + "/"
+        + "source_path"
+        + "/"
+        + (str(source_path).split("/")[-1])
+        + "/"
+        + "target_path"
+        + "/"
+        + (str(target_grid_path).split("/")[-1])
     )
     target = str(intermediate_dir) + "/" + ds_name
 
