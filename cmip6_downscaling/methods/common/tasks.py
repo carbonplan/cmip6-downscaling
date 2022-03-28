@@ -157,11 +157,11 @@ def rechunk(
     ----------
     path : UPath
         path to zarr store
-    chunking_pattern : str
-        The pattern of chunking you want to use. If used together with `chunking_template_file` it will override the template
+    pattern : str
+        The pattern of chunking you want to use. If used together with `template` it will override the template
         to ensure that the final dataset truly follows that `full_space` or `full_time` spec. This matters when you are passing
         a template that is either a shorter time length or a template that is a coarser grid (and thus a shorter lat/lon chunksize)
-    chunking_template_file : UPath
+    template : UPath
         The path to the file you want to use as a chunking template. The utility will grab the chunk sizes and use them as the chunk
         target to feed to rechunker.
     max_mem : str
