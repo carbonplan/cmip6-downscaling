@@ -9,7 +9,6 @@ import fsspec
 import papermill as pm
 import rechunker
 import xarray as xr
-import xesmf as xe
 import zarr
 from azure.storage.blob import BlobServiceClient, ContentSettings
 from carbonplan_data.metadata import get_cf_global_attrs
@@ -67,13 +66,15 @@ def get_obs(run_parameters: RunParameters) -> UPath:
         Path to subset observation dataset.
     """
 
-    target = (
-        intermediate_dir
-        / "get_obs"
-        / "{obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}".format(
+    ds_name = (
+        "get_obs"
+        + "/"
+        + "{obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}".format(
             **asdict(run_parameters)
         )
     )
+    target = str(intermediate_dir) + "/" + ds_name
+
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
         return target
@@ -89,12 +90,12 @@ def get_obs(run_parameters: RunParameters) -> UPath:
     )
     del subset[run_parameters.variable].encoding['chunks']
 
-    subset.attrs.update(**get_cf_global_attrs(version=version))
+    subset.attrs.update({'title': ds_name}, **get_cf_global_attrs(version=version))
     subset.to_zarr(target, mode='w')
     return target
 
 
-@task()
+@task(log_stdout=True)
 def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     """Prefect task that returns cmip GCM data from input run parameters.
 
@@ -111,13 +112,15 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
         UPath to experiment dataset.
     """
     time_period = getattr(run_parameters, time_subset)
-    target = (
-        intermediate_dir
-        / "get_experiment"
-        / "{model}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{time_period.start}_{time_period.stop}".format(
+    ds_name = (
+        "get_experiment"
+        + "/"
+        + "{model}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{time_period.start}_{time_period.stop}".format(
             time_period=time_period, **asdict(run_parameters)
         )
     )
+    target = str(intermediate_dir) + "/" + ds_name
+
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
         return target
@@ -139,7 +142,7 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     subset = subset.chunk({'time': 365})
     del subset[run_parameters.variable].encoding['chunks']
 
-    subset.attrs.update(**get_cf_global_attrs(version=version))
+    subset.attrs.update({'title': ds_name}, **get_cf_global_attrs(version=version))
     subset.to_zarr(target, mode='w')
     return target
 
@@ -176,8 +179,8 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
             "Not a valid chunking approach. Try passing either `full_space` or `full_time`, or a template chunked dataset."
         )
 
-    target = intermediate_dir / ("rechunk_" + pattern_string) / (path.path.split("/")[-1])
-    path_tmp = scratch_dir / ("rechunk_" + pattern_string) / (path.path.split("/")[-1])
+    target = intermediate_dir / ("rechunk_" + pattern_string) / (str(path).split("/")[-1])
+    path_tmp = scratch_dir / ("rechunk_" + pattern_string) / (str(path).split("/")[-1])
 
     target_store = fsspec.get_mapper(str(target))
     temp_store = fsspec.get_mapper(str(path_tmp))
@@ -273,7 +276,9 @@ def monthly_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
         Path to resampled dataset.
     """
 
-    target = results_dir / "monthly_summary" / run_parameters.run_id
+    ds_name = "monthly_summary" + "/" + str(run_parameters.run_id)
+    target = str(results_dir) + "/" + ds_name
+
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
         return target
@@ -289,7 +294,8 @@ def monthly_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
         else:
             print(f'{var} not implemented')
 
-    out_ds.attrs.update(**get_cf_global_attrs(version=version))
+    out_ds.attrs.update({'title': ds_name}, **get_cf_global_attrs(version=version))
+
     out_ds.to_zarr(target, mode='w')
 
     return target
@@ -312,7 +318,9 @@ def annual_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
         Path to resampled dataset.
     """
 
-    target = results_dir / "annual_summary" / run_parameters.run_id
+    ds_name = "annual_summary" + "/" + str(run_parameters.run_id)
+    target = str(results_dir) + "/" + ds_name
+
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
         return target
@@ -328,7 +336,7 @@ def annual_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
         else:
             print(f'{var} not implemented')
 
-    out_ds.attrs.update(**get_cf_global_attrs(version=version))
+    out_ds.attrs.update({'title': ds_name}, **get_cf_global_attrs(version=version))
     out_ds.to_zarr(target, mode='w')
 
     return target
@@ -351,14 +359,20 @@ def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
         Path to regridded output dataset.
     """
 
-    target = (
-        intermediate_dir
-        / "regrid"
-        / "source_path"
-        / (source_path.path.split("/")[-1])
-        / "target_path"
-        / (target_grid_path.path.split("/")[-1])
+    import xesmf as xe
+
+    ds_name = (
+        "regrid"
+        + "/"
+        + "source_path"
+        + "/"
+        + (str(source_path).split("/")[-1])
+        + "/"
+        + "target_path"
+        + "/"
+        + (str(target_grid_path).split("/")[-1])
     )
+    target = str(intermediate_dir) + "/" + ds_name
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
@@ -368,7 +382,7 @@ def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
 
     regridder = xe.Regridder(source_ds, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
     regridded_ds = regridder(source_ds)
-    regridded_ds.attrs.update(**get_cf_global_attrs(version=version))
+    regridded_ds.attrs.update({'title': ds_name}, **get_cf_global_attrs(version=version))
     regridded_ds.to_zarr(target, mode='w')
 
     return target
@@ -381,7 +395,9 @@ def _load_coords(ds: xr.Dataset) -> xr.Dataset:
     return ds
 
 
-def _pyramid_postprocess(dt: dt.DataTree, levels: int, other_chunks: dict = None) -> dt.DataTree:
+def _pyramid_postprocess(
+    dt: dt.DataTree, levels: int, other_chunks: dict = None, ds_name: str = None
+) -> dt.DataTree:
     '''Postprocess data pyramid
 
     Adds multiscales metadata and sets Zarr encoding
@@ -422,7 +438,7 @@ def _pyramid_postprocess(dt: dt.DataTree, levels: int, other_chunks: dict = None
                 dt[slevel].ds[var].encoding['dtype'] = 'int32'
 
     # set global metadata
-    dt.ds.attrs.update(**get_cf_global_attrs(version=version))
+    dt.ds.attrs.update({'title': ds_name}, **get_cf_global_attrs(version=version))
     return dt
 
 
@@ -446,7 +462,8 @@ def pyramid(ds_path: UPath, levels: int = 2, other_chunks: dict = None) -> UPath
     target : UPath
     '''
 
-    target = results_dir / "pyramid" / ds_path.path.replace('/', '_')
+    ds_name = "pyarmid" + ds_path.path.replace('/', '_')
+    target = str(results_dir) + "/" + ds_name
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
@@ -460,7 +477,7 @@ def pyramid(ds_path: UPath, levels: int = 2, other_chunks: dict = None) -> UPath
     dta = pyramid_regrid(ds, target_pyramid=None, levels=levels)
 
     # postprocess
-    dta = _pyramid_postprocess(dta, levels, other_chunks=other_chunks)
+    dta = _pyramid_postprocess(dta, levels, other_chunks=other_chunks, ds_name=ds_name)
 
     # write to target
     dta.to_zarr(target, mode='w')
