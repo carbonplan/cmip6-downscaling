@@ -174,7 +174,7 @@ def rechunk(
     """
     # print('rechunking dataset at {}'.format(path))
     # if both defined then you'll take the spatial part of template and override one dimension with the specified pattern
-    if chunking_template_file is not None:
+    if template is not None:
         pattern_string = 'matched'
         if chunking_pattern is not None:
             pattern_string += '_' + chunking_pattern
