@@ -76,8 +76,8 @@ with Flow(
     experiment_train_full_time_path = rechunk(experiment_train_path, chunking_pattern='full_time')
     experiment_predict_full_time_path = rechunk(
         experiment_predict_path,
-        chunking_pattern='full_time',
-        chunking_template_file=coarse_obs_full_time_path,
+        pattern='full_time',
+        template=coarse_obs_full_time_path,
     )
     bias_corrected_path = fit_and_predict(
         experiment_train_full_time_path=experiment_train_full_time_path,
