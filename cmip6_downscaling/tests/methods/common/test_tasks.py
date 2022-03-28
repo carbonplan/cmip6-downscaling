@@ -3,6 +3,7 @@ from dataclasses import asdict
 import numpy as np
 import pytest
 import xarray as xr
+from upath import UPath
 from xarray_schema import DataArraySchema, DatasetSchema
 
 from cmip6_downscaling import config
@@ -17,7 +18,13 @@ config.set(
 )
 
 from cmip6_downscaling.methods.common.containers import RunParameters
-from cmip6_downscaling.methods.common.tasks import get_obs, make_run_parameters, rechunk, regrid
+from cmip6_downscaling.methods.common.tasks import (
+    get_experiment,
+    get_obs,
+    make_run_parameters,
+    rechunk,
+    regrid,
+)
 
 params = [
     {
@@ -49,6 +56,12 @@ params = [
 ]
 
 
+rechunk_params = [
+    {'chunking_method': 'full_time', 'chunking_schema': {'time': -1, 'lat': 25, 'lon': 53}},
+    {'chunking_method': 'full_space', 'chunking_schema': {'time': 2920, 'lat': -1, 'lon': 1}},
+]
+
+
 @pytest.fixture(scope="module", params=params)
 def run_parameters(request):
     return RunParameters(**request.param)
@@ -62,7 +75,7 @@ def test_make_run_parameters(params):
 
 
 def check_global_attrs(ds):
-    for key in ['history', 'hostname', 'institution', 'source', 'tilte', 'username', 'version']:
+    for key in ['history', 'hostname', 'institution', 'source', 'title', 'username', 'version']:
         assert key in ds.attrs
 
 
@@ -82,23 +95,41 @@ def test_get_obs(run_parameters):
     schema.validate(ds)
 
 
+# NOTE: 🚧 work-in-progress 🚧
+def test_get_experiment(run_parameters):
+    get_experiment_path = get_experiment.run(run_parameters, time_subset='train_dates')
+
+    ds = xr.open_zarr(get_experiment_path)
+    check_global_attrs(ds)
+    schema = DatasetSchema(
+        {
+            run_parameters.variable: DataArraySchema(
+                dtype=np.floating, name=run_parameters.variable, dims=['time', 'lat', 'lon']
+            )
+        }
+    )
+    schema.validate(ds)
+
+
 def test_regrid(tmp_path):
 
     pytest.importorskip('xesmf')
 
     ds = xr.tutorial.open_dataset('air_temperature').chunk({'time': 10, 'lat': -1, 'lon': -1})
-    source_path = tmp_path / 'regrid_source.zarr'
+    source_path = UPath(tmp_path) / UPath('regrid_source.zarr')
     ds.to_zarr(source_path)
 
     target_ds = ds.isel(time=0).coarsen(lat=4, lon=4, boundary='trim').mean()
-    target_grid_path = tmp_path / 'regrid_target.zarr'
+    target_grid_path = UPath(tmp_path) / UPath('regrid_target.zarr')
     target_ds.to_zarr(target_grid_path)
 
     actual_path = regrid.run(source_path, target_grid_path)
     actual_ds = xr.open_zarr(actual_path)
+    print(actual_ds)
+    print(actual_ds.attrs.keys())
 
-    check_global_attrs(ds)
-    expected_shape = (ds.dims['time'], target_ds.dims['latitude'], target_ds.dims['longitude'])
+    check_global_attrs(actual_ds)
+    expected_shape = (ds.dims['time'], target_ds.dims['lat'], target_ds.dims['lon'])
     schema = DatasetSchema(
         {
             'air': DataArraySchema(
@@ -109,14 +140,28 @@ def test_regrid(tmp_path):
     schema.validate(actual_ds)
 
 
-def test_rechunk(tmp_path):
+# NOTE: 🚧 work-in-progress 🚧
 
+
+@pytest.mark.parametrize('rechunk_params', rechunk_params)
+def test_rechunk(rechunk_params, tmp_path):
+    # TODO Add testing parameterization to check full_space, full_time and template match
     ds = xr.tutorial.open_dataset('air_temperature').chunk({'time': 10, 'lat': -1, 'lon': -1})
-    source_path = tmp_path / 'rechunk.zarr'
-    ds.to_zarr(source_path)
+    source_path = str(tmp_path) + "/" + 'rechunk.zarr'
+    ds.to_zarr(source_path, mode='w')
 
-    actual_path = rechunk(
+    actual_path = rechunk.run(
         source_path,
-        chunking_pattern='full_time',
+        chunking_pattern=rechunk_params['chunking_method'],
     )
     actual_ds = xr.open_zarr(actual_path)
+
+    expected_chunks = rechunk_params['chunking_schema']
+    schema = DatasetSchema(
+        {
+            'air': DataArraySchema(
+                dtype=np.floating, name='air', dims=['time', 'lat', 'lon'], chunks=expected_chunks
+            )
+        }
+    )
+    schema.validate(actual_ds)
