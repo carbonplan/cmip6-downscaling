@@ -8,10 +8,10 @@ from skdownscale.pointwise_models.bcsd import BcsdPrecipitation, BcsdTemperature
 from upath import UPath
 
 import cmip6_downscaling
-from cmip6_downscaling import config
-from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
-from cmip6_downscaling.methods.common.containers import RunParameters
-from cmip6_downscaling.methods.common.utils import zmetadata_exists
+from . import config
+from .constants import ABSOLUTE_VARS, RELATIVE_VARS
+from .methods.common.containers import RunParameters
+from .methods.common.utils import zmetadata_exists
 
 warnings.filterwarnings(
     "ignore",
