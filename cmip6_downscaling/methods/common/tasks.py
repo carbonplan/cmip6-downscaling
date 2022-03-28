@@ -6,11 +6,8 @@ from typing import Union
 
 import datatree as dt
 import fsspec
-import papermill as pm
-import rechunker
 import xarray as xr
 import zarr
-from azure.storage.blob import BlobServiceClient, ContentSettings
 from carbonplan_data.metadata import get_cf_global_attrs
 from carbonplan_data.utils import set_zarr_encoding
 from ndpyramid import pyramid_regrid
@@ -166,6 +163,8 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
     target : UPath
         Path to rechunked dataset
     """
+
+    import rechunker
 
     if isinstance(chunking_pattern, str):
         pattern_string = chunking_pattern
@@ -500,6 +499,9 @@ def run_analyses(ds_path: UPath, run_parameters: RunParameters) -> UPath:
         The local location of an executed notebook path.
     """
 
+    import papermill
+    from azure.storage.blob import BlobServiceClient, ContentSettings
+
     from cmip6_downscaling.analysis import metrics
 
     root = PosixPath(metrics.__file__)
@@ -517,7 +519,7 @@ def run_analyses(ds_path: UPath, run_parameters: RunParameters) -> UPath:
     # parameters['predict_period_end'] = predict_period.stop
 
     # execute notebook with papermill
-    pm.execute_notebook(template_path, executed_notebook_path, parameters=parameters)
+    papermill.execute_notebook(template_path, executed_notebook_path, parameters=parameters)
 
     # convert from ipynb to html
     # TODO: move this to stand alone function
