@@ -16,6 +16,8 @@ def zmetadata_exists(path: UPath):
 
     if isinstance(path, pathlib.PosixPath):
         return (path / '.zmetadata').exists()
+    elif isinstance(path, UPath):
+        return path.fs.exists(str(path / '.zmetadata'))
     else:
         return (UPath(path) / '.zmetadata').exists()
 
