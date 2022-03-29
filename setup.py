@@ -4,13 +4,14 @@
 
 
 import pathlib
+
 from setuptools import find_packages, setup
 
 with open("requirements.txt") as f:
     INSTALL_REQUIRES = f.read().strip().split("\n")
 
 LONG_DESCRIPTION = pathlib.Path("README.md").read_text()
-PYTHON_REQUIRES = ">=3.7"
+PYTHON_REQUIRES = ">=3.8"
 
 description = "climate downscaling using cmip6 data"
 
