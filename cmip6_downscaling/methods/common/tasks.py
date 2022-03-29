@@ -454,7 +454,9 @@ def _pyramid_postprocess(
 
 
 @task(log_stdout=True, tags=['dask-resource:TASKSLOTS=1'])
-def pyramid(ds_path: UPath, run_parameters: RunParameters, levels: int = 2, other_chunks: dict = None) -> UPath:
+def pyramid(
+    ds_path: UPath, run_parameters: RunParameters, levels: int = 2, other_chunks: dict = None
+) -> UPath:
     '''Task to create a data pyramid from an xarray Dataset
 
     Parameters

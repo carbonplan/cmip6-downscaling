@@ -61,9 +61,7 @@ with Flow(
     # interpolated obs should have same exact chunking schema as ds at `obs_full_space_path`
     interpolated_obs_path = regrid(source_path=coarse_obs_path, target_grid_path=obs_path)
 
-    interpolated_obs_full_time_path = rechunk(
-        path=interpolated_obs_path, pattern="full_time"
-    )
+    interpolated_obs_full_time_path = rechunk(path=interpolated_obs_path, pattern="full_time")
     obs_full_time_path = rechunk(path=obs_path, pattern="full_time")
     spatial_anomalies_path = spatial_anomalies(
         obs_full_time_path, interpolated_obs_full_time_path, run_parameters
