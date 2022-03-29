@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 import xarray as xr
 
@@ -72,7 +74,7 @@ def metric_calc(ds: xr.Dataset, metric: str, dim: str = 'time', skipna: bool = F
     xr.Dataset
         dataset collapsed along the dimension `dim`
     """
-    if metric in ['mean', 'median', 'std']:
+    if metric in {'mean', 'median', 'std'}:
         return getattr(ds, metric)(dim=dim, skipna=skipna)
     elif 'percentile' in metric:
         # parse the percentile
@@ -227,6 +229,7 @@ def monthly_variability(ds: xr.Dataset, method: str = 'sum') -> xr.Dataset:
     xr.Dataset
         Statistics of monthly variability along time dimension
     """
-    assert method in ['sum', 'mean'], 'Must select sum or mean'
+    if method not in {'sum', 'mean'}:
+        raise ValueError('Must select sum or mean')
 
     return getattr(ds.resample(time='1M'), method)().std(dim='time')

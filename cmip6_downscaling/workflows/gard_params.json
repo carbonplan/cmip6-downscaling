@@ -2,20 +2,10 @@
   "obs": "ERA5",
   "gcm": "MIROC6",
   "scenario": "ssp370",
-  "features": [
-    "tasmax",
-    "tasmin",
-    "pr"
-  ],
+  "features": ["tasmax", "tasmin", "pr"],
   "variable": "tasmax",
-  "train_period": [
-    "1981",
-    "2010"
-  ],
-  "predict_period": [
-    "2099",
-    "2099"
-  ],
+  "train_period": ["1981", "2010"],
+  "predict_period": ["2099", "2099"],
   "latmin": "40",
   "latmax": "50",
   "lonmin": "80",

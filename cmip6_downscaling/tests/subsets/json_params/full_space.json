@@ -3,14 +3,8 @@
   "gcm": "MIROC6",
   "scenario": "ssp370",
   "variable": "tasmax",
-  "train_period": [
-    "1990",
-    "1990"
-  ],
-  "predict_period": [
-    "2020",
-    "2020"
-  ],
+  "train_period": ["1990", "1990"],
+  "predict_period": ["2020", "2020"],
   "latmin": "-90",
   "latmax": "90",
   "lonmin": "-180",

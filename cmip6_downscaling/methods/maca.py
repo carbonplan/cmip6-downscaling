@@ -1,4 +1,4 @@
-from typing import List, Optional, Union
+from __future__ import annotations
 
 import numpy as np
 import xarray as xr
@@ -13,9 +13,9 @@ def maca_bias_correction(
     ds_gcm: xr.Dataset,
     ds_obs: xr.Dataset,
     historical_period: slice,
-    variables: Union[str, List[str]],
-    batch_size: Optional[int] = 15,
-    buffer_size: Optional[int] = 15,
+    variables: str | list[str],
+    batch_size: int | None = 15,
+    buffer_size: int | None = 15,
 ) -> xr.Dataset:
     """
     Run bias correction as it is done in the MACA method. See https://climate.northwestknowledge.net/MACA/MACAmethod.php

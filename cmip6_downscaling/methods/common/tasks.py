@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import warnings
 from dataclasses import asdict
@@ -17,17 +19,14 @@ from upath import UPath
 from xarray_schema import DataArraySchema, DatasetSchema
 from xarray_schema.base import SchemaError
 
-import cmip6_downscaling
-from cmip6_downscaling import config, version
-from cmip6_downscaling.data.cmip import get_gcm
-from cmip6_downscaling.data.observations import open_era5
-from cmip6_downscaling.methods.common.utils import (
-    calc_auspicious_chunks_dict,
-    subset_dataset,
-    zmetadata_exists,
-)
-
+from ... import config
+from ..._version import __version__
+from ...data.cmip import get_gcm
+from ...data.observations import open_era5
+from ..common.utils import calc_auspicious_chunks_dict, subset_dataset, zmetadata_exists
 from .containers import RunParameters
+
+version = __version__
 
 warnings.filterwarnings(
     "ignore",
@@ -36,10 +35,10 @@ warnings.filterwarnings(
 )
 
 PIXELS_PER_TILE = 128
-code_version = cmip6_downscaling.__version__
+code_version = __version__
 scratch_dir = UPath(config.get("storage.scratch.uri"))
-intermediate_dir = UPath(config.get("storage.intermediate.uri")) / cmip6_downscaling.__version__
-results_dir = UPath(config.get("storage.results.uri")) / cmip6_downscaling.__version__
+intermediate_dir = UPath(config.get("storage.intermediate.uri")) / __version__
+results_dir = UPath(config.get("storage.results.uri")) / __version__
 use_cache = config.get('run_options.use_cache')
 
 
@@ -71,7 +70,7 @@ def get_obs(run_parameters: RunParameters) -> UPath:
             **asdict(run_parameters)
         )
     )
-    target = str(intermediate_dir) + "/" + ds_name
+    target = f'{str(intermediate_dir)}/{ds_name}'
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
@@ -117,7 +116,7 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
             time_period=time_period, **asdict(run_parameters)
         )
     )
-    target = str(intermediate_dir) + "/" + ds_name
+    target = f'{str(intermediate_dir)}/{ds_name}'
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
@@ -185,7 +184,7 @@ def rechunk(
         pattern_string = pattern
     target = intermediate_dir / ("rechunk_" + pattern_string) / (str(path).split("/")[-1])
     path_tmp = scratch_dir / ("rechunk_" + pattern_string) / (str(path).split("/")[-1])
-    print('writing rechunked dataset to {}'.format(target))
+    print(f'writing rechunked dataset to {target}')
     target_store = fsspec.get_mapper(str(target))
     temp_store = fsspec.get_mapper(str(path_tmp))
 
@@ -292,7 +291,7 @@ def monthly_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
     """
 
     ds_name = "monthly_summary" + "/" + str(run_parameters.run_id)
-    target = str(results_dir) + "/" + ds_name
+    target = f'{str(results_dir)}/{ds_name}'
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
@@ -332,7 +331,7 @@ def annual_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
     """
 
     ds_name = "annual_summary" + "/" + str(run_parameters.run_id)
-    target = str(results_dir) + "/" + ds_name
+    target = f'{str(results_dir)}/{ds_name}'
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
@@ -383,7 +382,7 @@ def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
         + "/"
         + (str(target_grid_path).split("/")[-1])
     )
-    target = str(intermediate_dir) + "/" + ds_name
+    target = f'{str(intermediate_dir)}/{ds_name}'
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
@@ -476,7 +475,7 @@ def pyramid(
     '''
 
     ds_name = "pyarmid" + ds_path.path.replace('/', '_')
-    target = str(results_dir) + "/" + ds_name
+    target = f'{str(results_dir)}/{ds_name}'
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')

@@ -5,10 +5,7 @@ from prefect import Flow, Parameter, task
 from xpersist import CacheStore
 from xpersist.prefect.result import XpersistResult
 
-from cmip6_downscaling import config, runtimes
-from cmip6_downscaling.methods.detrend import calc_epoch_trend, remove_epoch_trend
-from cmip6_downscaling.methods.maca import maca_bias_correction, maca_construct_analogs
-from cmip6_downscaling.methods.regions import combine_outputs, generate_subdomains
+# TODO: figure out where these are located
 from cmip6_downscaling.tasks.common_tasks import (
     get_coarse_obs_task,
     get_gcm_task,
@@ -25,6 +22,11 @@ from cmip6_downscaling.workflows.paths import (
     make_maca_output_path,
 )
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching, regrid_ds
+
+from ..methods.detrend import calc_epoch_trend, remove_epoch_trend
+from ..methods.maca import maca_bias_correction, maca_construct_analogs
+from ..methods.regions import combine_outputs, generate_subdomains
+from . import config, runtimes
 
 runtime = runtimes.get_runtime()
 
@@ -244,10 +246,7 @@ def get_subdomains_task(
         region_def=region_def,
     )
 
-    subdomains_list = []
-    for k in sorted(subdomains_dict.keys()):
-        subdomains_list.append(subdomains_dict[k])
-
+    subdomains_list = [subdomains_dict[k] for k in sorted(subdomains_dict.keys())]
     return subdomains_list, subdomains_dict, mask, len(subdomains_list)
 
 
@@ -335,13 +334,8 @@ def combine_outputs_task(
     combined_output: xr.Dataset
         The combined output
     """
-    ds_dict = {}
-    for k in sorted(subdomains_dict.keys()):
-        ds_dict[k] = ds_list.pop(0)
-
-    combined_output = combine_outputs(ds_dict=ds_dict, mask=mask)
-
-    return combined_output
+    ds_dict = {k: ds_list.pop(0) for k in sorted(subdomains_dict.keys())}
+    return combine_outputs(ds_dict=ds_dict, mask=mask)
 
 
 @task(
@@ -563,7 +557,7 @@ with Flow(
             train_period_end=train_period_end,
             day_rolling_window=epoch_adjustment_day_rolling_window,
             year_rolling_window=epoch_adjustment_year_rolling_window,
-            gcm_identifier=gcm_identifier + '_2',
+            gcm_identifier=f'{gcm_identifier}_2',
         )
 
         bias_corrected_gcm = remove_epoch_trend_task(
@@ -571,7 +565,7 @@ with Flow(
             trend=coarse_epoch_trend_2,
             day_rolling_window=epoch_adjustment_day_rolling_window,
             year_rolling_window=epoch_adjustment_year_rolling_window,
-            gcm_identifier=gcm_identifier + '_2',
+            gcm_identifier=f'{gcm_identifier}_2',
         )
 
     ## Step 4: Constructed Analogs
@@ -633,7 +627,7 @@ with Flow(
             trend_coarse=coarse_epoch_trend_2,
             day_rolling_window=epoch_adjustment_day_rolling_window,
             year_rolling_window=epoch_adjustment_year_rolling_window,
-            gcm_identifier=gcm_identifier + '_2',
+            gcm_identifier=f'{gcm_identifier}_2',
         )
 
     epoch_replaced_gcm = maca_epoch_replacement_task(

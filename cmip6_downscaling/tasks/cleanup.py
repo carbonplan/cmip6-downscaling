@@ -1,9 +1,9 @@
-from typing import List
+from __future__ import annotations
 
 import fsspec
 from prefect import task
 
-from cmip6_downscaling import config
+from .. import config
 
 
 def instantiate_az_filesystem() -> fsspec.filesystem:
@@ -19,7 +19,7 @@ def instantiate_az_filesystem() -> fsspec.filesystem:
     return fs
 
 
-def remove_stores(fpaths: List[str]):
+def remove_stores(fpaths: list[str]):
     """Removes AZ store
 
     Args:

@@ -1,4 +1,6 @@
-from typing import Any, Dict, Union
+from __future__ import annotations
+
+from typing import Any
 
 import xarray as xr
 from skdownscale.pointwise_models import (
@@ -12,9 +14,9 @@ VALID_CORRECTIONS = ['absolute', 'relative']
 
 
 def bias_correct_obs_by_method(
-    da_obs: Union[xr.DataArray, xr.Dataset],
+    da_obs: xr.DataArray | xr.Dataset,
     method: str,
-    bc_kwargs: Dict[str, Any],
+    bc_kwargs: dict[str, Any],
 ) -> xr.DataArray:
     if method == 'quantile_transform':
         if 'n_quantiles' not in bc_kwargs:
@@ -44,11 +46,11 @@ def bias_correct_obs_by_method(
 
 
 def bias_correct_gcm_by_method(
-    da_gcm: Union[xr.DataArray, xr.Dataset],
-    da_obs: Union[xr.DataArray, xr.Dataset],
+    da_gcm: xr.DataArray | xr.Dataset,
+    da_obs: xr.DataArray | xr.Dataset,
     historical_period: slice,
     method: str,
-    bc_kwargs: Dict[str, Any],
+    bc_kwargs: dict[str, Any],
 ):
     if method == 'quantile_transform':
         # transform gcm

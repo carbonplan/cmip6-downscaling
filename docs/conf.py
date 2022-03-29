@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # sphinx-next documentation build configuration file.
 # Minimal sphinx configuration supporting export of API-docs to JSPN.
@@ -50,8 +49,8 @@ source_suffix = ".rst"
 master_doc = "api"
 
 # General information about the project.
-project = u"cmip6_downscaling"
-copyright = u"2022, CarbonPlan"
+project = "cmip6_downscaling"
+copyright = "2022, CarbonPlan"
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the

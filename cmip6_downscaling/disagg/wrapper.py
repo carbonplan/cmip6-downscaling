@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 from typing import Iterable
 
@@ -7,7 +9,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from cmip6_downscaling.disagg import derived_variables, terraclimate
+from ..disagg import derived_variables, terraclimate
 
 # minimum set of input variables
 input_vars = ['ppt', 'tmax', 'tmin', 'ws', 'srad']

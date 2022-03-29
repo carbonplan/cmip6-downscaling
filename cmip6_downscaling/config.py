@@ -1,4 +1,6 @@
 """Config file used by donfig"""
+from __future__ import annotations
+
 _defaults = {
     'chunk_dims': {'full_space': ('time',), 'full_time': ('lat', 'lon')},
     'storage': {

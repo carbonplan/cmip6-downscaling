@@ -8,7 +8,7 @@ import pandas as pd
 import xarray as xr
 from prefect import Flow, task
 
-from cmip6_downscaling import runtimes
+from .. import runtimes
 
 # vars/pathing -----------------------------------------------------------
 

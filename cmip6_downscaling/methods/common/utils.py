@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 import pathlib
 import re
-from typing import Tuple
 
 import numpy as np
 import xarray as xr
@@ -65,7 +66,7 @@ def subset_dataset(
 
 def calc_auspicious_chunks_dict(
     da: xr.DataArray,
-    chunk_dims: Tuple = ("lat", "lon"),
+    chunk_dims: tuple = ("lat", "lon"),
 ) -> dict:
     """Figure out a chunk size that, given the size of the dataset, the dimension(s) you want to chunk on
     and the data type, will fit under the target_size. Currently only works for 100mb which

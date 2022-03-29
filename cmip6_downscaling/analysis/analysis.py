@@ -1,4 +1,4 @@
-from typing import Tuple
+from __future__ import annotations
 
 import cartopy.crs as ccrs
 import matplotlib.pyplot as plt
@@ -8,7 +8,7 @@ import xarray as xr
 from .qaqc import make_qaqc_ds
 
 
-def qaqc_checks(ds: xr.Dataset) -> Tuple[xr.Dataset, xr.Dataset]:
+def qaqc_checks(ds: xr.Dataset) -> tuple[xr.Dataset, xr.Dataset]:
     '''
     Create the temporal and spatial summaries of a handful of QAQC
     analyses - nans, aphysical quantities
@@ -159,11 +159,7 @@ def get_seasonal(ds: xr.Dataset, aggregator: str = 'mean') -> xr.Dataset:
     return getattr(ds.groupby('time.season'), aggregator)()
 
 
-def change_ds(
-    ds_historic: xr.Dataset,
-    ds_future: xr.Dataset,
-    metrics: list = ['mean', 'std', 'percentile1', 'percentile5', 'percentile95', 'percentile99'],
-) -> xr.Dataset:
+def change_ds(ds_historic: xr.Dataset, ds_future: xr.Dataset, metrics: list = None) -> xr.Dataset:
     """Calculate change in a variety of metrics between a historic and future period
 
     Parameters
@@ -180,6 +176,16 @@ def change_ds(
     xr.Dataset
         Dataset with changes for the metrics listed in `metrics`
     """
+    if metrics is None:
+        metrics = [
+            'mean',
+            'std',
+            'percentile1',
+            'percentile5',
+            'percentile95',
+            'percentile99',
+        ]
+
     ds = xr.Dataset()
     for metric in metrics:
         if metric == 'mean':

@@ -1,4 +1,6 @@
-from typing import Any, Dict, Tuple, Union
+from __future__ import annotations
+
+from typing import Any
 
 import numpy as np
 import regionmask
@@ -6,10 +8,10 @@ import xarray as xr
 
 
 def generate_subdomains(
-    ex_output_grid: Union[xr.Dataset, xr.DataArray],
-    buffer_size: Union[float, int],
+    ex_output_grid: xr.Dataset | xr.DataArray,
+    buffer_size: float | int,
     region_def: str = 'ar6',
-) -> Tuple[Dict[Union[int, float], Any], xr.DataArray]:
+) -> tuple[dict[int | float, Any], xr.DataArray]:
     """
     Given an example output grid, determine all subdomains that need to be process in order to generate the final output.
     Outputs the list of bounding boxes for each subdomain considering the buffer size, as well as a mask in the resolution of the example output grid specifying
@@ -64,7 +66,7 @@ def generate_subdomains(
 
 
 def combine_outputs(
-    ds_dict: Dict[Union[float, int], xr.Dataset],
+    ds_dict: dict[float | int, xr.Dataset],
     mask: xr.DataArray,
 ) -> xr.Dataset:
     """
