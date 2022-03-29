@@ -1,11 +1,9 @@
-from typing import List, Optional, Union
+from typing import List, Union
 
 import xarray as xr
 
-from cmip6_downscaling.workflows.paths import make_rechunked_obs_path
-from cmip6_downscaling.workflows.utils import lon_to_180, rechunk_zarr_array_with_caching
-
 from . import cat
+from .utils import lon_to_180
 
 variable_name_dict = {
     "tasmax": "air_temperature_at_2_metres_1hour_Maximum",
@@ -35,45 +33,15 @@ def open_era5(variables: Union[str, List[str]], time_period: slice) -> xr.Datase
     years = range(int(time_period.start), int(time_period.stop) + 1)
 
     ds = xr.concat([cat.era5(year=year).to_dask()[variables] for year in years], dim='time')
-    ds = lon_to_180(ds)
 
     if 'pr' in variables:
         # convert to mm/day - helpful to prevent rounding errors from very tiny numbers
         ds['pr'] *= 86400
+
+    ds = lon_to_180(ds)
+
+    # Reorders latitudes to [-90, 90]
+    if ds.lat[0] > ds.lat[-1]:
+        ds = ds.reindex({"lat": ds.lat[::-1]})
+
     return ds
-
-
-def get_obs(
-    obs: str,
-    train_period: slice,
-    variables: Union[str, List[str]],
-    chunking_approach: Optional[str] = None,
-    cache_within_rechunk: Optional[bool] = True,
-) -> xr.Dataset:
-    if obs == 'ERA5':
-        ds_obs = open_era5(variables=variables, time_period=train_period)
-    else:
-        raise NotImplementedError('only ERA5 is available as observation dataset right now')
-
-    if chunking_approach is None:
-        return ds_obs
-
-    if cache_within_rechunk:
-        path_dict = {
-            'obs': obs,
-            'train_period': train_period,
-            'variables': variables,
-        }
-        rechunked_path = make_rechunked_obs_path(
-            chunking_approach=chunking_approach,
-            **path_dict,
-        )
-    else:
-        rechunked_path = None
-    ds_obs_rechunked = rechunk_zarr_array_with_caching(
-        zarr_array=ds_obs,
-        chunking_approach=chunking_approach,
-        output_path=rechunked_path,
-    )
-
-    return ds_obs_rechunked

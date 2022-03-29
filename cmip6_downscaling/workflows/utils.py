@@ -1,4 +1,3 @@
-import os
 import random
 import re
 import string
@@ -18,42 +17,6 @@ from cmip6_downscaling import config
 schema_maps_chunks = DataArraySchema(chunks={'lat': -1, 'lon': -1})
 
 from dataclasses import dataclass
-
-
-@dataclass
-class BBox:
-    """Lat/lon bounding box"""
-
-    latmin: float = -90.0
-    latmax: float = 90.0
-    lonmin: float = -180.0
-    lonmax: float = 180
-
-    @property
-    def lat_slice(self) -> slice:
-        return slice(float(self.latmax), float(self.latmin))
-
-    @property
-    def lon_slice(self) -> slice:
-        return slice(float(self.lonmin), float(self.lonmax))
-
-    def __str__(self) -> str:
-        return f'{self.latmin}_{self.latmax}_{self.lonmin}_{self.lonmax}'
-
-
-def get_store(prefix, account_key=None):
-    """helper function to create a zarr store"""
-
-    if account_key is None:
-        account_key = os.environ.get("BLOB_ACCOUNT_KEY", None)
-
-    store = zarr.storage.ABSStore(
-        "carbonplan-downscaling",
-        prefix=prefix,
-        account_name="carbonplan",
-        account_key=account_key,
-    )
-    return store
 
 
 def subset_dataset(
@@ -175,37 +138,37 @@ def delete_chunks_encoding(ds: Union[xr.Dataset, xr.DataArray]):
             del ds[coord].encoding["chunks"]
 
 
-def lon_to_180(ds):
-    '''Converts longitude values to (-180, 180)
+# def lon_to_180(ds):
+#     '''Converts longitude values to (-180, 180)
 
-    Parameters
-    ----------
-    ds : xr.Dataset
-        Input dataset with `lon` coordinate
+#     Parameters
+#     ----------
+#     ds : xr.Dataset
+#         Input dataset with `lon` coordinate
 
-    Returns
-    -------
-    xr.Dataset
-        Copy of `ds` with updated coordinates
+#     Returns
+#     -------
+#     xr.Dataset
+#         Copy of `ds` with updated coordinates
 
-    See also
-    --------
-    cmip6_preprocessing.preprocessing.correct_lon
-    '''
+#     See also
+#     --------
+#     cmip6_preprocessing.preprocessing.correct_lon
+#     '''
 
-    ds = ds.copy()
+#     ds = ds.copy()
 
-    lon = ds["lon"].where(ds["lon"] < 180, ds["lon"] - 360)
-    ds = ds.assign_coords(lon=lon)
+#     lon = ds["lon"].where(ds["lon"] < 180, ds["lon"] - 360)
+#     ds = ds.assign_coords(lon=lon)
 
-    if not (ds["lon"].diff(dim="lon") > 0).all():
-        ds = ds.reindex(lon=np.sort(ds["lon"].data))
+#     if not (ds["lon"].diff(dim="lon") > 0).all():
+#         ds = ds.reindex(lon=np.sort(ds["lon"].data))
 
-    if "lon_bounds" in ds.variables:
-        lon_b = ds["lon_bounds"].where(ds["lon_bounds"] < 180, ds["lon_bounds"] - 360)
-        ds = ds.assign_coords(lon_bounds=lon_b)
+#     if "lon_bounds" in ds.variables:
+#         lon_b = ds["lon_bounds"].where(ds["lon_bounds"] < 180, ds["lon_bounds"] - 360)
+#         ds = ds.assign_coords(lon_bounds=lon_b)
 
-    return ds
+#     return ds
 
 
 def make_rechunker_stores(

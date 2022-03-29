@@ -1,5 +1,6 @@
 """Config file used by donfig"""
 _defaults = {
+    'chunk_dims': {'full_space': ('time',), 'full_time': ('lat', 'lon')},
     'storage': {
         'top_level': {
             'uri': 'az://',
@@ -17,6 +18,10 @@ _defaults = {
         },
         'temporary': {
             'uri': 'az://flow-outputs/temporary',
+            'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
+        },
+        'scratch': {
+            'uri': 'az://scratch',
             'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
         },
         'xpersist_store_name': '/xpersist_metadata_store',
@@ -62,7 +67,7 @@ _defaults = {
             'storage_options': {"account_name": "cmip6downscaling"},
         },
     },
-    'run_options': {'runtime': None, 'cleanup_flag': True},
+    'run_options': {'runtime': None, 'cleanup_flag': True, 'use_cache': True},
     "runtime": {
         "cloud": {
             "storage_prefix": "az://",
