@@ -491,7 +491,7 @@ def pyramid(
         dta = pyramid_regrid(ds, target_pyramid=None, levels=levels)
 
         dta = _pyramid_postprocess(dta, levels, other_chunks=other_chunks, ds_name=ds_name)
-    
+
     # write to target
     dta.to_zarr(target, mode='w')
     return target
