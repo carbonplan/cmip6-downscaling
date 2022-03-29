@@ -492,6 +492,13 @@ def pyramid(
 
         dta = _pyramid_postprocess(dta, levels, other_chunks=other_chunks, ds_name=ds_name)
 
+    # write to target
+    dta.to_zarr(target, mode='w')
+    return target
+
+
+@task
+def run_analyses(ds_path: UPath, run_parameters: RunParameters) -> UPath:
     """Prefect task to run the analyses on results from a downscaling run.
 
     Parameters
