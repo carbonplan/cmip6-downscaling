@@ -5,17 +5,27 @@ import xarray as xr
 from prefect import task
 from skdownscale.pointwise_models import PointWiseDownscaler
 from skdownscale.pointwise_models.bcsd import BcsdPrecipitation, BcsdTemperature
-from sklearn.exceptions import DataConversionWarning
 from upath import UPath
 
-from cmip6_downscaling import config
-from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
-from cmip6_downscaling.methods.bcsd.utils import reconstruct_finescale
-from cmip6_downscaling.methods.common.containers import RunParameters
-from cmip6_downscaling.methods.common.utils import zmetadata_exists
+import cmip6_downscaling
 
-intermediate_dir = UPath(config.get("storage.intermediate.uri"))
-results_dir = UPath(config.get("storage.results.uri"))
+from . import config
+from .constants import ABSOLUTE_VARS, RELATIVE_VARS
+from .methods.bcsd.utils import reconstruct_finescale
+from .methods.common.containers import RunParameters
+from .methods.common.utils import zmetadata_exists
+
+warnings.filterwarnings(
+    "ignore",
+    "(.*) filesystem path not explicitly implemented. falling back to default implementation. This filesystem may not be tested",
+    category=UserWarning,
+)
+
+
+code_version = cmip6_downscaling.__version__
+scratch_dir = UPath(config.get("storage.scratch.uri"))
+intermediate_dir = UPath(config.get("storage.intermediate.uri")) / cmip6_downscaling.__version__
+results_dir = UPath(config.get("storage.results.uri")) / cmip6_downscaling.__version__
 use_cache = config.get('run_options.use_cache')
 
 
@@ -79,7 +89,7 @@ def spatial_anomalies(
     return target
 
 
-@task
+@task(log_stdout=True)
 def fit_and_predict(
     experiment_train_full_time_path: UPath,
     experiment_predict_full_time_path: UPath,
@@ -128,19 +138,16 @@ def fit_and_predict(
     coarse_obs_full_time_ds = xr.open_zarr(coarse_obs_full_time_path)
     experiment_train_full_time_ds = xr.open_zarr(experiment_train_full_time_path)
     experiment_predict_full_time_ds = xr.open_zarr(experiment_predict_full_time_path)
-    # make times on the gcm data (all with a noon timestamp) align with the obs times (all with a midnight timestamp)
-    # TODO: instead add to gcm munging step to make timestamps all start of day
-    experiment_train_full_time_ds['time'] = coarse_obs_full_time_ds.time.values
-    with warnings.catch_warnings():
-        warnings.simplefilter('ignore', DataConversionWarning)
-        pointwise_model.fit(
-            experiment_train_full_time_ds[run_parameters.variable],
-            coarse_obs_full_time_ds[run_parameters.variable],
-        )
-        bias_corrected_da = pointwise_model.predict(
-            experiment_predict_full_time_ds[run_parameters.variable]
-        )
-    bias_corrected_ds = bias_corrected_da.to_dataset(name=run_parameters.variable)
+
+    pointwise_model.fit(
+        experiment_train_full_time_ds[run_parameters.variable],
+        coarse_obs_full_time_ds[run_parameters.variable],
+    )
+    bias_corrected_da = pointwise_model.predict(
+        experiment_predict_full_time_ds[run_parameters.variable]
+    )
+
+    bias_corrected_ds = bias_corrected_da.astype('float32').to_dataset(name=run_parameters.variable)
     bias_corrected_ds.to_zarr(target, mode='w')
     return target
 

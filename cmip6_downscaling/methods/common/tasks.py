@@ -6,12 +6,9 @@ from pathlib import PosixPath
 import dask
 import datatree as dt
 import fsspec
-import papermill as pm
 import rechunker
 import xarray as xr
-import xesmf as xe
 import zarr
-from azure.storage.blob import BlobServiceClient, ContentSettings
 from carbonplan_data.metadata import get_cf_global_attrs
 from carbonplan_data.utils import set_zarr_encoding
 from ndpyramid import pyramid_regrid
@@ -20,6 +17,7 @@ from upath import UPath
 from xarray_schema import DataArraySchema, DatasetSchema
 from xarray_schema.base import SchemaError
 
+import cmip6_downscaling
 from cmip6_downscaling import config, version
 from cmip6_downscaling.data.cmip import get_gcm
 from cmip6_downscaling.data.observations import open_era5
@@ -38,10 +36,10 @@ warnings.filterwarnings(
 )
 
 PIXELS_PER_TILE = 128
-
+code_version = cmip6_downscaling.__version__
 scratch_dir = UPath(config.get("storage.scratch.uri"))
-intermediate_dir = UPath(config.get("storage.intermediate.uri"))
-results_dir = UPath(config.get("storage.results.uri"))
+intermediate_dir = UPath(config.get("storage.intermediate.uri")) / cmip6_downscaling.__version__
+results_dir = UPath(config.get("storage.results.uri")) / cmip6_downscaling.__version__
 use_cache = config.get('run_options.use_cache')
 
 
@@ -66,13 +64,15 @@ def get_obs(run_parameters: RunParameters) -> UPath:
         Path to subset observation dataset.
     """
 
-    target = (
-        intermediate_dir
-        / "get_obs"
-        / "{obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}".format(
+    ds_name = (
+        "get_obs"
+        + "/"
+        + "{obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}".format(
             **asdict(run_parameters)
         )
     )
+    target = str(intermediate_dir) + "/" + ds_name
+
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
         return target
@@ -88,12 +88,12 @@ def get_obs(run_parameters: RunParameters) -> UPath:
     )
     del subset[run_parameters.variable].encoding['chunks']
 
-    subset.attrs.update(**get_cf_global_attrs(version=version))
+    subset.attrs.update({'title': ds_name}, **get_cf_global_attrs(version=version))
     subset.to_zarr(target, mode='w')
     return target
 
 
-@task()
+@task(log_stdout=True)
 def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     """Prefect task that returns cmip GCM data from input run parameters.
 
@@ -110,13 +110,15 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
         UPath to experiment dataset.
     """
     time_period = getattr(run_parameters, time_subset)
-    target = (
-        intermediate_dir
-        / "get_experiment"
-        / "{model}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{time_period.start}_{time_period.stop}".format(
+    ds_name = (
+        "get_experiment"
+        + "/"
+        + "{model}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{time_period.start}_{time_period.stop}".format(
             time_period=time_period, **asdict(run_parameters)
         )
     )
+    target = str(intermediate_dir) + "/" + ds_name
+
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
         return target
@@ -138,7 +140,7 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     subset = subset.chunk({'time': 365})
     del subset[run_parameters.variable].encoding['chunks']
 
-    subset.attrs.update(**get_cf_global_attrs(version=version))
+    subset.attrs.update({'title': ds_name}, **get_cf_global_attrs(version=version))
     subset.to_zarr(target, mode='w')
     return target
 
@@ -181,8 +183,8 @@ def rechunk(
     # if only pattern specified then use that pattern
     elif pattern is not None:
         pattern_string = pattern
-    target = intermediate_dir / "rechunk" / (pattern_string + path.path.replace("/", "_"))
-    path_tmp = scratch_dir / "rechunk" / (pattern_string + path.path.replace("/", "_"))
+    target = intermediate_dir / ("rechunk_" + pattern_string) / (str(path).split("/")[-1])
+    path_tmp = scratch_dir / ("rechunk_" + pattern_string) / (str(path).split("/")[-1])
     print('writing rechunked dataset to {}'.format(target))
     target_store = fsspec.get_mapper(str(target))
     temp_store = fsspec.get_mapper(str(path_tmp))
@@ -289,7 +291,9 @@ def monthly_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
         Path to resampled dataset.
     """
 
-    target = results_dir / "monthly_summary" / run_parameters.run_id
+    ds_name = "monthly_summary" + "/" + str(run_parameters.run_id)
+    target = str(results_dir) + "/" + ds_name
+
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
         return target
@@ -303,7 +307,8 @@ def monthly_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
     else:
         print(f'{run_parameters.variable} not implemented')
 
-    out_ds.attrs.update(**get_cf_global_attrs(version=version))
+    out_ds.attrs.update({'title': ds_name}, **get_cf_global_attrs(version=version))
+
     out_ds.to_zarr(target, mode='w')
 
     return target
@@ -326,7 +331,9 @@ def annual_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
         Path to resampled dataset.
     """
 
-    target = results_dir / "annual_summary" / run_parameters.run_id
+    ds_name = "annual_summary" + "/" + str(run_parameters.run_id)
+    target = str(results_dir) + "/" + ds_name
+
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
         return target
@@ -340,7 +347,7 @@ def annual_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
     else:
         print(f'{run_parameters.variable} not implemented')
 
-    out_ds.attrs.update(**get_cf_global_attrs(version=version))
+    out_ds.attrs.update({'title': ds_name}, **get_cf_global_attrs(version=version))
     out_ds.to_zarr(target, mode='w')
 
     return target
@@ -362,11 +369,21 @@ def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
     UPath
         Path to regridded output dataset.
     """
-    target = (
-        intermediate_dir
-        / "regrid"
-        / (source_path.path.replace('/', '_') + '_' + target_grid_path.path.replace('/', '_'))
+
+    import xesmf as xe
+
+    ds_name = (
+        "regrid"
+        + "/"
+        + "source_path"
+        + "/"
+        + (str(source_path).split("/")[-1])
+        + "/"
+        + "target_path"
+        + "/"
+        + (str(target_grid_path).split("/")[-1])
     )
+    target = str(intermediate_dir) + "/" + ds_name
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
@@ -376,7 +393,7 @@ def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
 
     regridder = xe.Regridder(source_ds, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
     regridded_ds = regridder(source_ds)
-    regridded_ds.attrs.update(**get_cf_global_attrs(version=version))
+    regridded_ds.attrs.update({'title': ds_name}, **get_cf_global_attrs(version=version))
     regridded_ds.to_zarr(target, mode='w')
 
     return target
@@ -389,7 +406,9 @@ def _load_coords(ds: xr.Dataset) -> xr.Dataset:
     return ds
 
 
-def _pyramid_postprocess(dt: dt.DataTree, levels: int, other_chunks: dict = None) -> dt.DataTree:
+def _pyramid_postprocess(
+    dt: dt.DataTree, levels: int, other_chunks: dict = None, ds_name: str = None
+) -> dt.DataTree:
     '''Postprocess data pyramid
 
     Adds multiscales metadata and sets Zarr encoding
@@ -430,12 +449,12 @@ def _pyramid_postprocess(dt: dt.DataTree, levels: int, other_chunks: dict = None
                 dt[slevel].ds[var].encoding['dtype'] = 'int32'
 
     # set global metadata
-    dt.ds.attrs.update(**get_cf_global_attrs(version=version))
+    dt.ds.attrs.update({'title': ds_name}, **get_cf_global_attrs(version=version))
     return dt
 
 
 @task(log_stdout=True, tags=['dask-resource:TASKSLOTS=1'])
-def pyramid(ds_path: UPath, levels: int = 2, other_chunks: dict = None) -> UPath:
+def pyramid(ds_path: UPath, run_parameters: RunParameters, levels: int = 2, other_chunks: dict = None) -> UPath:
     '''Task to create a data pyramid from an xarray Dataset
 
     Parameters
@@ -454,7 +473,8 @@ def pyramid(ds_path: UPath, levels: int = 2, other_chunks: dict = None) -> UPath
     target : UPath
     '''
 
-    target = results_dir / "pyramid" / ds_path.path.replace('/', '_')
+    ds_name = "pyarmid" + ds_path.path.replace('/', '_')
+    target = str(results_dir) + "/" + ds_name
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
@@ -468,16 +488,8 @@ def pyramid(ds_path: UPath, levels: int = 2, other_chunks: dict = None) -> UPath
         # create pyramid
         dta = pyramid_regrid(ds, target_pyramid=None, levels=levels)
 
-        # postprocess
-        dta = _pyramid_postprocess(dta, levels, other_chunks=other_chunks)
+        dta = _pyramid_postprocess(dta, levels, other_chunks=other_chunks, ds_name=ds_name)
 
-        # write to target
-        dta.to_zarr(target, mode='w')
-    return target
-
-
-@task
-def run_analyses(ds_path: UPath, run_parameters: RunParameters) -> UPath:
     """Prefect task to run the analyses on results from a downscaling run.
 
     Parameters
@@ -491,6 +503,9 @@ def run_analyses(ds_path: UPath, run_parameters: RunParameters) -> UPath:
     PosixPath
         The local location of an executed notebook path.
     """
+
+    import papermill
+    from azure.storage.blob import BlobServiceClient, ContentSettings
 
     from cmip6_downscaling.analysis import metrics
 
@@ -509,7 +524,7 @@ def run_analyses(ds_path: UPath, run_parameters: RunParameters) -> UPath:
     # parameters['predict_period_end'] = predict_period.stop
 
     # execute notebook with papermill
-    pm.execute_notebook(template_path, executed_notebook_path, parameters=parameters)
+    papermill.execute_notebook(template_path, executed_notebook_path, parameters=parameters)
 
     # convert from ipynb to html
     # TODO: move this to stand alone function

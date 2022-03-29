@@ -2,13 +2,9 @@ import warnings
 
 from prefect import Flow, Parameter
 
-from cmip6_downscaling import runtimes
-from cmip6_downscaling.methods.bcsd.tasks import (
-    fit_and_predict,
-    postprocess_bcsd,
-    spatial_anomalies,
-)
-from cmip6_downscaling.methods.common.tasks import (
+from . import runtimes
+from .methods.bcsd.tasks import fit_and_predict, postprocess_bcsd, spatial_anomalies
+from .methods.common.tasks import (
     annual_summary,
     get_experiment,
     get_obs,

@@ -1,3 +1,4 @@
+import pathlib
 import re
 from typing import Tuple
 
@@ -12,7 +13,11 @@ from .containers import BBox
 
 def zmetadata_exists(path: UPath):
     '''temporary workaround until path.exists() works'''
-    return path.fs.exists(str(path / '.zmetadata'))
+
+    if isinstance(path, pathlib.PosixPath):
+        return (path / '.zmetadata').exists()
+    else:
+        return (UPath(path) / '.zmetadata').exists()
 
 
 def subset_dataset(
