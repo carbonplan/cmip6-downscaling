@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 KELVIN = 273.15
 MONTHS_PER_YEAR = 12
 SEC_PER_DAY = 86400

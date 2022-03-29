@@ -1,4 +1,4 @@
-from typing import Tuple
+from __future__ import annotations
 
 import cartopy.crs as ccrs
 import matplotlib.pyplot as plt
@@ -8,7 +8,7 @@ import xarray as xr
 from .qaqc import make_qaqc_ds
 
 
-def qaqc_checks(ds: xr.Dataset) -> Tuple[xr.Dataset, xr.Dataset]:
+def qaqc_checks(ds: xr.Dataset) -> tuple[xr.Dataset, xr.Dataset]:
     '''
     Create the temporal and spatial summaries of a handful of QAQC
     analyses - nans, aphysical quantities

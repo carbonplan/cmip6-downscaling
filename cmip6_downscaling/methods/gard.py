@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import math
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 import fsspec
 import numpy as np
@@ -17,8 +19,8 @@ from cmip6_downscaling.workflows.paths import make_scrf_path
 
 def get_gard_model(
     model_type: str,
-    model_params: Dict[str, Any],
-) -> Union[AnalogRegression, PureAnalog, PureRegression]:
+    model_params: dict[str, Any],
+) -> AnalogRegression | PureAnalog | PureRegression:
     """
     Based on input, return the corresponding GARD model instance
 
@@ -52,7 +54,7 @@ def gard_fit_and_predict(
     X_pred: xr.Dataset,
     label: str,
     model_type: str,
-    model_params: Dict[str, Any],
+    model_params: dict[str, Any],
     dim: str = 'time',
     **kwargs,
 ) -> xr.Dataset:
@@ -173,7 +175,7 @@ def gard_postprocess(
     model_output: xr.Dataset,
     scrf: xr.DataArray,
     label: str,
-    model_params: Optional[Dict[str, Any]] = None,
+    model_params: dict[str, Any] | None = None,
     **kwargs,
 ) -> xr.Dataset:
     """

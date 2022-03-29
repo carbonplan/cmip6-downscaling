@@ -1,5 +1,6 @@
+from __future__ import annotations
+
 import math
-from typing import Dict, Optional
 
 import numba
 import numpy as np
@@ -202,7 +203,7 @@ def hydromod(
     soil: float,
     swe: float,
     mfsnow: float,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """
     Run simple hydro model to calculate water balance terms. This is
     a translation from matlab into python of a simple hydro model
@@ -398,9 +399,9 @@ def model(
     awc: float,
     lat: float,
     elev: float,
-    snowpack_prev: Optional[float] = None,
-    soil_prev: Optional[float] = None,
-    tmean_prev: Optional[float] = None,
+    snowpack_prev: float | None = None,
+    soil_prev: float | None = None,
+    tmean_prev: float | None = None,
 ) -> pd.DataFrame:
     """Terraclimate hydrology model
 

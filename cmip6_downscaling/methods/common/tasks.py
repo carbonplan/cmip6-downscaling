@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import warnings
 from dataclasses import asdict
@@ -185,7 +187,7 @@ def rechunk(
         pattern_string = pattern
     target = intermediate_dir / ("rechunk_" + pattern_string) / (str(path).split("/")[-1])
     path_tmp = scratch_dir / ("rechunk_" + pattern_string) / (str(path).split("/")[-1])
-    print('writing rechunked dataset to {}'.format(target))
+    print(f'writing rechunked dataset to {target}')
     target_store = fsspec.get_mapper(str(target))
     temp_store = fsspec.get_mapper(str(path_tmp))
 

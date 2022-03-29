@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import cartopy.crs as ccrs
 import matplotlib as mpl
 import matplotlib.pyplot as plt

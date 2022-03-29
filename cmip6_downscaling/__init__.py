@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dask.utils import SerializableLock
 from donfig import Config
 from pkg_resources import DistributionNotFound, get_distribution
