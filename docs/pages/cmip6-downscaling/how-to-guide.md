@@ -5,5 +5,6 @@ import Section from '../../components/section'
 Text here...
 
 export default ({ children }) => (
+
   <Section name='How-to Guide'>{children}</Section>
 )

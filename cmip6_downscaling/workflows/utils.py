@@ -185,12 +185,12 @@ def make_rechunker_stores(
         Stores where rechunker will write and the path to the target store
     """
     storage_options = config.get('storage.temporary.storage_options')
-    path_tmp = config.get('storage.temporary.uri') + "/{}.zarr".format(temp_file_name())
+    path_tmp = config.get('storage.temporary.uri') + f"/{temp_file_name()}.zarr"
 
     temp_store = fsspec.get_mapper(path_tmp, **storage_options)
 
     if output_path is None:
-        output_path = config.get('storage.temporary.uri') + "/{}.zarr".format(temp_file_name())
+        output_path = config.get('storage.temporary.uri') + f"/{temp_file_name()}.zarr"
     target_store = fsspec.get_mapper(output_path, **storage_options)
     print(f'this is temp_path: {path_tmp}. \n this is target_path: {output_path}')
     return temp_store, target_store, output_path

@@ -3,14 +3,13 @@ plugins:
     - module: intake_xarray
 
 sources:
-
   cmip6:
     description: 'CMIP6 in Azure Blob Storage'
     metadata:
       url: 'https://pangeo-data.github.io/pangeo-cmip6-cloud/'
     driver: intake_esm.esm_datastore
     args:
-      esmcol_obj: "https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.json"
+      esmcol_obj: 'https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.json'
 
   era5:
     description: 'ERA5 Reanalysis'
