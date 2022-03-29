@@ -11,6 +11,7 @@ import cmip6_downscaling
 
 from . import config
 from .constants import ABSOLUTE_VARS, RELATIVE_VARS
+from .methods.bcsd.utils import reconstruct_finescale
 from .methods.common.containers import RunParameters
 from .methods.common.utils import zmetadata_exists
 
@@ -28,7 +29,7 @@ results_dir = UPath(config.get("storage.results.uri")) / cmip6_downscaling.__ver
 use_cache = config.get('run_options.use_cache')
 
 
-@task
+@task(log_stdout=True)
 def spatial_anomalies(
     obs_full_time_path: UPath, interpolated_obs_full_time_path: UPath, run_parameters: RunParameters
 ) -> UPath:
@@ -74,7 +75,6 @@ def spatial_anomalies(
     if use_cache and zmetadata_exists(target):
         print(f"found existing target: {target}")
         return target
-
     interpolated_obs_full_time_ds = xr.open_zarr(interpolated_obs_full_time_path)
     obs_full_time_ds = xr.open_zarr(obs_full_time_path)
 
@@ -182,13 +182,20 @@ def postprocess_bcsd(
         return target
 
     bias_corrected_fine_full_time_ds = xr.open_zarr(bias_corrected_fine_full_time_path)
+    # hint for mapblocks about which month each day corresponds to
+    bias_corrected_fine_full_time_ds = bias_corrected_fine_full_time_ds.assign_coords(
+        {'month': bias_corrected_fine_full_time_ds['time.month']}
+    )
     spatial_anomalies_ds = xr.open_zarr(spatial_anomalies_path)
-    bcsd_results_ds = bias_corrected_fine_full_time_ds.groupby("time.month") + spatial_anomalies_ds
-    del bcsd_results_ds['month'].encoding['chunks']
-
-    # The groupby operation above results in inconsistent chunking (# of days per month)
-    # This manual chunk step returns the chunking scheme to that of the input dataset
-    rechunked_bcsd_results_ds = bcsd_results_ds.chunk(bias_corrected_fine_full_time_ds.chunks)
-
-    rechunked_bcsd_results_ds.to_zarr(target, mode='w')
+    # make all spatial anomalies into one chunk so that map_blocks has access to every month.
+    # otherwise it will only have access to one chunk and will only grab the last chunk (december)
+    # and result in nans in all months except for december
+    spatial_anomalies_ds = spatial_anomalies_ds.chunk({'month': -1}).persist()
+    bcsd_results_ds = xr.map_blocks(
+        reconstruct_finescale,
+        bias_corrected_fine_full_time_ds,
+        args=[spatial_anomalies_ds],
+        template=bias_corrected_fine_full_time_ds,
+    )
+    bcsd_results_ds.to_zarr(target, mode='w')
     return target

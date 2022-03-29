@@ -104,22 +104,25 @@ def calc_auspicious_chunks_dict(
             # rechunker doesn't like the the shorthand of -1 meaning the full length
             # so we'll always just give it the full length of the dimension
             chunks_dict[dim] = dim_sizes[dim]
-    # calculate the bytesize given the dtype
-    data_bytesize = int(re.findall(r"\d+", str(da.dtype))[0])
+    # calculate the bytesize given the dtype bitsize and divide by 8
+    data_bytesize = int(re.findall(r"\d+", str(da.dtype))[0]) / 8
     # calculate the size of the smallest minimum chunk based upon dtype and the
     # length of the unchunked dim(s). chunks_dict currently only has unchunked dims right now
     smallest_size_one_chunk = data_bytesize * np.prod(
         [dim_sizes[dim] for dim in chunks_dict.keys()]
     )
-    # the dims in chunk_dims should be of a square size that creates ~100 mb
-    perfect_chunk = target_size_bytes / smallest_size_one_chunk
-    # then make reasonable chunk size by rounding up (avoids corner case of it rounding down to 0...)
-    perfect_chunk_length = int(np.ceil(perfect_chunk ** (1 / len(chunk_dims))))
 
+    # the dims in chunk_dims should be of an array size (as in number of elements in the array)
+    # that creates ~100 mb. `perfect_chunk` is the how many of the smallest_size_chunks you can
+    # handle at once while still staying below the `target_size_bytes`
+    perfect_chunk = target_size_bytes / smallest_size_one_chunk
+
+    # then make reasonable chunk size by rounding up (avoids corner case of it rounding down to 0...)
+    # but if the array is oblong it might get big (? is logic right there- might it get small??)
+    perfect_chunk_length = int(np.ceil(perfect_chunk ** (1 / len(chunk_dims))))
     for dim in chunk_dims:
         # check that the rounding up as part of the `perfect_chunk_length` calculation
         # didn't make the chunk sizes bigger than the array itself, and if so
         # clip it to that size
         chunks_dict[dim] = min(perfect_chunk_length, dim_sizes[dim])
-
     return chunks_dict

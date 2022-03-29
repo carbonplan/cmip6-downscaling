@@ -2,10 +2,11 @@ import os
 import warnings
 from dataclasses import asdict
 from pathlib import PosixPath
-from typing import Union
 
+import dask
 import datatree as dt
 import fsspec
+import rechunker
 import xarray as xr
 import zarr
 from carbonplan_data.metadata import get_cf_global_attrs
@@ -145,7 +146,12 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
 
 
 @task(log_stdout=True)
-def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: str = "2GB") -> UPath:
+def rechunk(
+    path: UPath,
+    pattern: str = None,
+    template: UPath = None,
+    max_mem: str = "2GB",
+) -> UPath:
     """Use `rechunker` package to adjust chunks of dataset to a form
     conducive for your processing.
 
@@ -153,8 +159,13 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
     ----------
     path : UPath
         path to zarr store
-    chunking_pattern : str or UPath
-        The pattern of chunking you want to use.
+    pattern : str
+        The pattern of chunking you want to use. If used together with `template` it will override the template
+        to ensure that the final dataset truly follows that `full_space` or `full_time` spec. This matters when you are passing
+        a template that is either a shorter time length or a template that is a coarser grid (and thus a shorter lat/lon chunksize)
+    template : UPath
+        The path to the file you want to use as a chunking template. The utility will grab the chunk sizes and use them as the chunk
+        target to feed to rechunker.
     max_mem : str
         The memory available for rechunking steps. Must look like "2GB". Optional, default is 2GB.
 
@@ -163,24 +174,18 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
     target : UPath
         Path to rechunked dataset
     """
-
-    import rechunker
-
-    if isinstance(chunking_pattern, str):
-        pattern_string = chunking_pattern
-    elif isinstance(chunking_pattern, UPath):
-        # when you pass a dataset the chunking will match the chunking of that dataset
-        # so we'll call it "matched". this is ambiguous - like it could be chunked to match
-        # any number of patterns but it is sufficient for this implementation.
+    # print('rechunking dataset at {}'.format(path))
+    # if both defined then you'll take the spatial part of template and override one dimension with the specified pattern
+    if template is not None:
         pattern_string = 'matched'
-    else:
-        raise NotImplementedError(
-            "Not a valid chunking approach. Try passing either `full_space` or `full_time`, or a template chunked dataset."
-        )
-
+        if pattern is not None:
+            pattern_string += '_' + pattern
+    # if only pattern specified then use that pattern
+    elif pattern is not None:
+        pattern_string = pattern
     target = intermediate_dir / ("rechunk_" + pattern_string) / (str(path).split("/")[-1])
     path_tmp = scratch_dir / ("rechunk_" + pattern_string) / (str(path).split("/")[-1])
-
+    print('writing rechunked dataset to {}'.format(target))
     target_store = fsspec.get_mapper(str(target))
     temp_store = fsspec.get_mapper(str(path_tmp))
 
@@ -199,20 +204,32 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
     # open the dataset to access the coordinates
     ds = xr.open_zarr(path)
     example_var = list(ds.data_vars)[0]
-    # based upon whether you want to chunk along space or time, take the dataset and calculate
-    # an optimal chunking schema for processing.
-    if isinstance(chunking_pattern, str):
-        chunk_dims = config.get(f"chunk_dims.{chunking_pattern}")
-        chunk_def = calc_auspicious_chunks_dict(ds[example_var], chunk_dims=chunk_dims)
-
-    elif isinstance(chunking_pattern, UPath):
-        template_ds = xr.open_zarr(chunking_pattern)
+    # if you have defined a template then use the chunks of that template
+    # to form the desired chunk definition
+    if template is not None:
+        template_ds = xr.open_zarr(template)
         # define the chunk definition
         chunk_def = {
             'time': min(template_ds.chunks['time'][0], len(ds.time)),
             'lat': min(template_ds.chunks['lat'][0], len(ds.lat)),
             'lon': min(template_ds.chunks['lon'][0], len(ds.lon)),
         }
+        # if you have also defined a pattern then override the dimension you've specified there
+        if pattern is not None:
+            # the chunking pattern will return the dimensions that you'll chunk along
+            # so `full_time` will return `('lat', 'lon')`
+            chunk_dims = config.get(f"chunk_dims.{pattern}")
+            for dim in chunk_def.keys():
+                if dim not in chunk_dims:
+                    print('correcting dim')
+                    # override the chunksize of those unchunked dimensions to be the complete length (like passing chunksize=-1
+                    chunk_def[dim] = len(ds[dim])
+    # if you don't have a target template then you'll just use the `full_time` or `full_space` approach
+    elif pattern is not None:
+        chunk_dims = config.get(f"chunk_dims.{pattern}")
+        chunk_def = calc_auspicious_chunks_dict(ds[example_var], chunk_dims=chunk_dims)
+    else:
+        raise AttributeError('must either define chunking pattern or template')
     # Note:
     # for rechunker v 0.3.3:
     # initialize the chunks_dict that you'll pass in, filling the coordinates with
@@ -224,7 +241,6 @@ def rechunk(path: UPath, chunking_pattern: Union[str, UPath] = None, max_mem: st
         'lon': (chunk_def['lon'],),
         'lat': (chunk_def['lat'],),
     }
-
     for var in ds.data_vars:
         chunks_dict[var] = chunk_def
     # now that you have your chunks_dict you can check that the dataset at `path`
@@ -284,14 +300,12 @@ def monthly_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
 
     ds = xr.open_zarr(ds_path)
 
-    out_ds = xr.Dataset()
-    for var in ds:
-        if var in ['tasmax', 'tasmin']:
-            out_ds[var] = ds[var].resample(time='1MS').mean(dim='time')
-        elif var in ['pr']:
-            out_ds[var] = ds[var].resample(time='1MS').sum(dim='time')
-        else:
-            print(f'{var} not implemented')
+    if run_parameters.variable in ['tasmax', 'tasmin']:
+        out_ds = ds.resample(time='1MS').mean(dim='time')
+    elif run_parameters.variable in ['pr']:
+        out_ds = ds.resample(time='1MS').sum(dim='time')
+    else:
+        print(f'{run_parameters.variable} not implemented')
 
     out_ds.attrs.update({'title': ds_name}, **get_cf_global_attrs(version=version))
 
@@ -326,14 +340,12 @@ def annual_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
 
     ds = xr.open_zarr(ds_path)
 
-    out_ds = xr.Dataset()
-    for var in ds:
-        if var in ['tasmax', 'tasmin']:
-            out_ds[var] = ds[var].resample(time='YS').mean()
-        elif var in ['pr']:
-            out_ds[var] = ds[var].resample(time='YS').sum()
-        else:
-            print(f'{var} not implemented')
+    if run_parameters.variable in ['tasmax', 'tasmin']:
+        out_ds = ds.resample(time='YS').mean(dim='time')
+    elif run_parameters.variable in ['pr']:
+        out_ds = ds.resample(time='YS').sum(dim='time')
+    else:
+        print(f'{run_parameters.variable} not implemented')
 
     out_ds.attrs.update({'title': ds_name}, **get_cf_global_attrs(version=version))
     out_ds.to_zarr(target, mode='w')
@@ -442,7 +454,9 @@ def _pyramid_postprocess(
 
 
 @task(log_stdout=True, tags=['dask-resource:TASKSLOTS=1'])
-def pyramid(ds_path: UPath, levels: int = 2, other_chunks: dict = None) -> UPath:
+def pyramid(
+    ds_path: UPath, run_parameters: RunParameters, levels: int = 2, other_chunks: dict = None
+) -> UPath:
     '''Task to create a data pyramid from an xarray Dataset
 
     Parameters
@@ -471,20 +485,13 @@ def pyramid(ds_path: UPath, levels: int = 2, other_chunks: dict = None) -> UPath
     ds = xr.open_zarr(ds_path).pipe(_load_coords)
 
     ds.coords['date_str'] = ds['time'].dt.strftime('%Y-%m-%d').astype('S10')
+    # note: this worked when 8 processors and 4 cores
+    with dask.config.set(scheduler='threads'):
+        # create pyramid
+        dta = pyramid_regrid(ds, target_pyramid=None, levels=levels)
 
-    # create pyramid
-    dta = pyramid_regrid(ds, target_pyramid=None, levels=levels)
+        dta = _pyramid_postprocess(dta, levels, other_chunks=other_chunks, ds_name=ds_name)
 
-    # postprocess
-    dta = _pyramid_postprocess(dta, levels, other_chunks=other_chunks, ds_name=ds_name)
-
-    # write to target
-    dta.to_zarr(target, mode='w')
-    return target
-
-
-@task
-def run_analyses(ds_path: UPath, run_parameters: RunParameters) -> UPath:
     """Prefect task to run the analyses on results from a downscaling run.
 
     Parameters
