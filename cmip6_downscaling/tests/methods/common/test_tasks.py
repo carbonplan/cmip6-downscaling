@@ -156,7 +156,7 @@ def test_rechunk(rechunk_params, tmp_path):
 
     actual_path = rechunk.run(
         source_path,
-        chunking_pattern=rechunk_params['chunking_method'],
+        pattern=rechunk_params['chunking_method'],
     )
     actual_ds = xr.open_zarr(actual_path)
 
