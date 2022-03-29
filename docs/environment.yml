@@ -1,0 +1,16 @@
+name: docs
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.9
+  - pip
+  - ipykernel
+  - ipython
+  - setuptools
+  - sphinx
+  - numpydoc
+  # this project's dependencies
+  - numpy
+  - pandas
+  - scipy

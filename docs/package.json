@@ -1,0 +1,32 @@
+{
+  "name": "docs",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": " NODE_ENV=development next",
+    "start": "next start",
+    "build": "bash deploy.sh && next build"
+  },
+  "author": "",
+  "license": "MIT",
+  "prettier": "@carbonplan/prettier",
+  "dependencies": {
+    "@carbonplan/components": "^11.1.1",
+    "@carbonplan/icons": "^1.1.0",
+    "@carbonplan/theme": "^7.0.0",
+    "@mdx-js/loader": "^1.6.22",
+    "@mdx-js/react": "^1.6.22",
+    "@next/mdx": "^12.0.7",
+    "html-to-react": "^1.4.7",
+    "next": "^12.0.7",
+    "react": "^17.0.2",
+    "react-dom": "^17.0.2",
+    "rehype-slug": "^4.0.1",
+    "theme-ui": "^0.12.1"
+  },
+  "devDependencies": {
+    "@carbonplan/prettier": "^1.2.0",
+    "prettier": "^2.5.1"
+  }
+}
