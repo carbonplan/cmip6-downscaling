@@ -147,7 +147,7 @@ def monthly_pet(
     delta = (4098 * es) / (tmean + 237.3) ** 2
 
     lhv = 2.501 - 2.361e-3 * tmean  # latent heat of vaporization
-    cp = 1.013 * 10 ** -3  # specific heat of air
+    cp = 1.013 * 10**-3  # specific heat of air
 
     gamma = cp * P / (0.622 * lhv)  # Psychrometer constant (kPa C-1)
     pa = P / (1.01 * (tmean + KELVIN) * 0.287)  # mean air density at constant pressure
