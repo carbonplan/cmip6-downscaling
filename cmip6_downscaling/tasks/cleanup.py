@@ -3,7 +3,7 @@ from __future__ import annotations
 import fsspec
 from prefect import task
 
-from cmip6_downscaling import config
+from .. import config
 
 
 def instantiate_az_filesystem() -> fsspec.filesystem:

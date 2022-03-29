@@ -9,13 +9,11 @@ from skdownscale.pointwise_models import PointWiseDownscaler
 from skdownscale.pointwise_models.bcsd import BcsdPrecipitation, BcsdTemperature
 from upath import UPath
 
-import cmip6_downscaling
-
+from ..._version import __version__ as code_version
+from ...constants import ABSOLUTE_VARS, RELATIVE_VARS
+from ..common.containers import RunParameters
+from ..common.utils import reconstruct_finescale, zmetadata_exists
 from . import config
-from .constants import ABSOLUTE_VARS, RELATIVE_VARS
-from .methods.bcsd.utils import reconstruct_finescale
-from .methods.common.containers import RunParameters
-from .methods.common.utils import zmetadata_exists
 
 warnings.filterwarnings(
     "ignore",
@@ -24,10 +22,9 @@ warnings.filterwarnings(
 )
 
 
-code_version = cmip6_downscaling.__version__
 scratch_dir = UPath(config.get("storage.scratch.uri"))
-intermediate_dir = UPath(config.get("storage.intermediate.uri")) / cmip6_downscaling.__version__
-results_dir = UPath(config.get("storage.results.uri")) / cmip6_downscaling.__version__
+intermediate_dir = UPath(config.get("storage.intermediate.uri")) / code_version
+results_dir = UPath(config.get("storage.results.uri")) / code_version
 use_cache = config.get('run_options.use_cache')
 
 

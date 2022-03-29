@@ -73,7 +73,7 @@ def get_obs(run_parameters: RunParameters) -> UPath:
             **asdict(run_parameters)
         )
     )
-    target = str(intermediate_dir) + "/" + ds_name
+    target = f'{str(intermediate_dir)}/{ds_name}'
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
@@ -119,7 +119,7 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
             time_period=time_period, **asdict(run_parameters)
         )
     )
-    target = str(intermediate_dir) + "/" + ds_name
+    target = f'{str(intermediate_dir)}/{ds_name}'
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
@@ -294,7 +294,7 @@ def monthly_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
     """
 
     ds_name = "monthly_summary" + "/" + str(run_parameters.run_id)
-    target = str(results_dir) + "/" + ds_name
+    target = f'{str(results_dir)}/{ds_name}'
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
@@ -334,7 +334,7 @@ def annual_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
     """
 
     ds_name = "annual_summary" + "/" + str(run_parameters.run_id)
-    target = str(results_dir) + "/" + ds_name
+    target = f'{str(results_dir)}/{ds_name}'
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
@@ -385,7 +385,7 @@ def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
         + "/"
         + (str(target_grid_path).split("/")[-1])
     )
-    target = str(intermediate_dir) + "/" + ds_name
+    target = f'{str(intermediate_dir)}/{ds_name}'
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
@@ -478,7 +478,7 @@ def pyramid(
     '''
 
     ds_name = "pyarmid" + ds_path.path.replace('/', '_')
-    target = str(results_dir) + "/" + ds_name
+    target = f'{str(results_dir)}/{ds_name}'
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')

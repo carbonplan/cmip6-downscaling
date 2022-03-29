@@ -28,9 +28,9 @@ def by_month(x):
 @numba.njit
 def mf(t: float, t0: float = -2.0, t1: float = 6.5) -> float:
     if t < t0:
-        f = 0
+        return 0
     elif t > t1:
-        f = 1
+        return 1
     else:
         # see also https://github.com/abatz/WATERBALANCE/blob/master/runsnow.m
         # ann params from Dai 2008, Table 1a (row 1)
@@ -39,8 +39,7 @@ def mf(t: float, t0: float = -2.0, t1: float = 6.5) -> float:
         c = 1.1662
         d = 1.0223
         # parametric form from Dai 2008
-        f = 1 - (a * (np.tanh(b * (t - c)) - d) / 100.0)
-    return f
+        return 1 - (a * (np.tanh(b * (t - c)) - d) / 100.0)
 
 
 @numba.njit

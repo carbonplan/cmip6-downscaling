@@ -143,7 +143,7 @@ def process(ds: xr.Dataset) -> xr.Dataset:
     if 'vpd' not in ds:
         ds['vpd'] = sat_vp - ds['vap']
 
-    if not all(v in ds for v in ['tmean', 'vap', 'rh', 'tdew', 'vpd']):
-        raise ValueError('some derived variables were not calculated: %s' % ds)
+    if any(v not in ds for v in ['tmean', 'vap', 'rh', 'tdew', 'vpd']):
+        raise ValueError(f'some derived variables were not calculated: {ds}')
 
     return ds

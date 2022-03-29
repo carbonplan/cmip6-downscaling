@@ -4,9 +4,8 @@ import warnings
 
 from prefect import Flow, Parameter
 
-from . import runtimes
-from .methods.bcsd.tasks import fit_and_predict, postprocess_bcsd, spatial_anomalies
-from .methods.common.tasks import (
+from ..bcsd.tasks import fit_and_predict, postprocess_bcsd, spatial_anomalies
+from ..common.tasks import (
     annual_summary,
     get_experiment,
     get_obs,
@@ -17,6 +16,7 @@ from .methods.common.tasks import (
     regrid,
     run_analyses,
 )
+from . import runtimes
 
 warnings.filterwarnings(
     "ignore",

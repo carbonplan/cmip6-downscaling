@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import xarray as xr
 
-from cmip6_downscaling.constants import APHYSICAL_TEMP_HIGH, APHYSICAL_TEMP_LOW
+from ..constants import APHYSICAL_TEMP_HIGH, APHYSICAL_TEMP_LOW
 
 
 def check_is_bad_data(ds: xr.Dataset, type: str) -> xr.Dataset:
