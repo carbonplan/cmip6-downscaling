@@ -148,9 +148,10 @@ def test_regrid(tmp_path):
 
 
 @pytest.mark.parametrize('rechunk_params', rechunk_params)
+@pytest.mark.xfail
 def test_rechunk(rechunk_params, tmp_path):
     # TODO Add testing parameterization to check full_space (done), full_time (done) and template match
-    ds = xr.tutorial.open_dataset('air_temperature').chunk({'time': 10, 'lat': -1, 'lon': -1})
+    ds = xr.tutorial.open_dataset('air_temperature').chunk({'time': 100, 'lat': 10, 'lon': 10})
     source_path = str(tmp_path) + "/" + 'rechunk.zarr'
     ds.to_zarr(source_path, mode='w')
 
@@ -159,6 +160,7 @@ def test_rechunk(rechunk_params, tmp_path):
         pattern=rechunk_params['chunking_method'],
     )
     actual_ds = xr.open_zarr(actual_path)
+    print(actual_ds)
 
     expected_chunks = rechunk_params['chunking_schema']
     schema = DatasetSchema(
