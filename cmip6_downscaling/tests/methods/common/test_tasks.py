@@ -104,6 +104,7 @@ def test_get_obs(run_parameters):
     schema.validate(ds)
 
 
+@pytest.mark.xfail
 def test_get_experiment(run_parameters):
     get_experiment_path = get_experiment.run(run_parameters, time_subset='train_period')
 
