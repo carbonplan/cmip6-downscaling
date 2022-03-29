@@ -19,17 +19,14 @@ from upath import UPath
 from xarray_schema import DataArraySchema, DatasetSchema
 from xarray_schema.base import SchemaError
 
-import cmip6_downscaling
-from cmip6_downscaling import config, version
-from cmip6_downscaling.data.cmip import get_gcm
-from cmip6_downscaling.data.observations import open_era5
-from cmip6_downscaling.methods.common.utils import (
-    calc_auspicious_chunks_dict,
-    subset_dataset,
-    zmetadata_exists,
-)
-
+from ... import config
+from ..._version import __version__
+from ...data.cmip import get_gcm
+from ...data.observations import open_era5
+from ..common.utils import calc_auspicious_chunks_dict, subset_dataset, zmetadata_exists
 from .containers import RunParameters
+
+version = __version__
 
 warnings.filterwarnings(
     "ignore",
@@ -38,10 +35,10 @@ warnings.filterwarnings(
 )
 
 PIXELS_PER_TILE = 128
-code_version = cmip6_downscaling.__version__
+code_version = __version__
 scratch_dir = UPath(config.get("storage.scratch.uri"))
-intermediate_dir = UPath(config.get("storage.intermediate.uri")) / cmip6_downscaling.__version__
-results_dir = UPath(config.get("storage.results.uri")) / cmip6_downscaling.__version__
+intermediate_dir = UPath(config.get("storage.intermediate.uri")) / __version__
+results_dir = UPath(config.get("storage.results.uri")) / __version__
 use_cache = config.get('run_options.use_cache')
 
 
