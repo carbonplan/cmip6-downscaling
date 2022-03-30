@@ -5,6 +5,7 @@ from dataclasses import asdict
 
 import xarray as xr
 from prefect import task
+from carbonplan_data.metadata import get_cf_global_attrs
 from skdownscale.pointwise_models import PointWiseDownscaler
 from skdownscale.pointwise_models.bcsd import BcsdPrecipitation, BcsdTemperature
 from upath import UPath
@@ -64,13 +65,13 @@ def spatial_anomalies(
     UPath
         Path to spatial anomalies dataset.  (shape (nlat, nlon, 12))
     """
-    target = (
-        intermediate_dir
-        / "spatial_anomalies"
-        / "{obs}_{model}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}".format(
-            **asdict(run_parameters)
-        )
-    )
+    title = "spatial anomalies ds: {obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}_{predict_dates[0]}_{predict_dates[1]}".format(
+            **asdict(run_parameters))
+
+    ds_hash = str_to_hash(run_parameters.run_id)
+    target = intermediate_dir / 'spatial_anomalies' / ds_hash
+
+
     if use_cache and zmetadata_exists(target):
         print(f"found existing target: {target}")
         return target
@@ -82,6 +83,7 @@ def spatial_anomalies(
     # spatially-interpolated coarse predictions to add the spatial heterogeneity back in.
     spatial_anomalies = obs_full_time_ds - interpolated_obs_full_time_ds
     seasonal_cycle_spatial_anomalies = spatial_anomalies.groupby("time.month").mean()
+    seasonal_cycle_spatial_anomalies.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
 
     seasonal_cycle_spatial_anomalies.to_zarr(target, mode="w")
 
@@ -120,7 +122,12 @@ def fit_and_predict(
         ValueError checking validity of input variables.
     """
 
-    target = intermediate_dir / "fit_and_predict" / run_parameters.run_id
+    title = "fit_and_predict ds: {obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}_{predict_dates[0]}_{predict_dates[1]}".format(
+            **asdict(run_parameters))
+
+    ds_hash = str_to_hash(run_parameters.run_id)
+    target = intermediate_dir / 'fit_and_predict' / ds_hash
+
     if use_cache and zmetadata_exists(target):
         print(f"found existing target: {target}")
         return target
@@ -147,6 +154,8 @@ def fit_and_predict(
     )
 
     bias_corrected_ds = bias_corrected_da.astype('float32').to_dataset(name=run_parameters.variable)
+    bias_corrected_ds.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
+
     bias_corrected_ds.to_zarr(target, mode='w')
     return target
 
@@ -175,7 +184,12 @@ def postprocess_bcsd(
         UPath to post-processed dataset.
     """
 
-    target = results_dir / "daily" / run_parameters.run_id
+    title = "postprocess ds: {obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}_{predict_dates[0]}_{predict_dates[1]}".format(
+            **asdict(run_parameters))
+
+    ds_hash = str_to_hash(run_parameters.run_id)
+    target = intermediate_dir / 'postprocess' / ds_hash
+
     if use_cache and zmetadata_exists(target):
         print(f"found existing target: {target}")
         return target
@@ -196,5 +210,7 @@ def postprocess_bcsd(
         args=[spatial_anomalies_ds],
         template=bias_corrected_fine_full_time_ds,
     )
+    bcsd_results_ds.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
+
     bcsd_results_ds.to_zarr(target, mode='w')
     return target
