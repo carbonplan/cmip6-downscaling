@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pathlib
 import re
+from hashlib import blake2b
 
 import numpy as np
 import xarray as xr
@@ -21,6 +22,10 @@ def zmetadata_exists(path: UPath):
         return path.fs.exists(str(path / '.zmetadata'))
     else:
         return (UPath(path) / '.zmetadata').exists()
+
+
+def str_to_hash(s):
+    return blake2b(s.encode(), digest_size=8).hexdigest()
 
 
 def subset_dataset(

@@ -1,6 +1,8 @@
 from __future__ import annotations
+from decimal import MAX_EMAX
 
 import os
+from time import time
 import warnings
 from dataclasses import asdict
 from pathlib import PosixPath
@@ -23,7 +25,7 @@ from ... import config
 from ..._version import __version__
 from ...data.cmip import get_gcm
 from ...data.observations import open_era5
-from ..common.utils import calc_auspicious_chunks_dict, subset_dataset, zmetadata_exists
+from ..common.utils import calc_auspicious_chunks_dict, str_to_hash, subset_dataset, zmetadata_exists
 from .containers import RunParameters
 
 version = __version__
@@ -63,14 +65,9 @@ def get_obs(run_parameters: RunParameters) -> UPath:
         Path to subset observation dataset.
     """
 
-    ds_name = (
-        "get_obs"
-        + "/"
-        + "{obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}".format(
+    title = "obs ds: {obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}".format(
             **asdict(run_parameters)
-        )
-    )
-    target = f'{str(intermediate_dir)}/{ds_name}'
+    target = intermediate_dir / 'get_obs' / run_parameters.run_id_hash
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
@@ -87,7 +84,7 @@ def get_obs(run_parameters: RunParameters) -> UPath:
     )
     del subset[run_parameters.variable].encoding['chunks']
 
-    subset.attrs.update({'title': ds_name}, **get_cf_global_attrs(version=version))
+    subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
     subset.to_zarr(target, mode='w')
     return target
 
@@ -108,15 +105,12 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     UPath
         UPath to experiment dataset.
     """
-    time_period = getattr(run_parameters, time_subset)
-    ds_name = (
-        "get_experiment"
-        + "/"
-        + "{model}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{time_period.start}_{time_period.stop}".format(
+    time_period = run_parameters.time_subset
+    title = "experiment ds: {model}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{time_period.start}_{time_period.stop}".format(
             time_period=time_period, **asdict(run_parameters)
-        )
-    )
-    target = f'{str(intermediate_dir)}/{ds_name}'
+
+    ds_hash = str_to_hash(run_parameters.run_id + time_subset)
+    target = intermediate_dir / 'get_experiment' / ds_hash
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
@@ -139,7 +133,7 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     subset = subset.chunk({'time': 365})
     del subset[run_parameters.variable].encoding['chunks']
 
-    subset.attrs.update({'title': ds_name}, **get_cf_global_attrs(version=version))
+    subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
     subset.to_zarr(target, mode='w')
     return target
 
@@ -173,6 +167,9 @@ def rechunk(
     target : UPath
         Path to rechunked dataset
     """
+
+
+
     # print('rechunking dataset at {}'.format(path))
     # if both defined then you'll take the spatial part of template and override one dimension with the specified pattern
     if template is not None:
@@ -182,8 +179,9 @@ def rechunk(
     # if only pattern specified then use that pattern
     elif pattern is not None:
         pattern_string = pattern
-    target = intermediate_dir / ("rechunk_" + pattern_string) / (str(path).split("/")[-1])
-    path_tmp = scratch_dir / ("rechunk_" + pattern_string) / (str(path).split("/")[-1])
+    task_hash = str_to_hash(str(path) + pattern + str(template) + max_mem)
+    target = intermediate_dir / 'rechunk' / task_hash
+    path_tmp = scratch_dir / 'rechunk' / task_hash
     print(f'writing rechunked dataset to {target}')
     target_store = fsspec.get_mapper(str(target))
     temp_store = fsspec.get_mapper(str(path_tmp))
