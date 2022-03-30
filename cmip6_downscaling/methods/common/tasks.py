@@ -25,9 +25,9 @@ from ... import config
 from ..._version import __version__
 from ...data.cmip import get_gcm
 from ...data.observations import open_era5
+from ...utils import str_to_hash
 from ..common.utils import (
     calc_auspicious_chunks_dict,
-    str_to_hash,
     subset_dataset,
     zmetadata_exists,
 )
