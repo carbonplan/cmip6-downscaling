@@ -1,11 +1,11 @@
 from __future__ import annotations
-from decimal import MAX_EMAX
 
 import os
-from time import time
 import warnings
 from dataclasses import asdict
+from decimal import MAX_EMAX
 from pathlib import PosixPath
+from time import time
 
 import dask
 import datatree as dt
@@ -25,7 +25,12 @@ from ... import config
 from ..._version import __version__
 from ...data.cmip import get_gcm
 from ...data.observations import open_era5
-from ..common.utils import calc_auspicious_chunks_dict, str_to_hash, subset_dataset, zmetadata_exists
+from ..common.utils import (
+    calc_auspicious_chunks_dict,
+    str_to_hash,
+    subset_dataset,
+    zmetadata_exists,
+)
 from .containers import RunParameters
 
 version = __version__

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from .utils import str_to_hash
 from dataclasses import dataclass
+
+from .utils import str_to_hash
 
 
 @dataclass
