@@ -21,17 +21,17 @@ from upath import UPath
 from xarray_schema import DataArraySchema, DatasetSchema
 from xarray_schema.base import SchemaError
 
-from ... import config
-from ..._version import __version__
-from ...data.cmip import get_gcm
-from ...data.observations import open_era5
-from ..common.utils import (
+from cmip6_downscaling import config
+from cmip6_downscaling._version import __version__
+from cmip6_downscaling.data.cmip import get_gcm
+from cmip6_downscaling.data.observations import open_era5
+from cmip6_downscaling.methods.common.utils import (
     calc_auspicious_chunks_dict,
-    str_to_hash,
     subset_dataset,
     zmetadata_exists,
 )
-from .containers import RunParameters
+from cmip6_downscaling.methods.common.containers import RunParameters, str_to_hash
+
 
 version = __version__
 
@@ -293,10 +293,12 @@ def monthly_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
     UPath
         Path to resampled dataset.
     """
+
+
     title = "monthly summary ds: {obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}_{predict_dates[0]}_{predict_dates[1]}".format(
             **asdict(run_parameters))
 
-    ds_hash = str_to_hash(run_parameters.run_id)
+    ds_hash = str_to_hash(run_parameters.run_id + str(ds_path))
     target = intermediate_dir / 'monthly_summary' / ds_hash
 
     if use_cache and zmetadata_exists(target):
@@ -338,8 +340,7 @@ def annual_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
 
     title = "annual summary ds: {obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}_{predict_dates[0]}_{predict_dates[1]}".format(
             **asdict(run_parameters))
-
-    ds_hash = str_to_hash(run_parameters.run_id)
+    ds_hash = str_to_hash(run_parameters.run_id + str(ds_path))
     target = intermediate_dir / 'annual_summary' / ds_hash
 
     if use_cache and zmetadata_exists(target):
@@ -480,7 +481,7 @@ def pyramid(
     title = "pyramid ds: {obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}_{predict_dates[0]}_{predict_dates[1]}".format(
             **asdict(run_parameters))
 
-    ds_hash = str_to_hash(run_parameters.run_id)
+    ds_hash = str_to_hash(run_parameters.run_id + str(ds_path) + str(levels) + str(other_chunks))
     target = results_dir / 'pyramid' / ds_hash
 
 

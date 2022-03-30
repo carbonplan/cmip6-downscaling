@@ -10,11 +10,12 @@ from skdownscale.pointwise_models import PointWiseDownscaler
 from skdownscale.pointwise_models.bcsd import BcsdPrecipitation, BcsdTemperature
 from upath import UPath
 
-from ..._version import __version__ as code_version
-from ...constants import ABSOLUTE_VARS, RELATIVE_VARS
-from ..common.containers import RunParameters
-from ..common.utils import reconstruct_finescale, zmetadata_exists
-from . import config
+from cmip6_downscaling._version import __version__ as code_version
+from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
+from cmip6_downscaling.methods.common.containers import RunParameters, str_to_hash
+from cmip6_downscaling.methods.bcsd.utils import reconstruct_finescale
+from cmip6_downscaling.methods.common.utils import zmetadata_exists
+from cmip6_downscaling import config
 
 warnings.filterwarnings(
     "ignore",
@@ -68,7 +69,7 @@ def spatial_anomalies(
     title = "spatial anomalies ds: {obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}_{predict_dates[0]}_{predict_dates[1]}".format(
             **asdict(run_parameters))
 
-    ds_hash = str_to_hash(run_parameters.run_id)
+    ds_hash = str_to_hash(run_parameters.run_id + str(obs_full_time_path) + str(interpolated_obs_full_time_path))
     target = intermediate_dir / 'spatial_anomalies' / ds_hash
 
 
@@ -124,8 +125,8 @@ def fit_and_predict(
 
     title = "fit_and_predict ds: {obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}_{predict_dates[0]}_{predict_dates[1]}".format(
             **asdict(run_parameters))
+    ds_hash = str_to_hash(run_parameters.run_id + str(experiment_train_full_time_path) + str(experiment_predict_full_time_path) + str(coarse_obs_full_time_path))
 
-    ds_hash = str_to_hash(run_parameters.run_id)
     target = intermediate_dir / 'fit_and_predict' / ds_hash
 
     if use_cache and zmetadata_exists(target):

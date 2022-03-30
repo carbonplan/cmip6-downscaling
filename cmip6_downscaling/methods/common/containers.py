@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from hashlib import blake2b
 
-from .utils import str_to_hash
+
+def str_to_hash(s):
+    return blake2b(s.encode(), digest_size=8).hexdigest()
 
 
 @dataclass
@@ -16,7 +19,7 @@ class BBox:
 
     @property
     def lat_slice(self) -> slice:
-        return slice(float(self.latmax), float(self.latmin))
+        return slice(float(self.latmin), float(self.latmax))
 
     @property
     def lon_slice(self) -> slice:

@@ -4,8 +4,8 @@ import warnings
 
 from prefect import Flow, Parameter
 
-from ..bcsd.tasks import fit_and_predict, postprocess_bcsd, spatial_anomalies
-from ..common.tasks import (
+from cmip6_downscaling.methods.bcsd.tasks import fit_and_predict, postprocess_bcsd, spatial_anomalies
+from cmip6_downscaling.methods.common.tasks import (
     annual_summary,
     get_experiment,
     get_obs,
@@ -16,7 +16,7 @@ from ..common.tasks import (
     regrid,
     run_analyses,
 )
-from . import runtimes
+from cmip6_downscaling import runtimes
 
 warnings.filterwarnings(
     "ignore",
@@ -117,9 +117,9 @@ with Flow(
     annual_summary_full_space_path = rechunk(annual_summary_path, pattern='full_space')
 
     # pyramids
-    daily_pyramid_path = pyramid(final_bcsd_full_space_path, levels=4)
-    monthly_pyramid_path = pyramid(monthly_summary_full_space_path, levels=4)
-    annual_pyramid_path = pyramid(annual_summary_full_space_path, levels=4)
+    daily_pyramid_path = pyramid(final_bcsd_full_space_path,run_parameters=run_parameters, levels=4)
+    monthly_pyramid_path = pyramid(monthly_summary_full_space_path,run_parameters=run_parameters, levels=4)
+    annual_pyramid_path = pyramid(annual_summary_full_space_path,run_parameters=run_parameters, levels=4)
 
     # # if config.get('run_options.cleanup_flag') is True:
     # #     cleanup.run_rsfip(gcm_identifier, obs_identifier)
