@@ -9,8 +9,8 @@ from upath import UPath
 from xarray_schema import DataArraySchema
 from xarray_schema.base import SchemaError
 
-from .containers import BBox
 from ...utils import str_to_hash
+from .containers import BBox
 
 
 def zmetadata_exists(path: UPath):

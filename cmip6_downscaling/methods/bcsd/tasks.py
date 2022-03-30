@@ -4,8 +4,8 @@ import warnings
 from dataclasses import asdict
 
 import xarray as xr
-from prefect import task
 from carbonplan_data.metadata import get_cf_global_attrs
+from prefect import task
 from skdownscale.pointwise_models import PointWiseDownscaler
 from skdownscale.pointwise_models.bcsd import BcsdPrecipitation, BcsdTemperature
 from upath import UPath
@@ -66,11 +66,11 @@ def spatial_anomalies(
         Path to spatial anomalies dataset.  (shape (nlat, nlon, 12))
     """
     title = "spatial anomalies ds: {obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}_{predict_dates[0]}_{predict_dates[1]}".format(
-            **asdict(run_parameters))
+        **asdict(run_parameters)
+    )
 
     ds_hash = str_to_hash(run_parameters.run_id)
     target = intermediate_dir / 'spatial_anomalies' / ds_hash
-
 
     if use_cache and zmetadata_exists(target):
         print(f"found existing target: {target}")
@@ -83,7 +83,9 @@ def spatial_anomalies(
     # spatially-interpolated coarse predictions to add the spatial heterogeneity back in.
     spatial_anomalies = obs_full_time_ds - interpolated_obs_full_time_ds
     seasonal_cycle_spatial_anomalies = spatial_anomalies.groupby("time.month").mean()
-    seasonal_cycle_spatial_anomalies.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
+    seasonal_cycle_spatial_anomalies.attrs.update(
+        {'title': title}, **get_cf_global_attrs(version=version)
+    )
 
     seasonal_cycle_spatial_anomalies.to_zarr(target, mode="w")
 
@@ -123,7 +125,8 @@ def fit_and_predict(
     """
 
     title = "fit_and_predict ds: {obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}_{predict_dates[0]}_{predict_dates[1]}".format(
-            **asdict(run_parameters))
+        **asdict(run_parameters)
+    )
 
     ds_hash = str_to_hash(run_parameters.run_id)
     target = intermediate_dir / 'fit_and_predict' / ds_hash
@@ -185,7 +188,8 @@ def postprocess_bcsd(
     """
 
     title = "postprocess ds: {obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}_{predict_dates[0]}_{predict_dates[1]}".format(
-            **asdict(run_parameters))
+        **asdict(run_parameters)
+    )
 
     ds_hash = str_to_hash(run_parameters.run_id)
     target = intermediate_dir / 'postprocess' / ds_hash
