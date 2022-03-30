@@ -53,7 +53,6 @@ with Flow(
     # be chunked finely along time. but that's good to get it for regridding back to
     # the interpolated obs in next task
     # interpolated obs should have same exact chunking schema as ds at `obs_full_space_path`
-    # TODO: WRITE THIS
     interpolated_obs_full_space_path = coarsen_and_interpolate(
         obs_full_space_path, experiment_train_path
     )
@@ -86,7 +85,6 @@ with Flow(
         chunking_template_file=interpolated_obs_full_time_path,
     )
 
-    # TODO: WRITE THIS
     # fit and predict (TODO: put the transformation steps currently in the prep_gard_input task into the fit and predict step)
     model_output_path = fit_and_predict(
         xtrain_path=interpolated_obs_full_time_path,
