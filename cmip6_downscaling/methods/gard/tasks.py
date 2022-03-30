@@ -7,6 +7,7 @@ from upath import UPath
 from ... import config
 from ..._version import __version__
 from ..common.utils import zmetadata_exists
+from .containers import RunParameters
 
 version = __version__
 scratch_dir = UPath(config.get("storage.scratch.uri"))
@@ -55,9 +56,26 @@ def coarsen_and_interpolate(fine_path: UPath, coarse_path: UPath) -> UPath:
     return target
 
 
-# @task(tags=['dask-resource:TASKSLOTS=1'], log_stdout=True)
-# def fit_and_predict(
-#         xtrain: UPath,
-#         ytrain: UPath,
-#         xpred: UPath,
-#         run_parameters: RunParameters) -> UPath:
+@task(tags=['dask-resource:TASKSLOTS=1'], log_stdout=True)
+def fit_and_predict(
+    xtrain_path: UPath, ytrain_path: UPath, xpred_path: UPath, run_parameters: RunParameters
+) -> UPath:
+    """Prepare inputs (e.g. normalize), use them to fit a GARD model based upon
+    specified parameters and then use that fitted model to make a prediction.
+
+    Parameters
+    ----------
+    xtrain_path : UPath
+        Path to training dataset (interpolated obs)
+    ytrain_path : UPath
+        Path to target dataset (interpolated GCM)
+    xpred_path : UPath
+        Path to future prediction dataset (interpolated GCM)
+    run_parameters : RunParameters
+        Parameters for run set-up and model specs
+
+    Returns
+    -------
+    UPath
+        Path to output dataset
+    """

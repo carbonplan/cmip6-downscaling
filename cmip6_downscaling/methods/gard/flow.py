@@ -10,7 +10,7 @@ from cmip6_downscaling.methods.common.tasks import (  # annual_summary,; monthly
     rechunk,
     regrid,
 )
-from cmip6_downscaling.methods.gard.tasks import coarsen_and_interpolate
+from cmip6_downscaling.methods.gard.tasks import coarsen_and_interpolate, fit_and_predict
 
 warnings.filterwarnings(
     "ignore",
@@ -88,12 +88,12 @@ with Flow(
 
     # TODO: WRITE THIS
     # fit and predict (TODO: put the transformation steps currently in the prep_gard_input task into the fit and predict step)
-    # model_output_path = fit_and_predict(
-    #     xtrain=interpolated_obs_full_time_path,
-    #     ytrain=experiment_train_fine_full_time_path,
-    #     xpred=experiment_predict_fine_full_time_path,
-    #     run_parameters=run_parameters,
-    # )  # [transformation, gard_model_options])
+    model_output_path = fit_and_predict(
+        xtrain_path=interpolated_obs_full_time_path,
+        ytrain_path=experiment_train_fine_full_time_path,
+        xpred_path=experiment_predict_fine_full_time_path,
+        run_parameters=run_parameters,
+    )  # [transformation, gard_model_options])
 
     # # TODO: WRITE THIS
     # # post process (bring in scrf into the postprocess task)
