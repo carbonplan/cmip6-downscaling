@@ -2,6 +2,7 @@ import xarray as xr
 import xesmf as xe
 from carbonplan_data.metadata import get_cf_global_attrs
 from prefect import task
+from scipy.stats import norm as norm
 from skdownscale.pointwise_models import (  # AnalogRegression,; PureAnalog,; PureRegression,
     PointWiseDownscaler,
 )
@@ -13,9 +14,9 @@ from ..._version import __version__
 from ..common.bias_correction import bias_correct_gcm_by_method, bias_correct_obs_by_method
 from ..common.utils import zmetadata_exists
 from .containers import RunParameters
-from .utils import get_gard_model
+from .utils import get_gard_model, read_scrf
 
-version = __version__
+code_version = __version__
 scratch_dir = UPath(config.get("storage.scratch.uri"))
 intermediate_dir = UPath(config.get("storage.intermediate.uri")) / __version__
 results_dir = UPath(config.get("storage.results.uri")) / __version__
@@ -56,7 +57,7 @@ def coarsen_and_interpolate(fine_path: UPath, coarse_path: UPath) -> UPath:
     regridder = xe.Regridder(coarse_ds, fine_ds, "bilinear", extrap_method="nearest_s2d")
     interpolated_ds = regridder(coarse_ds)
 
-    interpolated_ds.attrs.update({'title': ds_name}, **get_cf_global_attrs(version=version))
+    interpolated_ds.attrs.update({'title': ds_name}, **get_cf_global_attrs(version=code_version))
     interpolated_ds.to_zarr(target, mode='w')
 
     return target
@@ -95,7 +96,10 @@ def fit_and_predict(
     ds_name = (
         f'train_obs_{xtrain_path.name}/train_gcm_{ytrain_path.name}/prediction_{xpred_path.name}'
     )
-    target = intermediate_dir / 'fit_and_predict' / ds_name
+    # TODO: swap this in once we pull hash naming PR
+    # ds_hash = str_to_hash()
+
+    target = intermediate_dir / 'gard_fit_and_predict' / ds_name
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
@@ -140,5 +144,93 @@ def fit_and_predict(
 
     # model prediction
     out = model.predict(transformed_gcm).to_dataset(dim='variable')
-
+    out.to_zarr(target)
     return out
+
+
+@task(tags=['dask-resource:TASKSLOTS=1'], log_stdout=True)
+def postprocess(
+    model_output_path: xr.Dataset,
+    run_parameters: RunParameters,
+    **kwargs,
+) -> xr.Dataset:
+    """
+    Add perturbation to the mean prediction of GARD to more accurately represent extreme events. The perturbation is
+    generated with the prediction error during model fit scaled with a spatio-temporally correlated random field.
+
+    Parameters
+    ----------
+    model_output : xr.Dataset
+        GARD model prediction output. Should contain three variables: pred (predicted mean), prediction_error
+        (prediction error in fit), and exceedance_prob (probability of exceedance for threshold)
+    scrf : xr.DataArray
+        Spatio-temporally correlated random fields (SCRF)
+    model_params : Dict
+        Model parameter dictionary
+
+    Returns
+    -------
+    downscaled : xr.Dataset
+        Final downscaled output
+    """
+    # TODO: turn this into a hash
+    ds_name = 'gard_daily_output'
+    # TODO: swap this in once we pull hash naming PR
+    # ds_hash = str_to_hash()
+
+    target = results_dir / 'daily' / ds_name
+
+    if use_cache and zmetadata_exists(target):
+        print(f'found existing target: {target}')
+        return target
+
+    model_output = xr.open_zarr(model_output_path)
+
+    if run_parameters.model_params is not None:
+        thresh = run_parameters.model_params.get('thresh')
+    else:
+        thresh = None
+
+    # read scrf
+    scrf = read_scrf(run_parameters)
+
+    ## CURRENTLY needs calendar to be gregorian
+    ## TODO: merge in the calendar conversion for GCMs and this should work great!
+    assert len(scrf.time) == len(model_output.time)
+    assert len(scrf.lat) == len(model_output.lat)
+    assert len(scrf.lon) == len(model_output.lon)
+
+    scrf = scrf.assign_coords(
+        {'lat': model_output.lat, 'lon': model_output.lon, 'time': model_output.time}
+    )
+
+    if thresh is not None:
+        # convert scrf from a normal distribution to a uniform distribution
+        scrf_uniform = xr.apply_ufunc(
+            norm.cdf, scrf, dask='parallelized', output_dtypes=[scrf.dtype]
+        )
+
+        # find where exceedance prob is exceeded
+        mask = scrf_uniform > (1 - model_output['exceedance_prob'])
+
+        # Rescale the uniform distribution
+        new_uniform = (scrf_uniform - (1 - model_output['exceedance_prob'])) / model_output[
+            'exceedance_prob'
+        ]
+
+        # Get the normal distribution equivalent of new_uniform
+        r_normal = xr.apply_ufunc(
+            norm.ppf, new_uniform, dask='parallelized', output_dtypes=[new_uniform.dtype]
+        )
+
+        downscaled = model_output['pred'] + r_normal * model_output['prediction_error']
+
+        # what do we do for thresholds like heat wave?
+        valids = xr.ufuncs.logical_or(mask, downscaled >= 0)
+        downscaled = downscaled.where(valids, 0)
+    else:
+        downscaled = model_output['pred'] + scrf * model_output['prediction_error']
+    # downscaled = downscaled.chunk({'time': 365, 'lat': 150, 'lon': 150})
+    downscaled.to_dataset(name=run_parameters.variable).to_zarr(target)
+
+    return target

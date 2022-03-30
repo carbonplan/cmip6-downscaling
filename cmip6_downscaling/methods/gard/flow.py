@@ -10,7 +10,11 @@ from cmip6_downscaling.methods.common.tasks import (  # annual_summary,; monthly
     rechunk,
     regrid,
 )
-from cmip6_downscaling.methods.gard.tasks import coarsen_and_interpolate, fit_and_predict
+from cmip6_downscaling.methods.gard.tasks import (
+    coarsen_and_interpolate,
+    fit_and_predict,
+    postprocess,
+)
 
 warnings.filterwarnings(
     "ignore",
@@ -93,12 +97,11 @@ with Flow(
         run_parameters=run_parameters,
     )  # [transformation, gard_model_options])
 
-    # # TODO: WRITE THIS
-    # # post process (bring in scrf into the postprocess task)
+    # # post process (add back in scrf)
     # # necessary input chunk pattern:
-    # final_bcsd_full_time_path = postprocess_gard(
-    #     model_output_path, spatial_anomalies_path, run_parameters
-    # )  # fine-scale maps (full_space) (time: 365)
+    final_gard_path = postprocess(
+        model_output_path=model_output_path, run_parameters=run_parameters
+    )  # this comes out in full-time currently
 
     # # temporary aggregations - these come out in full time
     # monthly_summary_path = monthly_summary(final_bcsd_full_time_path, run_parameters)
