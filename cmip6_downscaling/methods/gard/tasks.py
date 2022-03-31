@@ -14,7 +14,7 @@ from cmip6_downscaling import __version__ as version, config
 from ..common.bias_correction import bias_correct_gcm_by_method, bias_correct_obs_by_method
 from ..common.containers import RunParameters, str_to_hash
 from ..common.utils import zmetadata_exists
-from .utils import get_gard_model
+from .utils import get_gard_model, read_scrf
 
 scratch_dir = UPath(config.get("storage.scratch.uri"))
 intermediate_dir = UPath(config.get("storage.intermediate.uri")) / version
@@ -107,9 +107,9 @@ def fit_and_predict(
         return target
 
     kws = default_none_kwargs(run_parameters.bias_correction_kwargs, copy=True)
-    print(xtrain_path)
-    print(ytrain_path)
-    print(xpred_path)
+    print(f'xtrain dataset is located here {xtrain_path}')
+    print(f'ytrain dataset is located here {ytrain_path}')
+    print(f'xpred dataset is located here {xpred_path}')
     # load in datasets
     xtrain = xr.open_zarr(xtrain_path)
     ytrain = xr.open_zarr(ytrain_path)
@@ -117,6 +117,8 @@ def fit_and_predict(
     print(xtrain.chunks)
     print(ytrain.chunks)
     print(xpred.chunks)
+    print('these are the kws')
+    print(kws)
 
     # make sure you have the variables you need in obs
     for v in xpred.data_vars:
@@ -128,8 +130,20 @@ def fit_and_predict(
         da_obs=ytrain, method=run_parameters.bias_correction_method, bc_kwargs=kws
     ).to_dataset(dim="variable")
 
-    # transformed_gcm is for the prediction period
-    transformed_gcm = bias_correct_gcm_by_method(
+    # we need two transformed gcms - one for training and one for prediction
+    # for transformed gcm_train we pass the same thing as the training and the
+    # prediction since we're just transforming it
+    transformed_gcm_train = bias_correct_gcm_by_method(
+        gcm_train=xtrain,
+        obs_train=ytrain,
+        gcm_predict=xtrain,
+        method=run_parameters.bias_correction_method,
+        bc_kwargs=kws,
+    ).to_dataset(dim="variable")
+
+    # for transformed_gcm_pred we pass the gcm train and then also the gcm_pred
+    # to transform the gcm_pred
+    transformed_gcm_pred = bias_correct_gcm_by_method(
         gcm_train=xtrain,
         obs_train=ytrain,
         gcm_predict=xpred,
@@ -142,20 +156,18 @@ def fit_and_predict(
         model=get_gard_model(run_parameters.model_type, run_parameters.model_params), dim=dim
     )
 
-    print(transformed_gcm.sel(time=run_parameters.train_period.time_slice))
-    print(transformed_obs[run_parameters.variable])
     # model fitting
     model.fit(
-        transformed_gcm.sel(time=run_parameters.train_period.time_slice).assign_coords(
-            {"time": transformed_obs.time.values}
-        ),
+        transformed_gcm_train.assign_coords({"time": transformed_obs.time.values})[
+            run_parameters.variable
+        ],
         transformed_obs[run_parameters.variable],
     )
 
     # model prediction
-    out = model.predict(transformed_gcm).to_dataset(dim='variable')
+    out = model.predict(transformed_gcm_pred[run_parameters.variable]).to_dataset(dim='variable')
     out.to_zarr(target)
-    return out
+    return target
 
 
 @task(log_stdout=True)
@@ -182,7 +194,7 @@ def postprocess(
     """
     ds_hash = str_to_hash(str(model_output_path) + run_parameters.run_id_hash)
     target = results_dir / 'daily' / ds_hash
-
+    print(f'searching for dataset here: {model_output_path}')
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
         return target
@@ -196,7 +208,7 @@ def postprocess(
         thresh = None
 
     # read scrf
-    scrf = xr.Dataset()  # read_scrf(run_parameters)  # maybe this belongs in cat?
+    scrf = read_scrf(run_parameters)  # maybe this belongs in cat?
 
     ## CURRENTLY needs calendar to be gregorian
     ## TODO: merge in the calendar conversion for GCMs and this should work great!
@@ -207,7 +219,8 @@ def postprocess(
     scrf = scrf.assign_coords(
         {'lat': model_output.lat, 'lon': model_output.lon, 'time': model_output.time}
     )
-
+    print(scrf)
+    print(scrf.chunks)
     if thresh is not None:
         # convert scrf from a normal distribution to a uniform distribution
         scrf_uniform = xr.apply_ufunc(
@@ -233,8 +246,7 @@ def postprocess(
         valids = xr.ufuncs.logical_or(mask, downscaled >= 0)
         downscaled = downscaled.where(valids, 0)
     else:
-        downscaled = model_output['pred'] + scrf * model_output['prediction_error']
-    # downscaled = downscaled.chunk({'time': 365, 'lat': 150, 'lon': 150})
+        downscaled = model_output['pred'] + scrf['scrf'] * model_output['prediction_error']
     downscaled.to_dataset(name=run_parameters.variable).to_zarr(target)
 
     return target

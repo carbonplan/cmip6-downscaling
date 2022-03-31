@@ -190,7 +190,7 @@ def rechunk(
     task_hash = str_to_hash(str(path) + pattern_string + str(template) + max_mem)
     target = intermediate_dir / 'rechunk' / task_hash
     path_tmp = scratch_dir / 'rechunk' / task_hash
-    print(f'writing rechunked dataset to {target}')
+    print(f'writing rechunked dataset for {path} to {target}')
 
     target_store = fsspec.get_mapper(str(target))
     temp_store = fsspec.get_mapper(str(path_tmp))
