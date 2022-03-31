@@ -4,7 +4,12 @@ import warnings
 
 from prefect import Flow, Parameter
 
-from cmip6_downscaling.methods.bcsd.tasks import fit_and_predict, postprocess_bcsd, spatial_anomalies
+from cmip6_downscaling import runtimes
+from cmip6_downscaling.methods.bcsd.tasks import (
+    fit_and_predict,
+    postprocess_bcsd,
+    spatial_anomalies,
+)
 from cmip6_downscaling.methods.common.tasks import (
     annual_summary,
     get_experiment,
@@ -16,7 +21,6 @@ from cmip6_downscaling.methods.common.tasks import (
     regrid,
     run_analyses,
 )
-from cmip6_downscaling import runtimes
 
 warnings.filterwarnings(
     "ignore",
@@ -65,9 +69,7 @@ with Flow(
 
     interpolated_obs_full_time_path = rechunk(path=interpolated_obs_path, pattern="full_time")
     obs_full_time_path = rechunk(path=obs_path, pattern="full_time")
-    spatial_anomalies_path = spatial_anomalies(
-        obs_full_time_path, interpolated_obs_full_time_path
-    )
+    spatial_anomalies_path = spatial_anomalies(obs_full_time_path, interpolated_obs_full_time_path)
     coarse_obs_full_time_path = rechunk(coarse_obs_path, pattern='full_time')
     experiment_train_full_time_path = rechunk(experiment_train_path, pattern='full_time')
     experiment_predict_full_time_path = rechunk(
@@ -104,7 +106,7 @@ with Flow(
     annual_summary_path = annual_summary(final_bcsd_full_time_path, run_parameters)
 
     # analysis notebook
-    # analysis_location = run_analyses(final_bcsd_full_time_path, run_parameters)
+    analysis_location = run_analyses(final_bcsd_full_time_path, run_parameters)
 
     # since pyramids require full space we now rechunk everything into full
     # space before passing into pyramid step. we probably want to add a cleanup

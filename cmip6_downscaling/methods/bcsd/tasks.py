@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import warnings
-from dataclasses import asdict
 
 import xarray as xr
 from carbonplan_data.metadata import get_cf_global_attrs
@@ -10,12 +9,11 @@ from skdownscale.pointwise_models import PointWiseDownscaler
 from skdownscale.pointwise_models.bcsd import BcsdPrecipitation, BcsdTemperature
 from upath import UPath
 
-from cmip6_downscaling import __version__ as version
+from cmip6_downscaling import __version__ as version, config
 from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
-from cmip6_downscaling.methods.common.containers import RunParameters, str_to_hash
 from cmip6_downscaling.methods.bcsd.utils import reconstruct_finescale
+from cmip6_downscaling.methods.common.containers import RunParameters, str_to_hash
 from cmip6_downscaling.methods.common.utils import zmetadata_exists
-from cmip6_downscaling import config
 
 warnings.filterwarnings(
     "ignore",
@@ -29,10 +27,9 @@ intermediate_dir = UPath(config.get("storage.intermediate.uri")) / version
 results_dir = UPath(config.get("storage.results.uri")) / version
 use_cache = config.get('run_options.use_cache')
 
+
 @task(log_stdout=True)
-def spatial_anomalies(
-    obs_full_time_path: UPath, interpolated_obs_full_time_path: UPath
-) -> UPath:
+def spatial_anomalies(obs_full_time_path: UPath, interpolated_obs_full_time_path: UPath) -> UPath:
     """Returns spatial anomalies
     Calculate the seasonal cycle (12 timesteps) spatial anomaly associated
     with aggregating the fine_obs to a given coarsened scale and then reinterpolating
@@ -64,7 +61,6 @@ def spatial_anomalies(
         Path to spatial anomalies dataset.  (shape (nlat, nlon, 12))
     """
 
-
     ds_hash = str_to_hash(str(obs_full_time_path) + str(interpolated_obs_full_time_path))
     target = intermediate_dir / 'bcsd_spatial_anomalies' / ds_hash
 
@@ -79,7 +75,9 @@ def spatial_anomalies(
     # spatially-interpolated coarse predictions to add the spatial heterogeneity back in.
     spatial_anomalies = obs_full_time_ds - interpolated_obs_full_time_ds
     seasonal_cycle_spatial_anomalies = spatial_anomalies.groupby("time.month").mean()
-    seasonal_cycle_spatial_anomalies.attrs.update({'title': 'bcsd_spatial_anomalies'}, **get_cf_global_attrs(version=version))
+    seasonal_cycle_spatial_anomalies.attrs.update(
+        {'title': 'bcsd_spatial_anomalies'}, **get_cf_global_attrs(version=version)
+    )
 
     seasonal_cycle_spatial_anomalies.to_zarr(target, mode="w")
 
@@ -119,7 +117,11 @@ def fit_and_predict(
     """
 
     title = "bcsd_predictions"
-    ds_hash = str_to_hash(str(experiment_train_full_time_path) + str(experiment_predict_full_time_path) + str(coarse_obs_full_time_path))
+    ds_hash = str_to_hash(
+        str(experiment_train_full_time_path)
+        + str(experiment_predict_full_time_path)
+        + str(coarse_obs_full_time_path)
+    )
 
     target = intermediate_dir / 'bcsd_fit_and_predict' / ds_hash
 
@@ -160,8 +162,8 @@ def fit_and_predict(
 
 @task
 def postprocess_bcsd(
-    bias_corrected_fine_full_time_path: UPath,
-    spatial_anomalies_path: UPath) -> UPath:
+    bias_corrected_fine_full_time_path: UPath, spatial_anomalies_path: UPath
+) -> UPath:
     """Downscale the bias-corrected data (fit_and_predict results) by interpolating and then
     adding the spatial anomalies back in.
 

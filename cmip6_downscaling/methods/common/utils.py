@@ -23,8 +23,6 @@ def zmetadata_exists(path: UPath):
         return (UPath(path) / '.zmetadata').exists()
 
 
-
-
 def subset_dataset(
     ds: xr.Dataset,
     variable: str,

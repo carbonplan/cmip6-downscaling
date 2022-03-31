@@ -3,9 +3,7 @@ from __future__ import annotations
 import os
 import warnings
 from dataclasses import asdict
-from decimal import MAX_EMAX
 from pathlib import PosixPath
-from time import time
 
 import dask
 import datatree as dt
@@ -21,18 +19,15 @@ from upath import UPath
 from xarray_schema import DataArraySchema, DatasetSchema
 from xarray_schema.base import SchemaError
 
-from cmip6_downscaling import config
-from cmip6_downscaling import __version__ as version
+from cmip6_downscaling import __version__ as version, config
 from cmip6_downscaling.data.cmip import get_gcm
 from cmip6_downscaling.data.observations import open_era5
+from cmip6_downscaling.methods.common.containers import RunParameters, str_to_hash
 from cmip6_downscaling.methods.common.utils import (
     calc_auspicious_chunks_dict,
     subset_dataset,
     zmetadata_exists,
 )
-from cmip6_downscaling.methods.common.containers import RunParameters, str_to_hash
-
-
 
 warnings.filterwarnings(
     "ignore",
@@ -69,9 +64,13 @@ def get_obs(run_parameters: RunParameters) -> UPath:
     """
 
     title = "obs ds: {obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}".format(
-            **asdict(run_parameters))
-    ds_hash = str_to_hash("{obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}".format(
-            **asdict(run_parameters)))
+        **asdict(run_parameters)
+    )
+    ds_hash = str_to_hash(
+        "{obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}".format(
+            **asdict(run_parameters)
+        )
+    )
     target = intermediate_dir / 'get_obs' / ds_hash
     print(target)
 
@@ -111,9 +110,11 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     UPath
         UPath to experiment dataset.
     """
-    
+
     time_period = getattr(run_parameters, time_subset)
-    frmt_str = "{model}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{time_period.start}_{time_period.stop}".format(time_period=time_period, **asdict(run_parameters))
+    frmt_str = "{model}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{time_period.start}_{time_period.stop}".format(
+        time_period=time_period, **asdict(run_parameters)
+    )
     title = f"experiment ds: {frmt_str}"
     ds_hash = str_to_hash(frmt_str)
     target = intermediate_dir / 'get_experiment' / ds_hash
@@ -183,7 +184,6 @@ def rechunk(
     # if only pattern specified then use that pattern
     elif pattern is not None:
         pattern_string = pattern
-
 
     task_hash = str_to_hash(str(path) + pattern_string + str(template) + max_mem)
     target = intermediate_dir / 'rechunk' / task_hash
@@ -295,7 +295,6 @@ def monthly_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
         Path to resampled dataset.
     """
 
-
     title = "monthly summary ds: {obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}_{predict_dates[0]}_{predict_dates[1]}".format(
         **asdict(run_parameters)
     )
@@ -341,7 +340,8 @@ def annual_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
     """
 
     title = "annual summary ds: {obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}_{predict_dates[0]}_{predict_dates[1]}".format(
-            **asdict(run_parameters))
+        **asdict(run_parameters)
+    )
     ds_hash = str_to_hash(str(ds_path))
     target = intermediate_dir / 'annual_summary' / ds_hash
 
@@ -394,7 +394,9 @@ def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
 
     regridder = xe.Regridder(source_ds, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
     regridded_ds = regridder(source_ds)
-    regridded_ds.attrs.update({'title': source_ds.attrs['title']}, **get_cf_global_attrs(version=version))
+    regridded_ds.attrs.update(
+        {'title': source_ds.attrs['title']}, **get_cf_global_attrs(version=version)
+    )
     regridded_ds.to_zarr(target, mode='w')
 
     return target
@@ -455,8 +457,7 @@ def _pyramid_postprocess(
 
 
 @task(log_stdout=True, tags=['dask-resource:TASKSLOTS=1'])
-def pyramid(ds_path: UPath, levels: int = 2, other_chunks: dict = None
-) -> UPath:
+def pyramid(ds_path: UPath, levels: int = 2, other_chunks: dict = None) -> UPath:
     '''Task to create a data pyramid from an xarray Dataset
 
     Parameters
@@ -474,7 +475,6 @@ def pyramid(ds_path: UPath, levels: int = 2, other_chunks: dict = None
     -------
     target : UPath
     '''
-
 
     ds_hash = str_to_hash(str(ds_path) + str(levels) + str(other_chunks))
     target = results_dir / 'pyramid' / ds_hash
