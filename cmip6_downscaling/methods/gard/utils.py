@@ -9,7 +9,7 @@ import xarray as xr
 from scipy.stats import norm as norm
 from skdownscale.pointwise_models import AnalogRegression, PureAnalog, PureRegression
 
-from .containers import RunParameters
+from ..common.containers import RunParameters
 
 
 def get_gard_model(
@@ -121,6 +121,8 @@ def read_scrf(run_parameters: RunParameters):
             start_year=start_year,
             end_year=end_year,
         )
+        print(scrf_path)
+        print(scrf_storage)
         mapper = fsspec.get_mapper(scrf_storage + scrf_path)
         scrf.append(xr.open_zarr(mapper))
     # TODO: confirm whether this breaks the distributed fashion?

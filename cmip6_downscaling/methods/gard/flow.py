@@ -39,17 +39,22 @@ with Flow(
         table_id=Parameter("table_id"),
         scenario=Parameter("scenario"),
         variable=Parameter("variable"),
+        features=Parameter("features"),
         latmin=Parameter("latmin"),
         latmax=Parameter("latmax"),
         lonmin=Parameter("lonmin"),
         lonmax=Parameter("lonmax"),
         train_dates=Parameter("train_period"),
         predict_dates=Parameter("predict_period"),
+        bias_correction_method=Parameter("bias_correction_method"),
+        bias_correction_kwargs=Parameter("bias_correction_kwargs"),
+        model_type=Parameter("model_type"),
+        model_params=Parameter("model_params"),
     )
 
     # input datasets
     obs_path = get_obs(run_parameters)
-    obs_full_space_path = rechunk(path=obs_path, chunking_pattern='full_space')
+    obs_full_space_path = rechunk(path=obs_path, pattern='full_space')
     experiment_train_path = get_experiment(run_parameters, time_subset='train_period')
     experiment_predict_path = get_experiment(run_parameters, time_subset='predict_period')
 
@@ -67,10 +72,8 @@ with Flow(
     )
 
     # get gcm data into full space to prep for interpolation
-    experiment_train_full_space_path = rechunk(experiment_train_path, chunking_pattern="full_space")
-    experiment_predict_full_space_path = rechunk(
-        experiment_predict_path, chunking_pattern="full_space"
-    )
+    experiment_train_full_space_path = rechunk(experiment_train_path, pattern="full_space")
+    experiment_predict_full_space_path = rechunk(experiment_predict_path, pattern="full_space")
 
     # interpolate gcm to finescale
     experiment_train_fine_full_space_path = regrid(
@@ -81,18 +84,20 @@ with Flow(
     )
     # TODO: do we need the templates as well for the rechunking? probably defer to bcsd flow here
     experiment_train_fine_full_time_path = rechunk(
-        experiment_train_fine_full_space_path, chunking_pattern="full_time"
+        experiment_train_fine_full_space_path,
+        pattern="full_time",
+        template=interpolated_obs_full_time_path,
     )
     experiment_predict_fine_full_time_path = rechunk(
         experiment_predict_fine_full_space_path,
-        chunking_pattern="full_time",
-        chunking_template_file=interpolated_obs_full_time_path,
+        pattern="full_time",
+        template=interpolated_obs_full_time_path,
     )
 
     # fit and predict (TODO: put the transformation steps currently in the prep_gard_input task into the fit and predict step)
     model_output_path = fit_and_predict(
-        xtrain_path=interpolated_obs_full_time_path,
-        ytrain_path=experiment_train_fine_full_time_path,
+        xtrain_path=experiment_train_fine_full_time_path,
+        ytrain_path=interpolated_obs_full_time_path,
         xpred_path=experiment_predict_fine_full_time_path,
         run_parameters=run_parameters,
     )  # [transformation, gard_model_options])

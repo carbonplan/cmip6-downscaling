@@ -40,6 +40,7 @@ scratch_dir = UPath(config.get("storage.scratch.uri"))
 intermediate_dir = UPath(config.get("storage.intermediate.uri")) / __version__
 results_dir = UPath(config.get("storage.results.uri")) / __version__
 use_cache = config.get('run_options.use_cache')
+print(config.config)
 
 
 @task
@@ -116,7 +117,10 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
             time_period=time_period, **asdict(run_parameters)
         )
     )
-    target = f'{str(intermediate_dir)}/{ds_name}'
+    print(intermediate_dir)
+    print(ds_name)
+    target = intermediate_dir / ds_name
+    print(target)
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')

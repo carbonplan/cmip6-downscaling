@@ -6,7 +6,7 @@
   "grid_label": "gn",
   "table_id": "day",
   "member": "r1i1p1f1",
-  "features": ["tasmax", "tasmin", "pr"],
+  "features": ["tasmax"],
   "variable": "tasmax",
   "train_period": ["1981", "2010"],
   "predict_period": ["1981", "2099"],
@@ -16,8 +16,6 @@
   "lonmax": "90",
   "bias_correction_method": "quantile_transform",
   "bias_correction_kwargs": {},
-  "model_type": "AnalogRegression",
-  "model_params": {
-    "n_analogs": 50
-  }
+  "model_type": "PureRegression",
+  "model_params": {}
 }
