@@ -9,7 +9,7 @@ from upath import UPath
 from xarray_schema import DataArraySchema
 from xarray_schema.base import SchemaError
 
-from .containers import BBox
+from cmip6_downscaling.methods.common.containers import BBox
 
 
 def zmetadata_exists(path: UPath):

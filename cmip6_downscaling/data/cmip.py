@@ -50,7 +50,15 @@ def postprocess(ds: xr.Dataset) -> xr.Dataset:
         ds = ds.reindex({"lat": ds.lat[::-1]})
 
     # Shifts time from Noon (12:00) start to Midnight (00:00) start to match with Obs
-    ds['time'] = ds['time'].resample(time='1D').first()
+    # ds.coords['time'] = ds['time'].resample(time='1D').first()
+    ds['time'] = xr.cftime_range(
+        start=ds['time'].data[0],
+        end=ds['time'].data[-1],
+        normalize=True,
+        freq="1D",
+        calendar=ds.time.encoding['calendar'],
+    )
+
     return ds
 
 
@@ -99,11 +107,12 @@ def load_cmip(
             grid_label=grid_labels,
             variable_id=variable_ids,
         )
+
         keys = list(col_subset.keys())
         if len(keys) != 1:
             raise ValueError(f'intake-esm search returned {len(keys)}, expected exactly 1.')
 
-        ds = col_subset[keys[0]].to_dask().pipe(postprocess)
+        ds = col_subset[keys[0]](zarr_kwargs={'use_cftime': True}).to_dask().pipe(postprocess)
 
         # convert to mm/day - helpful to prevent rounding errors from very tiny numbers
         if 'pr' in ds:

@@ -19,14 +19,15 @@ from upath import UPath
 from xarray_schema import DataArraySchema, DatasetSchema
 from xarray_schema.base import SchemaError
 
-from ... import config
-from ..._version import __version__
-from ...data.cmip import get_gcm
-from ...data.observations import open_era5
-from ..common.utils import calc_auspicious_chunks_dict, subset_dataset, zmetadata_exists
-from .containers import RunParameters
-
-version = __version__
+from cmip6_downscaling import __version__ as version, config
+from cmip6_downscaling.data.cmip import get_gcm
+from cmip6_downscaling.data.observations import open_era5
+from cmip6_downscaling.methods.common.containers import RunParameters, str_to_hash
+from cmip6_downscaling.methods.common.utils import (
+    calc_auspicious_chunks_dict,
+    subset_dataset,
+    zmetadata_exists,
+)
 
 warnings.filterwarnings(
     "ignore",
@@ -35,10 +36,9 @@ warnings.filterwarnings(
 )
 
 PIXELS_PER_TILE = 128
-code_version = __version__
 scratch_dir = UPath(config.get("storage.scratch.uri"))
-intermediate_dir = UPath(config.get("storage.intermediate.uri")) / __version__
-results_dir = UPath(config.get("storage.results.uri")) / __version__
+intermediate_dir = UPath(config.get("storage.intermediate.uri")) / version
+results_dir = UPath(config.get("storage.results.uri")) / version
 use_cache = config.get('run_options.use_cache')
 
 
@@ -63,14 +63,16 @@ def get_obs(run_parameters: RunParameters) -> UPath:
         Path to subset observation dataset.
     """
 
-    ds_name = (
-        "get_obs"
-        + "/"
-        + "{obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}".format(
+    title = "obs ds: {obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}".format(
+        **asdict(run_parameters)
+    )
+    ds_hash = str_to_hash(
+        "{obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}".format(
             **asdict(run_parameters)
         )
     )
-    target = f'{str(intermediate_dir)}/{ds_name}'
+    target = intermediate_dir / 'get_obs' / ds_hash
+    print(target)
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
@@ -87,7 +89,7 @@ def get_obs(run_parameters: RunParameters) -> UPath:
     )
     del subset[run_parameters.variable].encoding['chunks']
 
-    subset.attrs.update({'title': ds_name}, **get_cf_global_attrs(version=version))
+    subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
     subset.to_zarr(target, mode='w')
     return target
 
@@ -108,16 +110,16 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     UPath
         UPath to experiment dataset.
     """
-    time_period = getattr(run_parameters, time_subset)
-    ds_name = (
-        "get_experiment"
-        + "/"
-        + "{model}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{time_period.start}_{time_period.stop}".format(
-            time_period=time_period, **asdict(run_parameters)
-        )
-    )
-    target = f'{str(intermediate_dir)}/{ds_name}'
 
+    time_period = getattr(run_parameters, time_subset)
+    frmt_str = "{model}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{time_period.start}_{time_period.stop}".format(
+        time_period=time_period, **asdict(run_parameters)
+    )
+    title = f"experiment ds: {frmt_str}"
+    ds_hash = str_to_hash(frmt_str)
+    target = intermediate_dir / 'get_experiment' / ds_hash
+
+    print(target)
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
         return target
@@ -139,7 +141,7 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     subset = subset.chunk({'time': 365})
     del subset[run_parameters.variable].encoding['chunks']
 
-    subset.attrs.update({'title': ds_name}, **get_cf_global_attrs(version=version))
+    subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
     subset.to_zarr(target, mode='w')
     return target
 
@@ -173,7 +175,7 @@ def rechunk(
     target : UPath
         Path to rechunked dataset
     """
-    # print('rechunking dataset at {}'.format(path))
+
     # if both defined then you'll take the spatial part of template and override one dimension with the specified pattern
     if template is not None:
         pattern_string = 'matched'
@@ -182,9 +184,12 @@ def rechunk(
     # if only pattern specified then use that pattern
     elif pattern is not None:
         pattern_string = pattern
-    target = intermediate_dir / ("rechunk_" + pattern_string) / (str(path).split("/")[-1])
-    path_tmp = scratch_dir / ("rechunk_" + pattern_string) / (str(path).split("/")[-1])
+
+    task_hash = str_to_hash(str(path) + pattern_string + str(template) + max_mem)
+    target = intermediate_dir / 'rechunk' / task_hash
+    path_tmp = scratch_dir / 'rechunk' / task_hash
     print(f'writing rechunked dataset to {target}')
+
     target_store = fsspec.get_mapper(str(target))
     temp_store = fsspec.get_mapper(str(path_tmp))
 
@@ -290,8 +295,12 @@ def monthly_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
         Path to resampled dataset.
     """
 
-    ds_name = "monthly_summary" + "/" + str(run_parameters.run_id)
-    target = f'{str(results_dir)}/{ds_name}'
+    title = "monthly summary ds: {obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}_{predict_dates[0]}_{predict_dates[1]}".format(
+        **asdict(run_parameters)
+    )
+
+    ds_hash = str_to_hash(str(ds_path))
+    target = intermediate_dir / 'monthly_summary' / ds_hash
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
@@ -306,7 +315,7 @@ def monthly_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
     else:
         print(f'{run_parameters.variable} not implemented')
 
-    out_ds.attrs.update({'title': ds_name}, **get_cf_global_attrs(version=version))
+    out_ds.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
 
     out_ds.to_zarr(target, mode='w')
 
@@ -330,8 +339,11 @@ def annual_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
         Path to resampled dataset.
     """
 
-    ds_name = "annual_summary" + "/" + str(run_parameters.run_id)
-    target = f'{str(results_dir)}/{ds_name}'
+    title = "annual summary ds: {obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}_{predict_dates[0]}_{predict_dates[1]}".format(
+        **asdict(run_parameters)
+    )
+    ds_hash = str_to_hash(str(ds_path))
+    target = intermediate_dir / 'annual_summary' / ds_hash
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
@@ -346,7 +358,7 @@ def annual_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
     else:
         print(f'{run_parameters.variable} not implemented')
 
-    out_ds.attrs.update({'title': ds_name}, **get_cf_global_attrs(version=version))
+    out_ds.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
     out_ds.to_zarr(target, mode='w')
 
     return target
@@ -371,18 +383,8 @@ def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
 
     import xesmf as xe
 
-    ds_name = (
-        "regrid"
-        + "/"
-        + "source_path"
-        + "/"
-        + (str(source_path).split("/")[-1])
-        + "/"
-        + "target_path"
-        + "/"
-        + (str(target_grid_path).split("/")[-1])
-    )
-    target = f'{str(intermediate_dir)}/{ds_name}'
+    ds_hash = str_to_hash(str(source_path) + str(target_grid_path))
+    target = intermediate_dir / 'regrid' / ds_hash
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
@@ -392,7 +394,9 @@ def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
 
     regridder = xe.Regridder(source_ds, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
     regridded_ds = regridder(source_ds)
-    regridded_ds.attrs.update({'title': ds_name}, **get_cf_global_attrs(version=version))
+    regridded_ds.attrs.update(
+        {'title': source_ds.attrs['title']}, **get_cf_global_attrs(version=version)
+    )
     regridded_ds.to_zarr(target, mode='w')
 
     return target
@@ -453,9 +457,7 @@ def _pyramid_postprocess(
 
 
 @task(log_stdout=True, tags=['dask-resource:TASKSLOTS=1'])
-def pyramid(
-    ds_path: UPath, run_parameters: RunParameters, levels: int = 2, other_chunks: dict = None
-) -> UPath:
+def pyramid(ds_path: UPath, levels: int = 2, other_chunks: dict = None) -> UPath:
     '''Task to create a data pyramid from an xarray Dataset
 
     Parameters
@@ -474,6 +476,9 @@ def pyramid(
     target : UPath
     '''
 
+    ds_hash = str_to_hash(str(ds_path) + str(levels) + str(other_chunks))
+    target = results_dir / 'pyramid' / ds_hash
+
     ds_name = "pyarmid" + ds_path.path.replace('/', '_')
     target = f'{str(results_dir)}/{ds_name}'
 
@@ -484,6 +489,8 @@ def pyramid(
     ds = xr.open_zarr(ds_path).pipe(_load_coords)
 
     ds.coords['date_str'] = ds['time'].dt.strftime('%Y-%m-%d').astype('S10')
+
+    ds.attrs.update({'title': ds.attrs['title']}, **get_cf_global_attrs(version=version))
     # note: this worked when 8 processors and 4 cores
     with dask.config.set(scheduler='threads'):
         # create pyramid

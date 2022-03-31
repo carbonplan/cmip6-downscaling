@@ -4,8 +4,13 @@ import warnings
 
 from prefect import Flow, Parameter
 
-from ..bcsd.tasks import fit_and_predict, postprocess_bcsd, spatial_anomalies
-from ..common.tasks import (
+from cmip6_downscaling import runtimes
+from cmip6_downscaling.methods.bcsd.tasks import (
+    fit_and_predict,
+    postprocess_bcsd,
+    spatial_anomalies,
+)
+from cmip6_downscaling.methods.common.tasks import (
     annual_summary,
     get_experiment,
     get_obs,
@@ -16,7 +21,6 @@ from ..common.tasks import (
     regrid,
     run_analyses,
 )
-from . import runtimes
 
 warnings.filterwarnings(
     "ignore",
@@ -65,9 +69,7 @@ with Flow(
 
     interpolated_obs_full_time_path = rechunk(path=interpolated_obs_path, pattern="full_time")
     obs_full_time_path = rechunk(path=obs_path, pattern="full_time")
-    spatial_anomalies_path = spatial_anomalies(
-        obs_full_time_path, interpolated_obs_full_time_path, run_parameters
-    )
+    spatial_anomalies_path = spatial_anomalies(obs_full_time_path, interpolated_obs_full_time_path)
     coarse_obs_full_time_path = rechunk(coarse_obs_path, pattern='full_time')
     experiment_train_full_time_path = rechunk(experiment_train_path, pattern='full_time')
     experiment_predict_full_time_path = rechunk(
@@ -96,7 +98,7 @@ with Flow(
         template=obs_full_time_path,
     )
     final_bcsd_full_time_path = postprocess_bcsd(
-        bias_corrected_fine_full_time_path, spatial_anomalies_path, run_parameters
+        bias_corrected_fine_full_time_path, spatial_anomalies_path
     )  # fine-scale maps (full_space) (time: 365)
 
     # temporary aggregations - these come out in full time

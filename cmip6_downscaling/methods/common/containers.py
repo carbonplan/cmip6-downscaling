@@ -1,6 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from hashlib import blake2b
+
+
+def str_to_hash(s):
+    return blake2b(s.encode(), digest_size=8).hexdigest()
 
 
 @dataclass
@@ -14,7 +19,7 @@ class BBox:
 
     @property
     def lat_slice(self) -> slice:
-        return slice(float(self.latmax), float(self.latmin))
+        return slice(float(self.latmin), float(self.latmax))
 
     @property
     def lon_slice(self) -> slice:
@@ -94,3 +99,7 @@ class RunParameters:
     @property
     def run_id(self):
         return f"{self.method}_{self.obs}_{self.model}_{self.scenario}_{self.variable}_{self.latmin}_{self.latmax}_{self.lonmin}_{self.lonmax}_{self.train_dates[0]}_{self.train_dates[1]}_{self.predict_dates[0]}_{self.predict_dates[1]}"
+
+    @property
+    def run_id_hash(self):
+        return str_to_hash(self.run_id)
