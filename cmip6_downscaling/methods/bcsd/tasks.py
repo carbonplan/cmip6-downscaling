@@ -183,7 +183,7 @@ def postprocess_bcsd(
     title = "bcsd_postprocess"
 
     ds_hash = str_to_hash(str(bias_corrected_fine_full_time_path) + str(spatial_anomalies_path))
-    target = intermediate_dir / title / ds_hash
+    target = results_dir / title / ds_hash
 
     if use_cache and zmetadata_exists(target):
         print(f"found existing target: {target}")

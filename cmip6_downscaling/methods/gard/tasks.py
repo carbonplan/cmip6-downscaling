@@ -9,17 +9,16 @@ from skdownscale.pointwise_models import (  # AnalogRegression,; PureAnalog,; Pu
 from skdownscale.pointwise_models.utils import default_none_kwargs
 from upath import UPath
 
-from ... import config
-from ..._version import __version__
-from ..common.bias_correction import bias_correct_gcm_by_method, bias_correct_obs_by_method
-from ..common.containers import RunParameters
-from ..common.utils import zmetadata_exists
-from .utils import get_gard_model, read_scrf
+from cmip6_downscaling import __version__ as version, config
 
-code_version = __version__
+from ..common.bias_correction import bias_correct_gcm_by_method, bias_correct_obs_by_method
+from ..common.containers import RunParameters, str_to_hash
+from ..common.utils import zmetadata_exists
+from .utils import get_gard_model
+
 scratch_dir = UPath(config.get("storage.scratch.uri"))
-intermediate_dir = UPath(config.get("storage.intermediate.uri")) / __version__
-results_dir = UPath(config.get("storage.results.uri")) / __version__
+intermediate_dir = UPath(config.get("storage.intermediate.uri")) / version
+results_dir = UPath(config.get("storage.results.uri")) / version
 use_cache = config.get('run_options.use_cache')
 
 
@@ -39,8 +38,8 @@ def coarsen_and_interpolate(fine_path: UPath, coarse_path: UPath) -> UPath:
     UPath
         Path to interpolated dataset.
     """
-    ds_name = f'source_path_{fine_path.name}/target_path_{coarse_path.name}'
-    target = intermediate_dir / 'coarsen_and_interpolate' / ds_name
+    ds_hash = str_to_hash(str(fine_path) + str(coarse_path))
+    target = intermediate_dir / 'coarsen_and_interpolate' / ds_hash
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
@@ -57,13 +56,15 @@ def coarsen_and_interpolate(fine_path: UPath, coarse_path: UPath) -> UPath:
     regridder = xe.Regridder(coarse_ds, fine_ds, "bilinear", extrap_method="nearest_s2d")
     interpolated_ds = regridder(coarse_ds)
 
-    interpolated_ds.attrs.update({'title': ds_name}, **get_cf_global_attrs(version=code_version))
+    interpolated_ds.attrs.update(
+        {'title': 'coarsen_and_interpolate'}, **get_cf_global_attrs(version=version)
+    )
     interpolated_ds.to_zarr(target, mode='w')
 
     return target
 
 
-@task(tags=['dask-resource:TASKSLOTS=1'], log_stdout=True)
+@task(log_stdout=True)
 def fit_and_predict(
     xtrain_path: UPath,
     ytrain_path: UPath,
@@ -92,12 +93,14 @@ def fit_and_predict(
     UPath
         Path to output dataset chunked full_time
     """
-    # TODO: turn this into a hash
-    ds_name = f'train_obs_{UPath(xtrain_path).name}/train_gcm_{UPath(ytrain_path).name}/prediction_{UPath(xpred_path).name}'
-    # TODO: swap this in once we pull hash naming PR
-    # ds_hash = str_to_hash()
-
-    target = intermediate_dir / 'gard_fit_and_predict' / ds_name
+    ds_hash = str_to_hash(
+        str(xtrain_path)
+        + str(ytrain_path)
+        + str(xpred_path)
+        + run_parameters.run_id_hash
+        + str(dim)
+    )
+    target = intermediate_dir / 'gard_fit_and_predict' / ds_hash
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
@@ -155,41 +158,35 @@ def fit_and_predict(
     return out
 
 
-@task(tags=['dask-resource:TASKSLOTS=1'], log_stdout=True)
+@task(log_stdout=True)
 def postprocess(
-    model_output_path: xr.Dataset,
+    model_output_path: UPath,
     run_parameters: RunParameters,
-    **kwargs,
-) -> xr.Dataset:
+) -> UPath:
     """
     Add perturbation to the mean prediction of GARD to more accurately represent extreme events. The perturbation is
     generated with the prediction error during model fit scaled with a spatio-temporally correlated random field.
 
     Parameters
     ----------
-    model_output : xr.Dataset
+    model_output_path : UPath
         GARD model prediction output. Should contain three variables: pred (predicted mean), prediction_error
         (prediction error in fit), and exceedance_prob (probability of exceedance for threshold)
-    scrf : xr.DataArray
-        Spatio-temporally correlated random fields (SCRF)
-    model_params : Dict
+    run_parameters : RunParameters
         Model parameter dictionary
 
     Returns
     -------
-    downscaled : xr.Dataset
+    downscaled : UPath
         Final downscaled output
     """
-    # TODO: turn this into a hash
-    ds_name = 'gard_daily_output'
-    # TODO: swap this in once we pull hash naming PR
-    # ds_hash = str_to_hash()
-
-    target = results_dir / 'daily' / ds_name
+    ds_hash = str_to_hash(str(model_output_path) + run_parameters.run_id_hash)
+    target = results_dir / 'daily' / ds_hash
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
         return target
+
     print(model_output_path)
     model_output = xr.open_zarr(model_output_path)
 
@@ -199,7 +196,7 @@ def postprocess(
         thresh = None
 
     # read scrf
-    scrf = read_scrf(run_parameters)
+    scrf = xr.Dataset()  # read_scrf(run_parameters)  # maybe this belongs in cat?
 
     ## CURRENTLY needs calendar to be gregorian
     ## TODO: merge in the calendar conversion for GCMs and this should work great!

@@ -48,7 +48,6 @@ def make_scrf_path(
     label: str,
     start_year: str,
     end_year: str,
-    **kwargs,
 ):
     """
     Path where spatially-temporally correlated random fields (SCRF) are saved.
