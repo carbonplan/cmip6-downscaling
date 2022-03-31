@@ -4,8 +4,8 @@ import warnings
 from dataclasses import asdict
 
 import xarray as xr
-from prefect import task
 from carbonplan_data.metadata import get_cf_global_attrs
+from prefect import task
 from skdownscale.pointwise_models import PointWiseDownscaler
 from skdownscale.pointwise_models.bcsd import BcsdPrecipitation, BcsdTemperature
 from upath import UPath
@@ -67,7 +67,6 @@ def spatial_anomalies(
 
     ds_hash = str_to_hash(str(obs_full_time_path) + str(interpolated_obs_full_time_path))
     target = intermediate_dir / 'bcsd_spatial_anomalies' / ds_hash
-
 
     if use_cache and zmetadata_exists(target):
         print(f"found existing target: {target}")

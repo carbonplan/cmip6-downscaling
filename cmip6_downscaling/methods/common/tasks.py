@@ -175,7 +175,6 @@ def rechunk(
         Path to rechunked dataset
     """
 
-
     # if both defined then you'll take the spatial part of template and override one dimension with the specified pattern
     if template is not None:
         pattern_string = 'matched'
@@ -298,7 +297,8 @@ def monthly_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
 
 
     title = "monthly summary ds: {obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}_{predict_dates[0]}_{predict_dates[1]}".format(
-            **asdict(run_parameters))
+        **asdict(run_parameters)
+    )
 
     ds_hash = str_to_hash(str(ds_path))
     target = intermediate_dir / 'monthly_summary' / ds_hash
@@ -478,7 +478,6 @@ def pyramid(ds_path: UPath, levels: int = 2, other_chunks: dict = None
 
     ds_hash = str_to_hash(str(ds_path) + str(levels) + str(other_chunks))
     target = results_dir / 'pyramid' / ds_hash
-
 
     ds_name = "pyarmid" + ds_path.path.replace('/', '_')
     target = f'{str(results_dir)}/{ds_name}'
