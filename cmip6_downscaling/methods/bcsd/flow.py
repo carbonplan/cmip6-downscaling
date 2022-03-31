@@ -66,7 +66,7 @@ with Flow(
     interpolated_obs_full_time_path = rechunk(path=interpolated_obs_path, pattern="full_time")
     obs_full_time_path = rechunk(path=obs_path, pattern="full_time")
     spatial_anomalies_path = spatial_anomalies(
-        obs_full_time_path, interpolated_obs_full_time_path, run_parameters
+        obs_full_time_path, interpolated_obs_full_time_path
     )
     coarse_obs_full_time_path = rechunk(coarse_obs_path, pattern='full_time')
     experiment_train_full_time_path = rechunk(experiment_train_path, pattern='full_time')
@@ -96,7 +96,7 @@ with Flow(
         template=obs_full_time_path,
     )
     final_bcsd_full_time_path = postprocess_bcsd(
-        bias_corrected_fine_full_time_path, spatial_anomalies_path, run_parameters
+        bias_corrected_fine_full_time_path, spatial_anomalies_path
     )  # fine-scale maps (full_space) (time: 365)
 
     # temporary aggregations - these come out in full time
@@ -104,7 +104,7 @@ with Flow(
     annual_summary_path = annual_summary(final_bcsd_full_time_path, run_parameters)
 
     # analysis notebook
-    analysis_location = run_analyses(final_bcsd_full_time_path, run_parameters)
+    # analysis_location = run_analyses(final_bcsd_full_time_path, run_parameters)
 
     # since pyramids require full space we now rechunk everything into full
     # space before passing into pyramid step. we probably want to add a cleanup
@@ -117,9 +117,9 @@ with Flow(
     annual_summary_full_space_path = rechunk(annual_summary_path, pattern='full_space')
 
     # pyramids
-    daily_pyramid_path = pyramid(final_bcsd_full_space_path,run_parameters=run_parameters, levels=4)
-    monthly_pyramid_path = pyramid(monthly_summary_full_space_path,run_parameters=run_parameters, levels=4)
-    annual_pyramid_path = pyramid(annual_summary_full_space_path,run_parameters=run_parameters, levels=4)
+    daily_pyramid_path = pyramid(final_bcsd_full_space_path, levels=4)
+    monthly_pyramid_path = pyramid(monthly_summary_full_space_path, levels=4)
+    annual_pyramid_path = pyramid(annual_summary_full_space_path, levels=4)
 
     # # if config.get('run_options.cleanup_flag') is True:
     # #     cleanup.run_rsfip(gcm_identifier, obs_identifier)

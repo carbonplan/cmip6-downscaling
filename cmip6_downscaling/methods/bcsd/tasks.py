@@ -10,7 +10,7 @@ from skdownscale.pointwise_models import PointWiseDownscaler
 from skdownscale.pointwise_models.bcsd import BcsdPrecipitation, BcsdTemperature
 from upath import UPath
 
-from cmip6_downscaling._version import __version__ as code_version
+from cmip6_downscaling import __version__ as version
 from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
 from cmip6_downscaling.methods.common.containers import RunParameters, str_to_hash
 from cmip6_downscaling.methods.bcsd.utils import reconstruct_finescale
@@ -25,14 +25,13 @@ warnings.filterwarnings(
 
 
 scratch_dir = UPath(config.get("storage.scratch.uri"))
-intermediate_dir = UPath(config.get("storage.intermediate.uri")) / code_version
-results_dir = UPath(config.get("storage.results.uri")) / code_version
+intermediate_dir = UPath(config.get("storage.intermediate.uri")) / version
+results_dir = UPath(config.get("storage.results.uri")) / version
 use_cache = config.get('run_options.use_cache')
-
 
 @task(log_stdout=True)
 def spatial_anomalies(
-    obs_full_time_path: UPath, interpolated_obs_full_time_path: UPath, run_parameters: RunParameters
+    obs_full_time_path: UPath, interpolated_obs_full_time_path: UPath
 ) -> UPath:
     """Returns spatial anomalies
     Calculate the seasonal cycle (12 timesteps) spatial anomaly associated
@@ -58,19 +57,16 @@ def spatial_anomalies(
         UPath to observation dataset chunked in full_time.
     interpolated_obs_full_time_path : UPath
         UPath to observation dataset interpolated to gcm grid and chunked in full time.
-    run_parameters : RunParameters
-        Prefect run parameters
 
     Returns
     -------
     UPath
         Path to spatial anomalies dataset.  (shape (nlat, nlon, 12))
     """
-    title = "spatial anomalies ds: {obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}_{predict_dates[0]}_{predict_dates[1]}".format(
-            **asdict(run_parameters))
 
-    ds_hash = str_to_hash(run_parameters.run_id + str(obs_full_time_path) + str(interpolated_obs_full_time_path))
-    target = intermediate_dir / 'spatial_anomalies' / ds_hash
+
+    ds_hash = str_to_hash(str(obs_full_time_path) + str(interpolated_obs_full_time_path))
+    target = intermediate_dir / 'bcsd_spatial_anomalies' / ds_hash
 
 
     if use_cache and zmetadata_exists(target):
@@ -84,7 +80,7 @@ def spatial_anomalies(
     # spatially-interpolated coarse predictions to add the spatial heterogeneity back in.
     spatial_anomalies = obs_full_time_ds - interpolated_obs_full_time_ds
     seasonal_cycle_spatial_anomalies = spatial_anomalies.groupby("time.month").mean()
-    seasonal_cycle_spatial_anomalies.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
+    seasonal_cycle_spatial_anomalies.attrs.update({'title': 'bcsd_spatial_anomalies'}, **get_cf_global_attrs(version=version))
 
     seasonal_cycle_spatial_anomalies.to_zarr(target, mode="w")
 
@@ -123,11 +119,10 @@ def fit_and_predict(
         ValueError checking validity of input variables.
     """
 
-    title = "fit_and_predict ds: {obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}_{predict_dates[0]}_{predict_dates[1]}".format(
-            **asdict(run_parameters))
-    ds_hash = str_to_hash(run_parameters.run_id + str(experiment_train_full_time_path) + str(experiment_predict_full_time_path) + str(coarse_obs_full_time_path))
+    title = "bcsd_predictions"
+    ds_hash = str_to_hash(str(experiment_train_full_time_path) + str(experiment_predict_full_time_path) + str(coarse_obs_full_time_path))
 
-    target = intermediate_dir / 'fit_and_predict' / ds_hash
+    target = intermediate_dir / 'bcsd_fit_and_predict' / ds_hash
 
     if use_cache and zmetadata_exists(target):
         print(f"found existing target: {target}")
@@ -146,6 +141,9 @@ def fit_and_predict(
     experiment_train_full_time_ds = xr.open_zarr(experiment_train_full_time_path)
     experiment_predict_full_time_ds = xr.open_zarr(experiment_predict_full_time_path)
 
+    print(coarse_obs_full_time_ds)
+    print(experiment_train_full_time_ds)
+    print(experiment_predict_full_time_ds)
     pointwise_model.fit(
         experiment_train_full_time_ds[run_parameters.variable],
         coarse_obs_full_time_ds[run_parameters.variable],
@@ -164,9 +162,7 @@ def fit_and_predict(
 @task
 def postprocess_bcsd(
     bias_corrected_fine_full_time_path: UPath,
-    spatial_anomalies_path: UPath,
-    run_parameters: RunParameters,
-) -> UPath:
+    spatial_anomalies_path: UPath) -> UPath:
     """Downscale the bias-corrected data (fit_and_predict results) by interpolating and then
     adding the spatial anomalies back in.
 
@@ -176,8 +172,6 @@ def postprocess_bcsd(
         UPath to output dataset from the fit_and_predict task.
     spatial_anomalies_path : UPath
         UPath to the output of the spatial_anomalies task.
-    run_parameters : RunParameters
-        Prefect run parameters.
 
     Returns
     -------
@@ -185,11 +179,10 @@ def postprocess_bcsd(
         UPath to post-processed dataset.
     """
 
-    title = "postprocess ds: {obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}_{predict_dates[0]}_{predict_dates[1]}".format(
-            **asdict(run_parameters))
+    title = "bcsd_postprocess"
 
-    ds_hash = str_to_hash(run_parameters.run_id)
-    target = intermediate_dir / 'postprocess' / ds_hash
+    ds_hash = str_to_hash(str(bias_corrected_fine_full_time_path) + str(spatial_anomalies_path))
+    target = intermediate_dir / title / ds_hash
 
     if use_cache and zmetadata_exists(target):
         print(f"found existing target: {target}")

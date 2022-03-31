@@ -22,7 +22,7 @@ from xarray_schema import DataArraySchema, DatasetSchema
 from xarray_schema.base import SchemaError
 
 from cmip6_downscaling import config
-from cmip6_downscaling._version import __version__
+from cmip6_downscaling import __version__ as version
 from cmip6_downscaling.data.cmip import get_gcm
 from cmip6_downscaling.data.observations import open_era5
 from cmip6_downscaling.methods.common.utils import (
@@ -33,7 +33,6 @@ from cmip6_downscaling.methods.common.utils import (
 from cmip6_downscaling.methods.common.containers import RunParameters, str_to_hash
 
 
-version = __version__
 
 warnings.filterwarnings(
     "ignore",
@@ -42,10 +41,9 @@ warnings.filterwarnings(
 )
 
 PIXELS_PER_TILE = 128
-code_version = __version__
 scratch_dir = UPath(config.get("storage.scratch.uri"))
-intermediate_dir = UPath(config.get("storage.intermediate.uri")) / __version__
-results_dir = UPath(config.get("storage.results.uri")) / __version__
+intermediate_dir = UPath(config.get("storage.intermediate.uri")) / version
+results_dir = UPath(config.get("storage.results.uri")) / version
 use_cache = config.get('run_options.use_cache')
 
 
@@ -72,7 +70,10 @@ def get_obs(run_parameters: RunParameters) -> UPath:
 
     title = "obs ds: {obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}".format(
             **asdict(run_parameters))
-    target = intermediate_dir / 'get_obs' / run_parameters.run_id_hash
+    ds_hash = str_to_hash("{obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}".format(
+            **asdict(run_parameters)))
+    target = intermediate_dir / 'get_obs' / ds_hash
+    print(target)
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
@@ -110,13 +111,14 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     UPath
         UPath to experiment dataset.
     """
-    time_period = run_parameters.time_subset
-    title = "experiment ds: {model}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{time_period.start}_{time_period.stop}".format(
-            time_period=time_period, **asdict(run_parameters))
-
-    ds_hash = str_to_hash(run_parameters.run_id + time_subset)
+    
+    time_period = getattr(run_parameters, time_subset)
+    frmt_str = "{model}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{time_period.start}_{time_period.stop}".format(time_period=time_period, **asdict(run_parameters))
+    title = f"experiment ds: {frmt_str}"
+    ds_hash = str_to_hash(frmt_str)
     target = intermediate_dir / 'get_experiment' / ds_hash
 
+    print(target)
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
         return target
@@ -184,7 +186,7 @@ def rechunk(
         pattern_string = pattern
 
 
-    task_hash = str_to_hash(str(path) + pattern + str(template) + max_mem)
+    task_hash = str_to_hash(str(path) + pattern_string + str(template) + max_mem)
     target = intermediate_dir / 'rechunk' / task_hash
     path_tmp = scratch_dir / 'rechunk' / task_hash
     print(f'writing rechunked dataset to {target}')
@@ -298,7 +300,7 @@ def monthly_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
     title = "monthly summary ds: {obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}_{predict_dates[0]}_{predict_dates[1]}".format(
             **asdict(run_parameters))
 
-    ds_hash = str_to_hash(run_parameters.run_id + str(ds_path))
+    ds_hash = str_to_hash(str(ds_path))
     target = intermediate_dir / 'monthly_summary' / ds_hash
 
     if use_cache and zmetadata_exists(target):
@@ -340,7 +342,7 @@ def annual_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
 
     title = "annual summary ds: {obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}_{predict_dates[0]}_{predict_dates[1]}".format(
             **asdict(run_parameters))
-    ds_hash = str_to_hash(run_parameters.run_id + str(ds_path))
+    ds_hash = str_to_hash(str(ds_path))
     target = intermediate_dir / 'annual_summary' / ds_hash
 
     if use_cache and zmetadata_exists(target):
@@ -381,12 +383,8 @@ def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
 
     import xesmf as xe
 
-    title = "regrid ds: {obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}_{predict_dates[0]}_{predict_dates[1]}".format(
-            **asdict(run_parameters))
-
-
-    ds_hash = str_to_hash(run_parameters.run_id + str(source_path) + str(target_grid_path))
-    target = intermediate_dir / 'regrid' / task_hash
+    ds_hash = str_to_hash(str(source_path) + str(target_grid_path))
+    target = intermediate_dir / 'regrid' / ds_hash
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
@@ -396,7 +394,7 @@ def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
 
     regridder = xe.Regridder(source_ds, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
     regridded_ds = regridder(source_ds)
-    regridded_ds.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
+    regridded_ds.attrs.update({'title': source_ds.attrs['title']}, **get_cf_global_attrs(version=version))
     regridded_ds.to_zarr(target, mode='w')
 
     return target
@@ -457,8 +455,7 @@ def _pyramid_postprocess(
 
 
 @task(log_stdout=True, tags=['dask-resource:TASKSLOTS=1'])
-def pyramid(
-    ds_path: UPath, run_parameters: RunParameters, levels: int = 2, other_chunks: dict = None
+def pyramid(ds_path: UPath, levels: int = 2, other_chunks: dict = None
 ) -> UPath:
     '''Task to create a data pyramid from an xarray Dataset
 
@@ -478,10 +475,8 @@ def pyramid(
     target : UPath
     '''
 
-    title = "pyramid ds: {obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}_{predict_dates[0]}_{predict_dates[1]}".format(
-            **asdict(run_parameters))
 
-    ds_hash = str_to_hash(run_parameters.run_id + str(ds_path) + str(levels) + str(other_chunks))
+    ds_hash = str_to_hash(str(ds_path) + str(levels) + str(other_chunks))
     target = results_dir / 'pyramid' / ds_hash
 
 
@@ -496,7 +491,7 @@ def pyramid(
 
     ds.coords['date_str'] = ds['time'].dt.strftime('%Y-%m-%d').astype('S10')
 
-    ds.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
+    ds.attrs.update({'title': ds.attrs['title']}, **get_cf_global_attrs(version=version))
     # note: this worked when 8 processors and 4 cores
     with dask.config.set(scheduler='threads'):
         # create pyramid
