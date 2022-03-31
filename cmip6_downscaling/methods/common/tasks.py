@@ -25,6 +25,7 @@ from cmip6_downscaling.data.observations import open_era5
 from cmip6_downscaling.methods.common.containers import RunParameters, str_to_hash
 from cmip6_downscaling.methods.common.utils import (
     calc_auspicious_chunks_dict,
+    resample_wrapper,
     subset_dataset,
     zmetadata_exists,
 )
@@ -189,7 +190,7 @@ def rechunk(
     target = intermediate_dir / 'rechunk' / task_hash
     path_tmp = scratch_dir / 'rechunk' / task_hash
     print(f'writing rechunked dataset to {target}')
-
+    print(target)
     target_store = fsspec.get_mapper(str(target))
     temp_store = fsspec.get_mapper(str(path_tmp))
 
@@ -279,15 +280,15 @@ def rechunk(
 
 
 @task
-def monthly_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
-    """Prefect task to create monthly resampled data. Takes mean of `tasmax` and `tasmin` and sum of `pr`.
+def time_summary(ds_path: UPath, freq: str) -> UPath:
+    """Prefect task to create resampled data. Takes mean of `tasmax` and `tasmin` and sum of `pr`.
 
     Parameters
     ----------
     ds_path : UPath
         UPath to input zarr store at daily timestep
-    run_parameters : RunParameters
-        prefect run parameters
+    freq : str
+        aggregation frequency
 
     Returns
     -------
@@ -295,70 +296,18 @@ def monthly_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
         Path to resampled dataset.
     """
 
-    title = "monthly summary ds: {obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}_{predict_dates[0]}_{predict_dates[1]}".format(
-        **asdict(run_parameters)
-    )
-
-    ds_hash = str_to_hash(str(ds_path))
-    target = intermediate_dir / 'monthly_summary' / ds_hash
-
+    ds_hash = str_to_hash(str(ds_path) + freq)
+    target = intermediate_dir / 'time_summary' / ds_hash
+    print(target)
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
         return target
 
     ds = xr.open_zarr(ds_path)
 
-    if run_parameters.variable in ['tasmax', 'tasmin']:
-        out_ds = ds.resample(time='1MS').mean(dim='time')
-    elif run_parameters.variable in ['pr']:
-        out_ds = ds.resample(time='1MS').sum(dim='time')
-    else:
-        print(f'{run_parameters.variable} not implemented')
+    out_ds = resample_wrapper(ds, freq=freq)
 
-    out_ds.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
-
-    out_ds.to_zarr(target, mode='w')
-
-    return target
-
-
-@task
-def annual_summary(ds_path: UPath, run_parameters: RunParameters) -> UPath:
-    """Prefect task to create yearly resampled data. Takes mean of `tasmax` and `tasmin` and sum of `pr`.
-
-    Parameters
-    ----------
-    ds_path : UPath
-        UPath to input zarr store at daily timestep
-    run_parameters : RunParameters
-        prefect run parameters
-
-    Returns
-    -------
-    UPath
-        Path to resampled dataset.
-    """
-
-    title = "annual summary ds: {obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}_{predict_dates[0]}_{predict_dates[1]}".format(
-        **asdict(run_parameters)
-    )
-    ds_hash = str_to_hash(str(ds_path))
-    target = intermediate_dir / 'annual_summary' / ds_hash
-
-    if use_cache and zmetadata_exists(target):
-        print(f'found existing target: {target}')
-        return target
-
-    ds = xr.open_zarr(ds_path)
-
-    if run_parameters.variable in ['tasmax', 'tasmin']:
-        out_ds = ds.resample(time='YS').mean(dim='time')
-    elif run_parameters.variable in ['pr']:
-        out_ds = ds.resample(time='YS').sum(dim='time')
-    else:
-        print(f'{run_parameters.variable} not implemented')
-
-    out_ds.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
+    out_ds.attrs.update({'title': 'time_summary'}, **get_cf_global_attrs(version=version))
     out_ds.to_zarr(target, mode='w')
 
     return target
@@ -409,9 +358,7 @@ def _load_coords(ds: xr.Dataset) -> xr.Dataset:
     return ds
 
 
-def _pyramid_postprocess(
-    dt: dt.DataTree, levels: int, other_chunks: dict = None, ds_name: str = None
-) -> dt.DataTree:
+def _pyramid_postprocess(dt: dt.DataTree, levels: int, other_chunks: dict = None) -> dt.DataTree:
     '''Postprocess data pyramid
 
     Adds multiscales metadata and sets Zarr encoding
@@ -452,7 +399,7 @@ def _pyramid_postprocess(
                 dt[slevel].ds[var].encoding['dtype'] = 'int32'
 
     # set global metadata
-    dt.ds.attrs.update({'title': ds_name}, **get_cf_global_attrs(version=version))
+    dt.ds.attrs.update({'title': 'multiscale data pyramid'}, **get_cf_global_attrs(version=version))
     return dt
 
 
@@ -479,9 +426,6 @@ def pyramid(ds_path: UPath, levels: int = 2, other_chunks: dict = None) -> UPath
     ds_hash = str_to_hash(str(ds_path) + str(levels) + str(other_chunks))
     target = results_dir / 'pyramid' / ds_hash
 
-    ds_name = "pyarmid" + ds_path.path.replace('/', '_')
-    target = f'{str(results_dir)}/{ds_name}'
-
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
         return target
@@ -491,12 +435,12 @@ def pyramid(ds_path: UPath, levels: int = 2, other_chunks: dict = None) -> UPath
     ds.coords['date_str'] = ds['time'].dt.strftime('%Y-%m-%d').astype('S10')
 
     ds.attrs.update({'title': ds.attrs['title']}, **get_cf_global_attrs(version=version))
-    # note: this worked when 8 processors and 4 cores
+    target_pyramid = dt.open_datatree('az://static/target-pyramid', engine='zarr')
     with dask.config.set(scheduler='threads'):
         # create pyramid
-        dta = pyramid_regrid(ds, target_pyramid=None, levels=levels)
+        dta = pyramid_regrid(ds, target_pyramid=target_pyramid, levels=levels)
 
-        dta = _pyramid_postprocess(dta, levels, other_chunks=other_chunks, ds_name=ds_name)
+        dta = _pyramid_postprocess(dta, levels, other_chunks=other_chunks)
 
     # write to target
     dta.to_zarr(target, mode='w')
