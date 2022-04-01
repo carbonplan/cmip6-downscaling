@@ -127,3 +127,42 @@ def calc_auspicious_chunks_dict(
         # clip it to that size
         chunks_dict[dim] = min(perfect_chunk_length, dim_sizes[dim])
     return chunks_dict
+
+
+def _resample_func(ds, freq='1MS'):
+    """Helper function to apply resampling."""
+    out_ds = xr.Dataset(attrs=ds.attrs)
+
+    for v in ds.data_vars:
+        if v in ['tasmax', 'tasmin']:
+            out_ds[v] = ds[v].resample(time=freq).mean(dim='time')
+        elif v in ['pr']:
+            out_ds[v] = ds[v].resample(time=freq).sum(dim='time')
+        else:
+            print(f'{v} not implemented')
+
+    return out_ds
+
+
+def resample_wrapper(ds, freq='1MS'):
+    """Wrapper function for resampling.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Input xarray dataset.
+    freq : str, optional
+        resample frequency, by default '1MS'.
+
+    Returns
+    -------
+    xr.Dataset
+        xarray dataset resampled to freq
+    """
+
+    # Use _resample_func() to make template dataset
+    template = _resample_func(ds, freq=freq).chunk({'time': -1})
+    # Apply map_blocks input dataset
+    out_ds = xr.map_blocks(_resample_func, ds, kwargs={'freq': freq}, template=template)
+
+    return out_ds

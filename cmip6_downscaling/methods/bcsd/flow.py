@@ -11,15 +11,14 @@ from cmip6_downscaling.methods.bcsd.tasks import (
     spatial_anomalies,
 )
 from cmip6_downscaling.methods.common.tasks import (
-    annual_summary,
     get_experiment,
     get_obs,
     make_run_parameters,
-    monthly_summary,
     pyramid,
     rechunk,
     regrid,
     run_analyses,
+    time_summary,
 )
 
 warnings.filterwarnings(
@@ -102,8 +101,8 @@ with Flow(
     )  # fine-scale maps (full_space) (time: 365)
 
     # temporary aggregations - these come out in full time
-    monthly_summary_path = monthly_summary(final_bcsd_full_time_path, run_parameters)
-    annual_summary_path = annual_summary(final_bcsd_full_time_path, run_parameters)
+    monthly_summary_path = time_summary(final_bcsd_full_time_path, freq='1MS')
+    annual_summary_path = time_summary(final_bcsd_full_time_path, freq='1AS')
 
     # analysis notebook
     analysis_location = run_analyses(final_bcsd_full_time_path, run_parameters)
@@ -123,5 +122,5 @@ with Flow(
     monthly_pyramid_path = pyramid(monthly_summary_full_space_path, levels=4)
     annual_pyramid_path = pyramid(annual_summary_full_space_path, levels=4)
 
-    # # if config.get('run_options.cleanup_flag') is True:
-    # #     cleanup.run_rsfip(gcm_identifier, obs_identifier)
+    # if config.get('run_options.cleanup_flag') is True:
+    #     cleanup.run_rsfip(gcm_identifier, obs_identifier)
