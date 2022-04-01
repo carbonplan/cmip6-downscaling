@@ -68,65 +68,11 @@ def coarsen_and_interpolate(fine_path: UPath, coarse_path: UPath) -> UPath:
     return target
 
 
-@task(log_stdout=True)
-def fit_and_predict(
-    xtrain_path: UPath,
-    ytrain_path: UPath,
-    xpred_path: UPath,
-    run_parameters: RunParameters,
-    dim: str = 'time',
-) -> UPath:
-    """Prepare inputs (e.g. normalize), use them to fit a GARD model based upon
-    specified parameters and then use that fitted model to make a prediction.
+def _fit_and_predict_wrapper(xtrain, ytrain, xpred, run_parameters, dim='time'):
 
-    Parameters
-    ----------
-    xtrain_path : UPath
-        Path to training dataset (interpolated GCM) chunked full_time
-    ytrain_path : UPath
-        Path to target dataset (interpolated obs) chunked full_time
-    xpred_path : UPath
-        Path to future prediction dataset (interpolated GCM) chunked full_time
-    run_parameters : RunParameters
-        Parameters for run set-up and model specs
-    dim : str, optional
-        Dimension to apply the model along. Default is ``time``.
-
-    Returns
-    -------
-    UPath
-        Path to output dataset chunked full_time
-    """
-    ds_hash = str_to_hash(
-        str(xtrain_path)
-        + str(ytrain_path)
-        + str(xpred_path)
-        + run_parameters.run_id_hash
-        + str(dim)
-    )
-    target = intermediate_dir / 'gard_fit_and_predict' / ds_hash
-
-    if use_cache and zmetadata_exists(target):
-        print(f'found existing target: {target}')
-        return target
+    xpred = xpred.rename({'time': 't2'})
 
     kws = default_none_kwargs(run_parameters.bias_correction_kwargs, copy=True)
-    print(f'xtrain dataset is located here {xtrain_path}')
-    print(f'ytrain dataset is located here {ytrain_path}')
-    print(f'xpred dataset is located here {xpred_path}')
-    # load in datasets
-    xtrain = xr.open_zarr(xtrain_path)
-    ytrain = xr.open_zarr(ytrain_path)
-    xpred = xr.open_zarr(xpred_path)
-    print(xtrain.chunks)
-    print(ytrain.chunks)
-    print(xpred.chunks)
-    print('these are the kws')
-    print(kws)
-
-    # make sure you have the variables you need in obs
-    for v in xpred.data_vars:
-        assert v in ytrain.data_vars
 
     # data transformation (this wants full-time chunking)
     # transformed_obs is for the training period
@@ -170,7 +116,83 @@ def fit_and_predict(
 
     # model prediction
     out = model.predict(transformed_gcm_pred[run_parameters.variable]).to_dataset(dim='variable')
-    out.to_zarr(target)
+
+    return out
+
+
+@task(log_stdout=True)
+def fit_and_predict(
+    xtrain_path: UPath,
+    ytrain_path: UPath,
+    xpred_path: UPath,
+    run_parameters: RunParameters,
+    dim: str = 'time',
+) -> UPath:
+    """Prepare inputs (e.g. normalize), use them to fit a GARD model based upon
+    specified parameters and then use that fitted model to make a prediction.
+
+    Parameters
+    ----------
+    xtrain_path : UPath
+        Path to training dataset (interpolated GCM) chunked full_time
+    ytrain_path : UPath
+        Path to target dataset (interpolated obs) chunked full_time
+    xpred_path : UPath
+        Path to future prediction dataset (interpolated GCM) chunked full_time
+    run_parameters : RunParameters
+        Parameters for run set-up and model specs
+    dim : str, optional
+        Dimension to apply the model along. Default is ``time``.
+
+    Returns
+    -------
+    UPath
+        Path to output dataset chunked full_time
+    """
+    ds_hash = str_to_hash(
+        str(xtrain_path)
+        + str(ytrain_path)
+        + str(xpred_path)
+        + run_parameters.run_id_hash
+        + str(dim)
+    )
+    target = intermediate_dir / 'gard_fit_and_predict' / ds_hash
+
+    if use_cache and zmetadata_exists(target):
+        print(f'found existing target: {target}')
+        return target
+
+    print(f'xtrain dataset is located here {xtrain_path}')
+    print(f'ytrain dataset is located here {ytrain_path}')
+    print(f'xpred dataset is located here {xpred_path}')
+    # load in datasets
+    xtrain = xr.open_zarr(xtrain_path)
+    ytrain = xr.open_zarr(ytrain_path)
+    xpred = xr.open_zarr(xpred_path)
+    print(xtrain.chunks)
+    print(ytrain.chunks)
+    print(xpred.chunks)
+
+    # make sure you have the variables you need in obs
+    for v in xpred.data_vars:
+        assert v in ytrain.data_vars
+
+    # Create a template dataset for map blocks
+    # This feals a bit fragile.
+    template_var = list(xpred.data_vars.keys())[0]
+    template = xpred[[template_var]].rename({template_var: run_parameters.variable})
+
+    out = xr.map_blocks(
+        _fit_and_predict_wrapper,
+        xtrain,
+        args=(ytrain, xpred.rename({'time': 't2'}), run_parameters),
+        kwargs={'dim': dim},
+        template=template,
+    )
+
+    out.attrs.update({'title': 'gard_fit_and_predict'}, **get_cf_global_attrs(version=version))
+
+    out.to_zarr(target, mode='w')
     return target
 
 
