@@ -25,6 +25,8 @@ warnings.filterwarnings(
 runtime = runtimes.get_runtime()
 print(runtime)
 
+good_fit_predict_chunks = {'lat': 24, 'lon': 24, 'time': 10957}
+
 
 with Flow(
     name="gard", storage=runtime.storage, run_config=runtime.run_config, executor=runtime.executor

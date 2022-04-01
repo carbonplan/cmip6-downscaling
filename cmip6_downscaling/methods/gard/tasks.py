@@ -21,6 +21,8 @@ intermediate_dir = UPath(config.get("storage.intermediate.uri")) / version
 results_dir = UPath(config.get("storage.results.uri")) / version
 use_cache = config.get('run_options.use_cache')
 
+good_fit_predict_chunks = {'lat': 24, 'lon': 24, 'time': 10957}
+
 
 @task(tags=['dask-resource:TASKSLOTS=1'], log_stdout=True)
 def coarsen_and_interpolate(fine_path: UPath, coarse_path: UPath) -> UPath:

@@ -142,9 +142,6 @@ def fit_and_predict(
     experiment_train_full_time_ds = xr.open_zarr(experiment_train_full_time_path)
     experiment_predict_full_time_ds = xr.open_zarr(experiment_predict_full_time_path)
 
-    print(coarse_obs_full_time_ds)
-    print(experiment_train_full_time_ds)
-    print(experiment_predict_full_time_ds)
     pointwise_model.fit(
         experiment_train_full_time_ds[run_parameters.variable],
         coarse_obs_full_time_ds[run_parameters.variable],
@@ -184,7 +181,7 @@ def postprocess_bcsd(
 
     ds_hash = str_to_hash(str(bias_corrected_fine_full_time_path) + str(spatial_anomalies_path))
     target = results_dir / title / ds_hash
-
+    print(target)
     if use_cache and zmetadata_exists(target):
         print(f"found existing target: {target}")
         return target
