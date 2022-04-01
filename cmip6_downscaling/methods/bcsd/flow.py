@@ -100,24 +100,24 @@ with Flow(
         bias_corrected_fine_full_time_path, spatial_anomalies_path
     )  # fine-scale maps (full_space) (time: 365)
 
-    # # # temporary aggregations - these come out in full time
+    # temporary aggregations - these come out in full time
     monthly_summary_path = time_summary(final_bcsd_full_time_path, freq='1MS')
     annual_summary_path = time_summary(final_bcsd_full_time_path, freq='1AS')
 
-    # # # analysis notebook
+    # analysis notebook
     analysis_location = run_analyses(final_bcsd_full_time_path, run_parameters)
 
-    # # since pyramids require full space we now rechunk everything into full
-    # # space before passing into pyramid step. we probably want to add a cleanup
-    # # to this step in particular since otherwise we will have an exact
-    # # duplicate of the daily, monthly, and annual datasets
+    # since pyramids require full space we now rechunk everything into full
+    # space before passing into pyramid step. we probably want to add a cleanup
+    # to this step in particular since otherwise we will have an exact
+    # duplicate of the daily, monthly, and annual datasets
     final_bcsd_full_space_path = rechunk(final_bcsd_full_time_path, pattern='full_space')
 
-    # # # # make temporal summaries
+    # make temporal summaries
     monthly_summary_full_space_path = rechunk(monthly_summary_path, pattern='full_space')
     annual_summary_full_space_path = rechunk(annual_summary_path, pattern='full_space')
 
-    # # # pyramids
+    # pyramids
     daily_pyramid_path = pyramid(final_bcsd_full_space_path, levels=4)
     monthly_pyramid_path = pyramid(monthly_summary_full_space_path, levels=4)
     annual_pyramid_path = pyramid(annual_summary_full_space_path, levels=4)
