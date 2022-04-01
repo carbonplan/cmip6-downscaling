@@ -227,7 +227,7 @@ def rechunk(
             chunk_dims = config.get(f"chunk_dims.{pattern}")
             for dim in chunk_def.keys():
                 if dim not in chunk_dims:
-                    print('correcting dim')
+                    print(f'correcting dim {dim}')
                     # override the chunksize of those unchunked dimensions to be the complete length (like passing chunksize=-1
                     chunk_def[dim] = len(ds[dim])
     # if you don't have a target template then you'll just use the `full_time` or `full_space` approach
@@ -236,6 +236,8 @@ def rechunk(
         chunk_def = calc_auspicious_chunks_dict(ds[example_var], chunk_dims=chunk_dims)
     else:
         raise AttributeError('must either define chunking pattern or template')
+    print(f'template for when writing rechunked dataset for {path} to {target} is {template}')
+
     # Note:
     # for rechunker v 0.3.3:
     # initialize the chunks_dict that you'll pass in, filling the coordinates with
@@ -263,6 +265,8 @@ def rechunk(
         return path
     except SchemaError:
         pass
+    print(f'chunks_dict for when writing rechunked dataset for {path} to {target} is {chunks_dict}')
+
     rechunk_plan = rechunker.rechunk(
         source=group,
         target_chunks=chunks_dict,
@@ -395,7 +399,7 @@ def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
     target_grid_ds = xr.open_zarr(target_grid_path)
 
     regridder = xe.Regridder(source_ds, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
-    regridded_ds = regridder(source_ds)
+    regridded_ds = regridder(source_ds, keep_attrs=True)
     regridded_ds.attrs.update(
         {'title': source_ds.attrs['title']}, **get_cf_global_attrs(version=version)
     )

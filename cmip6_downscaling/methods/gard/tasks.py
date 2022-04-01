@@ -43,6 +43,9 @@ def coarsen_and_interpolate(fine_path: UPath, coarse_path: UPath) -> UPath:
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
+        interpolated_ds = xr.open_zarr(target)
+        print('the interpolated chunks look like this')
+        print(interpolated_ds.chunks)
         return target
 
     fine_ds = xr.open_zarr(fine_path)
@@ -60,7 +63,8 @@ def coarsen_and_interpolate(fine_path: UPath, coarse_path: UPath) -> UPath:
         {'title': 'coarsen_and_interpolate'}, **get_cf_global_attrs(version=version)
     )
     interpolated_ds.to_zarr(target, mode='w')
-
+    print('the interpolated chunks look like this')
+    print(interpolated_ds.chunks)
     return target
 
 

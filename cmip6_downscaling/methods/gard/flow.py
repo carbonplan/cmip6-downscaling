@@ -66,16 +66,18 @@ with Flow(
         obs_full_space_path, experiment_train_path
     )
 
-    # TODO: do we need the templates as well for the rechunking? probably defer to bcsd flow here
-    interpolated_obs_full_time_path = rechunk(
-        interpolated_obs_full_space_path, template=experiment_train_path, pattern='full_time'
-    )
+    # just allow the interpolated obs full time rechunking determine the size of the subsequent full-time chunking routines
+    interpolated_obs_full_time_path = rechunk(interpolated_obs_full_space_path, pattern='full_time')
 
     # get gcm data into full space to prep for interpolation
-    experiment_train_full_space_path = rechunk(experiment_train_path, pattern="full_space")
-    experiment_predict_full_space_path = rechunk(experiment_predict_path, pattern="full_space")
+    experiment_train_full_space_path = rechunk(
+        experiment_train_path, pattern="full_space", template=obs_full_space_path
+    )
+    experiment_predict_full_space_path = rechunk(
+        experiment_predict_path, pattern="full_space", template=obs_full_space_path
+    )
 
-    # interpolate gcm to finescale
+    # interpolate gcm to finescale. it will retain the same temporal chunking pattern (likely 25 timesteps)
     experiment_train_fine_full_space_path = regrid(
         source_path=experiment_train_full_space_path, target_grid_path=obs_path
     )
