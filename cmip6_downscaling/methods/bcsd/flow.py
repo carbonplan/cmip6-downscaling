@@ -10,14 +10,13 @@ from cmip6_downscaling.methods.bcsd.tasks import (
     postprocess_bcsd,
     spatial_anomalies,
 )
-from cmip6_downscaling.methods.common.tasks import (
+from cmip6_downscaling.methods.common.tasks import (  # run_analyses,
     get_experiment,
     get_obs,
     make_run_parameters,
     pyramid,
     rechunk,
     regrid,
-    run_analyses,
     time_summary,
 )
 
@@ -105,7 +104,7 @@ with Flow(
     annual_summary_path = time_summary(final_bcsd_full_time_path, freq='1AS')
 
     # analysis notebook
-    analysis_location = run_analyses(final_bcsd_full_time_path, run_parameters)
+    # analysis_location = run_analyses(final_bcsd_full_time_path, run_parameters)
 
     # since pyramids require full space we now rechunk everything into full
     # space before passing into pyramid step. we probably want to add a cleanup
