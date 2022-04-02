@@ -13,7 +13,7 @@ from cmip6_downscaling import __version__ as version, config
 from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
 from cmip6_downscaling.methods.bcsd.utils import reconstruct_finescale
 from cmip6_downscaling.methods.common.containers import RunParameters, str_to_hash
-from cmip6_downscaling.methods.common.utils import zmetadata_exists
+from cmip6_downscaling.methods.common.utils import blocking_to_zarr, zmetadata_exists
 
 warnings.filterwarnings(
     "ignore",
@@ -79,7 +79,7 @@ def spatial_anomalies(obs_full_time_path: UPath, interpolated_obs_full_time_path
         {'title': 'bcsd_spatial_anomalies'}, **get_cf_global_attrs(version=version)
     )
 
-    seasonal_cycle_spatial_anomalies.to_zarr(target, mode="w")
+    blocking_to_zarr(seasonal_cycle_spatial_anomalies, target)
 
     return target
 
@@ -153,7 +153,7 @@ def fit_and_predict(
     bias_corrected_ds = bias_corrected_da.astype('float32').to_dataset(name=run_parameters.variable)
     bias_corrected_ds.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
 
-    bias_corrected_ds.to_zarr(target, mode='w')
+    blocking_to_zarr(bias_corrected_ds, target)
     return target
 
 
@@ -204,5 +204,5 @@ def postprocess_bcsd(
     )
     bcsd_results_ds.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
 
-    bcsd_results_ds.to_zarr(target, mode='w')
+    blocking_to_zarr(bcsd_results_ds, target)
     return target

@@ -24,6 +24,7 @@ from cmip6_downscaling.data.cmip import get_gcm
 from cmip6_downscaling.data.observations import open_era5
 from cmip6_downscaling.methods.common.containers import RunParameters, str_to_hash
 from cmip6_downscaling.methods.common.utils import (
+    blocking_to_zarr,
     calc_auspicious_chunks_dict,
     resample_wrapper,
     subset_dataset,
@@ -91,7 +92,7 @@ def get_obs(run_parameters: RunParameters) -> UPath:
     del subset[run_parameters.variable].encoding['chunks']
 
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
-    subset.to_zarr(target, mode='w')
+    blocking_to_zarr(subset, target)
     return target
 
 
@@ -143,7 +144,7 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     del subset[run_parameters.variable].encoding['chunks']
 
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
-    subset.to_zarr(target, mode='w')
+    blocking_to_zarr(subset, target)
     return target
 
 
@@ -308,8 +309,7 @@ def time_summary(ds_path: UPath, freq: str) -> UPath:
     out_ds = resample_wrapper(ds, freq=freq)
 
     out_ds.attrs.update({'title': 'time_summary'}, **get_cf_global_attrs(version=version))
-    out_ds.to_zarr(target, mode='w')
-
+    blocking_to_zarr(out_ds, target)
     return target
 
 
@@ -346,8 +346,7 @@ def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
     regridded_ds.attrs.update(
         {'title': source_ds.attrs['title']}, **get_cf_global_attrs(version=version)
     )
-    regridded_ds.to_zarr(target, mode='w')
-
+    blocking_to_zarr(regridded_ds, target)
     return target
 
 
