@@ -53,17 +53,6 @@ class BaseRuntime:
         )
 
 
-class MyStorage(Azure):
-    def __init__(self, *args, **kwargs):
-        print('MyStorage-args:', args)
-        print('MyStorage-kwargs:', kwargs)
-        print(
-            'MyStorage-AZURE_STORAGE_CONNECTION_STRING:',
-            os.environ['AZURE_STORAGE_CONNECTION_STRING'],
-        )
-        super().__init__(*args, **kwargs)
-
-
 class CloudRuntime(BaseRuntime):
     def _generate_env(self):
         env = {
@@ -72,6 +61,7 @@ class CloudRuntime(BaseRuntime):
                 "runtime.cloud.dask_distributed_worker_resources_taskslots"
             ),
             "PREFECT__FLOWS__CHECKPOINTING": "true",
+            "PREFECT__LOGGING__LEVEL": "DEBUG",
             **_threadsafe_env_vars,
         }
 
@@ -82,7 +72,7 @@ class CloudRuntime(BaseRuntime):
 
     @property
     def storage(self) -> Storage:
-        return MyStorage(
+        return Azure(
             container=config.get("runtime.cloud.storage_options.container"),
         )
 
