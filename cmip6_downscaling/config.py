@@ -26,8 +26,6 @@ _defaults = {
             'uri': 'az://scratch',
             'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
         },
-        'xpersist_store_name': '/xpersist_metadata_store',
-        'xpersist_overwrite': {'mode': 'w'},
         'web_results': {
             'blob': 'analysis_notebooks',
             'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
@@ -75,7 +73,6 @@ _defaults = {
             "storage_prefix": "az://",
             "storage_options": {
                 'container': 'prefect',
-                'connection_string': "$AZURE_STORAGE_CONNECTION_STRING",
             },
             "agent": "az-eu-west",
             "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git@main",
