@@ -53,6 +53,17 @@ class BaseRuntime:
         )
 
 
+class MyStorage(Azure):
+    def __init__(self, *args, **kwargs):
+        print('MyStorage-args:', args)
+        print('MyStorage-kwargs:', kwargs)
+        print(
+            'MyStorage-AZURE_STORAGE_CONNECTION_STRING:',
+            os.environ['AZURE_STORAGE_CONNECTION_STRING'],
+        )
+        super().__init__(*args, **kwargs)
+
+
 class CloudRuntime(BaseRuntime):
     def _generate_env(self):
         env = {
@@ -71,7 +82,7 @@ class CloudRuntime(BaseRuntime):
 
     @property
     def storage(self) -> Storage:
-        return Azure(
+        return MyStorage(
             container=config.get("runtime.cloud.storage_options.container"),
         )
 
