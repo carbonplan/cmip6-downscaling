@@ -71,7 +71,11 @@ class CloudRuntime(BaseRuntime):
 
     @property
     def storage(self) -> Storage:
-        return Azure(config.get("runtime.cloud.storage_options.container"))
+        print('storage container: ->', config.get("runtime.cloud.storage_options.container"))
+        return Azure(
+            container=config.get("runtime.cloud.storage_options.container"),
+            connection_string=os.getenv('AZURE_STORAGE_CONNECTION_STRING', None),
+        )
 
     @property
     def run_config(self) -> RunConfig:
