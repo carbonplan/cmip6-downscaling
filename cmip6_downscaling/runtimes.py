@@ -57,7 +57,7 @@ class CloudRuntime(BaseRuntime):
     def _generate_env(self):
         env = {
             "EXTRA_PIP_PACKAGES": config.get("runtime.cloud.extra_pip_packages"),
-            "DASK_DISTRIBUTED__WORKER__RESOURCES__TASKSLOTS": config.get(
+            "DASK_DISTRIBUTED__WORKER__RESOURCES__taskslots": config.get(
                 "runtime.cloud.dask_distributed_worker_resources_taskslots"
             ),
             "PREFECT__FLOWS__CHECKPOINTING": "true",
@@ -99,7 +99,7 @@ class CloudRuntime(BaseRuntime):
         )
 
         # TODO: this can done in the constructor now
-        pod_spec.spec.containers[0].args.extend(["--resources", "TASKSLOTS=1"])
+        pod_spec.spec.containers[0].args.extend(["--resources", "taskslots=1"])
 
         executor = DaskExecutor(
             cluster_class=lambda: KubeCluster(
@@ -155,12 +155,21 @@ class PangeoRuntime(LocalRuntime):
 
     @property
     def executor(self) -> Executor:
+
+        # self._cluster = GatewayCluster()
+        # self._cluster.adapt(minimum=1, maximum=20)
+        from dask_gateway import Gateway
+
+        self._gateway = Gateway()
+        self._cluster = self._gateway.get_cluster('prod.d5c78bebd9a243b596693972b39f3f5f')
         return DaskExecutor(
-            cluster_kwargs={
-                'resources': {'TASKSLOTS': 1},
-                'n_workers': config.get("runtime.pangeo.n_workers"),
-                'threads_per_worker': config.get("runtime.pangeo.threads_per_worker"),
-            }
+            address=self._cluster.scheduler_address,
+            client_kwargs={"security": self._cluster.security}
+            #     cluster_kwargs={
+            #         'resources': {'taskslots': 1},
+            #         'n_workers': config.get("runtime.pangeo.n_workers"),
+            #         'threads_per_worker': config.get("runtime.pangeo.threads_per_worker"),
+            #     }
         )
 
     def _generate_env(self):

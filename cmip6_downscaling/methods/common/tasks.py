@@ -314,7 +314,8 @@ def time_summary(ds_path: UPath, freq: str) -> UPath:
     return target
 
 
-@task(tags=['dask-resource:taskslots=1'], log_stdout=True)
+# tags=['dask-resource:taskslots=1']
+@task(log_stdout=True)
 def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
     """Task to regrid a dataset to target grid.
 
@@ -403,7 +404,10 @@ def _pyramid_postprocess(dt: dt.DataTree, levels: int, other_chunks: dict = None
     return dt
 
 
-@task(log_stdout=True, tags=['dask-resource:taskslots=1'])
+# tags=['dask-resource:taskslots=1']
+@task(
+    log_stdout=True,
+)
 def pyramid(ds_path: UPath, levels: int = 2, other_chunks: dict = None) -> UPath:
     '''Task to create a data pyramid from an xarray Dataset
 
