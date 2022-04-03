@@ -29,6 +29,12 @@ def blocking_to_zarr(ds: xr.Dataset, target):
 
     The function blocks until the write is complete then writes Zarr's consolidated metadata
     '''
+
+    # testing a workaround
+    if str(target).startswith('/'):
+        print('fell back to using a string target')
+        target = 'az://flow-outputs' + str(target)
+
     t = ds.to_zarr(target, mode='w', compute=False, consolidated=False)
     t.compute()
     zarr.consolidate_metadata(target)
