@@ -8,14 +8,12 @@ _defaults = {
             'uri': 'az://',
             'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
         },
-        'gcm_identifier_template': '{gcm}/{scenario}/{variable}/{bbox}/{train_period}/{predict_period}/',
-        'obs_identifier_template': '{obs}/{variable}/{bbox}/{train_period}/',
         'intermediate': {
-            'uri': 'az://flow-outputs/prefect_intermediates',
+            'uri': 'az://flow-outputs/intermediates',
             'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
         },
         'results': {
-            'uri': 'az://flow-outputs/prefect_results',
+            'uri': 'az://flow-outputs/results',
             'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
         },
         'temporary': {
@@ -31,32 +29,32 @@ _defaults = {
             'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
         },
     },
-    'methods': {
-        'bcsd': {
-            'process_stages': {
-                "intermediate": {
-                    'obs_ds': {'path_template': '/obs_ds/{obs_identifier}'},
-                    'coarsened_obs': {'path_template': '/coarsened_obs/{obs_identifier}'},
-                    'spatial_anomalies': {'path_template': '/spatial_anomalies/{obs_identifier}'},
-                    'gcm_predict': {'path_template': '/gcm_predict/{gcm_identifier}'},
-                    'rechunked_gcm': {'path_template': '/rechunked_gcm/{gcm_identifier}'},
-                    'bias_corrected': {'path_template': '/bias_corrected/{gcm_identifier}'},
-                },
-                "results": {
-                    "bcsd_output": {"path_template": "/bcsd_output/{gcm_identifier}"},
-                    "bcsd_output_monthly": {
-                        "path_template": "/bcsd_output_monthly/{gcm_identifier}"
-                    },
-                    "bcsd_output_annual": {"path_template": "/bcsd_output_annual/{gcm_identifier}"},
-                    "pyramid_daily": {"path_template": "/pyramid_daily/{gcm_identifier}"},
-                    "pyramid_monthly": {"path_template": "/pyramid_monthly/{gcm_identifier}"},
-                    "pyramid_annual": {"path_template": "/pyramid_annual/{gcm_identifier}"},
-                },
-            },
-        },
-        'gard': {},
-        'maca': {},
-    },
+    # 'methods': {
+    #     'bcsd': {
+    #         'process_stages': {
+    #             "intermediate": {
+    #                 'obs_ds': {'path_template': '/obs_ds/{obs_identifier}'},
+    #                 'coarsened_obs': {'path_template': '/coarsened_obs/{obs_identifier}'},
+    #                 'spatial_anomalies': {'path_template': '/spatial_anomalies/{obs_identifier}'},
+    #                 'gcm_predict': {'path_template': '/gcm_predict/{gcm_identifier}'},
+    #                 'rechunked_gcm': {'path_template': '/rechunked_gcm/{gcm_identifier}'},
+    #                 'bias_corrected': {'path_template': '/bias_corrected/{gcm_identifier}'},
+    #             },
+    #             "results": {
+    #                 "bcsd_output": {"path_template": "/bcsd_output/{gcm_identifier}"},
+    #                 "bcsd_output_monthly": {
+    #                     "path_template": "/bcsd_output_monthly/{gcm_identifier}"
+    #                 },
+    #                 "bcsd_output_annual": {"path_template": "/bcsd_output_annual/{gcm_identifier}"},
+    #                 "pyramid_daily": {"path_template": "/pyramid_daily/{gcm_identifier}"},
+    #                 "pyramid_monthly": {"path_template": "/pyramid_monthly/{gcm_identifier}"},
+    #                 "pyramid_annual": {"path_template": "/pyramid_annual/{gcm_identifier}"},
+    #             },
+    #         },
+    #     },
+    #     'gard': {},
+    #     'maca': {},
+    # },
     "data_catalog": {
         "cmip": {
             'uri': "https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.json",
@@ -67,7 +65,7 @@ _defaults = {
             'storage_options': {"account_name": "cmip6downscaling"},
         },
     },
-    'run_options': {'runtime': None, 'cleanup_flag': True, 'use_cache': True},
+    'run_options': {'runtime': "pangeo", 'cleanup_flag': True, 'use_cache': True},
     "runtime": {
         "cloud": {
             "storage_prefix": "az://",
@@ -97,7 +95,7 @@ _defaults = {
         "pangeo": {
             "storage_prefix": "az://",
             "storage_options": {'directory': './'},
-            'n_workers': 12,
+            'n_workers': 32,
             'threads_per_worker': 1,
         },
     },
