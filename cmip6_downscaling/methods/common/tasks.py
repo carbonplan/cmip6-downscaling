@@ -74,6 +74,7 @@ def get_obs(run_parameters: RunParameters) -> UPath:
         )
     )
     target = intermediate_dir / 'get_obs' / ds_hash
+    print(config.get("storage.intermediate.uri"))
     print(target)
 
     if use_cache and zmetadata_exists(target):
