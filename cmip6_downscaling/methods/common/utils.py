@@ -9,9 +9,14 @@ import zarr
 from upath import UPath
 from xarray_schema import DataArraySchema
 from xarray_schema.base import SchemaError
+from hashlib import blake2b
 
 from cmip6_downscaling.methods.common.containers import BBox
 
+
+
+def str_to_hash(s):
+    return blake2b(s.encode(), digest_size=8).hexdigest()
 
 def zmetadata_exists(path: UPath):
     '''temporary workaround until path.exists() works'''

@@ -22,7 +22,6 @@ warnings.filterwarnings(
 )
 
 
-scratch_dir = UPath(config.get("storage.scratch.uri"))
 intermediate_dir = UPath(config.get("storage.intermediate.uri")) / version
 results_dir = UPath(config.get("storage.results.uri")) / version
 use_cache = config.get('run_options.use_cache')

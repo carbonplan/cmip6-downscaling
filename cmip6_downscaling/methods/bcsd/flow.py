@@ -117,9 +117,9 @@ with Flow(
     annual_summary_full_space_path = rechunk(annual_summary_path, pattern='full_space')
 
     # pyramids
-    daily_pyramid_path = pyramid(final_bcsd_full_space_path, levels=4)
-    monthly_pyramid_path = pyramid(monthly_summary_full_space_path, levels=4)
-    annual_pyramid_path = pyramid(annual_summary_full_space_path, levels=4)
+    pyramid(final_bcsd_full_space_path, levels=4)
+    pyramid(monthly_summary_full_space_path, levels=4)
+    pyramid(annual_summary_full_space_path, levels=4)
 
     # if config.get('run_options.cleanup_flag') is True:
     #     cleanup.run_rsfip(gcm_identifier, obs_identifier)

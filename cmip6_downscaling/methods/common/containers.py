@@ -1,12 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from hashlib import blake2b
-
-
-def str_to_hash(s):
-    return blake2b(s.encode(), digest_size=8).hexdigest()
-
+from utils import str_to_hash
 
 @dataclass
 class BBox:
