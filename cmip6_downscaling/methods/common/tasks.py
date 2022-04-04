@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import datetime
+import json
 import os
 import warnings
 from dataclasses import asdict
@@ -516,3 +518,24 @@ def run_analyses(ds_path: UPath, run_parameters: RunParameters) -> UPath:
             )
 
     return executed_notebook_path
+
+
+@task
+def finalize(path_dict: dict, run_parameters: RunParameters):
+
+    now = datetime.datetime.utcnow()
+    target1 = results_dir / 'runs' / run_parameters.run_id / (now + '.json')
+    target2 = results_dir / 'runs' / run_parameters.run_id / 'latest.json'
+    print(target1)
+    print(target2)
+
+    out = {}
+    out['parameters'] = asdict(run_parameters)
+    out['attrs'] = get_cf_global_attrs(version=version)
+    out['datasets'] = {k: str(p) for k, p in path_dict.items()}
+
+    with target1.open(mode='w') as f:
+        json.dump(out, f, indent=2)
+
+    with target2.open(mode='w') as f:
+        json.dump(out, f, indent=2)

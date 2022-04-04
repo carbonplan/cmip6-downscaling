@@ -161,7 +161,7 @@ class PangeoRuntime(LocalRuntime):
         from dask_gateway import Gateway
 
         self._gateway = Gateway()
-        self._cluster = self._gateway.get_cluster('prod.d5c78bebd9a243b596693972b39f3f5f')
+        self._cluster = self._gateway.get_cluster('prod.43fa8908c39744138e416073595e19fc')
         return DaskExecutor(
             address=self._cluster.scheduler_address,
             client_kwargs={"security": self._cluster.security}
