@@ -22,13 +22,14 @@ from xarray_schema.base import SchemaError
 from cmip6_downscaling import __version__ as version, config
 from cmip6_downscaling.data.cmip import get_gcm
 from cmip6_downscaling.data.observations import open_era5
-from cmip6_downscaling.methods.common.containers import RunParameters, str_to_hash
+from cmip6_downscaling.methods.common.containers import RunParameters
 from cmip6_downscaling.methods.common.utils import (
     blocking_to_zarr,
     calc_auspicious_chunks_dict,
     resample_wrapper,
     subset_dataset,
     zmetadata_exists,
+    str_to_hash
 )
 
 warnings.filterwarnings(

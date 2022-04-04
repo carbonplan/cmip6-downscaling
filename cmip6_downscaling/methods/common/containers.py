@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from utils import str_to_hash
+import cmip6_downscaling.methods.common.utils as utils 
 
 @dataclass
 class BBox:
@@ -97,4 +97,4 @@ class RunParameters:
 
     @property
     def run_id_hash(self):
-        return str_to_hash(self.run_id)
+        return utils.str_to_hash(self.run_id)
