@@ -27,9 +27,9 @@ from cmip6_downscaling.methods.common.utils import (
     blocking_to_zarr,
     calc_auspicious_chunks_dict,
     resample_wrapper,
+    str_to_hash,
     subset_dataset,
     zmetadata_exists,
-    str_to_hash
 )
 
 warnings.filterwarnings(

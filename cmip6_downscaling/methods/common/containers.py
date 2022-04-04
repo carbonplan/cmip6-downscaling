@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import cmip6_downscaling.methods.common.utils as utils 
+
+import cmip6_downscaling.methods.common.utils as utils
+
 
 @dataclass
 class BBox:
