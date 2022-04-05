@@ -523,7 +523,7 @@ def run_analyses(ds_path: UPath, run_parameters: RunParameters) -> UPath:
 @task
 def finalize(path_dict: dict, run_parameters: RunParameters):
 
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.utcnow().isoformat()
     target1 = results_dir / 'runs' / run_parameters.run_id / (now + '.json')
     target2 = results_dir / 'runs' / run_parameters.run_id / 'latest.json'
     print(target1)
