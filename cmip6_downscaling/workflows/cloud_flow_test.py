@@ -9,7 +9,6 @@ from prefect import Flow, task
 from cmip6_downscaling import runtimes
 
 
-
 @task(log_stdout=True, tags=['dask-resource:TASKSLOTS=1'])
 def my_task(num: int) -> None:
     time.sleep(1)

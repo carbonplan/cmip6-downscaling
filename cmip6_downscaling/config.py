@@ -29,7 +29,6 @@ _defaults = {
             'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
         },
     },
- 
     "data_catalog": {
         "cmip": {
             'uri': "https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.json",
