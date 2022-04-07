@@ -57,7 +57,7 @@ def load_top_cities(
         Dataframe with columns ['city', 'lat', 'lng']
     """
 
-    cities = pd.read_csv('https://cmip6downscaling.blob.core.windows.net/cmip6/worldcities.csv')
+    cities = pd.read_csv('https://cmip6downscaling.blob.core.windows.net/static/worldcities.csv')
     top_cities = (
         cities.sort_values('population', ascending=False)
         .groupby('country')
