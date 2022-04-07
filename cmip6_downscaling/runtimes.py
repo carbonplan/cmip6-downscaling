@@ -174,22 +174,24 @@ class GatewayRuntime(PangeoRuntime):
 
         self._gateway = Gateway()
 
-        env = {
-            'EXTRA_PIP_PACKAGES': config.get("runtime.gateway.extra_pip_packages"),
-            'AZURE_STORAGE_CONNECTION_STRING': os.environ['AZURE_STORAGE_CONNECTION_STRING'],
-        }
+        if config.get("runtime.gateway.cluster_name"):
+            # connect to an existing cluster
+            self._cluster = self._gateway.get_cluster(config.get("runtime.gateway.cluster_name"))
+        else:
+            # create a new cluster
+            options = self._gateway.cluster_options(use_local_defaults=False)
+            options['worker_cores'] = config.get("runtime.gateway.worker_cores")
+            options['worker_memory'] = config.get("runtime.gateway.worker_memory")
+            options['image'] = config.get("runtime.gateway.image")
+            options['environment'].update(self._generate_env())
 
-        options = self._gateway.cluster_options(use_local_defaults=False)
-        options['worker_cores'] = config.get("runtime.gateway.worker_cores")
-        options['worker_memory'] = config.get("runtime.gateway.worker_memory")
-        options['image'] = config.get("runtime.gateway.image")
-        options['environment'].update(env)
-
-        self._cluster = self._gateway.new_cluster(cluster_options=options, shutdown_on_close=True)
-        self._cluster.adapt(
-            minimum=config.get("runtime.gateway.adapt_min"),
-            maximum=config.get("runtime.gateway.adapt_max"),
-        )
+            self._cluster = self._gateway.new_cluster(
+                cluster_options=options, shutdown_on_close=True
+            )
+            self._cluster.adapt(
+                minimum=config.get("runtime.gateway.adapt_min"),
+                maximum=config.get("runtime.gateway.adapt_max"),
+            )
 
     @cached_property
     def executor(self) -> Executor:
@@ -204,12 +206,13 @@ class GatewayRuntime(PangeoRuntime):
             client_kwargs={"security": self._cluster.security},
         )
 
-    def __del__(self):
-        try:
-            self._cluster.close()
-            self._gateway.close()
-        except:
-            pass
+    def _generate_env(self):
+        env = {**_threadsafe_env_vars}
+        if config.get("runtime.gateway.extra_pip_packages"):
+            env['EXTRA_PIP_PACKAGES'] = config.get("runtime.gateway.extra_pip_packages")
+        if 'AZURE_STORAGE_CONNECTION_STRING' in os.environ:
+            env['AZURE_STORAGE_CONNECTION_STRING'] = os.environ['AZURE_STORAGE_CONNECTION_STRING']
+        return env
 
 
 def get_runtime():

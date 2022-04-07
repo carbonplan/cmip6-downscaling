@@ -92,6 +92,7 @@ _defaults = {
             "storage_options": {
                 'container': 'prefect',
             },
+            "cluster_name": '',  #
             "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git@gateway",
             "image": "carbonplan/cmip6-downscaling-prefect:2022.04.03",
             "worker_cores": 1,
