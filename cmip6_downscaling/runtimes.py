@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from abc import abstractmethod
+from functools import cached_property
 
 import dask
 from dask_kubernetes import KubeCluster, make_pod_spec
@@ -29,17 +30,17 @@ class BaseRuntime:
     def __init__(self):
         pass
 
-    @property
+    @cached_property
     @abstractmethod
     def storage(self) -> Storage:  # pragma: no cover
         pass
 
-    @property
+    @cached_property
     @abstractmethod
     def run_config(self) -> RunConfig:  # pragma: no cover
         pass
 
-    @property
+    @cached_property
     @abstractmethod
     def executor(self) -> Executor:  # pragma: no cover
         pass
@@ -57,7 +58,7 @@ class CloudRuntime(BaseRuntime):
     def _generate_env(self):
         env = {
             "EXTRA_PIP_PACKAGES": config.get("runtime.cloud.extra_pip_packages"),
-            "DASK_DISTRIBUTED__WORKER__RESOURCES__TASKSLOTS": config.get(
+            "DASK_DISTRIBUTED__WORKER__RESOURCES__taskslots": config.get(
                 "runtime.cloud.dask_distributed_worker_resources_taskslots"
             ),
             "PREFECT__FLOWS__CHECKPOINTING": "true",
@@ -69,13 +70,13 @@ class CloudRuntime(BaseRuntime):
 
         return env
 
-    @property
+    @cached_property
     def storage(self) -> Storage:
         return Azure(
             container=config.get("runtime.cloud.storage_options.container"),
         )
 
-    @property
+    @cached_property
     def run_config(self) -> RunConfig:
         return KubernetesRun(
             cpu_request=config.get("runtime.cloud.kubernetes_cpu"),
@@ -85,7 +86,7 @@ class CloudRuntime(BaseRuntime):
             env=self._generate_env(),
         )
 
-    @property
+    @cached_property
     def executor(self) -> Executor:
 
         pod_spec = make_pod_spec(
@@ -99,7 +100,7 @@ class CloudRuntime(BaseRuntime):
         )
 
         # TODO: this can done in the constructor now
-        pod_spec.spec.containers[0].args.extend(["--resources", "TASKSLOTS=1"])
+        pod_spec.spec.containers[0].args.extend(["--resources", "taskslots=1"])
 
         executor = DaskExecutor(
             cluster_class=lambda: KubeCluster(
@@ -115,15 +116,15 @@ class CloudRuntime(BaseRuntime):
 
 
 class LocalRuntime(BaseRuntime):
-    @property
+    @cached_property
     def storage(self) -> Storage:
         return Local(**config.get("runtime.local.storage_options"))
 
-    @property
+    @cached_property
     def run_config(self) -> RunConfig:
         return LocalRun(env=self._generate_env())
 
-    @property
+    @cached_property
     def executor(self) -> Executor:
         return LocalDaskExecutor(scheduler="processes")
 
@@ -132,11 +133,11 @@ class LocalRuntime(BaseRuntime):
 
 
 class CIRuntime(LocalRuntime):
-    @property
+    @cached_property
     def storage(self) -> Storage:
         return Local(**config.get("runtime.test.storage_options"))
 
-    @property
+    @cached_property
     def executor(self) -> Executor:
         return LocalExecutor()
 
@@ -145,15 +146,15 @@ class PangeoRuntime(LocalRuntime):
     def __init__(self):
         dask.config.set({'temporary_directory': '/tmp/dask'})
 
-    @property
+    @cached_property
     def storage(self) -> Storage:
         return Local(**config.get("runtime.pangeo.storage_options"))
 
-    @property
+    @cached_property
     def run_config(self) -> RunConfig:
         return LocalRun(env=self._generate_env())
 
-    @property
+    @cached_property
     def executor(self) -> Executor:
         return DaskExecutor(
             cluster_kwargs={
@@ -167,6 +168,53 @@ class PangeoRuntime(LocalRuntime):
         return _threadsafe_env_vars
 
 
+class GatewayRuntime(PangeoRuntime):
+    def __init__(self):
+        from dask_gateway import Gateway
+
+        self._gateway = Gateway()
+
+        if config.get("runtime.gateway.cluster_name"):
+            # connect to an existing cluster
+            self._cluster = self._gateway.get_cluster(config.get("runtime.gateway.cluster_name"))
+        else:
+            # create a new cluster
+            options = self._gateway.cluster_options(use_local_defaults=False)
+            options['worker_cores'] = config.get("runtime.gateway.worker_cores")
+            options['worker_memory'] = config.get("runtime.gateway.worker_memory")
+            options['image'] = config.get("runtime.gateway.image")
+            options['environment'].update(self._generate_env())
+
+            self._cluster = self._gateway.new_cluster(
+                cluster_options=options, shutdown_on_close=True
+            )
+            self._cluster.adapt(
+                minimum=config.get("runtime.gateway.adapt_min"),
+                maximum=config.get("runtime.gateway.adapt_max"),
+            )
+
+    @cached_property
+    def executor(self) -> Executor:
+
+        print('cluster info:')
+        print(self._cluster)
+        print(self._cluster.name)
+        print(self._cluster.dashboard_link)
+
+        return DaskExecutor(
+            address=self._cluster.scheduler_address,
+            client_kwargs={"security": self._cluster.security},
+        )
+
+    def _generate_env(self):
+        env = {**_threadsafe_env_vars}
+        if config.get("runtime.gateway.extra_pip_packages"):
+            env['EXTRA_PIP_PACKAGES'] = config.get("runtime.gateway.extra_pip_packages")
+        if 'AZURE_STORAGE_CONNECTION_STRING' in os.environ:
+            env['AZURE_STORAGE_CONNECTION_STRING'] = os.environ['AZURE_STORAGE_CONNECTION_STRING']
+        return env
+
+
 def get_runtime():
     if config.get("run_options.runtime") == "ci":
         runtime = CIRuntime()
@@ -176,6 +224,8 @@ def get_runtime():
         runtime = CloudRuntime()
     elif config.get("run_options.runtime") == "pangeo":
         runtime = PangeoRuntime()
+    elif config.get("run_options.runtime") == "gateway":
+        runtime = GatewayRuntime()
     elif os.environ.get("CI") == "true":
         runtime = CIRuntime()
         print("CIRuntime selected from os.environ")

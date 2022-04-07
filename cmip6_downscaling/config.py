@@ -61,6 +61,19 @@ _defaults = {
             "adapt_max": 20,
             "dask_distributed_worker_resources_taskslots": "1",
         },
+        "gateway": {
+            "storage_prefix": "az://",
+            "storage_options": {
+                'container': 'prefect',
+            },
+            "cluster_name": '',  #
+            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git@main",
+            "image": "carbonplan/cmip6-downscaling-prefect:2022.04.07",
+            "worker_cores": 1,
+            "worker_memory": 16,  # Gi
+            "adapt_min": 1,
+            "adapt_max": 60,
+        },
         "local": {"storage_prefix": "/tmp/", "storage_options": {'directory': './'}},
         "test": {
             "storage_prefix": "/tmp/",

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import datetime
+import json
 import os
 import warnings
 from dataclasses import asdict
@@ -312,7 +314,8 @@ def time_summary(ds_path: UPath, freq: str) -> UPath:
     return target
 
 
-@task(tags=['dask-resource:taskslots=1'], log_stdout=True)
+# tags=['dask-resource:taskslots=1']
+@task(log_stdout=True)
 def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
     """Task to regrid a dataset to target grid.
 
@@ -401,7 +404,10 @@ def _pyramid_postprocess(dt: dt.DataTree, levels: int, other_chunks: dict = None
     return dt
 
 
-@task(log_stdout=True, tags=['dask-resource:taskslots=1'])
+# tags=['dask-resource:taskslots=1']
+@task(
+    log_stdout=True,
+)
 def pyramid(ds_path: UPath, levels: int = 2, other_chunks: dict = None) -> UPath:
     '''Task to create a data pyramid from an xarray Dataset
 
@@ -510,3 +516,24 @@ def run_analyses(ds_path: UPath, run_parameters: RunParameters) -> UPath:
             )
 
     return executed_notebook_path
+
+
+@task
+def finalize(path_dict: dict, run_parameters: RunParameters):
+
+    now = datetime.datetime.utcnow().isoformat()
+    target1 = results_dir / 'runs' / run_parameters.run_id / (now + '.json')
+    target2 = results_dir / 'runs' / run_parameters.run_id / 'latest.json'
+    print(target1)
+    print(target2)
+
+    out = {}
+    out['parameters'] = asdict(run_parameters)
+    out['attrs'] = get_cf_global_attrs(version=version)
+    out['datasets'] = {k: str(p) for k, p in path_dict.items()}
+
+    with target1.open(mode='w') as f:
+        json.dump(out, f, indent=2)
+
+    with target2.open(mode='w') as f:
+        json.dump(out, f, indent=2)

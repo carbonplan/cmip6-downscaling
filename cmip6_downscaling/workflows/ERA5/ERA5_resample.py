@@ -41,7 +41,7 @@ run_config = KubernetesRun(cpu_request=7, memory_request="16Gi", image=image, la
 
 def get_ERA5_zstore_list(year: str = None) -> list:
     col = intake.open_esm_datastore(
-        "https://cmip6downscaling.blob.core.windows.net/cmip6/ERA5_catalog.json"
+        "https://cmip6downscaling.blob.core.windows.net/training/ERA5_catalog.json"
     )
     store_list = list(col.df.zstore)
     if year is not None:
@@ -113,7 +113,9 @@ def downsample_and_combine(year: str):
     )
 
     # write data as consolidated zarr store
-    mapper = fsspec.get_mapper(f'az://cmip6/ERA5_daily/{year}', connection_string=connection_string)
+    mapper = fsspec.get_mapper(
+        f'az://training/ERA5_daily/{year}', connection_string=connection_string
+    )
     ds.to_zarr(mapper, mode='w', consolidated=True)
 
 
