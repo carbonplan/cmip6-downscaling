@@ -29,32 +29,6 @@ _defaults = {
             'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
         },
     },
-    # 'methods': {
-    #     'bcsd': {
-    #         'process_stages': {
-    #             "intermediate": {
-    #                 'obs_ds': {'path_template': '/obs_ds/{obs_identifier}'},
-    #                 'coarsened_obs': {'path_template': '/coarsened_obs/{obs_identifier}'},
-    #                 'spatial_anomalies': {'path_template': '/spatial_anomalies/{obs_identifier}'},
-    #                 'gcm_predict': {'path_template': '/gcm_predict/{gcm_identifier}'},
-    #                 'rechunked_gcm': {'path_template': '/rechunked_gcm/{gcm_identifier}'},
-    #                 'bias_corrected': {'path_template': '/bias_corrected/{gcm_identifier}'},
-    #             },
-    #             "results": {
-    #                 "bcsd_output": {"path_template": "/bcsd_output/{gcm_identifier}"},
-    #                 "bcsd_output_monthly": {
-    #                     "path_template": "/bcsd_output_monthly/{gcm_identifier}"
-    #                 },
-    #                 "bcsd_output_annual": {"path_template": "/bcsd_output_annual/{gcm_identifier}"},
-    #                 "pyramid_daily": {"path_template": "/pyramid_daily/{gcm_identifier}"},
-    #                 "pyramid_monthly": {"path_template": "/pyramid_monthly/{gcm_identifier}"},
-    #                 "pyramid_annual": {"path_template": "/pyramid_annual/{gcm_identifier}"},
-    #             },
-    #         },
-    #     },
-    #     'gard': {},
-    #     'maca': {},
-    # },
     "data_catalog": {
         "cmip": {
             'uri': "https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.json",
@@ -76,7 +50,7 @@ _defaults = {
             "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git@main",
             "kubernetes_cpu": 7,
             "kubernetes_memory": "16Gi",
-            "image": "carbonplan/cmip6-downscaling-prefect:2022.03.30",
+            "image": "carbonplan/cmip6-downscaling-prefect:2022.04.07",
             "pod_memory_limit": "8Gi",
             "pod_memory_request": "8Gi",
             "pod_threads_per_worker": 1,
@@ -86,6 +60,19 @@ _defaults = {
             "adapt_min": 2,
             "adapt_max": 20,
             "dask_distributed_worker_resources_taskslots": "1",
+        },
+        "gateway": {
+            "storage_prefix": "az://",
+            "storage_options": {
+                'container': 'prefect',
+            },
+            "cluster_name": '',  #
+            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git@main",
+            "image": "carbonplan/cmip6-downscaling-prefect:2022.04.07",
+            "worker_cores": 1,
+            "worker_memory": 16,  # Gi
+            "adapt_min": 1,
+            "adapt_max": 60,
         },
         "local": {"storage_prefix": "/tmp/", "storage_options": {'directory': './'}},
         "test": {
