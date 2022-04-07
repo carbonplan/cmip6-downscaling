@@ -99,4 +99,4 @@ class RunParameters:
 
     @property
     def run_id_hash(self):
-        return utils.str_to_hash(self.run_id)
+        return str_to_hash(self.run_id)
