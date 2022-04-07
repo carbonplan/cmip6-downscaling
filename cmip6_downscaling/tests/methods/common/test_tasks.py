@@ -89,22 +89,7 @@ def check_global_attrs(ds):
 
 
 def test_get_obs(run_parameters):
-    run_parameters = RunParameters(
-        method='bcsd',
-        obs='ERA5',
-        model='MIROC6',
-        member='r1i1p1f1',
-        grid_label='gn',
-        table_id='day',
-        scenario='ssp370',
-        variable='tasmax',
-        latmin='-2',
-        latmax='2',
-        lonmin='14.5',
-        lonmax='18.5',
-        train_dates=['1980', '1981'],
-        predict_dates=['2050', '2051'],
-    )
+
     obs_path = get_obs.run(run_parameters)
 
     ds = xr.open_zarr(obs_path)
