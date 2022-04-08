@@ -29,10 +29,10 @@ from cmip6_downscaling.methods.common.utils import (
     blocking_to_zarr,
     calc_auspicious_chunks_dict,
     resample_wrapper,
-    str_to_hash,
     subset_dataset,
     zmetadata_exists,
 )
+from cmip6_downscaling.utils import str_to_hash
 
 warnings.filterwarnings(
     "ignore",
@@ -145,7 +145,8 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     del subset[run_parameters.variable].encoding['chunks']
 
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
-    blocking_to_zarr(subset, target)
+    subset.to_zarr(target, mode='w')
+    # blocking_to_zarr(subset, target)
     return target
 
 

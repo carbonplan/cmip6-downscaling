@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from cmip6_downscaling.methods.common.utils import str_to_hash
+from cmip6_downscaling.utils import str_to_hash
 
 
 @dataclass
