@@ -24,11 +24,12 @@ from xarray_schema.base import SchemaError
 from cmip6_downscaling import __version__ as version, config
 from cmip6_downscaling.data.cmip import get_gcm
 from cmip6_downscaling.data.observations import open_era5
-from cmip6_downscaling.methods.common.containers import RunParameters, str_to_hash
+from cmip6_downscaling.methods.common.containers import RunParameters
 from cmip6_downscaling.methods.common.utils import (
     blocking_to_zarr,
     calc_auspicious_chunks_dict,
     resample_wrapper,
+    str_to_hash,
     subset_dataset,
     zmetadata_exists,
 )
@@ -76,8 +77,6 @@ def get_obs(run_parameters: RunParameters) -> UPath:
         )
     )
     target = intermediate_dir / 'get_obs' / ds_hash
-    print(config.get("storage.intermediate.uri"))
-    print(target)
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
@@ -93,7 +92,6 @@ def get_obs(run_parameters: RunParameters) -> UPath:
         chunking_schema={'time': 365, 'lat': 150, 'lon': 150},
     )
     del subset[run_parameters.variable].encoding['chunks']
-
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
     blocking_to_zarr(subset, target)
     return target

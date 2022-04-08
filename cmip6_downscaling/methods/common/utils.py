@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pathlib
 import re
+from hashlib import blake2b
 
 import numpy as np
 import xarray as xr
@@ -10,7 +11,11 @@ from upath import UPath
 from xarray_schema import DataArraySchema
 from xarray_schema.base import SchemaError
 
-from cmip6_downscaling.methods.common.containers import BBox
+import cmip6_downscaling.methods.common.containers as containers
+
+
+def str_to_hash(s):
+    return blake2b(s.encode(), digest_size=8).hexdigest()
 
 
 def zmetadata_exists(path: UPath):
@@ -44,7 +49,7 @@ def subset_dataset(
     ds: xr.Dataset,
     variable: str,
     time_period: slice,
-    bbox: BBox,
+    bbox: containers.BBox,
     chunking_schema: dict = None,
 ) -> xr.Dataset:
     """Uses Xarray slicing to spatially subset a dataset based on input params.

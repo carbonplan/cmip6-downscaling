@@ -89,6 +89,7 @@ def check_global_attrs(ds):
 
 
 def test_get_obs(run_parameters):
+
     obs_path = get_obs.run(run_parameters)
 
     ds = xr.open_zarr(obs_path)
@@ -160,7 +161,6 @@ def test_rechunk(rechunk_params, tmp_path):
         pattern=rechunk_params['chunking_method'],
     )
     actual_ds = xr.open_zarr(actual_path)
-    print(actual_ds)
 
     expected_chunks = rechunk_params['chunking_schema']
     schema = DatasetSchema(
