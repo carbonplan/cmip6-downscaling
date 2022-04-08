@@ -61,9 +61,9 @@ with Flow(
     p['experiment_train_path'] = get_experiment(run_parameters, time_subset='train_period')
     p['experiment_predict_path'] = get_experiment(run_parameters, time_subset='predict_period')
 
-    # after regridding coarse_obs will have smaller array size in space but still
-    # be chunked finely along time. but that's good to get it for regridding back to
-    # the interpolated obs in next task
+    # # after regridding coarse_obs will have smaller array size in space but still
+    # # be chunked finely along time. but that's good to get it for regridding back to
+    # # the interpolated obs in next task
     p['coarse_obs_path'] = regrid(p['obs_full_space_path'], p['experiment_train_path'])
 
     # interpolated obs should have same exact chunking schema as ds at `p['obs_full_space_path']`
@@ -131,7 +131,7 @@ with Flow(
     p['monthly_pyramid_path'] = pyramid(p['monthly_summary_full_space_path'], levels=4)
     p['annual_pyramid_path'] = pyramid(p['annual_summary_full_space_path'], levels=4)
 
-    # finalize
+    # # finalize
     finalize(p, run_parameters)
 
     # if config.get('run_options.cleanup_flag') is True:

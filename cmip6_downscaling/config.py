@@ -35,11 +35,16 @@ _defaults = {
             'storage_options': {"account_name": "cmip6downscaling"},
         },
         "era5": {
-            'uri': "https://cmip6downscaling.blob.core.windows.net/cmip6/ERA5_daily/",
+            'uri': "https://cmip6downscaling.blob.core.windows.net/training/ERA5_daily/",
             'storage_options': {"account_name": "cmip6downscaling"},
         },
     },
-    'run_options': {'runtime': "pangeo", 'cleanup_flag': True, 'use_cache': True},
+    'run_options': {
+        'runtime': "pangeo",
+        'cleanup_flag': True,
+        'use_cache': True,
+        "regrid_tags": ['dask-resource:taskslots=1'],
+    },
     "runtime": {
         "cloud": {
             "storage_prefix": "az://",
@@ -47,10 +52,10 @@ _defaults = {
                 'container': 'prefect',
             },
             "agent": "az-eu-west",
-            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git@main",
+            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git",
             "kubernetes_cpu": 7,
             "kubernetes_memory": "16Gi",
-            "image": "carbonplan/cmip6-downscaling-prefect:2022.04.07",
+            "image": "carbonplan/cmip6-downscaling-prefect:latest",
             "pod_memory_limit": "8Gi",
             "pod_memory_request": "8Gi",
             "pod_threads_per_worker": 1,
@@ -66,7 +71,7 @@ _defaults = {
             "storage_options": {
                 'container': 'prefect',
             },
-            "cluster_name": '',  #
+            "cluster_name": '',
             "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git@main",
             "image": "carbonplan/cmip6-downscaling-prefect:2022.04.07",
             "worker_cores": 1,
@@ -82,7 +87,7 @@ _defaults = {
         "pangeo": {
             "storage_prefix": "az://",
             "storage_options": {'directory': './'},
-            'n_workers': 32,
+            'n_workers': 16,
             'threads_per_worker': 1,
         },
     },

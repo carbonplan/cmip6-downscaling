@@ -7,7 +7,6 @@ import warnings
 from dataclasses import asdict
 from pathlib import PosixPath
 
-import dask
 import datatree as dt
 import fsspec
 import rechunker
@@ -147,7 +146,9 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     del subset[run_parameters.variable].encoding['chunks']
 
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
-    blocking_to_zarr(subset, target)
+    subset.to_zarr(target, mode='w')
+
+    # blocking_to_zarr(subset, target)
     return target
 
 
@@ -317,7 +318,12 @@ def time_summary(ds_path: UPath, freq: str) -> UPath:
 
 
 # tags=['dask-resource:taskslots=1']
-@task(log_stdout=True)
+@task(
+    log_stdout=True,
+    tags=config.get('run_options.regrid_tags'),
+    max_retries=2,
+    retry_delay=datetime.timedelta(seconds=5),
+)
 def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
     """Task to regrid a dataset to target grid.
 
@@ -409,6 +415,9 @@ def _pyramid_postprocess(dt: dt.DataTree, levels: int, other_chunks: dict = None
 # tags=['dask-resource:taskslots=1']
 @task(
     log_stdout=True,
+    tags=config.get('run_options.regrid_tags'),
+    max_retries=2,
+    retry_delay=datetime.timedelta(seconds=5),
 )
 def pyramid(ds_path: UPath, levels: int = 2, other_chunks: dict = None) -> UPath:
     '''Task to create a data pyramid from an xarray Dataset
@@ -442,11 +451,10 @@ def pyramid(ds_path: UPath, levels: int = 2, other_chunks: dict = None) -> UPath
 
     ds.attrs.update({'title': ds.attrs['title']}, **get_cf_global_attrs(version=version))
     target_pyramid = dt.open_datatree('az://static/target-pyramid', engine='zarr')
-    with dask.config.set(scheduler='threads'):
-        # create pyramid
-        dta = pyramid_regrid(ds, target_pyramid=target_pyramid, levels=levels)
+    # create pyramid
+    dta = pyramid_regrid(ds, target_pyramid=target_pyramid, levels=levels)
 
-        dta = _pyramid_postprocess(dta, levels, other_chunks=other_chunks)
+    dta = _pyramid_postprocess(dta, levels, other_chunks=other_chunks)
 
     # write to target
     dta.to_zarr(target, mode='w')
