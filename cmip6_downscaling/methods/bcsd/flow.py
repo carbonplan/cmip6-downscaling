@@ -127,6 +127,7 @@ with Flow(
     p['annual_summary_full_space_path'] = rechunk(p['annual_summary_path'], pattern='full_space')
 
     # pyramids
+
     p['daily_pyramid_path'] = pyramid(p['final_bcsd_full_space_path'], levels=4)
     p['monthly_pyramid_path'] = pyramid(p['monthly_summary_full_space_path'], levels=4)
     p['annual_pyramid_path'] = pyramid(p['annual_summary_full_space_path'], levels=4)
