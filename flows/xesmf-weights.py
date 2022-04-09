@@ -52,7 +52,6 @@ def generate_weights_pyramid(ds_in, levels):
                 'row': (dim, w.coords[0, :] + 1),
             }
         )
-        print(ds)
         weights_pyramid[str(level)] = ds
     weights_pyramid.ds.attrs['levels'] = levels
     weights_pyramid.ds.attrs['regrid_method'] = regridder.method
@@ -68,7 +67,8 @@ def generate_weights(store: dict, levels: int) -> bool:
     try:
         ds_in = xr.open_dataset(store['zstore'], engine='zarr', chunks={})
         weights_pyramid = generate_weights_pyramid(ds_in, levels)
-        print(weights_pyramid)
+        print(weights_pyramid.ds.attrs)
+        print(store)
 
     except Exception:
         print(f'Failed to load {store["zstore"]}')
