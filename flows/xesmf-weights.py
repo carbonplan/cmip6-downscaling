@@ -33,32 +33,43 @@ def get_stores() -> list[dict]:
     return stores
 
 
-@task(log_stdout=True)
-def generate_weights(store: dict, levels: int) -> bool:
+def generate_weights_pyramid(ds_in, levels):
     import datatree
     import xarray as xr
     import xesmf as xe
     from ndpyramid.regrid import make_grid_ds
 
+    weights_pyramid = datatree.DataTree()
+    for level in range(levels):
+        ds_out = make_grid_ds(level=level)
+        regridder = xe.Regridder(ds_in, ds_out, method='bilinear')
+        w = regridder.weights.data
+        dim = 'n_s'
+        ds = xr.Dataset(
+            {
+                'S': (dim, w.data),
+                'col': (dim, w.coords[1, :] + 1),
+                'row': (dim, w.coords[0, :] + 1),
+            }
+        )
+        print(ds)
+        weights_pyramid[str(level)] = ds
+    weights_pyramid.ds.attrs['levels'] = levels
+    weights_pyramid.ds.attrs['regrid_method'] = regridder.method
+
+    return weights_pyramid
+
+
+@task(log_stdout=True)
+def generate_weights(store: dict, levels: int) -> bool:
+
+    import xarray as xr
+
     try:
         ds_in = xr.open_dataset(store['zstore'], engine='zarr', chunks={})
-        weights_pyramid = datatree.DataTree()
-        for level in range(levels):
-            ds_out = make_grid_ds(level=level)
-            regridder = xe.Regridder(ds_in, ds_out, method='bilinear')
-            w = regridder.weights.data
-            dim = 'n_s'
-            ds = xr.Dataset(
-                {
-                    'S': (dim, w.data),
-                    'col': (dim, w.coords[1, :] + 1),
-                    'row': (dim, w.coords[0, :] + 1),
-                }
-            )
-            print(ds)
-            weights_pyramid[str(level)] = ds
-        weights_pyramid.ds.attrs['levels'] = levels
-        weights_pyramid.ds.attrs['regrid_method'] = regridder.method
+        weights_pyramid = generate_weights_pyramid(ds_in, levels)
+        print(weights_pyramid)
+
     except Exception:
         print(f'Failed to load {store["zstore"]}')
     return True
