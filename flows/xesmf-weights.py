@@ -3,7 +3,7 @@ from __future__ import annotations
 from prefect import Flow, task, unmapped
 
 from cmip6_downscaling import config
-from cmip6_downscaling.runtimes import GatewayRuntime
+from cmip6_downscaling.runtimes import get_runtime
 
 config.set(
     {
@@ -11,7 +11,7 @@ config.set(
     }
 )
 
-runtime = GatewayRuntime()
+runtime = get_runtime()
 
 
 @task(log_stdout=True)
