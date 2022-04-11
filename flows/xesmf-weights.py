@@ -39,7 +39,7 @@ def get_stores() -> list[dict]:
     return stores
 
 
-@task(log_stdout=True)
+@task(log_stdout=True, tags=['dask-resource:taskslots=1'])
 def generate_weights(store: dict, levels: int, method: str = 'bilinear') -> dict:
 
     import xarray as xr
