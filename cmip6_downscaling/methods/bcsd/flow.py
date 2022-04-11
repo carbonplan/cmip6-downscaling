@@ -14,6 +14,8 @@ from cmip6_downscaling.methods.common.tasks import (  # run_analyses,
     finalize,
     get_experiment,
     get_obs,
+    get_pyramid_weights,
+    get_weights,
     make_run_parameters,
     pyramid,
     rechunk,
@@ -55,6 +57,9 @@ with Flow(
     p = {}
 
     # input datasets
+    p['gcm_to_obs_weights'] = get_weights(run_parameters=run_parameters, direction='gcm_to_obs')
+    p['obs_to_gcm_weights'] = get_weights(run_parameters=run_parameters, direction='obs_to_gcm')
+
     p['obs_path'] = get_obs(run_parameters)
 
     p['obs_full_space_path'] = rechunk(path=p['obs_path'], pattern='full_space')
@@ -64,11 +69,16 @@ with Flow(
     # after regridding coarse_obs will have smaller array size in space but still
     # be chunked finely along time. but that's good to get it for regridding back to
     # the interpolated obs in next task
-    p['coarse_obs_path'] = regrid(p['obs_full_space_path'], p['experiment_train_path'])
+
+    p['coarse_obs_path'] = regrid(
+        p['obs_full_space_path'], p['experiment_train_path'], weights_path=p['obs_to_gcm_weights']
+    )
 
     # interpolated obs should have same exact chunking schema as ds at `p['obs_full_space_path']`
     p['interpolated_obs_path'] = regrid(
-        source_path=p['coarse_obs_path'], target_grid_path=p['obs_path']
+        source_path=p['coarse_obs_path'],
+        target_grid_path=p['obs_path'],
+        weights_path=p['gcm_to_obs_weights'],
     )
 
     p['interpolated_obs_full_time_path'] = rechunk(
@@ -97,7 +107,9 @@ with Flow(
         template=p['obs_full_space_path'],
     )
     p['bias_corrected_fine_full_space_path'] = regrid(
-        source_path=p['bias_corrected_full_space_path'], target_grid_path=p['obs_path']
+        source_path=p['bias_corrected_full_space_path'],
+        target_grid_path=p['obs_path'],
+        weights_path=p['gcm_to_obs_weights'],
     )
 
     p['bias_corrected_fine_full_time_path'] = rechunk(
@@ -128,9 +140,17 @@ with Flow(
 
     # pyramids
 
-    p['daily_pyramid_path'] = pyramid(p['final_bcsd_full_space_path'], levels=4)
-    p['monthly_pyramid_path'] = pyramid(p['monthly_summary_full_space_path'], levels=4)
-    p['annual_pyramid_path'] = pyramid(p['annual_summary_full_space_path'], levels=4)
+    p['pyramid_weights'] = get_pyramid_weights(run_parameters=run_parameters, levels=4)
+
+    p['daily_pyramid_path'] = pyramid(
+        p['final_bcsd_full_space_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
+    )
+    p['monthly_pyramid_path'] = pyramid(
+        p['monthly_summary_full_space_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
+    )
+    p['annual_pyramid_path'] = pyramid(
+        p['annual_summary_full_space_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
+    )
 
     # finalize
     finalize(p, run_parameters)

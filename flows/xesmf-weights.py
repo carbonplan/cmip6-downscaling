@@ -92,6 +92,6 @@ with Flow(
     executor=runtime.executor,
 ) as flow:
     stores = get_stores()
-    attrs = generate_weights.map(stores, levels=unmapped(2), method=unmapped('bilinear'))
+    attrs = generate_weights.map(stores, levels=unmapped(4), method=unmapped('bilinear'))
     vals = merge(attrs)
     _ = catalog(vals)
