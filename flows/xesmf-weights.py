@@ -6,19 +6,19 @@ from prefect.tasks.control_flow import merge
 from upath import UPath
 
 from cmip6_downscaling import config
-from cmip6_downscaling.runtimes import CloudRuntime
+from cmip6_downscaling.runtimes import PangeoRuntime
 
-config.set(
-    {
-        'runtime.cloud.extra_pip_packages': 'git+https://github.com/carbonplan/cmip6-downscaling.git@main git+https://github.com/intake/intake-esm.git git+https://github.com/carbonplan/ndpyramid@weights-pyramid tabulate'
-    }
-)
+# config.set(
+#     {
+#         'runtime.cloud.extra_pip_packages': 'git+https://github.com/carbonplan/cmip6-downscaling.git@main git+https://github.com/intake/intake-esm.git git+https://github.com/carbonplan/ndpyramid@weights-pyramid tabulate'
+#     }
+# )
 
-folder = 'xesmf-weights'
+folder = 'xesmf_weights/cmip6_pyramids'
 
-scratch_dir = UPath(config.get('storage.scratch.uri')) / folder
+scratch_dir = UPath(config.get('storage.static.uri')) / folder
 
-runtime = CloudRuntime()
+runtime = PangeoRuntime()
 
 
 @task(log_stdout=True)
@@ -33,16 +33,13 @@ def get_stores() -> list[dict]:
         .first()
         .reset_index()
         .drop(columns=['member_id', 'dcpp_init_year', 'version', 'activity_id', 'institution_id'])
-        .sample(5)
     ).to_dict(orient='records')
 
-    print(len(stores))
     return stores
 
 
-@task(log_stdout=True, tags=['dask-resource:taskslots=1'])
+@task(log_stdout=True)
 def generate_weights(store: dict, levels: int, method: str = 'bilinear') -> dict:
-
     import xarray as xr
     from ndpyramid.regrid import generate_weights_pyramid
 
@@ -84,7 +81,7 @@ def catalog(vals):
 
     target = scratch_dir / 'weights.csv'
     df = pd.DataFrame(vals)
-    df.to_csv(target, index=False)
+    df.to_csv(target, mode='w', index=False)
     print(target)
 
 

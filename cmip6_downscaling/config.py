@@ -20,6 +20,10 @@ _defaults = {
             'uri': 'az://flow-outputs/temporary',
             'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
         },
+        'static': {
+            'uri': 'az://static',
+            'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
+        },
         'scratch': {
             'uri': 'az://scratch',
             'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
