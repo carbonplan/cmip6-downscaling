@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dask
 from prefect import Flow, task, unmapped
 from prefect.tasks.control_flow import merge
 from upath import UPath
@@ -57,10 +58,11 @@ def generate_weights(store: dict, levels: int, method: str = 'bilinear') -> dict
     print(f'store: {store}')
 
     try:
-        ds_in = xr.open_dataset(store['zstore'], engine='zarr', chunks={}).isel(time=0)
-        weights_pyramid = generate_weights_pyramid(ds_in, levels, method=method)
-        print(weights_pyramid)
-        weights_pyramid.to_zarr(target, mode='w')
+        with dask.config.set({'scheduler': 'sync'}):
+            ds_in = xr.open_dataset(store['zstore'], engine='zarr', chunks={}).isel(time=0)
+            weights_pyramid = generate_weights_pyramid(ds_in, levels, method=method)
+            print(weights_pyramid)
+            weights_pyramid.to_zarr(target, mode='w')
 
     except Exception as e:
         print(f'Failed to load {store["zstore"]}')
