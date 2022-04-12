@@ -130,7 +130,7 @@ def get_gcm(
     variable: str,
 ) -> xr.Dataset:
     """
-    Load and combine historical and future GCM into one dataset.
+    Load historical or future GCM into one dataset.
 
     Parameters
     ----------
@@ -155,9 +155,7 @@ def get_gcm(
         A dataset containing both historical and future period of GCM data
     """
 
-    historical_gcm = load_cmip(
-        activity_ids='CMIP',
-        experiment_ids='historical',
+    kws = dict(
         member_ids=member_id,
         table_ids=table_id,
         grid_labels=grid_label,
@@ -165,17 +163,10 @@ def get_gcm(
         variable_ids=variable,
     )
 
-    future_gcm = load_cmip(
-        activity_ids='ScenarioMIP',
-        experiment_ids=scenario,
-        member_ids=member_id,
-        table_ids=table_id,
-        grid_labels=grid_label,
-        source_ids=source_id,
-        variable_ids=variable,
-    )
-
-    ds_gcm = xr.combine_by_coords([historical_gcm, future_gcm], combine_attrs='drop_conflicts')
+    if 'hist' in scenario:
+        ds_gcm = load_cmip(activity_ids='CMIP', experiment_ids='historical', **kws)
+    else:
+        ds_gcm = load_cmip(activity_ids='ScenarioMIP', experiment_ids=scenario, **kws)
 
     ds_gcm = ds_gcm.reindex(time=sorted(ds_gcm.time.values))
 

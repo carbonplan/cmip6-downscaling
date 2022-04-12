@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import datetime
+import json
 import os
 import warnings
 from dataclasses import asdict
@@ -22,13 +24,15 @@ from xarray_schema.base import SchemaError
 from cmip6_downscaling import __version__ as version, config
 from cmip6_downscaling.data.cmip import get_gcm
 from cmip6_downscaling.data.observations import open_era5
-from cmip6_downscaling.methods.common.containers import RunParameters, str_to_hash
+from cmip6_downscaling.methods.common.containers import RunParameters
 from cmip6_downscaling.methods.common.utils import (
+    blocking_to_zarr,
     calc_auspicious_chunks_dict,
     resample_wrapper,
     subset_dataset,
     zmetadata_exists,
 )
+from cmip6_downscaling.utils import str_to_hash
 
 warnings.filterwarnings(
     "ignore",
@@ -74,7 +78,6 @@ def get_obs(run_parameters: RunParameters) -> UPath:
         )
     )
     target = intermediate_dir / 'get_obs' / ds_hash
-    print(target)
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
@@ -90,9 +93,8 @@ def get_obs(run_parameters: RunParameters) -> UPath:
         chunking_schema={'time': 365, 'lat': 150, 'lon': 150},
     )
     del subset[run_parameters.variable].encoding['chunks']
-
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
-    subset.to_zarr(target, mode='w')
+    blocking_to_zarr(subset, target)
     return target
 
 
@@ -146,6 +148,7 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
 
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
     subset.to_zarr(target, mode='w')
+    # blocking_to_zarr(subset, target)
     return target
 
 
@@ -314,12 +317,12 @@ def time_summary(ds_path: UPath, freq: str) -> UPath:
     out_ds = resample_wrapper(ds, freq=freq)
 
     out_ds.attrs.update({'title': 'time_summary'}, **get_cf_global_attrs(version=version))
-    out_ds.to_zarr(target, mode='w')
-
+    blocking_to_zarr(out_ds, target)
     return target
 
 
-@task(tags=['dask-resource:TASKSLOTS=1'], log_stdout=True)
+# tags=['dask-resource:taskslots=1']
+@task(log_stdout=True)
 def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
     """Task to regrid a dataset to target grid.
 
@@ -352,8 +355,7 @@ def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
     regridded_ds.attrs.update(
         {'title': source_ds.attrs['title']}, **get_cf_global_attrs(version=version)
     )
-    regridded_ds.to_zarr(target, mode='w')
-
+    blocking_to_zarr(regridded_ds, target)
     return target
 
 
@@ -409,7 +411,10 @@ def _pyramid_postprocess(dt: dt.DataTree, levels: int, other_chunks: dict = None
     return dt
 
 
-@task(log_stdout=True, tags=['dask-resource:TASKSLOTS=1'])
+# tags=['dask-resource:taskslots=1']
+@task(
+    log_stdout=True,
+)
 def pyramid(ds_path: UPath, levels: int = 2, other_chunks: dict = None) -> UPath:
     '''Task to create a data pyramid from an xarray Dataset
 
@@ -518,3 +523,24 @@ def run_analyses(ds_path: UPath, run_parameters: RunParameters) -> UPath:
             )
 
     return executed_notebook_path
+
+
+@task
+def finalize(path_dict: dict, run_parameters: RunParameters):
+
+    now = datetime.datetime.utcnow().isoformat()
+    target1 = results_dir / 'runs' / run_parameters.run_id / (now + '.json')
+    target2 = results_dir / 'runs' / run_parameters.run_id / 'latest.json'
+    print(target1)
+    print(target2)
+
+    out = {}
+    out['parameters'] = asdict(run_parameters)
+    out['attrs'] = get_cf_global_attrs(version=version)
+    out['datasets'] = {k: str(p) for k, p in path_dict.items()}
+
+    with target1.open(mode='w') as f:
+        json.dump(out, f, indent=2)
+
+    with target2.open(mode='w') as f:
+        json.dump(out, f, indent=2)

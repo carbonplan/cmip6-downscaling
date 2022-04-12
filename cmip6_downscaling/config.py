@@ -8,14 +8,12 @@ _defaults = {
             'uri': 'az://',
             'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
         },
-        'gcm_identifier_template': '{gcm}/{scenario}/{variable}/{bbox}/{train_period}/{predict_period}/',
-        'obs_identifier_template': '{obs}/{variable}/{bbox}/{train_period}/',
         'intermediate': {
-            'uri': 'az://flow-outputs/prefect_intermediates',
+            'uri': 'az://flow-outputs/intermediates',
             'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
         },
         'results': {
-            'uri': 'az://flow-outputs/prefect_results',
+            'uri': 'az://flow-outputs/results',
             'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
         },
         'temporary': {
@@ -26,38 +24,10 @@ _defaults = {
             'uri': 'az://scratch',
             'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
         },
-        'xpersist_store_name': '/xpersist_metadata_store',
-        'xpersist_overwrite': {'mode': 'w'},
         'web_results': {
             'blob': 'analysis_notebooks',
             'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
         },
-    },
-    'methods': {
-        'bcsd': {
-            'process_stages': {
-                "intermediate": {
-                    'obs_ds': {'path_template': '/obs_ds/{obs_identifier}'},
-                    'coarsened_obs': {'path_template': '/coarsened_obs/{obs_identifier}'},
-                    'spatial_anomalies': {'path_template': '/spatial_anomalies/{obs_identifier}'},
-                    'gcm_predict': {'path_template': '/gcm_predict/{gcm_identifier}'},
-                    'rechunked_gcm': {'path_template': '/rechunked_gcm/{gcm_identifier}'},
-                    'bias_corrected': {'path_template': '/bias_corrected/{gcm_identifier}'},
-                },
-                "results": {
-                    "bcsd_output": {"path_template": "/bcsd_output/{gcm_identifier}"},
-                    "bcsd_output_monthly": {
-                        "path_template": "/bcsd_output_monthly/{gcm_identifier}"
-                    },
-                    "bcsd_output_annual": {"path_template": "/bcsd_output_annual/{gcm_identifier}"},
-                    "pyramid_daily": {"path_template": "/pyramid_daily/{gcm_identifier}"},
-                    "pyramid_monthly": {"path_template": "/pyramid_monthly/{gcm_identifier}"},
-                    "pyramid_annual": {"path_template": "/pyramid_annual/{gcm_identifier}"},
-                },
-            },
-        },
-        'gard': {},
-        'maca': {},
     },
     "data_catalog": {
         "cmip": {
@@ -69,28 +39,40 @@ _defaults = {
             'storage_options': {"account_name": "cmip6downscaling"},
         },
     },
-    'run_options': {'runtime': None, 'cleanup_flag': True, 'use_cache': True},
+    'run_options': {'runtime': "pangeo", 'cleanup_flag': True, 'use_cache': True},
     "runtime": {
         "cloud": {
             "storage_prefix": "az://",
             "storage_options": {
                 'container': 'prefect',
-                'connection_string': "$AZURE_STORAGE_CONNECTION_STRING",
             },
             "agent": "az-eu-west",
-            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git@feature/test_runner",
+            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git",
             "kubernetes_cpu": 7,
             "kubernetes_memory": "16Gi",
-            "image": "carbonplan/cmip6-downscaling-prefect:2022.02.08",
-            "pod_memory_limit": "4Gi",
-            "pod_memory_request": "4Gi",
-            "pod_threads_per_worker": 2,
+            "image": "carbonplan/cmip6-downscaling-prefect:latest",
+            "pod_memory_limit": "8Gi",
+            "pod_memory_request": "8Gi",
+            "pod_threads_per_worker": 1,
             "pod_cpu_limit": 2,
             "pod_cpu_request": 2,
             "deploy_mode": "remote",
             "adapt_min": 2,
-            "adapt_max": 2,
+            "adapt_max": 20,
             "dask_distributed_worker_resources_taskslots": "1",
+        },
+        "gateway": {
+            "storage_prefix": "az://",
+            "storage_options": {
+                'container': 'prefect',
+            },
+            "cluster_name": '',  #
+            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git@main",
+            "image": "carbonplan/cmip6-downscaling-prefect:2022.04.07",
+            "worker_cores": 1,
+            "worker_memory": 16,  # Gi
+            "adapt_min": 1,
+            "adapt_max": 60,
         },
         "local": {"storage_prefix": "/tmp/", "storage_options": {'directory': './'}},
         "test": {
@@ -100,7 +82,7 @@ _defaults = {
         "pangeo": {
             "storage_prefix": "az://",
             "storage_options": {'directory': './'},
-            'n_workers': 16,
+            'n_workers': 32,
             'threads_per_worker': 1,
         },
     },

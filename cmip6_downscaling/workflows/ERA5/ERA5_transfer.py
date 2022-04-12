@@ -11,8 +11,8 @@ from prefect.run_configs import KubernetesRun
 from prefect.storage import Azure
 
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
-csv_catalog_path = "az://cmip6/ERA5_catalog.csv"
-json_catalog_path = "az://cmip6/ERA5_catalog.json"
+csv_catalog_path = "az://training/ERA5_catalog.csv"
+json_catalog_path = "az://training/ERA5_catalog.json"
 
 # Helper Functions -----------------------------------------------------------
 

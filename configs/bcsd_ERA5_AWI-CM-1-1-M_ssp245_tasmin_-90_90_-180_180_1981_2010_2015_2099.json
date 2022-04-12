@@ -1,0 +1,16 @@
+{
+  "method": "bcsd",
+  "obs": "ERA5",
+  "model": "AWI-CM-1-1-M",
+  "member": "r1i1p1f1",
+  "grid_label": "gn",
+  "table_id": "day",
+  "scenario": "ssp245",
+  "variable": "tasmin",
+  "train_period": ["1981", "2010"],
+  "predict_period": ["2015", "2099"],
+  "latmin": "-90",
+  "latmax": "90",
+  "lonmin": "-180",
+  "lonmax": "180"
+}
