@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import dask
 from prefect import Flow, task
+from prefect.engine.signals import SKIP
+from prefect.tasks.control_flow.filter import FilterTask
 from upath import UPath
 
 from cmip6_downscaling import config
@@ -13,6 +15,10 @@ folder = 'xesmf_weights/downscaled_pyramid'
 scratch_dir = UPath(config.get('storage.static.uri')) / folder
 
 runtime = PangeoRuntime()
+
+filter_results = FilterTask(
+    filter_func=lambda x: not isinstance(x, (BaseException, SKIP, type(None)))
+)
 
 
 @task(log_stdout=True)
@@ -31,14 +37,14 @@ def generate_weights(store: dict, levels: int, method: str = 'bilinear') -> dict
             print(weights_pyramid)
             weights_pyramid.to_zarr(target, mode='w')
 
+        return {
+            'regrid_method': method,
+            'levels': levels,
+            'path': str(target),
+        }
+
     except Exception as e:
-        print(e)
-    attrs = {
-        'regrid_method': method,
-        'levels': levels,
-        'path': str(target),
-    }
-    return attrs
+        raise SKIP(f'{e}') from e
 
 
 @task(log_stdout=True)
@@ -57,5 +63,5 @@ with Flow(
     run_config=runtime.run_config,
     executor=runtime.executor,
 ) as flow:
-    attrs = generate_weights({'variable_id': 'tasmax'}, levels=4, method='bilinear')
+    attrs = filter_results(generate_weights({'variable_id': 'tasmax'}, levels=4, method='bilinear'))
     _ = catalog(attrs)

@@ -5,7 +5,9 @@ import itertools
 import dask
 import xesmf as xe
 from prefect import Flow, task, unmapped
+from prefect.engine.signals import SKIP
 from prefect.tasks.control_flow import merge
+from prefect.tasks.control_flow.filter import FilterTask
 from upath import UPath
 
 from cmip6_downscaling import config
@@ -24,6 +26,11 @@ folder = 'xesmf_weights/gcm_obs'
 static_dir = UPath(config.get('storage.static.uri')) / folder
 
 runtime = PangeoRuntime()
+
+
+filter_results = FilterTask(
+    filter_func=lambda x: not isinstance(x, (BaseException, SKIP, type(None)))
+)
 
 
 @task(log_stdout=True)
@@ -68,26 +75,26 @@ def generate_weights(store: dict, method: str = 'bilinear') -> dict:
             )
             weights_reversed = xesmf_weights_to_xarray(regridder_reversed)
             weights_reversed.to_zarr(target_reverse, mode='w')
+
+        attrs_forward = {
+            'source_id': store['source_id'],
+            'table_id': store['table_id'],
+            'grid_label': store['grid_label'],
+            'regrid_method': method,
+            'path': str(target_forwards),
+            'direction': 'gcm_to_obs',
+        }
+        attrs_reverse = {
+            'source_id': store['source_id'],
+            'table_id': store['table_id'],
+            'grid_label': store['grid_label'],
+            'regrid_method': method,
+            'path': str(target_reverse),
+            'direction': 'obs_to_gcm',
+        }
+        return [attrs_forward, attrs_reverse]
     except Exception as e:
-        print(f'Failed to load {store["zstore"]}')
-        print(e)
-    attrs_forward = {
-        'source_id': store['source_id'],
-        'table_id': store['table_id'],
-        'grid_label': store['grid_label'],
-        'regrid_method': method,
-        'path': str(target_forwards),
-        'direction': 'gcm_to_obs',
-    }
-    attrs_reverse = {
-        'source_id': store['source_id'],
-        'table_id': store['table_id'],
-        'grid_label': store['grid_label'],
-        'regrid_method': method,
-        'path': str(target_reverse),
-        'direction': 'obs_to_gcm',
-    }
-    return [attrs_forward, attrs_reverse]
+        raise SKIP(f'Failed to load {store["zstore"]}') from e
 
 
 @task(log_stdout=True)
@@ -96,8 +103,8 @@ def catalog(vals):
 
     target = static_dir / 'weights.csv'
     flat_vals = itertools.chain(*vals)
-    print(flat_vals)
     df = pd.DataFrame(flat_vals)
+    print(df.head())
     df.to_csv(target, mode='w', index=False)
     print(target)
 
@@ -109,6 +116,6 @@ with Flow(
     executor=runtime.executor,
 ) as flow:
     stores = get_stores()
-    attrs = generate_weights.map(stores, method=unmapped('bilinear'))
+    attrs = filter_results(generate_weights.map(stores, method=unmapped('bilinear')))
     vals = merge(attrs)
     _ = catalog(vals)

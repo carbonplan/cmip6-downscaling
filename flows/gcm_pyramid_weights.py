@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import dask
 from prefect import Flow, task, unmapped
+from prefect.engine.signals import SKIP
 from prefect.tasks.control_flow import merge
+from prefect.tasks.control_flow.filter import FilterTask
 from upath import UPath
 
 from cmip6_downscaling import config
@@ -13,6 +15,10 @@ folder = 'xesmf_weights/cmip6_pyramids'
 scratch_dir = UPath(config.get('storage.static.uri')) / folder
 
 runtime = PangeoRuntime()
+
+filter_results = FilterTask(
+    filter_func=lambda x: not isinstance(x, (BaseException, SKIP, type(None)))
+)
 
 
 @task(log_stdout=True)
@@ -54,7 +60,7 @@ def generate_weights(store: dict, levels: int, method: str = 'bilinear') -> dict
             weights_pyramid = generate_weights_pyramid(ds_in, levels, method=method)
             print(weights_pyramid)
             weights_pyramid.to_zarr(target, mode='w')
-        attrs = {
+        return {
             'source_id': store['source_id'],
             'table_id': store['table_id'],
             'grid_label': store['grid_label'],
@@ -62,11 +68,9 @@ def generate_weights(store: dict, levels: int, method: str = 'bilinear') -> dict
             'levels': levels,
             'path': str(target),
         }
-    except Exception as e:
-        print(f'Failed to load {store["zstore"]}')
-        print(e)
 
-    return attrs
+    except Exception as e:
+        raise SKIP(f"Failed to load {store['zstore']}") from e
 
 
 @task(log_stdout=True)
@@ -86,6 +90,8 @@ with Flow(
     executor=runtime.executor,
 ) as flow:
     stores = get_stores()
-    attrs = generate_weights.map(stores, levels=unmapped(4), method=unmapped('bilinear'))
+    attrs = filter_results(
+        generate_weights.map(stores, levels=unmapped(4), method=unmapped('bilinear'))
+    )
     vals = merge(attrs)
     _ = catalog(vals)
