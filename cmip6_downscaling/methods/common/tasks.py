@@ -318,7 +318,7 @@ def time_summary(ds_path: UPath, freq: str) -> UPath:
 
 @task(log_stdout=True)
 def get_weights(*, run_parameters, direction, regrid_method="bilinear"):
-    weights = pd.read_csv('az://static/xesmf_weights/gcm_obs/weights.csv')
+    weights = pd.read_csv(config.get('weights.gcm_obs_weights.uri'))
     path = (
         weights[
             (weights.source_id == run_parameters.model)
@@ -336,7 +336,8 @@ def get_weights(*, run_parameters, direction, regrid_method="bilinear"):
 
 @task(log_stdout=True)
 def get_pyramid_weights(*, run_parameters, levels, regrid_method="bilinear"):
-    weights = pd.read_csv('az://static/xesmf_weights/pyramid/weights.csv')
+    weights = pd.read_csv(config.get('weights.downscaled_pyramid.uri'))
+
     path = (
         weights[
             (weights.source_id == run_parameters.model)

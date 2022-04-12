@@ -43,6 +43,13 @@ _defaults = {
             'storage_options': {"account_name": "cmip6downscaling"},
         },
     },
+    'weights': {
+        'gcm_pyramid_weights': {'uri': 'az://static/xesmf_weights/cmip6_pyramids/weights.csv'},
+        'downscaled_pyramid_weights': {
+            'uri': 'az://static/xesmf_weights/downscaled_pyramid/weights.csv'
+        },
+        'gcm_obs_weights': {'uri': 'az://static/xesmf_weights/gcm_obs/weights.csv'},
+    },
     'run_options': {'runtime': "pangeo", 'cleanup_flag': True, 'use_cache': True},
     "runtime": {
         "cloud": {

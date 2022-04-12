@@ -8,12 +8,6 @@ from upath import UPath
 from cmip6_downscaling import config
 from cmip6_downscaling.runtimes import PangeoRuntime
 
-# config.set(
-#     {
-#         'runtime.cloud.extra_pip_packages': 'git+https://github.com/carbonplan/cmip6-downscaling.git@main git+https://github.com/intake/intake-esm.git git+https://github.com/carbonplan/ndpyramid@weights-pyramid tabulate'
-#     }
-# )
-
 folder = 'xesmf_weights/cmip6_pyramids'
 
 scratch_dir = UPath(config.get('storage.static.uri')) / folder
@@ -60,18 +54,18 @@ def generate_weights(store: dict, levels: int, method: str = 'bilinear') -> dict
             weights_pyramid = generate_weights_pyramid(ds_in, levels, method=method)
             print(weights_pyramid)
             weights_pyramid.to_zarr(target, mode='w')
-
+        attrs = {
+            'source_id': store['source_id'],
+            'table_id': store['table_id'],
+            'grid_label': store['grid_label'],
+            'regrid_method': method,
+            'levels': levels,
+            'path': str(target),
+        }
     except Exception as e:
         print(f'Failed to load {store["zstore"]}')
         print(e)
-    attrs = {
-        'source_id': store['source_id'],
-        'table_id': store['table_id'],
-        'grid_label': store['grid_label'],
-        'regrid_method': method,
-        'levels': levels,
-        'path': str(target),
-    }
+
     return attrs
 
 
