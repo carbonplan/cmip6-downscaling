@@ -134,6 +134,7 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
         grid_label=run_parameters.grid_label,
         source_id=run_parameters.model,
         variable=run_parameters.variable,
+        time_slice=time_period.time_slice,
     )
 
     subset = subset_dataset(
