@@ -58,7 +58,7 @@ _defaults = {
                 'container': 'prefect',
             },
             "agent": "az-eu-west",
-            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git",
+            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git@debug/prefect_scaling ndpyramid=0.0.5 git+https://github.com/pangeo-data/rechunker",
             "kubernetes_cpu": 7,
             "kubernetes_memory": "16Gi",
             "image": "carbonplan/cmip6-downscaling-prefect:latest",
@@ -78,7 +78,7 @@ _defaults = {
                 'container': 'prefect',
             },
             "cluster_name": '',  #
-            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git@pregenerate-weights ndpyramid=0.0.5 git+https://github.com/pangeo-data/rechunker",
+            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git ndpyramid=0.0.5 git+https://github.com/pangeo-data/rechunker",
             "image": "carbonplan/cmip6-downscaling-prefect:latest",
             "worker_cores": 1,
             "worker_memory": 16,  # Gi
@@ -93,7 +93,7 @@ _defaults = {
         "pangeo": {
             "storage_prefix": "az://",
             "storage_options": {'directory': './'},
-            'n_workers': 32,
+            'n_workers': 16,
             'threads_per_worker': 1,
         },
     },
