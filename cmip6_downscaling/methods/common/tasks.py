@@ -7,9 +7,10 @@ import warnings
 from dataclasses import asdict
 from pathlib import PosixPath
 
-import dask
+import datatree
 import datatree as dt
 import fsspec
+import pandas as pd
 import rechunker
 import xarray as xr
 import zarr
@@ -136,6 +137,7 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
         grid_label=run_parameters.grid_label,
         source_id=run_parameters.model,
         variable=run_parameters.variable,
+        time_slice=time_period.time_slice,
     )
 
     subset = subset_dataset(
@@ -321,8 +323,37 @@ def time_summary(ds_path: UPath, freq: str) -> UPath:
     return target
 
 
+@task(log_stdout=True)
+def get_weights(*, run_parameters, direction, regrid_method="bilinear"):
+    weights = pd.read_csv(config.get('weights.gcm_obs_weights.uri'))
+    path = (
+        weights[
+            (weights.source_id == run_parameters.model)
+            & (weights.table_id == run_parameters.table_id)
+            & (weights.grid_label == run_parameters.grid_label)
+            & (weights.regrid_method == regrid_method)
+            & (weights.direction == direction)
+        ]
+        .iloc[0]
+        .path
+    )
+    print(path)
+    return path
+
+
+@task(log_stdout=True)
+def get_pyramid_weights(*, run_parameters, levels, regrid_method="bilinear"):
+    weights = pd.read_csv(config.get('weights.downscaled_pyramid_weights.uri'))
+    print(weights)
+    path = (
+        weights[(weights.regrid_method == regrid_method) & (weights.levels == levels)].iloc[0].path
+    )
+    print(path)
+    return path
+
+
 @task(tags=['dask-resource:taskslots=1'], log_stdout=True)
-def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
+def regrid(source_path: UPath, target_grid_path: UPath, weights_path: UPath = None) -> UPath:
     """Task to regrid a dataset to target grid.
 
     Parameters
@@ -331,6 +362,8 @@ def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
         Path to dataset that will be regridded
     target_grid_path : UPath
         Path to template grid dataset
+    weights_path : UPath (Optional)
+        Path to weights file
 
     Returns
     -------
@@ -343,12 +376,31 @@ def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
     ds_hash = str_to_hash(str(source_path) + str(target_grid_path))
     target = intermediate_dir / 'regrid' / ds_hash
     print(target)
+
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
         return target
     source_ds = xr.open_zarr(source_path)
     target_grid_ds = xr.open_zarr(target_grid_path)
-    regridder = xe.Regridder(source_ds, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
+
+    if weights_path:
+        from ndpyramid.regrid import _reconstruct_xesmf_weights
+
+        weights = _reconstruct_xesmf_weights(xr.open_zarr(weights_path))
+        print(weights_path)
+        regridder = xe.Regridder(
+            source_ds,
+            target_grid_ds,
+            weights=weights,
+            reuse_weights=True,
+            method="bilinear",
+            extrap_method="nearest_s2d",
+        )
+    else:
+        regridder = xe.Regridder(
+            source_ds, target_grid_ds, method="bilinear", extrap_method="nearest_s2d"
+        )
+
     regridded_ds = regridder(source_ds, keep_attrs=True)
     regridded_ds.attrs.update(
         {'title': source_ds.attrs['title']}, **get_cf_global_attrs(version=version)
@@ -409,17 +461,20 @@ def _pyramid_postprocess(dt: dt.DataTree, levels: int, other_chunks: dict = None
     return dt
 
 
-# tags=['dask-resource:taskslots=1']
 @task(
     log_stdout=True,
 )
-def pyramid(ds_path: UPath, levels: int = 2, other_chunks: dict = None) -> UPath:
+def pyramid(
+    ds_path: UPath, weights_pyramid_path: str, levels: int = 2, other_chunks: dict = None
+) -> UPath:
     '''Task to create a data pyramid from an xarray Dataset
 
     Parameters
     ----------
     ds_path : UPath
         Path to input dataset
+    weights_pyramid_path : str
+        Path to weights pyramid
     levels : int, optional
         Number of levels in pyramid, by default 2
     uri : str, optional
@@ -427,11 +482,11 @@ def pyramid(ds_path: UPath, levels: int = 2, other_chunks: dict = None) -> UPath
     other_chunks : dict
         Chunks for non-spatial dims
 
+
     Returns
     -------
     target : UPath
     '''
-
     ds_hash = str_to_hash(str(ds_path) + str(levels) + str(other_chunks))
     target = results_dir / 'pyramid' / ds_hash
 
@@ -445,11 +500,11 @@ def pyramid(ds_path: UPath, levels: int = 2, other_chunks: dict = None) -> UPath
 
     ds.attrs.update({'title': ds.attrs['title']}, **get_cf_global_attrs(version=version))
     target_pyramid = dt.open_datatree('az://static/target-pyramid', engine='zarr')
-    with dask.config.set(scheduler='threads'):
-        # create pyramid
-        dta = pyramid_regrid(ds, target_pyramid=target_pyramid, levels=levels)
-
-        dta = _pyramid_postprocess(dta, levels, other_chunks=other_chunks)
+    weights_pyramid = datatree.open_datatree(weights_pyramid_path, engine='zarr')
+    # create pyramid
+    dta = pyramid_regrid(
+        ds, target_pyramid=target_pyramid, levels=levels, weights_pyramid=weights_pyramid
+    )
 
     # write to target
     dta.to_zarr(target, mode='w')

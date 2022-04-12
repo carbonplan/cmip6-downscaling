@@ -128,6 +128,7 @@ def get_gcm(
     grid_label: str,
     source_id: str,
     variable: str,
+    time_slice: slice,
 ) -> xr.Dataset:
     """
     Load historical or future GCM into one dataset.
@@ -146,13 +147,13 @@ def get_gcm(
         Name of source_id
     variable : str
         Name of variable to load
-    bbox : BBox
-        Bounding box for subset
+    time_slice : slice
+        Time period that you're hoping to load
 
     Returns
     -------
     ds_gcm : xr.Dataset
-        A dataset containing both historical and future period of GCM data
+        A dataset containing either historical or future GCM data
     """
 
     kws = dict(
@@ -162,12 +163,14 @@ def get_gcm(
         source_ids=source_id,
         variable_ids=variable,
     )
-
-    if 'hist' in scenario:
+    if float(time_slice.stop) < 2015:
+        # you're working with historical data
         ds_gcm = load_cmip(activity_ids='CMIP', experiment_ids='historical', **kws)
-    else:
+    elif float(time_slice.start) > 2014:
+        # you're working with future data
         ds_gcm = load_cmip(activity_ids='ScenarioMIP', experiment_ids=scenario, **kws)
-
+    else:
+        raise ValueError(f'time slice {time_slice} not supported')
     ds_gcm = ds_gcm.reindex(time=sorted(ds_gcm.time.values))
 
     return ds_gcm
