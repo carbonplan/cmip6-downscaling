@@ -1,5 +1,6 @@
 import warnings
 
+import dask
 from prefect import Flow, Parameter
 
 from cmip6_downscaling import runtimes
@@ -27,7 +28,7 @@ print(runtime)
 
 good_fit_predict_chunks = {'lat': 24, 'lon': 24, 'time': 10957}
 
-
+print(dask.config.config)
 with Flow(
     name="gard", storage=runtime.storage, run_config=runtime.run_config, executor=runtime.executor
 ) as flow:
