@@ -58,9 +58,6 @@ class CloudRuntime(BaseRuntime):
     def _generate_env(self):
         env = {
             "EXTRA_PIP_PACKAGES": config.get("runtime.cloud.extra_pip_packages"),
-            "DASK_DISTRIBUTED__WORKER__RESOURCES__taskslots": config.get(
-                "runtime.cloud.dask_distributed_worker_resources_taskslots"
-            ),
             "PREFECT__FLOWS__CHECKPOINTING": "true",
             **_threadsafe_env_vars,
         }
@@ -98,9 +95,6 @@ class CloudRuntime(BaseRuntime):
             cpu_request=config.get("runtime.cloud.pod_cpu_request"),
             env=self._generate_env(),
         )
-
-        # TODO: this can done in the constructor now
-        pod_spec.spec.containers[0].args.extend(["--resources", "taskslots=1"])
 
         executor = DaskExecutor(
             cluster_class=lambda: KubeCluster(
@@ -158,7 +152,6 @@ class PangeoRuntime(LocalRuntime):
     def executor(self) -> Executor:
         return DaskExecutor(
             cluster_kwargs={
-                'resources': {'TASKSLOTS': 1},
                 'n_workers': config.get("runtime.pangeo.n_workers"),
                 'threads_per_worker': config.get("runtime.pangeo.threads_per_worker"),
             }
