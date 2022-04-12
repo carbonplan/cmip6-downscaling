@@ -50,7 +50,7 @@ _defaults = {
         },
         'gcm_obs_weights': {'uri': 'az://static/xesmf_weights/gcm_obs/weights.csv'},
     },
-    'run_options': {'runtime': "pangeo", 'cleanup_flag': True, 'use_cache': True},
+    'run_options': {'runtime': "pangeo", 'use_cache': True},
     "runtime": {
         "cloud": {
             "storage_prefix": "az://",
@@ -78,8 +78,8 @@ _defaults = {
                 'container': 'prefect',
             },
             "cluster_name": '',  #
-            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git@main",
-            "image": "carbonplan/cmip6-downscaling-prefect:2022.04.07",
+            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git@pregenerate-weights ndpyramid=0.0.5 git+https://github.com/pangeo-data/rechunker",
+            "image": "carbonplan/cmip6-downscaling-prefect:latest",
             "worker_cores": 1,
             "worker_memory": 16,  # Gi
             "adapt_min": 1,

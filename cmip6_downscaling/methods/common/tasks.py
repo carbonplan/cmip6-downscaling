@@ -336,18 +336,10 @@ def get_weights(*, run_parameters, direction, regrid_method="bilinear"):
 
 @task(log_stdout=True)
 def get_pyramid_weights(*, run_parameters, levels, regrid_method="bilinear"):
-    weights = pd.read_csv(config.get('weights.downscaled_pyramid.uri'))
-
+    weights = pd.read_csv(config.get('weights.downscaled_pyramid_weights.uri'))
+    print(weights)
     path = (
-        weights[
-            (weights.source_id == run_parameters.model)
-            & (weights.table_id == run_parameters.table_id)
-            & (weights.grid_label == run_parameters.grid_label)
-            & (weights.regrid_method == regrid_method)
-            & (weights.levels == levels)
-        ]
-        .iloc[0]
-        .path
+        weights[(weights.regrid_method == regrid_method) & (weights.levels == levels)].iloc[0].path
     )
     print(path)
     return path

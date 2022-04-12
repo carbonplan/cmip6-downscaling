@@ -32,7 +32,6 @@ def generate_weights(store: dict, levels: int, method: str = 'bilinear') -> dict
     try:
         with dask.config.set({'scheduler': 'sync'}):
             ds_in = open_era5(store['variable_id'], time_period=slice('2000', '2001'))
-            print(ds_in)
             weights_pyramid = generate_weights_pyramid(ds_in, levels, method=method)
             print(weights_pyramid)
             weights_pyramid.to_zarr(target, mode='w')
@@ -44,7 +43,7 @@ def generate_weights(store: dict, levels: int, method: str = 'bilinear') -> dict
         }
 
     except Exception as e:
-        raise SKIP(f'{e}') from e
+        print(e)
 
 
 @task(log_stdout=True)
@@ -63,5 +62,5 @@ with Flow(
     run_config=runtime.run_config,
     executor=runtime.executor,
 ) as flow:
-    attrs = filter_results(generate_weights({'variable_id': 'tasmax'}, levels=4, method='bilinear'))
+    attrs = generate_weights({'variable_id': 'tasmax'}, levels=4, method='bilinear')
     _ = catalog(attrs)

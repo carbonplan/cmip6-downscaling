@@ -154,6 +154,3 @@ with Flow(
 
     # finalize
     finalize(p, run_parameters)
-
-    # if config.get('run_options.cleanup_flag') is True:
-    #     cleanup.run_rsfip(gcm_identifier, obs_identifier)
