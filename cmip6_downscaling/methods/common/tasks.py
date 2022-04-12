@@ -321,8 +321,7 @@ def time_summary(ds_path: UPath, freq: str) -> UPath:
     return target
 
 
-# tags=['dask-resource:taskslots=1']
-@task(log_stdout=True)
+@task(tags=['dask-resource:taskslots=1'], log_stdout=True)
 def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
     """Task to regrid a dataset to target grid.
 
@@ -343,19 +342,18 @@ def regrid(source_path: UPath, target_grid_path: UPath) -> UPath:
 
     ds_hash = str_to_hash(str(source_path) + str(target_grid_path))
     target = intermediate_dir / 'regrid' / ds_hash
-
+    print(target)
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
         return target
     source_ds = xr.open_zarr(source_path)
     target_grid_ds = xr.open_zarr(target_grid_path)
-
     regridder = xe.Regridder(source_ds, target_grid_ds, "bilinear", extrap_method="nearest_s2d")
     regridded_ds = regridder(source_ds, keep_attrs=True)
     regridded_ds.attrs.update(
         {'title': source_ds.attrs['title']}, **get_cf_global_attrs(version=version)
     )
-    blocking_to_zarr(regridded_ds, target)
+    regridded_ds.to_zarr(target, mode='w')
     return target
 
 
