@@ -12,8 +12,9 @@ from upath import UPath
 from cmip6_downscaling import __version__ as version, config
 from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
 from cmip6_downscaling.methods.bcsd.utils import reconstruct_finescale
-from cmip6_downscaling.methods.common.containers import RunParameters, str_to_hash
+from cmip6_downscaling.methods.common.containers import RunParameters
 from cmip6_downscaling.methods.common.utils import blocking_to_zarr, zmetadata_exists
+from cmip6_downscaling.utils import str_to_hash
 
 warnings.filterwarnings(
     "ignore",
@@ -22,7 +23,6 @@ warnings.filterwarnings(
 )
 
 
-scratch_dir = UPath(config.get("storage.scratch.uri"))
 intermediate_dir = UPath(config.get("storage.intermediate.uri")) / version
 results_dir = UPath(config.get("storage.results.uri")) / version
 use_cache = config.get('run_options.use_cache')

@@ -10,7 +10,7 @@ from upath import UPath
 from xarray_schema import DataArraySchema
 from xarray_schema.base import SchemaError
 
-from cmip6_downscaling.methods.common.containers import BBox
+import cmip6_downscaling.methods.common.containers as containers
 
 
 def zmetadata_exists(path: UPath):
@@ -44,7 +44,7 @@ def subset_dataset(
     ds: xr.Dataset,
     variable: str,
     time_period: slice,
-    bbox: BBox,
+    bbox: containers.BBox,
     chunking_schema: dict = None,
 ) -> xr.Dataset:
     """Uses Xarray slicing to spatially subset a dataset based on input params.

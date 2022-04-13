@@ -6,7 +6,7 @@ import os
 downscaling_methods = ['bcsd']
 
 _prefect_register_str = (
-    """prefect register --project "envs" -p ../../workflows/{downscaling_method}_flow.py"""
+    """prefect register --project "envs" -p ../methods/{downscaling_method}/flow.py"""
 )
 _prefect_run_str = """prefect run -i "{flow_run_id}" --param-file {param_file}"""
 
@@ -15,7 +15,7 @@ _prefect_run_str = """prefect run -i "{flow_run_id}" --param-file {param_file}""
 
 def retrieve_test_parms():
     """retrieve list of all .json param files in method subdir"""
-    return glob.glob('json_params/*.json')
+    return glob.glob('../configs/*.json')
 
 
 def register_flow():

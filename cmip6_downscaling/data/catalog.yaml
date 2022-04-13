@@ -22,6 +22,6 @@ sources:
         type: int
         default: 1979
     args:
-      urlpath: az://cmip6/ERA5_daily/{{ '%04d' % year }}/
+      urlpath: az://training/ERA5_daily/{{ '%04d' % year }}/
       storage_options:
         account_name: cmip6downscaling
