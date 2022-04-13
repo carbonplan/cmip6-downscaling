@@ -14,19 +14,28 @@ runtime = CloudRuntime()
 
 
 var_name_dict = {
-    "eastward_wind_at_10_metres": "uas",
-    "northward_wind_at_10_metres": "vas",
-    "eastward_wind_at_100_metres": "ua100m",
-    "northward_wind_at_100_metres": "va100m",
-    "dew_point_temperature_at_2_metres": "tdps",
-    "air_temperature_at_2_metres": "tas",
-    "air_temperature_at_2_metres_1hour_Maximum": "tasmax",
-    "air_temperature_at_2_metres_1hour_Minimum": "tasmin",
-    "air_pressure_at_mean_sea_level": "psl",
-    "sea_surface_temperature": "tos",
-    "surface_air_pressure": "ps",
-    "integral_wrt_time_of_surface_direct_downwelling_shortwave_flux_in_air_1hour_Accumulation": "rsds",
-    "precipitation_amount_1hour_Accumulation": "pr",
+    "eastward_wind_at_10_metres": {'cmip6_name': "uas", 'aggregation_method': "mean"},
+    "northward_wind_at_10_metres": {'cmip6_name': "vas", 'aggregation_method': "mean"},
+    "eastward_wind_at_100_metres": {'cmip6_name': "ua100m", 'aggregation_method': "mean"},
+    "northward_wind_at_100_metres": {'cmip6_name': "va100m", 'aggregation_method': "mean"},
+    "dew_point_temperature_at_2_metres": {'cmip6_name': "tdps", 'aggregation_method': "mean"},
+    "air_temperature_at_2_metres": {'cmip6_name': "tas", 'aggregation_method': "mean"},
+    "air_temperature_at_2_metres_1hour_Maximum": {
+        'cmip6_name': "tasmax",
+        'aggregation_method': "max",
+    },
+    "air_temperature_at_2_metres_1hour_Minimum": {
+        'cmip6_name': "tasmin",
+        'aggregation_method': "min",
+    },
+    "air_pressure_at_mean_sea_level": {'cmip6_name': "psl", 'aggregation_method': "mean"},
+    "sea_surface_temperature": {'cmip6_name': "tos", 'aggregation_method': "mean"},
+    "surface_air_pressure": {'cmip6_name': "ps", 'aggregation_method': "mean"},
+    "integral_wrt_time_of_surface_direct_downwelling_shortwave_flux_in_air_1hour_Accumulation": {
+        'cmip6_name': "rsds",
+        'aggregation_method': "sum",
+    },
+    "precipitation_amount_1hour_Accumulation": {'cmip6_name': "pr", 'aggregation_method': "sum"},
 }
 
 
@@ -41,7 +50,8 @@ def parse_era5(path):
     var_attrs = ds[attrs['standard_name']].attrs
     attrs['product_type'] = var_attrs['product_type']
     attrs['short_name'] = var_attrs['shortNameECMWF']
-    attrs['cf_variable_name'] = var_name_dict.get(attrs['standard_name'], None)
+    attrs['cf_variable_name'] = var_name_dict[attrs['standard_name']]['cmip6_name']
+    attrs['aggregation_method'] = var_name_dict[attrs['standard_name']]['aggregation_method']
     attrs['units'] = var_attrs['units']
     attrs['zstore'] = path
     attrs['timescale'] = 'hourly'
@@ -83,7 +93,7 @@ def build_catalog(*, name: str, bucket: str) -> None:
                 "options": {"dim": "time", "coords": "minimal"},
             }
         ],
-        groupby_attrs=['product_type', 'timescale', 'short_name'],
+        groupby_attrs=['product_type', 'short_name', 'timescale', 'year'],
         directory=bucket,
     )
 
