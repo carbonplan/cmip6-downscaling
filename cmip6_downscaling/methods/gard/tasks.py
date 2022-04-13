@@ -1,6 +1,7 @@
 import xarray as xr
 import xesmf as xe
 from carbonplan_data.metadata import get_cf_global_attrs
+from distributed import wait
 from prefect import task
 from scipy.stats import norm as norm
 from skdownscale.pointwise_models import (  # AnalogRegression,; PureAnalog,; PureRegression,
@@ -23,8 +24,8 @@ use_cache = config.get('run_options.use_cache')
 
 good_fit_predict_chunks = {'lat': 24, 'lon': 24, 'time': 10957}
 
-
-@task(tags=['dask-resource:TASKSLOTS=1'], log_stdout=True)
+# tags=['dask-resource:TASKSLOTS=1'],
+@task(tags=['dask-resource:taskslots=1'], log_stdout=True)
 def coarsen_and_interpolate(fine_path: UPath, coarse_path: UPath) -> UPath:
     """
     Coarsen up obs and then interpolate it back to the original finescale grid.
@@ -74,12 +75,12 @@ def _fit_and_predict_wrapper(xtrain, ytrain, xpred, run_parameters, dim='time'):
 
     xpred = xpred.rename({'t2': 'time'})
 
-    kws = default_none_kwargs(run_parameters.bias_correction_kwargs, copy=True)
+    kws = default_none_kwargs(run_parameters['bias_correction_kwargs'], copy=True)
 
     # data transformation (this wants full-time chunking)
     # transformed_obs is for the training period
     transformed_obs = bias_correct_obs_by_method(
-        da_obs=ytrain, method=run_parameters.bias_correction_method, bc_kwargs=kws
+        da_obs=ytrain, method=run_parameters['bias_correction_method'], bc_kwargs=kws
     ).to_dataset(dim="variable")
 
     # we need two transformed gcms - one for training and one for prediction
@@ -89,7 +90,7 @@ def _fit_and_predict_wrapper(xtrain, ytrain, xpred, run_parameters, dim='time'):
         gcm_train=xtrain,
         obs_train=ytrain,
         gcm_predict=xtrain,
-        method=run_parameters.bias_correction_method,
+        method=run_parameters['bias_correction_method'],
         bc_kwargs=kws,
     ).to_dataset(dim="variable")
 
@@ -99,26 +100,34 @@ def _fit_and_predict_wrapper(xtrain, ytrain, xpred, run_parameters, dim='time'):
         gcm_train=xtrain,
         obs_train=ytrain,
         gcm_predict=xpred,
-        method=run_parameters.bias_correction_method,
+        method=run_parameters['bias_correction_method'],
         bc_kwargs=kws,
     ).to_dataset(dim="variable")
 
     # model definition
     model = PointWiseDownscaler(
-        model=get_gard_model(run_parameters.model_type, run_parameters.model_params), dim=dim
+        model=get_gard_model(run_parameters['model_type'], run_parameters['model_params']), dim=dim
     )
 
     # model fitting
     model.fit(
         transformed_gcm_train.assign_coords({"time": transformed_obs.time.values})[
-            run_parameters.variable
+            run_parameters['variable']
         ],
-        transformed_obs[run_parameters.variable],
+        transformed_obs[run_parameters['variable']],
     )
 
     # model prediction
-    out = model.predict(transformed_gcm_pred[run_parameters.variable]).to_dataset(dim='variable')
+    out = model.predict(transformed_gcm_pred[run_parameters['variable']]).to_dataset(dim='variable')
 
+    # t = out.to_zarr(
+    #                 data_mapper,
+    #                 mode='a',
+    #                 region=region, #{'lat': index_locations_based_on_xpred
+    #                                 # 'lon' index_locations_based_on_xpred
+    #                                 #  'time': slice(0,len(time))}
+    #                 compute=True,
+    # t.compute()
     return out
 
 
@@ -202,8 +211,10 @@ def fit_and_predict(
 
     out.attrs.update({'title': 'gard_fit_and_predict'}, **get_cf_global_attrs(version=version))
     print(out)
-    t = out.to_zarr(target, compute=False, mode='w')
-    t.compute()
+    # out = wait(out.persist()) # this was great
+    t = out.to_zarr(target, mode='w')
+    # del out#compute=False,  # this was great
+    # t.compute()
     return target
 
 
