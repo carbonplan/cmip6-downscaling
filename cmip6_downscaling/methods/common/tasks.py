@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import datetime
 import json
 import os
@@ -91,7 +92,9 @@ def get_obs(run_parameters: RunParameters) -> UPath:
         run_parameters.bbox,
         chunking_schema={'time': 365, 'lat': 150, 'lon': 150},
     )
+
     del subset[run_parameters.variable].encoding['chunks']
+
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
     subset.to_zarr(target, mode='w')
 
@@ -145,10 +148,13 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
 
     # Note: dataset is chunked into time:365 chunks to standardize leap-year chunking.
     subset = subset.chunk({'time': 365})
-    del subset[run_parameters.variable].encoding['chunks']
 
+    with contextlib.suppress(KeyError):
+        del subset[run_parameters.variable].encoding['chunks']
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
+    print(subset)
     subset.to_zarr(target, mode='w')
+    print(target)
     # blocking_to_zarr(subset, target)
     return target
 
@@ -182,7 +188,8 @@ def rechunk(
     target : UPath
         Path to rechunked dataset
     """
-
+    print(path)
+    print(pattern)
     # if both defined then you'll take the spatial part of template and override one dimension with the specified pattern
     if template is not None:
         pattern_string = 'matched'
@@ -214,6 +221,7 @@ def rechunk(
     group = zarr.open_consolidated(path)
     # open the dataset to access the coordinates
     ds = xr.open_zarr(path)
+    print(ds.chunks)
     example_var = list(ds.data_vars)[0]
     # if you have defined a template then use the chunks of that template
     # to form the desired chunk definition
@@ -239,6 +247,8 @@ def rechunk(
     elif pattern is not None:
         chunk_dims = config.get(f"chunk_dims.{pattern}")
         chunk_def = calc_auspicious_chunks_dict(ds[example_var], chunk_dims=chunk_dims)
+        print(chunk_dims)
+        print(chunk_def)
     else:
         raise AttributeError('must either define chunking pattern or template')
     # Note:
@@ -281,7 +291,7 @@ def rechunk(
     # consolidate_metadata here since when it comes out of rechunker it isn't consolidated.
     zarr.consolidate_metadata(target_store)
     temp_store.clear()
-
+    print(xr.open_zarr(target_store).chunks)
     return target
 
 
@@ -379,7 +389,8 @@ def regrid(source_path: UPath, target_grid_path: UPath, weights_path: UPath = No
         return target
     source_ds = xr.open_zarr(source_path)
     target_grid_ds = xr.open_zarr(target_grid_path)
-
+    print(source_ds.chunks)
+    print(target_grid_ds.chunks)
     if weights_path:
         from ndpyramid.regrid import _reconstruct_xesmf_weights
 
@@ -403,7 +414,7 @@ def regrid(source_path: UPath, target_grid_path: UPath, weights_path: UPath = No
         {'title': source_ds.attrs['title']}, **get_cf_global_attrs(version=version)
     )
     regridded_ds.to_zarr(target, mode='w')
-
+    print(regridded_ds.chunks)
     # blocking_to_zarr(regridded_ds, target)
     return target
 

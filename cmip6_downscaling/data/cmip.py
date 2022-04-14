@@ -115,8 +115,10 @@ def load_cmip(
         ds = col_subset[keys[0]](zarr_kwargs={'use_cftime': True}).to_dask().pipe(postprocess)
 
         # convert to mm/day - helpful to prevent rounding errors from very tiny numbers
-        if 'pr' in ds:
-            ds['pr'] *= 86400
+        with xr.set_options(keep_attrs=True):
+            if 'pr' in ds:
+                ds['pr'] *= 86400
+                ds['pr'] = ds['pr'].astype('float32')
 
         return ds
 
@@ -163,6 +165,7 @@ def get_gcm(
         source_ids=source_id,
         variable_ids=variable,
     )
+    print(kws)
     if float(time_slice.stop) < 2015:
         # you're working with historical data
         ds_gcm = load_cmip(activity_ids='CMIP', experiment_ids='historical', **kws)

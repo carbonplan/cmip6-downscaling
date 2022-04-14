@@ -116,6 +116,11 @@ def fit_and_predict(
         ValueError checking validity of input variables.
     """
 
+    print('experiment_train_full_time_path: ', experiment_train_full_time_path)
+    print('experiment_predict_full_time_path: ', experiment_predict_full_time_path)
+    print('coarse_obs_full_time_path: ', coarse_obs_full_time_path)
+    print('run_params: ', run_parameters)
+
     title = "bcsd_predictions"
     ds_hash = str_to_hash(
         str(experiment_train_full_time_path)
