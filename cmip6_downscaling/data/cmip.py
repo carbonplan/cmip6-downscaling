@@ -115,10 +115,10 @@ def load_cmip(
         ds = col_subset[keys[0]](zarr_kwargs={'use_cftime': True}).to_dask().pipe(postprocess)
 
         # convert to mm/day - helpful to prevent rounding errors from very tiny numbers
-        with xr.set_options(keep_attrs=True):
-            if 'pr' in ds:
-                ds['pr'] *= 86400
-                ds['pr'] = ds['pr'].astype('float32')
+        if 'pr' in ds:
+            # with xr.set_options(keep_attrs=True):
+            ds['pr'] *= 86400
+            ds['pr'] = ds['pr'].astype('float32')
 
         return ds
 

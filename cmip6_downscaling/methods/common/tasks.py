@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import contextlib
 import datetime
 import json
 import os
@@ -93,7 +92,7 @@ def get_obs(run_parameters: RunParameters) -> UPath:
         chunking_schema={'time': 365, 'lat': 150, 'lon': 150},
     )
 
-    del subset[run_parameters.variable].encoding['chunks']
+    # del subset[run_parameters.variable].encoding['chunks']
 
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
     subset.to_zarr(target, mode='w')
@@ -149,10 +148,9 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     # Note: dataset is chunked into time:365 chunks to standardize leap-year chunking.
     subset = subset.chunk({'time': 365})
 
-    with contextlib.suppress(KeyError):
-        del subset[run_parameters.variable].encoding['chunks']
+    # with contextlib.suppress(KeyError):
+    #     del subset[run_parameters.variable].encoding['chunks']
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
-    print(subset)
     subset.to_zarr(target, mode='w')
     print(target)
     # blocking_to_zarr(subset, target)
@@ -403,10 +401,15 @@ def regrid(source_path: UPath, target_grid_path: UPath, weights_path: UPath = No
             reuse_weights=True,
             method="bilinear",
             extrap_method="nearest_s2d",
+            ignore_degenerate=True,
         )
     else:
         regridder = xe.Regridder(
-            source_ds, target_grid_ds, method="bilinear", extrap_method="nearest_s2d"
+            source_ds,
+            target_grid_ds,
+            method="bilinear",
+            extrap_method="nearest_s2d",
+            ignore_degenerate=True,
         )
 
     regridded_ds = regridder(source_ds, keep_attrs=True)
@@ -500,10 +503,13 @@ def pyramid(
     ds_hash = str_to_hash(str(ds_path) + str(levels) + str(other_chunks))
     target = results_dir / 'pyramid' / ds_hash
 
-    if use_cache and zmetadata_exists(target):
-        print(f'found existing target: {target}')
-        return target
+    # if use_cache and zmetadata_exists(target):
+    #     print(f'found existing target: {target}')
+    #     return target
 
+    import ESMF
+
+    ESMF.Manager(debug=True)
     ds = xr.open_zarr(ds_path).pipe(_load_coords)
 
     ds.coords['date_str'] = ds['time'].dt.strftime('%Y-%m-%d').astype('S10')
@@ -513,7 +519,11 @@ def pyramid(
     weights_pyramid = datatree.open_datatree(weights_pyramid_path, engine='zarr')
     # create pyramid
     dta = pyramid_regrid(
-        ds, target_pyramid=target_pyramid, levels=levels, weights_pyramid=weights_pyramid
+        ds,
+        target_pyramid=target_pyramid,
+        levels=levels,
+        weights_pyramid=weights_pyramid,
+        regridder_kws={'ignore_degenerate': True},
     )
 
     # write to target
