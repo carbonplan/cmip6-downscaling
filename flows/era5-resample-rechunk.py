@@ -1,11 +1,17 @@
 from prefect import Flow, Parameter, task, unmapped
 
-from cmip6_downscaling.runtimes import CloudRuntime
+from cmip6_downscaling import config
+from cmip6_downscaling.runtimes import PangeoRuntime
 
-# config.set({"runtime.pangeo.n_workers": 16, "runtime.pangeo.threads_per_worker": 1})
+config.set({"runtime.pangeo.n_workers": 10, "runtime.pangeo.threads_per_worker": 1})
 
+# config.set(
+#     {
+#         'runtime.cloud.extra_pip_packages': 'git+https://github.com/carbonplan/cmip6-downscaling.git@main git+https://github.com/intake/intake-esm.git'
+#     }
+# )
 
-runtime = CloudRuntime()
+runtime = PangeoRuntime()
 
 
 @task(log_stdout=True)
