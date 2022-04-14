@@ -503,9 +503,9 @@ def pyramid(
     ds_hash = str_to_hash(str(ds_path) + str(levels) + str(other_chunks))
     target = results_dir / 'pyramid' / ds_hash
 
-    # if use_cache and zmetadata_exists(target):
-    #     print(f'found existing target: {target}')
-    #     return target
+    if use_cache and zmetadata_exists(target):
+        print(f'found existing target: {target}')
+        return target
 
     import ESMF
 
