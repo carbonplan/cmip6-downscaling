@@ -1,7 +1,7 @@
+import dask
 import xarray as xr
 import xesmf as xe
 from carbonplan_data.metadata import get_cf_global_attrs
-from distributed import wait
 from prefect import task
 from scipy.stats import norm as norm
 from skdownscale.pointwise_models import (  # AnalogRegression,; PureAnalog,; PureRegression,
@@ -24,7 +24,7 @@ use_cache = config.get('run_options.use_cache')
 
 good_fit_predict_chunks = {'lat': 24, 'lon': 24, 'time': 10957}
 
-# tags=['dask-resource:TASKSLOTS=1'],
+
 @task(tags=['dask-resource:taskslots=1'], log_stdout=True)
 def coarsen_and_interpolate(fine_path: UPath, coarse_path: UPath) -> UPath:
     """
@@ -210,11 +210,10 @@ def fit_and_predict(
     )
 
     out.attrs.update({'title': 'gard_fit_and_predict'}, **get_cf_global_attrs(version=version))
-    print(out)
+    out = dask.optimize(out)[0]
     # out = wait(out.persist()) # this was great
-    t = out.to_zarr(target, mode='w')
-    # del out#compute=False,  # this was great
-    # t.compute()
+    t = out.to_zarr(target, compute=False, mode='w')
+    t.compute(retries=5)
     return target
 
 
@@ -300,7 +299,7 @@ def postprocess(
         downscaled = downscaled.where(valids, 0)
     else:
         downscaled = model_output['pred'] + scrf['scrf'] * model_output['prediction_error']
-    downscaled.to_dataset(name=run_parameters.variable).chunk({'time': 25}).to_zarr(
+    (dask.optimize(downscaled.to_dataset(name=run_parameters.variable))[0]).to_zarr(
         target, mode='w'
     )
 
