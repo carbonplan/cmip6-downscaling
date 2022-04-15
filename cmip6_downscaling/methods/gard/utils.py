@@ -102,5 +102,5 @@ def read_scrf(run_parameters: RunParameters):
         lon=run_parameters.bbox.lon_slice,
         lat=run_parameters.bbox.lat_slice,
     )
-
+    scrf = scrf.drop('spatial_ref').astype('float32').chunk({'time': -1})
     return scrf

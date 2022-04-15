@@ -1,3 +1,4 @@
+import dask
 import xarray as xr
 import xesmf as xe
 from carbonplan_data.metadata import get_cf_global_attrs
@@ -24,7 +25,7 @@ use_cache = config.get('run_options.use_cache')
 good_fit_predict_chunks = {'lat': 24, 'lon': 24, 'time': 10957}
 
 
-@task(tags=['dask-resource:TASKSLOTS=1'], log_stdout=True)
+@task(tags=['dask-resource:taskslots=1'], log_stdout=True)
 def coarsen_and_interpolate(fine_path: UPath, coarse_path: UPath) -> UPath:
     """
     Coarsen up obs and then interpolate it back to the original finescale grid.
@@ -201,9 +202,9 @@ def fit_and_predict(
     )
 
     out.attrs.update({'title': 'gard_fit_and_predict'}, **get_cf_global_attrs(version=version))
-    print(out)
+    out = dask.optimize(out)[0]
     t = out.to_zarr(target, compute=False, mode='w')
-    t.compute()
+    t.compute(retries=5)
     return target
 
 
@@ -289,7 +290,7 @@ def postprocess(
         downscaled = downscaled.where(valids, 0)
     else:
         downscaled = model_output['pred'] + scrf['scrf'] * model_output['prediction_error']
-    downscaled.to_dataset(name=run_parameters.variable).chunk({'time': 25}).to_zarr(
+    (dask.optimize(downscaled.to_dataset(name=run_parameters.variable))[0]).to_zarr(
         target, mode='w'
     )
 
