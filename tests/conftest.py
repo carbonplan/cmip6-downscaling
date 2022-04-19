@@ -16,7 +16,6 @@ def set_test_config():
     )
 
 
-@pytest.fixture(scope="session", autouse=True)
 def example_3d_dataarray_us_domain(val=0):
     return xr.DataArray(
         val,
