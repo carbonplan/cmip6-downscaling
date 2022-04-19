@@ -1,4 +1,6 @@
-from cmip6_downscaling.runtimes import (  # CloudRuntime,
+import pytest
+
+from cmip6_downscaling.runtimes import (
     BaseRuntime,
     CIRuntime,
     LocalRuntime,
@@ -7,16 +9,11 @@ from cmip6_downscaling.runtimes import (  # CloudRuntime,
 )
 
 
-def test_runtimes():
+@pytest.mark.parametrize('runtime', [LocalRuntime, CIRuntime, PangeoRuntime])
+def test_runtimes(runtime):
 
-    # cloud_runtime = CloudRuntime()
-    # assert isinstance(cloud_runtime, BaseRuntime)
-    local_runtime = LocalRuntime()
-    assert isinstance(local_runtime, BaseRuntime)
-    ci_runtime = CIRuntime()
-    assert isinstance(ci_runtime, BaseRuntime)
-    pangeo_runtime = PangeoRuntime()
-    assert isinstance(pangeo_runtime, BaseRuntime)
+    _runtime = runtime()
+    assert isinstance(_runtime, BaseRuntime)
 
 
 def test_get_runtime():
