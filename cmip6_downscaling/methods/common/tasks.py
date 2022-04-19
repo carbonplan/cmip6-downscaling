@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import datetime
 import json
 import os
@@ -186,8 +187,7 @@ def rechunk(
     if template is not None:
         pattern_string = 'matched'
         if pattern is not None:
-            pattern_string += '_' + pattern
-    # if only pattern specified then use that pattern
+            pattern_string += f'_{pattern}'
     elif pattern is not None:
         pattern_string = pattern
 
@@ -229,12 +229,11 @@ def rechunk(
             # the chunking pattern will return the dimensions that you'll chunk along
             # so `full_time` will return `('lat', 'lon')`
             chunk_dims = config.get(f"chunk_dims.{pattern}")
-            for dim in chunk_def.keys():
+            for dim in chunk_def:
                 if dim not in chunk_dims:
                     print('correcting dim')
                     # override the chunksize of those unchunked dimensions to be the complete length (like passing chunksize=-1
                     chunk_def[dim] = len(ds[dim])
-    # if you don't have a target template then you'll just use the `full_time` or `full_space` approach
     elif pattern is not None:
         chunk_dims = config.get(f"chunk_dims.{pattern}")
         chunk_def = calc_auspicious_chunks_dict(ds[example_var], chunk_dims=chunk_dims)
@@ -256,17 +255,13 @@ def rechunk(
     # now that you have your chunks_dict you can check that the dataset at `path`
     # you're passing in doesn't already match that schema. because if so, we don't
     # need to bother with rechunking and we'll skip it!
-    schema_dict = {}
-    for var in ds.data_vars:
-        schema_dict[var] = DataArraySchema(chunks=chunk_def)
+    schema_dict = {var: DataArraySchema(chunks=chunk_def) for var in ds.data_vars}
     target_schema = DatasetSchema(schema_dict)
-    try:
+    with contextlib.suppress(SchemaError):
         # check to see if the initial dataset already matches the schema, in which case just
         # return the initial path and work with that
         target_schema.validate(ds)
         return path
-    except SchemaError:
-        pass
     rechunk_plan = rechunker.rechunk(
         source=group,
         target_chunks=chunks_dict,
@@ -558,11 +553,8 @@ def run_analyses(ds_path: UPath, run_parameters: RunParameters) -> UPath:
         blob_name = config.get('storage.web_results.blob') / parameters.run_id / 'analyses.html'
         blob_client = blob_service_client.get_blob_client(container='$web', blob=blob_name)
         # clean up before writing
-        try:
+        with contextlib.suppress(Exception):
             blob_client.delete_blob()
-        except:  # TODO: raise specific error
-            pass
-
         #  need to specify html content type so that it will render and not download
         with open(executed_html_path, "rb") as data:
             blob_client.upload_blob(
@@ -576,13 +568,12 @@ def run_analyses(ds_path: UPath, run_parameters: RunParameters) -> UPath:
 def finalize(path_dict: dict, run_parameters: RunParameters):
 
     now = datetime.datetime.utcnow().isoformat()
-    target1 = results_dir / 'runs' / run_parameters.run_id / (now + '.json')
+    target1 = results_dir / 'runs' / run_parameters.run_id / f'{now}.json'
     target2 = results_dir / 'runs' / run_parameters.run_id / 'latest.json'
     print(target1)
     print(target2)
 
-    out = {}
-    out['parameters'] = asdict(run_parameters)
+    out = {'parameters': asdict(run_parameters)}
     out['attrs'] = get_cf_global_attrs(version=version)
     out['datasets'] = {k: str(p) for k, p in path_dict.items()}
 
