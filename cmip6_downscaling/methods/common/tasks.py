@@ -95,7 +95,8 @@ def get_obs(run_parameters: RunParameters) -> UPath:
     )
     del subset[run_parameters.variable].encoding['chunks']
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
-    blocking_to_zarr(subset, target)
+    store = subset.to_zarr(target, mode='w', compute=False)
+    store.compute(retries=5)
     return target
 
 
@@ -394,7 +395,7 @@ def regrid(source_path: UPath, target_grid_path: UPath, weights_path: UPath = No
     regridded_ds.attrs.update(
         {'title': source_ds.attrs['title']}, **get_cf_global_attrs(version=version)
     )
-    blocking_to_zarr(regridded_ds, target)
+    regridded_ds.to_zarr(target, mode='w')
     return target
 
 

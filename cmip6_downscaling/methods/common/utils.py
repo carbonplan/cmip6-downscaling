@@ -5,7 +5,6 @@ import re
 
 import numpy as np
 import xarray as xr
-import zarr
 from upath import UPath
 from xarray_schema import DataArraySchema
 from xarray_schema.base import SchemaError
@@ -35,9 +34,8 @@ def blocking_to_zarr(ds: xr.Dataset, target):
         print('fell back to using a string target')
         target = 'az://flow-outputs' + str(target)
 
-    t = ds.to_zarr(target, mode='w', compute=False, consolidated=False)
-    t.compute()
-    zarr.consolidate_metadata(target)
+    t = ds.to_zarr(target, mode='w', compute=False)
+    t.compute(retries=5)
 
 
 def subset_dataset(
