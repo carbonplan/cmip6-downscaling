@@ -1,12 +1,13 @@
+import itertools
+
 import numpy as np
 import xarray as xr
 
-from cmip6_downscaling.methods.regions import combine_outputs, generate_subdomains  # noqa: F401
-from cmip6_downscaling.tests.fixtures import example_3d_data_us_domain  # noqa: F401
+from cmip6_downscaling.methods.regions import combine_outputs, generate_subdomains
 
 
-def test_generate_subdomains():
-    ds = example_3d_data_us_domain()
+def test_generate_subdomains(example_3d_data_us_domain):
+    ds = example_3d_data_us_domain
 
     region_def = 'ar6'
     buffer_size = 4
@@ -35,8 +36,8 @@ def test_generate_subdomains():
     assert mask.lon.max().values == ds.lon.max().values
 
 
-def test_combine_outputs():
-    ds = example_3d_data_us_domain()
+def test_combine_outputs(example_3d_data_us_domain):
+    ds = example_3d_data_us_domain
 
     # get mask using test data
     region_def = 'ar6'
@@ -57,14 +58,13 @@ def test_combine_outputs():
 
     # test that the correct combined output is present
     out = combine_outputs(ds_dict, mask)
-    for k in subdomains.keys():
-        for v in ds.data_vars:
-            unique_val = np.unique(out[v].where(mask == k).values)
-            unique_val = unique_val[np.isfinite(unique_val)]
-            # ensure that there is only one value for the region
-            assert len(unique_val) == 1
-            # ensure that for region k, the value we get is k
-            assert unique_val[0] == k
+    for k, v in itertools.product(subdomains.keys(), ds.data_vars):
+        unique_val = np.unique(out[v].where(mask == k).values)
+        unique_val = unique_val[np.isfinite(unique_val)]
+        # ensure that there is only one value for the region
+        assert len(unique_val) == 1
+        # ensure that for region k, the value we get is k
+        assert unique_val[0] == k
 
 
 def test_region_28():
