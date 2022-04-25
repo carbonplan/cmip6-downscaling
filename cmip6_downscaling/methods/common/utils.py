@@ -36,7 +36,7 @@ def blocking_to_zarr(ds: xr.Dataset, target):
         target = 'az://flow-outputs' + str(target)
 
     t = ds.to_zarr(target, mode='w', compute=False, consolidated=False)
-    t.compute()
+    t.compute(retries=10)
     zarr.consolidate_metadata(target)
 
 

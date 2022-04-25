@@ -73,6 +73,7 @@ def spatial_anomalies(obs_full_time_path: UPath, interpolated_obs_full_time_path
     # calculate the difference between the actual obs (with finer spatial heterogeneity)
     # and the interpolated coarse obs this will be saved and added to the
     # spatially-interpolated coarse predictions to add the spatial heterogeneity back in.
+
     spatial_anomalies = obs_full_time_ds - interpolated_obs_full_time_ds
     seasonal_cycle_spatial_anomalies = spatial_anomalies.groupby("time.month").mean()
     seasonal_cycle_spatial_anomalies.attrs.update(
@@ -115,11 +116,6 @@ def fit_and_predict(
     ValueError
         ValueError checking validity of input variables.
     """
-
-    print('experiment_train_full_time_path: ', experiment_train_full_time_path)
-    print('experiment_predict_full_time_path: ', experiment_predict_full_time_path)
-    print('coarse_obs_full_time_path: ', coarse_obs_full_time_path)
-    print('run_params: ', run_parameters)
 
     title = "bcsd_predictions"
     ds_hash = str_to_hash(

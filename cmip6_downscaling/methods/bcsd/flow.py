@@ -66,9 +66,9 @@ with Flow(
     p['experiment_train_path'] = get_experiment(run_parameters, time_subset='train_period')
     p['experiment_predict_path'] = get_experiment(run_parameters, time_subset='predict_period')
 
-    # # after regridding coarse_obs will have smaller array size in space but still
-    # # be chunked finely along time. but that's good to get it for regridding back to
-    # # the interpolated obs in next task
+    # after regridding coarse_obs will have smaller array size in space but still
+    # be chunked finely along time. but that's good to get it for regridding back to
+    # the interpolated obs in next task
 
     p['coarse_obs_path'] = regrid(
         p['obs_full_space_path'], p['experiment_train_path'], weights_path=p['obs_to_gcm_weights']
@@ -90,6 +90,7 @@ with Flow(
     )
     p['coarse_obs_full_time_path'] = rechunk(p['coarse_obs_path'], pattern='full_time')
     p['experiment_train_full_time_path'] = rechunk(p['experiment_train_path'], pattern='full_time')
+    # rechunk fails
     p['experiment_predict_full_time_path'] = rechunk(
         p['experiment_predict_path'],
         pattern='full_time',
@@ -138,7 +139,7 @@ with Flow(
     p['monthly_summary_full_space_path'] = rechunk(p['monthly_summary_path'], pattern='full_space')
     p['annual_summary_full_space_path'] = rechunk(p['annual_summary_path'], pattern='full_space')
 
-    # # pyramids
+    # pyramids
 
     p['pyramid_weights'] = get_pyramid_weights(run_parameters=run_parameters, levels=4)
 

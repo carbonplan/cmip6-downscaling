@@ -70,7 +70,6 @@ _defaults = {
             "deploy_mode": "remote",
             "adapt_min": 2,
             "adapt_max": 20,
-            "dask_distributed_worker_resources_taskslots": "1",
         },
         "gateway": {
             "storage_prefix": "az://",
@@ -93,7 +92,7 @@ _defaults = {
         "pangeo": {
             "storage_prefix": "az://",
             "storage_options": {'directory': './'},
-            'n_workers': 16,
+            'n_workers': 12,
             'threads_per_worker': 1,
         },
     },
