@@ -50,7 +50,7 @@ _defaults = {
         },
         'gcm_obs_weights': {'uri': 'az://static/xesmf_weights/gcm_obs/weights.csv'},
     },
-    'run_options': {'runtime': "pangeo", 'use_cache': True},
+    'run_options': {'runtime': "pangeo", 'cleanup_flag': True, 'use_cache': True},
     "runtime": {
         "cloud": {
             "storage_prefix": "az://",
@@ -70,7 +70,6 @@ _defaults = {
             "deploy_mode": "remote",
             "adapt_min": 2,
             "adapt_max": 20,
-            "dask_distributed_worker_resources_taskslots": "1",
         },
         "gateway": {
             "storage_prefix": "az://",
@@ -78,7 +77,7 @@ _defaults = {
                 'container': 'prefect',
             },
             "cluster_name": '',  #
-            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git@pregenerate-weights ndpyramid=0.0.5 git+https://github.com/pangeo-data/rechunker",
+            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git",
             "image": "carbonplan/cmip6-downscaling-prefect:latest",
             "worker_cores": 1,
             "worker_memory": 16,  # Gi
@@ -93,7 +92,7 @@ _defaults = {
         "pangeo": {
             "storage_prefix": "az://",
             "storage_options": {'directory': './'},
-            'n_workers': 32,
+            'n_workers': 12,
             'threads_per_worker': 1,
         },
     },

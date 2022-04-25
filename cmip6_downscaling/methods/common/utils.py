@@ -5,6 +5,7 @@ import re
 
 import numpy as np
 import xarray as xr
+import zarr
 from upath import UPath
 from xarray_schema import DataArraySchema
 from xarray_schema.base import SchemaError
@@ -36,6 +37,7 @@ def blocking_to_zarr(ds: xr.Dataset, target):
 
     t = ds.to_zarr(target, mode='w', compute=False)
     t.compute(retries=5)
+    zarr.consolidate_metadata(target)
 
 
 def subset_dataset(

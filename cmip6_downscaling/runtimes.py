@@ -58,6 +58,7 @@ class CloudRuntime(BaseRuntime):
     def _generate_env(self):
         env = {
             "EXTRA_PIP_PACKAGES": config.get("runtime.cloud.extra_pip_packages"),
+            "PREFECT__CLOUD__HEARTBEAT_MODE": "thread",
             "PREFECT__FLOWS__CHECKPOINTING": "true",
             **_threadsafe_env_vars,
         }

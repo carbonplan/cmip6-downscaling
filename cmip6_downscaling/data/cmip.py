@@ -116,7 +116,9 @@ def load_cmip(
 
         # convert to mm/day - helpful to prevent rounding errors from very tiny numbers
         if 'pr' in ds:
+            # with xr.set_options(keep_attrs=True):
             ds['pr'] *= 86400
+            ds['pr'] = ds['pr'].astype('float32')
 
         return ds
 

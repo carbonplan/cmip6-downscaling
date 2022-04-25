@@ -28,7 +28,6 @@ from cmip6_downscaling.data.cmip import get_gcm
 from cmip6_downscaling.data.observations import open_era5
 from cmip6_downscaling.methods.common.containers import RunParameters
 from cmip6_downscaling.methods.common.utils import (
-    blocking_to_zarr,
     calc_auspicious_chunks_dict,
     resample_wrapper,
     subset_dataset,
@@ -93,7 +92,10 @@ def get_obs(run_parameters: RunParameters) -> UPath:
         run_parameters.bbox,
         chunking_schema={'time': 365, 'lat': 150, 'lon': 150},
     )
-    del subset[run_parameters.variable].encoding['chunks']
+
+    if run_parameters.variable != 'pr':
+        del subset[run_parameters.variable].encoding['chunks']
+
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
     store = subset.to_zarr(target, mode='w', compute=False)
     store.compute(retries=5)
@@ -116,7 +118,6 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     UPath
         UPath to experiment dataset.
     """
-
     time_period = getattr(run_parameters, time_subset)
     frmt_str = "{model}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{time_period.start}_{time_period.stop}".format(
         time_period=time_period, **asdict(run_parameters)
@@ -146,11 +147,10 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
 
     # Note: dataset is chunked into time:365 chunks to standardize leap-year chunking.
     subset = subset.chunk({'time': 365})
-    del subset[run_parameters.variable].encoding['chunks']
-
+    if run_parameters.variable != 'pr':
+        del subset[run_parameters.variable].encoding['chunks']
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
     subset.to_zarr(target, mode='w')
-    # blocking_to_zarr(subset, target)
     return target
 
 
@@ -183,7 +183,6 @@ def rechunk(
     target : UPath
         Path to rechunked dataset
     """
-
     # if both defined then you'll take the spatial part of template and override one dimension with the specified pattern
     if template is not None:
         pattern_string = 'matched'
@@ -276,7 +275,6 @@ def rechunk(
     # consolidate_metadata here since when it comes out of rechunker it isn't consolidated.
     zarr.consolidate_metadata(target_store)
     temp_store.clear()
-
     return target
 
 
@@ -309,7 +307,8 @@ def time_summary(ds_path: UPath, freq: str) -> UPath:
     out_ds = resample_wrapper(ds, freq=freq)
 
     out_ds.attrs.update({'title': 'time_summary'}, **get_cf_global_attrs(version=version))
-    blocking_to_zarr(out_ds, target)
+    out_ds.to_zarr(target, mode='w')
+
     return target
 
 
@@ -372,7 +371,6 @@ def regrid(source_path: UPath, target_grid_path: UPath, weights_path: UPath = No
         return target
     source_ds = xr.open_zarr(source_path)
     target_grid_ds = xr.open_zarr(target_grid_path)
-
     if weights_path:
         from ndpyramid.regrid import _reconstruct_xesmf_weights
 
@@ -385,10 +383,15 @@ def regrid(source_path: UPath, target_grid_path: UPath, weights_path: UPath = No
             reuse_weights=True,
             method="bilinear",
             extrap_method="nearest_s2d",
+            ignore_degenerate=True,
         )
     else:
         regridder = xe.Regridder(
-            source_ds, target_grid_ds, method="bilinear", extrap_method="nearest_s2d"
+            source_ds,
+            target_grid_ds,
+            method="bilinear",
+            extrap_method="nearest_s2d",
+            ignore_degenerate=True,
         )
 
     regridded_ds = regridder(source_ds, keep_attrs=True)
@@ -493,7 +496,11 @@ def pyramid(
     weights_pyramid = datatree.open_datatree(weights_pyramid_path, engine='zarr')
     # create pyramid
     dta = pyramid_regrid(
-        ds, target_pyramid=target_pyramid, levels=levels, weights_pyramid=weights_pyramid
+        ds,
+        target_pyramid=target_pyramid,
+        levels=levels,
+        weights_pyramid=weights_pyramid,
+        regridder_kws={'ignore_degenerate': True},
     )
 
     # write to target
