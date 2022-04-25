@@ -33,8 +33,6 @@ from cmip6_downscaling.methods.common.utils import (
     subset_dataset,
     zmetadata_exists,
 )
-
-get_gcm
 from cmip6_downscaling.utils import str_to_hash
 
 warnings.filterwarnings(
@@ -120,7 +118,6 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     UPath
         UPath to experiment dataset.
     """
-    print(run_parameters)
     time_period = getattr(run_parameters, time_subset)
     frmt_str = "{model}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{time_period.start}_{time_period.stop}".format(
         time_period=time_period, **asdict(run_parameters)
@@ -186,8 +183,6 @@ def rechunk(
     target : UPath
         Path to rechunked dataset
     """
-    print('path: ', path)
-    print('template: ', template)
     # if both defined then you'll take the spatial part of template and override one dimension with the specified pattern
     if template is not None:
         pattern_string = 'matched'
@@ -218,7 +213,6 @@ def rechunk(
     group = zarr.open_consolidated(path)
     # open the dataset to access the coordinates
     ds = xr.open_zarr(path)
-    print(ds)
     example_var = list(ds.data_vars)[0]
     # if you have defined a template then use the chunks of that template
     # to form the desired chunk definition
@@ -315,7 +309,6 @@ def time_summary(ds_path: UPath, freq: str) -> UPath:
     out_ds.attrs.update({'title': 'time_summary'}, **get_cf_global_attrs(version=version))
     out_ds.to_zarr(target, mode='w')
 
-    # blocking_to_zarr(out_ds, target)
     return target
 
 
@@ -494,9 +487,6 @@ def pyramid(
         print(f'found existing target: {target}')
         return target
 
-    import ESMF
-
-    ESMF.Manager(debug=True)
     ds = xr.open_zarr(ds_path).pipe(_load_coords)
 
     ds.coords['date_str'] = ds['time'].dt.strftime('%Y-%m-%d').astype('S10')

@@ -58,7 +58,7 @@ _defaults = {
                 'container': 'prefect',
             },
             "agent": "az-eu-west",
-            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git@debug/prefect_scaling",
+            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git",
             "kubernetes_cpu": 7,
             "kubernetes_memory": "16Gi",
             "image": "carbonplan/cmip6-downscaling-prefect:latest",
@@ -77,8 +77,8 @@ _defaults = {
                 'container': 'prefect',
             },
             "cluster_name": '',  #
-            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git@main",
-            "image": "carbonplan/cmip6-downscaling-prefect:2022.04.07",
+            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git",
+            "image": "carbonplan/cmip6-downscaling-prefect:latest",
             "worker_cores": 1,
             "worker_memory": 16,  # Gi
             "adapt_min": 1,

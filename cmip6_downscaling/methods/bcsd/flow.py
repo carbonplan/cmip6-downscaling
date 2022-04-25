@@ -74,7 +74,7 @@ with Flow(
         p['obs_full_space_path'], p['experiment_train_path'], weights_path=p['obs_to_gcm_weights']
     )
 
-    # # interpolated obs should have same exact chunking schema as ds at `p['obs_full_space_path']`
+    # interpolated obs should have same exact chunking schema as ds at `p['obs_full_space_path']`
     p['interpolated_obs_path'] = regrid(
         source_path=p['coarse_obs_path'],
         target_grid_path=p['obs_path'],
@@ -90,7 +90,7 @@ with Flow(
     )
     p['coarse_obs_full_time_path'] = rechunk(p['coarse_obs_path'], pattern='full_time')
     p['experiment_train_full_time_path'] = rechunk(p['experiment_train_path'], pattern='full_time')
-    # rechunk fails
+
     p['experiment_predict_full_time_path'] = rechunk(
         p['experiment_predict_path'],
         pattern='full_time',

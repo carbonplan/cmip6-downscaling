@@ -165,7 +165,6 @@ def get_gcm(
         source_ids=source_id,
         variable_ids=variable,
     )
-    print(kws)
     if float(time_slice.stop) < 2015:
         # you're working with historical data
         ds_gcm = load_cmip(activity_ids='CMIP', experiment_ids='historical', **kws)

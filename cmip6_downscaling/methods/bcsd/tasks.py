@@ -80,7 +80,6 @@ def spatial_anomalies(obs_full_time_path: UPath, interpolated_obs_full_time_path
         {'title': 'bcsd_spatial_anomalies'}, **get_cf_global_attrs(version=version)
     )
     seasonal_cycle_spatial_anomalies.to_zarr(target, mode='w')
-    # blocking_to_zarr(seasonal_cycle_spatial_anomalies, target)
 
     return target
 
@@ -156,7 +155,6 @@ def fit_and_predict(
 
     bias_corrected_ds.to_zarr(target, mode='w')
 
-    # blocking_to_zarr(bias_corrected_ds, target)
     return target
 
 
