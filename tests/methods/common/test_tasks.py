@@ -153,7 +153,7 @@ def test_regrid(tmp_path):
 def test_rechunk(rechunk_params, tmp_path):
     # TODO Add testing parameterization to check full_space (done), full_time (done) and template match
     ds = xr.tutorial.open_dataset('air_temperature').chunk({'time': 100, 'lat': 10, 'lon': 10})
-    source_path = str(tmp_path) + "/" + 'rechunk.zarr'
+    source_path = f'{str(tmp_path)}/rechunk.zarr'
     ds.to_zarr(source_path, mode='w')
 
     actual_path = rechunk.run(
