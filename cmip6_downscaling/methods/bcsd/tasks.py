@@ -155,7 +155,9 @@ def fit_and_predict(
     # Create a template dataset for map blocks
     # This feals a bit fragile.
     template_var = list(xpred.data_vars.keys())[0]
-    template = xpred[[template_var]].astype('float32').rename({template_var: run_parameters.variable})
+    template = (
+        xpred[[template_var]].astype('float32').rename({template_var: run_parameters.variable})
+    )
 
     out = xr.map_blocks(
         _fit_and_predict_wrapper,
