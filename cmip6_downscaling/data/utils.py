@@ -32,13 +32,18 @@ def to_standard_calendar(obj: T_Xarray) -> T_Xarray:
     if orig_calendar == "360_day":
         raise ValueError("360_day calendar is not supported")
 
-    # reindex / interpolate
-    obj_new = xclim.core.calendar.convert_calendar(obj, "standard", missing=np.nan).interpolate_na(
-        dim="time", method="linear"
+    # reindex / interpolate -- Note: .chunk was added to fix dask error
+    obj_new = (
+        xclim.core.calendar.convert_calendar(obj, "standard", missing=np.nan)
+        .chunk({'time': -1})
+        .interpolate_na(dim="time", method="linear")
     )
 
     # reset encoding
     obj_new["time"].encoding["calendar"] = "standard"
+
+    # sets time to datetimeindex
+    obj_new['time'] = obj_new.indexes['time'].to_datetimeindex()
 
     return obj_new
 
