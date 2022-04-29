@@ -7,6 +7,7 @@ from cmip6_downscaling import runtimes
 from cmip6_downscaling.methods.common.tasks import (  # annual_summary,; monthly_summary,; pyramid,; run_analyses,
     get_experiment,
     get_obs,
+    get_weights,
     make_run_parameters,
     rechunk,
     regrid,
@@ -54,12 +55,15 @@ with Flow(
         model_type=Parameter("model_type"),
         model_params=Parameter("model_params"),
     )
-
+    p = {}
     # input datasets
     obs_path = get_obs(run_parameters)
     obs_full_space_path = rechunk(path=obs_path, pattern='full_space')
+    obs_full_time_path = rechunk(path=obs_path, pattern='full_time')
     experiment_train_path = get_experiment(run_parameters, time_subset='train_period')
     experiment_predict_path = get_experiment(run_parameters, time_subset='predict_period')
+    p['gcm_to_obs_weights'] = get_weights(run_parameters=run_parameters, direction='gcm_to_obs')
+    p['obs_to_gcm_weights'] = get_weights(run_parameters=run_parameters, direction='obs_to_gcm')
 
     # after regridding coarse_obs will have smaller array size in space but still
     # be chunked finely along time. but that's good to get it for regridding back to
@@ -69,10 +73,11 @@ with Flow(
         obs_full_space_path, experiment_train_path
     )
 
-    # just allow the interpolated obs full time rechunking determine the size of the subsequent full-time chunking routines
+    # # just allow the interpolated obs full time rechunking determine the size of the subsequent full-time chunking routines
     interpolated_obs_full_time_path = rechunk(interpolated_obs_full_space_path, pattern='full_time')
 
-    # get gcm data into full space to prep for interpolation
+    # # get gcm data into full space to prep for interpolation
+    # # TODO: do we need this?
     experiment_train_full_space_path = rechunk(
         experiment_train_path, pattern="full_space", template=obs_full_space_path
     )
@@ -80,14 +85,17 @@ with Flow(
         experiment_predict_path, pattern="full_space", template=obs_full_space_path
     )
 
-    # interpolate gcm to finescale. it will retain the same temporal chunking pattern (likely 25 timesteps)
+    # # interpolate gcm to finescale. it will retain the same temporal chunking pattern (likely 25 timesteps)
     experiment_train_fine_full_space_path = regrid(
-        source_path=experiment_train_full_space_path, target_grid_path=obs_path
+        source_path=experiment_train_full_space_path,
+        target_grid_path=obs_path,
+        weights_path=p['gcm_to_obs_weights'],
     )
     experiment_predict_fine_full_space_path = regrid(
-        source_path=experiment_predict_full_space_path, target_grid_path=obs_path
+        source_path=experiment_predict_full_space_path, target_grid_path=obs_path,
+        weights_path=p['gcm_to_obs_weights']
     )
-    # TODO: do we need the templates as well for the rechunking? probably defer to bcsd flow here
+    # # TODO: do we need the templates as well for the rechunking? probably defer to bcsd flow here
     experiment_train_fine_full_time_path = rechunk(
         experiment_train_fine_full_space_path,
         pattern="full_time",
@@ -99,16 +107,16 @@ with Flow(
         template=interpolated_obs_full_time_path,
     )
 
-    # fit and predict (TODO: put the transformation steps currently in the prep_gard_input task into the fit and predict step)
+    # # # fit and predict (TODO: put the transformation steps currently in the prep_gard_input task into the fit and predict step)
     model_output_path = fit_and_predict(
-        xtrain_path=experiment_train_fine_full_time_path,
-        ytrain_path=interpolated_obs_full_time_path,
+        xtrain_path=interpolated_obs_full_time_path,
+        ytrain_path=obs_full_time_path,
         xpred_path=experiment_predict_fine_full_time_path,
         run_parameters=run_parameters,
     )  # [transformation, gard_model_options])
 
-    # # post process (add back in scrf)
-    # # necessary input chunk pattern:
+    # # # # post process (add back in scrf)
+    # # # # necessary input chunk pattern:
     final_gard_path = postprocess(
         model_output_path=model_output_path, run_parameters=run_parameters
     )  # this comes out in full-time currently

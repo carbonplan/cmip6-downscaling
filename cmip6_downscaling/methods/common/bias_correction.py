@@ -48,42 +48,42 @@ def bias_correct_obs_by_method(
 
 
 def bias_correct_gcm_by_method(
-    gcm_train: xr.DataArray | xr.Dataset,
-    obs_train: xr.DataArray | xr.Dataset,
-    gcm_predict: xr.DataArray | xr.Dataset,
+    gcm_hist: xr.DataArray | xr.Dataset,
+    gcm_pred: xr.DataArray | xr.Dataset,
+    obs: xr.DataArray | xr.Dataset,
     method: str,
     bc_kwargs: dict[str, Any],
 ):
     if method == 'quantile_transform':
         # transform gcm
         if 'n_quantiles' not in bc_kwargs:
-            bc_kwargs['n_quantiles'] = len(gcm_train.time)
+            bc_kwargs['n_quantiles'] = len(obs.time)
         qt = PointWiseDownscaler(model=QuantileTransformer(**bc_kwargs))
-        qt.fit(gcm_train)
-        return qt.transform(gcm_predict)
+        qt.fit(gcm_hist)
+        return qt.transform(gcm_pred)
 
     elif method == 'z_score':
         # transform gcm
         sc = PointWiseDownscaler(model=StandardScaler(**bc_kwargs))
-        sc.fit(gcm_train)
-        return sc.transform(gcm_predict)
+        sc.fit(gcm_hist)
+        return sc.transform(gcm_pred)
 
     # TODO: test to see QuantileMappingReressor and TrendAwareQuantileMappingRegressor
     # can handle multiple variables at once
     elif method == 'quantile_map':
         qm = PointWiseDownscaler(model=QuantileMappingReressor(**bc_kwargs), dim='time')
-        qm.fit(gcm_train, obs_train)
-        return qm.predict(gcm_predict)
+        qm.fit(gcm_hist, obs)
+        return qm.predict(gcm_pred)
 
     elif method == 'detrended_quantile_map':
         qm = PointWiseDownscaler(
             TrendAwareQuantileMappingRegressor(QuantileMappingReressor(**bc_kwargs))
         )
-        qm.fit(gcm_train, obs_train)
-        return qm.predict(gcm_predict)
+        qm.fit(gcm_hist, obs)
+        return qm.predict(gcm_pred)
 
     elif method == 'none':
-        return gcm_predict
+        return gcm_pred
 
     else:
         available_methods = [
