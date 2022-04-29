@@ -94,13 +94,13 @@ def read_scrf(run_parameters: RunParameters):
         scrf_list.append(scrf_ten_years.drop('time'))
     scrf = xr.concat(scrf_list, dim='time')
     scrf['time'] = pd.date_range(start='1981-01-01', periods=scrf.dims['time'])
-    scrf = scrf.sel(time=run_parameters.predict_period.time_slice)
+    scrf = scrf.sel(time=slice('1981', '2010'))  # run_parameters.predict_period.time_slice)
     # TODO: confirm whether this breaks the distributed fashion?
     # TODO: check how are the scrfs chunked??
     # subset into the spatial domain
-    scrf = scrf.sel(
-        lon=run_parameters.bbox.lon_slice,
-        lat=run_parameters.bbox.lat_slice,
-    )
+    # scrf = scrf.sel(
+    #     lon=run_parameters.bbox.lon_slice,
+    #     lat=run_parameters.bbox.lat_slice,
+    # )
     scrf = scrf.drop('spatial_ref').astype('float32').chunk({'time': -1})
     return scrf

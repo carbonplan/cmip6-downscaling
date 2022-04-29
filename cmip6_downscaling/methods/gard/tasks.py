@@ -71,56 +71,67 @@ def coarsen_and_interpolate(fine_path: UPath, coarse_path: UPath) -> UPath:
     return target
 
 
-def _fit_and_predict_wrapper(xtrain, ytrain, xpred, run_parameters, dim='time'):
+def _fit_and_predict_wrapper(xtrain, ytrain, xpred, xhist, run_parameters, dim='time'):
+    """_summary_
+
+    Parameters
+    ----------
+    xtrain : _type_
+        _description_
+    ytrain : _type_
+        _description_
+    xpred : _type_
+        _description_
+    xhist : _type_
+        _description_
+    run_parameters : _type_
+        _description_
+    dim : str, optional
+        _description_, by default 'time'
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
 
     xpred = xpred.rename({'t2': 'time'})
 
-    kws = default_none_kwargs(run_parameters.bias_correction_kwargs, copy=True)
+    kws = default_none_kwargs(run_parameters['bias_correction_kwargs'], copy=True)
 
     # data transformation (this wants full-time chunking)
+    # we need two transformed datasets: one of interpolated obs and one of interpolated gcm
     # transformed_obs is for the training period
     transformed_obs = bias_correct_obs_by_method(
-        da_obs=ytrain, method=run_parameters.bias_correction_method, bc_kwargs=kws
+        da_obs=xtrain, method=run_parameters['bias_correction_method'], bc_kwargs=kws
     ).to_dataset(dim="variable")
 
-    # we need two transformed gcms - one for training and one for prediction
-    # for transformed gcm_train we pass the same thing as the training and the
-    # prediction since we're just transforming it
-    transformed_gcm_train = bias_correct_gcm_by_method(
-        gcm_train=xtrain,
-        obs_train=ytrain,
-        gcm_predict=xtrain,
-        method=run_parameters.bias_correction_method,
-        bc_kwargs=kws,
-    ).to_dataset(dim="variable")
-
-    # for transformed_gcm_pred we pass the gcm train and then also the gcm_pred
-    # to transform the gcm_pred
-    transformed_gcm_pred = bias_correct_gcm_by_method(
-        gcm_train=xtrain,
-        obs_train=ytrain,
-        gcm_predict=xpred,
-        method=run_parameters.bias_correction_method,
+    # transformed gcm is the interpolated GCM for the prediction period transformed
+    # w.r.t. the interpolated obs used in the training
+    transformed_gcm = bias_correct_gcm_by_method(
+        gcm_hist=xhist,
+        gcm_pred=xpred,
+        obs=xtrain,
+        method=run_parameters['bias_correction_method'],
         bc_kwargs=kws,
     ).to_dataset(dim="variable")
 
     # model definition
     model = PointWiseDownscaler(
-        model=get_gard_model(run_parameters.model_type, run_parameters.model_params), dim=dim
+        model=get_gard_model(run_parameters['model_type'], run_parameters['model_params']), dim=dim
     )
 
     # model fitting
     model.fit(
-        transformed_gcm_train.assign_coords({"time": transformed_obs.time.values})[
-            run_parameters.variable
-        ],
-        transformed_obs[run_parameters.variable],
+        transformed_obs[run_parameters['variable']],
+        ytrain.assign_coords({"time": transformed_obs.time.values})[run_parameters['variable']],
     )
 
     # model prediction
-    out = model.predict(transformed_gcm_pred[run_parameters.variable]).to_dataset(dim='variable')
+    out = model.predict(transformed_gcm[run_parameters['variable']]).to_dataset(dim='variable')
 
-    return out
+    # return out
+    return transformed_obs, transformed_gcm, model, out
 
 
 @task(log_stdout=True)
@@ -181,9 +192,8 @@ def fit_and_predict(
     # data transformation (this wants full-time chunking)
     # transformed_obs is for the training period
 
-    # we need two transformed gcms - one for training and one for prediction
-    # for transformed gcm_train we pass the same thing as the training and the
-    # prediction since we're just transforming it
+    # we need only the prediction GCM (xpred), but we'll transform it into the space of the
+    # transformed interpolated obs (xtrain)
     # Create a template dataset for map blocks
     # This feals a bit fragile.
     template_var = list(xpred.data_vars.keys())[0]
