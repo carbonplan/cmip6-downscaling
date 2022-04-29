@@ -8,12 +8,11 @@ from sklearn.linear_model import LinearRegression
 
 from cmip6_downscaling.workflows.utils import generate_batches
 
-
-def maca_bias_correction(
-    ds_gcm: xr.Dataset,
-    ds_obs: xr.Dataset,
-    historical_period: slice,
-    variables: str | list[str],
+@task(log_stdout=True)
+def maca_bias_correction_task(
+    detrended_gcm_path: str,
+    coarse_obs_full_time_path: str,
+    run_parameters: RunParameters,
     batch_size: int | None = 15,
     buffer_size: int | None = 15,
 ) -> xr.Dataset:
