@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import dask
+import pandas as pd
 import xarray as xr
 
 from . import cat
-from .utils import lon_to_180
+from .utils import lon_to_180, to_standard_calendar
 
 
 def postprocess(ds: xr.Dataset) -> xr.Dataset:
@@ -15,6 +16,7 @@ def postprocess(ds: xr.Dataset) -> xr.Dataset:
     - Squeezes length 1 dimensions (if present)
     - Standardizes longitude convention to [-180, 180]
     - Reorders latitudes to [-90, 90]
+    - Shifts time from Noon (12:00) start to Midnight (00:00)
 
     Parameters
     ----------
@@ -27,39 +29,42 @@ def postprocess(ds: xr.Dataset) -> xr.Dataset:
         Post processed dataset
     """
 
-    # drop band variables
-    if ('lat_bnds' in ds) or ('lat_bnds' in ds.coords):
-        ds = ds.drop('lat_bnds')
-    if ('lon_bnds' in ds) or ('lon_bnds' in ds.coords):
-        ds = ds.drop('lon_bnds')
-    if ('time_bnds' in ds) or ('time_bnds' in ds.coords):
-        ds = ds.drop('time_bnds')
+    with xr.set_options(keep_attrs=True):
+        # drop band variables
+        if ('lat_bnds' in ds) or ('lat_bnds' in ds.coords):
+            ds = ds.drop('lat_bnds')
+        if ('lon_bnds' in ds) or ('lon_bnds' in ds.coords):
+            ds = ds.drop('lon_bnds')
+        if ('time_bnds' in ds) or ('time_bnds' in ds.coords):
+            ds = ds.drop('time_bnds')
 
-    # drop height variable
-    if 'height' in ds:
-        ds = ds.drop('height')
+        # drop height variable
+        if 'height' in ds:
+            ds = ds.drop('height')
 
-    # squeeze length 1 dimensions
-    ds = ds.squeeze(drop=True)
+        # squeeze length 1 dimensions
+        ds = ds.squeeze(drop=True)
 
-    # standardize longitude convention
-    ds = lon_to_180(ds)
+        # standardize longitude convention
+        ds = lon_to_180(ds)
 
-    # Reorders latitudes to [-90, 90]
-    if ds.lat[0] > ds.lat[-1]:
-        ds = ds.reindex({"lat": ds.lat[::-1]})
+        # Reorders latitudes to [-90, 90]
+        if ds.lat[0] > ds.lat[-1]:
+            ds = ds.reindex({"lat": ds.lat[::-1]})
 
-    # Shifts time from Noon (12:00) start to Midnight (00:00) start to match with Obs
-    # ds.coords['time'] = ds['time'].resample(time='1D').first()
-    ds['time'] = xr.cftime_range(
-        start=ds['time'].data[0],
-        end=ds['time'].data[-1],
-        normalize=True,
-        freq="1D",
-        calendar=ds.time.encoding['calendar'],
-    )
+        # checks calendar
+        ds = to_standard_calendar(ds)
 
-    return ds
+        # Shifts time from Noon (12:00) start to Midnight (00:00) start to match with Obs
+        # ds.coords['time'] = ds['time'].resample(time='1D').first()
+
+        ds['time'] = pd.date_range(
+            start=ds['time'].data[0],
+            end=ds['time'].data[-1],
+            normalize=True,
+            freq="1D",
+        )
+        return ds
 
 
 def load_cmip(
