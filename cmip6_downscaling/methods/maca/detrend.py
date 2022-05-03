@@ -103,16 +103,16 @@ def calc_epoch_trend(data, historical_period, day_rolling_window=21, year_rollin
     ----------
     data : xr.Dataset
         Data to calculate epoch trend on
-    historical_period: slice
+    historical_period : slice
         Slice indicating the historical period to be used when calculating historical mean
     day_rolling_window: int
         Number of days to include when calculating the rolling average
-    year_rolling_window: int
+    year_rolling_window : int
         Number of years to include when calculating the rolling average
 
     Returns
     -------
-    trend: xr.Dataset
+    trend : xr.Dataset
         The long term average trend
     """
     # the rolling windows need to be odd numbers since the rolling average is centered
@@ -156,12 +156,3 @@ def calc_epoch_trend(data, historical_period, day_rolling_window=21, year_rollin
     assert trend.isnull().sum().values == 0
 
     return trend
-
-
-def remove_epoch_trend(data, trend, **kwargs):
-    """
-    Subtract the trend from data
-    """
-    ea_data = data - trend
-
-    return ea_data

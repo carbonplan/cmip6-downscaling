@@ -1,9 +1,12 @@
 from __future__ import annotations
+from this import d
 
 from typing import Any
 
 import numpy as np
+from cmip6_downscaling.methods.common.containers import RunParameters
 import regionmask
+import pandas as pd
 import xarray as xr
 
 
@@ -63,6 +66,55 @@ def generate_subdomains(
 
             subdomains[n] = (min(min_lon, max_lon), min_lat, max(min_lon, max_lon), max_lat)
     return subdomains, mask
+
+
+def get_region(id):
+    return xr.open_zarr(f'{prefix}/id')
+
+
+def _merge(mask, varname, times):
+    components = pd.unique(mask.values.ravel())
+    components = components[~np.isnan(components)]
+    
+    if components.size > 0:
+        merged = (
+            xr.merge(
+                (
+                    xr.open_zarr(f'az://scratch/regions/{ind}.zarr')
+                    .where(mask.isin(ind))
+                    .sortby(["lon", "lat"])
+                    for ind in components
+                )
+            )
+            .reindex_like(mask)
+            .sortby("lat", ascending=False)
+        )
+    else:
+        merged = mask.expand_dims(time=times).to_dataset(name=varname)
+    return merged.load()
+
+
+@task(log_stdout=True)
+def combine_regions(region_paths: list[str], mask_path: UPath, run_parameters: RunParameters):
+
+    # Todo:
+    # - should we pass all paths to each block task where the list of paths can be filtered or should we just pass a template path?
+    # - deci
+
+    ds_hash = str_to_hash(str(region_paths) + str(mask_path))
+    target = intermediate_dir / 'combine_regions' / ds_hash
+
+    if use_cache and zmetadata_exists(target):
+        print(f"found existing target: {target}")
+        return target
+
+    mask = xr.open_zarr(mask_path)
+
+    combined_ds = mask.map_blocks(_merge, run_parameters.variable, times=template.time, template=template)
+
+    combined_ds.attrs.update({'title': 'combine_regions'}, **get_cf_global_attrs(version=version))
+    combined_ds.to_zarr(target, mode='w')
+
 
 
 def combine_outputs(

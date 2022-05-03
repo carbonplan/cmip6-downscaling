@@ -2,46 +2,94 @@ from __future__ import annotations
 
 import numpy as np
 import xarray as xr
-import xesmf as xe
+
 from skdownscale.pointwise_models import EquidistantCdfMatcher, PointWiseDownscaler
 from sklearn.linear_model import LinearRegression
 
-from cmip6_downscaling.workflows.utils import generate_batches
+from .utils import generate_batches
 
-@task(log_stdout=True)
-def maca_bias_correction_task(
-    detrended_gcm_path: str,
-    coarse_obs_full_time_path: str,
-    run_parameters: RunParameters,
+
+def get_doy_mask(
+    source_doy: xr.DataArray,
+    target_doy: xr.DataArray,
+    doy_range: int = 45,
+) -> xr.DataArray:
+    """
+    Given two 1D dataarrays containing day of year informations: source_doy and target_doy , return a matrix of shape
+    len(target_doy) x len(source_doy). Cell (i, j) is True if the source doy j is within doy_range days of the target
+    doy i, and False otherwise
+
+    Parameters
+    ----------
+    source_doy : xr.DataArray
+        1D xr data array with day of year information
+    target_doy : xr.DataArray
+        1D xr data array with day of year information
+
+    Returns
+    -------
+    mask : xr.DataArray
+        2D xr data array of boolean type in the shape of len(target_doy) x len(source_doy)
+    """
+    # get the min and max doy within doy_range days to target doy
+    target_doy_min = target_doy - doy_range
+    target_doy_max = target_doy + doy_range
+    # make sure the range is within 0-365
+    # TODO: what to do with leap years???
+    target_doy_min[target_doy_min <= 0] += 365
+    target_doy_max[target_doy_max > 365] -= 365
+
+    # if the min is larger than max, the target doy is at the edge of a year, and we can accept the
+    # source if any one of the condition is True
+    one_sided = target_doy_min > target_doy_max
+    edges = ((source_doy >= target_doy_min) | (source_doy <= target_doy_max)) & (one_sided)
+    # otherwise the source doy needs to be within min and max
+    within = (source_doy >= target_doy_min) & (source_doy <= target_doy_max) & (~one_sided)
+
+    # mask is true if either one of the condition is satisfied
+    mask = edges | within
+
+    return mask
+
+
+def maca_bias_correction(
+    ds_gcm: xr.Dataset,
+    ds_obs: str,
+    variables: list[str],
     batch_size: int | None = 15,
     buffer_size: int | None = 15,
 ) -> xr.Dataset:
     """
-    Run bias correction as it is done in the MACA method. See https://climate.northwestknowledge.net/MACA/MACAmethod.php
-    for more details. Briefly, the bias correction is performed using the Equidistant CDF matching method in batches.
-    Neighboring day of years are bias corrected together with a buffer. That is, with a batch size of 15 and a buffer size
-    of 15, the 45 neighboring days of year are bias corrected together, but only the result of the center 15 days are used.
-    The historical GCM is mapped to historical coarsened observation in the bias correction.
+    Run bias correction as it is done in the MACA method.
+    
+    The bias correction is performed using the Equidistant CDF matching method in batches.
+    Neighboring day of years are bias corrected together with a buffer. That is, with a batch
+    size of 15 and a buffer size of 15, the 45 neighboring days of year are bias corrected
+    together, but only the result of the center 15 days are used. The historical GCM is mapped
+    to historical coarsened observation in the bias correction.
 
     Parameters
     ----------
-    ds_gcm: xr.Dataset
+    ds_gcm : xr.Dataset
         GCM dataset, must have a dimension called time on which we can call .dt.dayofyear on
-    ds_obs: xr.Dataset
+    ds_obs : xr.Dataset
         Observation dataset, must have a dimension called time on which we can call .dt.dayofyear on
-    historical_period: slice
-        The historical period
-    variables: List[str]
+    variables : List[str]
         Names of the variables used in obs and gcm dataset (including features and label)
-    batch_size: Optional[int]
+    batch_size : Optional[int]
         The batch size in terms of day of year to bias correct together
-    buffer_size: Optional[int]
+    buffer_size : Optional[int]
         The buffer size in terms of day of year to include in the bias correction
 
     Returns
     -------
-    ds_out: xr.Dataset
+    ds_out : xr.Dataset
         The bias corrected dataset
+
+    See Also
+    --------
+    https://climate.northwestknowledge.net/MACA/MACAmethod.php
+
     """
     if isinstance(variables, str):
         variables = [variables]
@@ -72,16 +120,16 @@ def maca_bias_correction_task(
             gcm_batch = ds_gcm.sel(time=doy_gcm.isin(b))
             obs_batch = ds_obs.sel(time=doy_obs.isin(b))
 
-            train_x = gcm_batch.sel(time=historical_period)[[var]]
-            train_y = obs_batch.sel(time=historical_period)[var]
+            train_x = gcm_batch[[var]]  # JH: not needed anymore? .sel(time=historical_period)
+            train_y = obs_batch[var]  # JH: not needed anymore? .sel(time=historical_period)
 
-            # TODO: this is a total hack to get around the different calendars of observation dataset and GCM
-            # should be able to remove once we unify all calendars
-            if len(train_x.time) > len(train_y.time):
-                train_x = train_x.isel(time=slice(0, len(train_y.time)))
-            elif len(train_x.time) < len(train_y.time):
-                train_y = train_y.isel(time=slice(0, len(train_x.time)))
-            train_x = train_x.assign_coords({'time': train_y.time})
+            # # TODO: this is a total hack to get around the different calendars of observation dataset and GCM
+            # # should be able to remove once we unify all calendars
+            # if len(train_x.time) > len(train_y.time):
+            #     train_x = train_x.isel(time=slice(0, len(train_y.time)))
+            # elif len(train_x.time) < len(train_y.time):
+            #     train_y = train_y.isel(time=slice(0, len(train_x.time)))
+            # train_x = train_x.assign_coords({'time': train_y.time})
 
             bias_correction_model.fit(
                 train_x.unify_chunks(),  # dataset
@@ -96,49 +144,6 @@ def maca_bias_correction_task(
         ds_out[var] = xr.concat(bc_result, dim='time').sortby('time')
 
     return ds_out
-
-
-def get_doy_mask(
-    source_doy: xr.DataArray,
-    target_doy: xr.DataArray,
-    doy_range: int = 45,
-) -> xr.DataArray:
-    """
-    Given two 1D dataarrays containing day of year informations: source_doy and target_doy , return a matrix of shape
-    len(target_doy) x len(source_doy). Cell (i, j) is True if the source doy j is within doy_range days of the target
-    doy i, and False otherwise
-
-    Parameters
-    ----------
-    source_doy: xr.DataArray
-        1D xr data array with day of year information
-    target_doy: xr.DataArray
-        1D xr data array with day of year information
-
-    Returns
-    -------
-    mask: xr.DataArray
-        2D xr data array of boolean type in the shape of len(target_doy) x len(source_doy)
-    """
-    # get the min and max doy within doy_range days to target doy
-    target_doy_min = target_doy - doy_range
-    target_doy_max = target_doy + doy_range
-    # make sure the range is within 0-365
-    # TODO: what to do with leap years???
-    target_doy_min[target_doy_min <= 0] += 365
-    target_doy_max[target_doy_max > 365] -= 365
-
-    # if the min is larger than max, the target doy is at the edge of a year, and we can accept the
-    # source if any one of the condition is True
-    one_sided = target_doy_min > target_doy_max
-    edges = ((source_doy >= target_doy_min) | (source_doy <= target_doy_max)) & (one_sided)
-    # otherwise the source doy needs to be within min and max
-    within = (source_doy >= target_doy_min) & (source_doy <= target_doy_max) & (~one_sided)
-
-    # mask is true if either one of the condition is satisfied
-    mask = edges | within
-
-    return mask
 
 
 def maca_construct_analogs(
@@ -159,11 +164,11 @@ def maca_construct_analogs(
 
     Parameters
     ----------
-    ds_gcm: xr.Dataset
+    ds_gcm : xr.Dataset
         GCM dataset, original/coarse resolution
-    ds_obs_coarse: xr.Dataset
+    ds_obs_coarse : xr.Dataset
         Observation dataset coarsened to the GCM resolution
-    ds_obs_fine: xr.Dataset
+    ds_obs_fine : xr.Dataset
         Observation dataset, original/fine resolution
     label: str
         Name of variable to be downscaled
@@ -174,7 +179,7 @@ def maca_construct_analogs(
 
     Returns
     -------
-    downscaled: xr.Dataset
+    downscaled : xr.Dataset
         The downscaled dataset
     """
     # make sure the input data is valid with the correct shape and dims
