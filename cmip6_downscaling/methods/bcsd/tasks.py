@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import warnings
+from datetime import timedelta
 
 import xarray as xr
 from carbonplan_data.metadata import get_cf_global_attrs
@@ -28,7 +29,7 @@ results_dir = UPath(config.get("storage.results.uri")) / version
 use_cache = config.get('run_options.use_cache')
 
 
-@task(log_stdout=True)
+@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
 def spatial_anomalies(obs_full_time_path: UPath, interpolated_obs_full_time_path: UPath) -> UPath:
     """Returns spatial anomalies
     Calculate the seasonal cycle (12 timesteps) spatial anomaly associated
@@ -103,7 +104,7 @@ def _fit_and_predict_wrapper(xtrain, ytrain, xpred, run_parameters, dim='time'):
     return bias_corrected_ds
 
 
-@task(log_stdout=True)
+@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
 def fit_and_predict(
     experiment_train_full_time_path: UPath,
     experiment_predict_full_time_path: UPath,
@@ -174,7 +175,7 @@ def fit_and_predict(
     return target
 
 
-@task
+@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
 def postprocess_bcsd(
     bias_corrected_fine_full_time_path: UPath, spatial_anomalies_path: UPath
 ) -> UPath:
@@ -222,5 +223,4 @@ def postprocess_bcsd(
     bcsd_results_ds.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
     bcsd_results_ds.to_zarr(target, mode='w')
 
-    # blocking_to_zarr(bcsd_results_ds, target)
     return target
