@@ -58,7 +58,7 @@ _defaults = {
                 'container': 'prefect',
             },
             "agent": "az-eu-west",
-            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git git+https://github.com/pangeo-data/rechunker",
+            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git@cloud_runner git+https://github.com/pangeo-data/rechunker",
             "kubernetes_cpu": 2,
             "kubernetes_memory": "4Gi",
             "image": "carbonplan/cmip6-downscaling-prefect:latest",
