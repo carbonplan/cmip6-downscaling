@@ -85,7 +85,6 @@ def spatial_anomalies(obs_full_time_path: UPath, interpolated_obs_full_time_path
     return target
 
 
-
 def _fit_and_predict_wrapper(xtrain, ytrain, xpred, run_parameters, dim='time'):
     xpred = xpred.rename({'t2': 'time'})
     if run_parameters.variable in ABSOLUTE_VARS:
