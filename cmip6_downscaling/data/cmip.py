@@ -117,7 +117,7 @@ def load_cmip(
         if len(keys) != 1:
             raise ValueError(f'intake-esm search returned {len(keys)}, expected exactly 1.')
 
-        ds = col_subset[keys[0]](zarr_kwargs={'use_cftime': True}).to_dask().pipe(postprocess)
+        ds = col_subset[keys[0]]().to_dask().pipe(postprocess)
 
         # convert to mm/day - helpful to prevent rounding errors from very tiny numbers
         if 'pr' in ds:
