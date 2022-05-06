@@ -5,10 +5,9 @@ import re
 
 import numpy as np
 import xarray as xr
-import zarr
-from upath import UPath
-from xarray_schema import DataArraySchema
-from xarray_schema.base import SchemaError
+from upath import UPath  # type: ignore
+from xarray_schema import DataArraySchema  # type: ignore
+from xarray_schema.base import SchemaError  # type: ignore
 
 import cmip6_downscaling.methods.common.containers as containers
 
@@ -22,22 +21,6 @@ def zmetadata_exists(path: UPath):
         return path.fs.exists(str(path / '.zmetadata'))
     else:
         return (UPath(path) / '.zmetadata').exists()
-
-
-def blocking_to_zarr(ds: xr.Dataset, target):
-    '''helper function to write a xarray Dataset to a zarr store.
-
-    The function blocks until the write is complete then writes Zarr's consolidated metadata
-    '''
-
-    # testing a workaround
-    if str(target).startswith('/'):
-        print('fell back to using a string target')
-        target = 'az://flow-outputs' + str(target)
-
-    t = ds.to_zarr(target, mode='w', compute=False)
-    t.compute(retries=5)
-    zarr.consolidate_metadata(target)
 
 
 def subset_dataset(

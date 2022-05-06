@@ -9,20 +9,20 @@ from dataclasses import asdict
 from datetime import timedelta
 from pathlib import PosixPath
 
-import datatree
-import datatree as dt
-import fsspec
-import pandas as pd
-import rechunker
+import datatree  # type: ignore
+import datatree as dt  # type: ignore
+import fsspec  # type: ignore
+import pandas as pd  # type: ignore
+import rechunker  # type: ignore
 import xarray as xr
-import zarr
-from carbonplan_data.metadata import get_cf_global_attrs
-from carbonplan_data.utils import set_zarr_encoding
-from ndpyramid import pyramid_regrid
-from prefect import task
-from upath import UPath
-from xarray_schema import DataArraySchema, DatasetSchema
-from xarray_schema.base import SchemaError
+import zarr  # type: ignore
+from carbonplan_data.metadata import get_cf_global_attrs  # type: ignore
+from carbonplan_data.utils import set_zarr_encoding  # type: ignore
+from ndpyramid import pyramid_regrid  # type: ignore
+from prefect import task  # type: ignore
+from upath import UPath  # type: ignore
+from xarray_schema import DataArraySchema, DatasetSchema  # type: ignore
+from xarray_schema.base import SchemaError  # type: ignore
 
 from cmip6_downscaling import __version__ as version, config
 from cmip6_downscaling.data.cmip import get_gcm
@@ -84,7 +84,7 @@ def get_obs(run_parameters: RunParameters) -> UPath:
         print(f'found existing target: {target}')
         return target
 
-    ds = open_era5(run_parameters.variable, run_parameters.train_period)
+    ds = open_era5(run_parameters.variable, run_parameters.train_period.time_slice)
 
     subset = subset_dataset(
         ds,
@@ -98,8 +98,7 @@ def get_obs(run_parameters: RunParameters) -> UPath:
         del subset[run_parameters.variable].encoding['chunks']
 
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
-    store = subset.to_zarr(target, mode='w', compute=False)
-    store.compute(retries=5)
+    subset.to_zarr(target, mode='w')
     return target
 
 
@@ -252,7 +251,7 @@ def rechunk(
         'lat': (chunk_def['lat'],),
     }
     for var in ds.data_vars:
-        chunks_dict[var] = chunk_def
+        chunks_dict[var] = chunk_def  # type: ignore[assignment]
     # now that you have your chunks_dict you can check that the dataset at `path`
     # you're passing in doesn't already match that schema. because if so, we don't
     # need to bother with rechunking and we'll skip it!
@@ -361,7 +360,7 @@ def regrid(source_path: UPath, target_grid_path: UPath, weights_path: UPath = No
         Path to regridded output dataset.
     """
 
-    import xesmf as xe
+    import xesmf as xe  # type: ignore
 
     ds_hash = str_to_hash(str(source_path) + str(target_grid_path))
     target = intermediate_dir / 'regrid' / ds_hash
@@ -373,7 +372,7 @@ def regrid(source_path: UPath, target_grid_path: UPath, weights_path: UPath = No
     source_ds = xr.open_zarr(source_path)
     target_grid_ds = xr.open_zarr(target_grid_path)
     if weights_path:
-        from ndpyramid.regrid import _reconstruct_xesmf_weights
+        from ndpyramid.regrid import _reconstruct_xesmf_weights  # type: ignore
 
         weights = _reconstruct_xesmf_weights(xr.open_zarr(weights_path))
         print(weights_path)
@@ -523,18 +522,18 @@ def run_analyses(ds_path: UPath, run_parameters: RunParameters) -> UPath:
         The local location of an executed notebook path.
     """
 
-    import papermill
-    from azure.storage.blob import BlobServiceClient, ContentSettings
+    import papermill  # type: ignore
+    from azure.storage.blob import BlobServiceClient, ContentSettings  # type: ignore
 
-    from cmip6_downscaling.analysis import metrics
+    from cmip6_downscaling.analysis import metrics  # type: ignore
 
     root = PosixPath(metrics.__file__)
     template_path = root.parent / 'analyses_template.ipynb'
     executed_notebook_path = root.parent / f'analyses_{run_parameters.run_id}.ipynb'
     executed_html_path = root.parent / f'analyses_{run_parameters.run_id}.html'
 
-    parameters = asdict(run_parameters)
-    parameters['run_id'] = run_parameters.run_id
+    parameters = asdict(run_parameters)  # type: ignore[assignment]
+    parameters['run_id'] = run_parameters.run_id  # type: ignore[assignment]
     # TODO: figure out how to unpack these fields in the notebook
     # asdict will return lists for train_dates and predict_dates
     # parameters['train_period_start'] = train_period.start
@@ -555,9 +554,11 @@ def run_analyses(ds_path: UPath, run_parameters: RunParameters) -> UPath:
     if connection_string is not None:
         # if you have a connection_string, copy the html to azure, if not just return
         # because it is already in your local machine
-        blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+        blob_service_client = BlobServiceClient.from_connection_string(
+            connection_string
+        )  # type: BlobServiceClient
         # TODO: fix b/c the run_id has slashes now!!!
-        blob_name = config.get('storage.web_results.blob') / parameters.run_id / 'analyses.html'
+        blob_name = config.get('storage.web_results.blob') / parameters['run_id'] / 'analyses.html'
         blob_client = blob_service_client.get_blob_client(container='$web', blob=blob_name)
         # clean up before writing
         with contextlib.suppress(Exception):

@@ -4,11 +4,11 @@ import warnings
 from datetime import timedelta
 
 import xarray as xr
-from carbonplan_data.metadata import get_cf_global_attrs
-from prefect import task
-from skdownscale.pointwise_models import PointWiseDownscaler
-from skdownscale.pointwise_models.bcsd import BcsdPrecipitation, BcsdTemperature
-from upath import UPath
+from carbonplan_data.metadata import get_cf_global_attrs  # type: ignore
+from prefect import task  # type: ignore
+from skdownscale.pointwise_models import PointWiseDownscaler  # type: ignore
+from skdownscale.pointwise_models.bcsd import BcsdPrecipitation, BcsdTemperature  # type: ignore
+from upath import UPath  # type: ignore
 
 from cmip6_downscaling import __version__ as version, config
 from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS

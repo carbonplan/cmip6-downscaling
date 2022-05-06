@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import warnings
 
-from prefect import Flow, Parameter
+from prefect import Flow, Parameter  # type: ignore
 
 from cmip6_downscaling import runtimes
 from cmip6_downscaling.methods.bcsd.tasks import (

@@ -30,8 +30,8 @@ class BBox:
 class TimePeriod:
     """Time period object"""
 
-    start: str = None
-    stop: str = None
+    start: str | None = None
+    stop: str | None = None
 
     @property
     def time_slice(self):
