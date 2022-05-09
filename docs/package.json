@@ -4,9 +4,11 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "create-mamba-env": "bash create-mamba-env.sh",
+    "make-sphinx-json": "bash make-sphinx-json.sh",
     "dev": " NODE_ENV=development next",
     "start": "next start",
-    "build": "bash deploy.sh && next build"
+    "build": "npm run create-mamba-env && npm run make-sphinx-json && next build"
   },
   "author": "",
   "license": "MIT",

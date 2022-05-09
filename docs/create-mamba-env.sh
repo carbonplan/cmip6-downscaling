@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -x
+set -xe
 
 # install mamba
 yum install -y wget bzip2
@@ -11,8 +11,3 @@ source ~/.bashrc
 # install python deps
 micromamba create -y -f ./environment.yml
 micromamba activate docs
-pip install ..
-
-# build json content
-make json
-ls _build/json/*

@@ -1,4 +1,4 @@
-name: docs
+name: cmip6-downscaling-docs
 channels:
   - conda-forge
   - nodefaults
@@ -29,3 +29,5 @@ dependencies:
   - xclim
   - xpersist
   - zarr
+  - pip:
+      - -e ..
