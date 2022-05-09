@@ -1,0 +1,16 @@
+{
+  "method": "gard",
+  "obs": "ERA5",
+  "model": "CMCC-ESM2",
+  "member": "r1i1p1f1",
+  "grid_label": "gn",
+  "table_id": "day",
+  "scenario": "ssp245",
+  "variable": "pr",
+  "latmin": "-90",
+  "latmax": "90",
+  "lonmin": "-180",
+  "lonmax": "180",
+  "train_dates": ["1981", "2010"],
+  "predict_dates": ["2015", "2099"]
+}
