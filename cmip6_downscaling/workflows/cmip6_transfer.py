@@ -2,11 +2,11 @@
 import json
 import os
 
-import fsspec
-import intake
-import pandas as pd
+import fsspec  # type: ignore
+import intake  # type: ignore
+import pandas as pd  # type: ignore
 import xarray as xr
-from prefect import Flow, task
+from prefect import Flow, task  # type: ignore
 
 from .. import runtimes
 

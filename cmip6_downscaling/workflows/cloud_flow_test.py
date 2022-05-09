@@ -1,10 +1,10 @@
 import time
 import uuid
 
-import ESMF
+import ESMF  # type: ignore
 import numpy as np
-from dask.distributed import get_worker
-from prefect import Flow, task
+from dask.distributed import get_worker  # type: ignore
+from prefect import Flow, task  # type: ignore
 
 from cmip6_downscaling import runtimes
 

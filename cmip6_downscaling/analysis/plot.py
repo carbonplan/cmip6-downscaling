@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import cartopy.crs as ccrs
-import matplotlib as mpl
-import matplotlib.pyplot as plt
-import pandas as pd
-import seaborn as sns
+import cartopy.crs as ccrs  # type: ignore
+import matplotlib as mpl  # type: ignore
+import matplotlib.pyplot as plt  # type: ignore
+import pandas as pd  # type: ignore
+import seaborn as sns  # type: ignore
 import xarray as xr
-from carbonplan import styles
+from carbonplan import styles  # type: ignore
 
 styles.mpl.set_theme(style='carbonplan_light')
 

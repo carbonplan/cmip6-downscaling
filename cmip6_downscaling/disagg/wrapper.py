@@ -3,10 +3,10 @@ from __future__ import annotations
 import os
 from typing import Iterable
 
-import dask
-import numba
+import dask  # type: ignore
+import numba  # type: ignore
 import numpy as np
-import pandas as pd
+import pandas as pd  # type: ignore
 import xarray as xr
 
 from ..disagg import derived_variables, terraclimate

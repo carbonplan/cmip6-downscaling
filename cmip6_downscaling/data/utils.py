@@ -1,5 +1,5 @@
 import numpy as np
-import xclim
+import xclim  # type: ignore
 from xarray.core.types import T_Xarray
 
 

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import dask
-import pandas as pd
+import dask  # type: ignore
+import pandas as pd  # type: ignore
 import xarray as xr
 
-from . import cat
-from .utils import lon_to_180, to_standard_calendar
+from . import cat  # type: ignore
+from .utils import lon_to_180, to_standard_calendar  # type: ignore
 
 
 def postprocess(ds: xr.Dataset) -> xr.Dataset:
@@ -173,6 +173,7 @@ def get_gcm(
     if float(time_slice.stop) < 2015:
         # you're working with historical data
         ds_gcm = load_cmip(activity_ids='CMIP', experiment_ids='historical', **kws)
+
     elif float(time_slice.start) > 2014:
         # you're working with future data
         ds_gcm = load_cmip(activity_ids='ScenarioMIP', experiment_ids=scenario, **kws)

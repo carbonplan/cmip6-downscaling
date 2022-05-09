@@ -6,9 +6,9 @@ from typing import Dict, List
 import fsspec  # type: ignore
 import pandas as pd  # type: ignore
 import xarray as xr
-from prefect import Flow, task
-from prefect.run_configs import KubernetesRun
-from prefect.storage import Azure
+from prefect import Flow, task  # type: ignore
+from prefect.run_configs import KubernetesRun  # type: ignore
+from prefect.storage import Azure  # type: ignore
 
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 csv_catalog_path = "az://training/ERA5_catalog.csv"

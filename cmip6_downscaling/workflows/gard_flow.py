@@ -1,3 +1,4 @@
+# type: ignore
 import os
 
 os.environ['PREFECT__FLOWS__CHECKPOINTING'] = 'true'
@@ -5,15 +6,19 @@ os.environ['PREFECT__FLOWS__CHECKPOINTING'] = 'true'
 from typing import List
 
 import xarray as xr
-from prefect import Flow, Parameter, task
-from xpersist import CacheStore
-from xpersist.prefect.result import XpersistResult
+from prefect import Flow, Parameter, task  # type: ignore
+from xpersist import CacheStore  # type: ignore
+from xpersist.prefect.result import XpersistResult  # type: ignore
 
-from cmip6_downscaling import config
-from cmip6_downscaling.methods.bcsd import return_obs
-from cmip6_downscaling.methods.gard import gard_fit_and_predict, gard_postprocess, read_scrf
-from cmip6_downscaling.runtimes import get_runtime
-from cmip6_downscaling.tasks.common_tasks import (
+from cmip6_downscaling import config  # type: ignore
+from cmip6_downscaling.methods.bcsd import return_obs  # type: ignore
+from cmip6_downscaling.methods.gard import (  # type: ignore
+    gard_fit_and_predict,
+    gard_postprocess,
+    read_scrf,
+)
+from cmip6_downscaling.runtimes import get_runtime  # type: ignore
+from cmip6_downscaling.tasks.common_tasks import (  # type: ignore
     bias_correct_gcm_task,
     bias_correct_obs_task,
     build_bbox,
@@ -22,13 +27,13 @@ from cmip6_downscaling.tasks.common_tasks import (
     interpolate_gcm_task,
     path_builder_task,
 )
-from cmip6_downscaling.workflows.paths import (
+from cmip6_downscaling.workflows.paths import (  # type: ignore
     make_bias_corrected_gcm_path,
     make_gard_post_processed_output_path,
     make_gard_predict_output_path,
     make_rechunked_obs_path,
 )
-from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching
+from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching  # type: ignore
 
 runtime = get_runtime()
 

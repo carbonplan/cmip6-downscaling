@@ -1,8 +1,8 @@
 # flake8: noqa
 from __future__ import annotations
 
-from dask.utils import SerializableLock
-from donfig import Config
+from dask.utils import SerializableLock  # type: ignore
+from donfig import Config  # type: ignore
 
 from ._version import __version__
 from .config import _defaults

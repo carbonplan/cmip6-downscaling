@@ -1,12 +1,12 @@
 import os
 
-import intake
-from intake_esm.merge_util import AggregationError
-from prefect import Flow, unmapped
-from prefect.run_configs import KubernetesRun
-from prefect.storage import Azure
+import intake  # type: ignore
+from intake_esm.merge_util import AggregationError  # type: ignore
+from prefect import Flow, unmapped  # type: ignore
+from prefect.run_configs import KubernetesRun  # type: ignore
+from prefect.storage import Azure  # type: ignore
 
-from cmip6_downscaling.tasks.pyramid import regrid
+from cmip6_downscaling.tasks.pyramid import regrid  # type: ignore
 
 LEVELS = 2
 TIME_SLICE = slice('1950', '2100')

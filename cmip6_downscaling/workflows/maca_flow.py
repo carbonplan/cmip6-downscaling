@@ -1,19 +1,20 @@
+# type: ignore
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import xarray as xr
-from prefect import Flow, Parameter, task
-from xpersist import CacheStore
-from xpersist.prefect.result import XpersistResult
+from prefect import Flow, Parameter, task  # type: ignore
+from xpersist import CacheStore  # type: ignore
+from xpersist.prefect.result import XpersistResult  # type: ignore
 
 # TODO: figure out where these are located
-from cmip6_downscaling.tasks.common_tasks import (
+from cmip6_downscaling.tasks.common_tasks import (  # type: ignore
     get_coarse_obs_task,
     get_gcm_task,
     get_obs_task,
     path_builder_task,
     rechunker_task,
 )
-from cmip6_downscaling.workflows.paths import (
+from cmip6_downscaling.workflows.paths import (  # type: ignore
     make_bias_corrected_gcm_path,
     make_epoch_adjusted_downscaled_gcm_path,
     make_epoch_adjusted_gcm_path,
@@ -21,12 +22,15 @@ from cmip6_downscaling.workflows.paths import (
     make_epoch_trend_path,
     make_maca_output_path,
 )
-from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching, regrid_ds
+from cmip6_downscaling.workflows.utils import (  # type: ignore
+    rechunk_zarr_array_with_caching,
+    regrid_ds,
+)
 
-from ..methods.detrend import calc_epoch_trend, remove_epoch_trend
-from ..methods.maca import maca_bias_correction, maca_construct_analogs
-from ..methods.regions import combine_outputs, generate_subdomains
-from . import config, runtimes
+from ..methods.detrend import calc_epoch_trend, remove_epoch_trend  # type: ignore
+from ..methods.maca import maca_bias_correction, maca_construct_analogs  # type: ignore
+from ..methods.regions import combine_outputs, generate_subdomains  # type: ignore
+from . import config, runtimes  # type: ignore
 
 runtime = runtimes.get_runtime()
 

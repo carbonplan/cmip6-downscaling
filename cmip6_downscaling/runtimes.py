@@ -4,11 +4,16 @@ import os
 from abc import abstractmethod
 from functools import cached_property
 
-import dask
-from dask_kubernetes import KubeCluster, make_pod_spec
-from prefect.executors import DaskExecutor, Executor, LocalDaskExecutor, LocalExecutor
-from prefect.run_configs import KubernetesRun, LocalRun, RunConfig
-from prefect.storage import Azure, Local, Storage
+import dask  # type: ignore
+from dask_kubernetes import KubeCluster, make_pod_spec  # type: ignore
+from prefect.executors import (  # type: ignore
+    DaskExecutor,
+    Executor,
+    LocalDaskExecutor,
+    LocalExecutor,
+)
+from prefect.run_configs import KubernetesRun, LocalRun, RunConfig  # type: ignore
+from prefect.storage import Azure, Local, Storage  # type: ignore
 
 from . import config
 
@@ -164,7 +169,7 @@ class PangeoRuntime(LocalRuntime):
 
 class GatewayRuntime(PangeoRuntime):
     def __init__(self):
-        from dask_gateway import Gateway
+        from dask_gateway import Gateway  # type: ignore
 
         self._gateway = Gateway()
 

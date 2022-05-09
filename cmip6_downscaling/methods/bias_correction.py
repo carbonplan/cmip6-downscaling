@@ -3,12 +3,12 @@ from __future__ import annotations
 from typing import Any
 
 import xarray as xr
-from skdownscale.pointwise_models import (
+from skdownscale.pointwise_models import (  # type: ignore
     PointWiseDownscaler,
     QuantileMappingReressor,
     TrendAwareQuantileMappingRegressor,
 )
-from sklearn.preprocessing import QuantileTransformer, StandardScaler
+from sklearn.preprocessing import QuantileTransformer, StandardScaler  # type: ignore
 
 VALID_CORRECTIONS = ['absolute', 'relative']
 

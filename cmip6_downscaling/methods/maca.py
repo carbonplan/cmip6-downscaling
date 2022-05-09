@@ -1,12 +1,13 @@
+# type: ignore
 from __future__ import annotations
 
 import numpy as np
 import xarray as xr
-import xesmf as xe
-from skdownscale.pointwise_models import EquidistantCdfMatcher, PointWiseDownscaler
-from sklearn.linear_model import LinearRegression
+import xesmf as xe  # type: ignore
+from skdownscale.pointwise_models import EquidistantCdfMatcher, PointWiseDownscaler  # type: ignore
+from sklearn.linear_model import LinearRegression  # type: ignore
 
-from cmip6_downscaling.workflows.utils import generate_batches
+from cmip6_downscaling.workflows.utils import generate_batches  # type: ignore
 
 
 def maca_bias_correction(

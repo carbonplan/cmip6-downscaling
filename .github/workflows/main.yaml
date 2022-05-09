@@ -27,3 +27,6 @@ jobs:
       - name: Running Tests
         run: |
           python -m pytest --verbose
+      - name: mypy
+        run: |
+          mypy $(git ls-files '*.py')

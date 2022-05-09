@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import pandas as pd
+import pandas as pd  # type: ignore
 
 
 def add_circular_temporal_pad(data, offset, timeunit='D'):

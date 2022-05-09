@@ -1,11 +1,12 @@
+# type: ignore
 from __future__ import annotations
 
 import math
 
-import numba
+import numba  # type: ignore
 import numpy as np
-import pandas as pd
-from climate_indices import palmer
+import pandas as pd  # type: ignore
+from climate_indices import palmer  # type: ignore
 
 from .. import CLIMATE_NORMAL_PERIOD
 from ..constants import KELVIN, MGM2D_PER_WM2, MIN_PER_DAY, MM_PER_IN, MONTHS_PER_YEAR, SEC_PER_DAY

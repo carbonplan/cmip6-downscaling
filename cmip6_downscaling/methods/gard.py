@@ -1,20 +1,21 @@
+# type: ignore
 from __future__ import annotations
 
 import math
 from typing import Any
 
-import fsspec
+import fsspec  # type: ignore
 import numpy as np
 import xarray as xr
-from scipy.stats import norm as norm
-from skdownscale.pointwise_models import (
+from scipy.stats import norm as norm  # type: ignore
+from skdownscale.pointwise_models import (  # type: ignore
     AnalogRegression,
     PointWiseDownscaler,
     PureAnalog,
     PureRegression,
 )
 
-from cmip6_downscaling.workflows.paths import make_scrf_path
+from cmip6_downscaling.workflows.paths import make_scrf_path  # type: ignore
 
 
 def get_gard_model(

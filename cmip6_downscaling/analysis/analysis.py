@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import cartopy.crs as ccrs
-import matplotlib.pyplot as plt
-import pandas as pd
+import cartopy.crs as ccrs  # type: ignore
+import matplotlib.pyplot as plt  # type: ignore
+import pandas as pd  # type: ignore
 import xarray as xr
 
-from .qaqc import make_qaqc_ds
+from .qaqc import make_qaqc_ds  # type: ignore
 
 
 def qaqc_checks(ds: xr.Dataset) -> tuple[xr.Dataset, xr.Dataset]:

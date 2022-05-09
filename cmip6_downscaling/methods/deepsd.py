@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import fsspec
+import fsspec  # type: ignore
 import numpy as np
 import xarray as xr
-import xesmf as xe
+import xesmf as xe  # type: ignore
 
-from cmip6_downscaling.workflows.paths import make_coarse_obs_path
+from cmip6_downscaling.workflows.paths import make_coarse_obs_path  # type: ignore
 
 intermediate_cache_path = 'az://flow-outputs/intermediate'
 

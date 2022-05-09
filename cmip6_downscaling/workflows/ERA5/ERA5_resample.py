@@ -2,13 +2,13 @@
 
 import os
 
-import dask
-import fsspec
-import intake
+import dask  # type: ignore
+import fsspec  # type: ignore
+import intake  # type: ignore
 import xarray as xr
-from prefect import Flow, task
-from prefect.run_configs import KubernetesRun
-from prefect.storage import Azure
+from prefect import Flow, task  # type: ignore
+from prefect.run_configs import KubernetesRun  # type: ignore
+from prefect.storage import Azure  # type: ignore
 
 connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
 image = "carbonplan/cmip6-downscaling-prefect:latest"

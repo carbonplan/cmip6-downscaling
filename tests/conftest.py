@@ -40,3 +40,7 @@ def da_noleap(val=1.0):
         dims=['lat', 'lon', 'time'],
         coords={'lat': np.arange(19, 56, 1), 'lon': np.arange(-133, -61, 2), 'time': time},
     )
+
+
+def test(asdf):
+    print(asdf + 1)
