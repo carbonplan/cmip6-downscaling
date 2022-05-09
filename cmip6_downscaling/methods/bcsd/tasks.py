@@ -86,6 +86,31 @@ def spatial_anomalies(obs_full_time_path: UPath, interpolated_obs_full_time_path
 
 
 def _fit_and_predict_wrapper(xtrain, ytrain, xpred, run_parameters, dim='time'):
+    """Wrapper for map_blocks for fit and predict task
+
+    Parameters
+    ----------
+    xtrain : xr.Dataset
+        Experiment training dataset
+    ytrain : xr.Dataset
+        Observation training dataset
+    xpred : xr.Dataset
+        Experiment prediction dataset
+    run_parameters : RunParameters
+        Prefect run parameters
+    dim : str, optional
+        dimension, by default 'time'
+
+    Returns
+    -------
+    xr.Dataset
+        Output bias corrected dataset
+
+    Raises
+    ------
+    ValueError
+        raise ValueError if the given variable is not implimented.
+    """
     xpred = xpred.rename({'t2': 'time'})
     if run_parameters.variable in ABSOLUTE_VARS:
         model = BcsdTemperature(return_anoms=False)
