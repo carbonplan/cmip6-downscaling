@@ -11,6 +11,21 @@ dependencies:
   - sphinx
   - numpydoc
   # this project's dependencies
+  - adlfs
+  - dask
+  - dask-kubernetes
+  - donfig
+  - fsspec
+  - gcsfs
+  - intake-esm
+  - intake-xarray
   - numpy
   - pandas
+  - prefect
+  - regionmask
+  - scikit-downscale
+  - scikit-learn
   - scipy
+  - xclim
+  - xpersist
+  - zarr
