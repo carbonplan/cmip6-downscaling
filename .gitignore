@@ -132,3 +132,4 @@ dmypy.json
 
 node_modules/
 .next/
+generated/

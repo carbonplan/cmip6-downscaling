@@ -10,6 +10,7 @@ dependencies:
   - setuptools
   - sphinx
   - numpydoc
+  - myst-nb
   # this project's dependencies
   - adlfs
   - dask
@@ -29,5 +30,9 @@ dependencies:
   - xclim
   - xpersist
   - zarr
+  - universal_pathlib
+  - ndpyramid
   - pip:
+      - git+https://github.com/carbonplan/xarray-schema
+      - carbonplan-data
       - -e ..

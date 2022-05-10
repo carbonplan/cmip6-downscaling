@@ -10,4 +10,4 @@ source ~/.bashrc
 
 # install python deps
 micromamba create -y -f ./environment.yml
-micromamba activate docs
+micromamba activate cmip6-downscaling-docs
