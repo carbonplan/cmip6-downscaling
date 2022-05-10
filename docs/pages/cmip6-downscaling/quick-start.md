@@ -31,7 +31,4 @@ The `cmip6-downscaling` package provides a number of downscaling implementations
 import cmip6_downscaling
 ```
 
-export default ({ children }) => (
-
-  <Section name='Quick Start'>{children}</Section>
-)
+export default ({ children }) => <Section name='Quick Start'>{children}</Section>

@@ -8,7 +8,8 @@
     "make-sphinx-json": "bash make-sphinx-json.sh",
     "dev": " NODE_ENV=development next",
     "start": "next start",
-    "build": "npm run create-mamba-env && npm run make-sphinx-json && next build"
+    "build": "npm run create-mamba-env && npm run make-sphinx-json && next build",
+    "devbuild": "next build"
   },
   "author": "",
   "license": "MIT",
@@ -20,7 +21,7 @@
     "@mdx-js/loader": "^1.6.22",
     "@mdx-js/react": "^1.6.22",
     "@next/mdx": "^12.0.7",
-    "html-to-react": "^1.4.7",
+    "html-to-react": "^1.4.8",
     "next": "^12.0.7",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
