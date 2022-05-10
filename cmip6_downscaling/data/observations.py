@@ -37,6 +37,7 @@ def open_era5(variables: str | list[str], time_period: slice) -> xr.Dataset:
     if 'pr' in variables:
         # convert to mm/day - helpful to prevent rounding errors from very tiny numbers
         ds['pr'] *= 86400
+        ds['pr'] = ds['pr'].astype('float32')
 
     ds = lon_to_180(ds)
 

@@ -50,7 +50,7 @@ _defaults = {
         },
         'gcm_obs_weights': {'uri': 'az://static/xesmf_weights/gcm_obs/weights.csv'},
     },
-    'run_options': {'runtime': "pangeo", 'use_cache': True},
+    'run_options': {'runtime': "pangeo", 'cleanup_flag': True, 'use_cache': True},
     "runtime": {
         "cloud": {
             "storage_prefix": "az://",
@@ -58,19 +58,18 @@ _defaults = {
                 'container': 'prefect',
             },
             "agent": "az-eu-west",
-            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git",
-            "kubernetes_cpu": 7,
-            "kubernetes_memory": "16Gi",
+            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git@cloud_runner git+https://github.com/pangeo-data/rechunker",
+            "kubernetes_cpu": 2,
+            "kubernetes_memory": "4Gi",
             "image": "carbonplan/cmip6-downscaling-prefect:latest",
-            "pod_memory_limit": "8Gi",
-            "pod_memory_request": "8Gi",
+            "pod_memory_limit": "22Gi",
+            "pod_memory_request": "21Gi",
             "pod_threads_per_worker": 1,
             "pod_cpu_limit": 2,
             "pod_cpu_request": 2,
             "deploy_mode": "remote",
-            "adapt_min": 2,
+            "adapt_min": 12,
             "adapt_max": 20,
-            "dask_distributed_worker_resources_taskslots": "1",
         },
         "gateway": {
             "storage_prefix": "az://",
@@ -78,7 +77,7 @@ _defaults = {
                 'container': 'prefect',
             },
             "cluster_name": '',  #
-            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git@pregenerate-weights ndpyramid=0.0.5 git+https://github.com/pangeo-data/rechunker",
+            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git",
             "image": "carbonplan/cmip6-downscaling-prefect:latest",
             "worker_cores": 1,
             "worker_memory": 16,  # Gi
@@ -93,8 +92,8 @@ _defaults = {
         "pangeo": {
             "storage_prefix": "az://",
             "storage_options": {'directory': './'},
-            'n_workers': 10,
-            'threads_per_worker': 2,
+            'n_workers': 12,
+            'threads_per_worker': 1,
         },
     },
 }

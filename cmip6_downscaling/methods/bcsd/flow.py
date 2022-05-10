@@ -90,6 +90,7 @@ with Flow(
     )
     p['coarse_obs_full_time_path'] = rechunk(p['coarse_obs_path'], pattern='full_time')
     p['experiment_train_full_time_path'] = rechunk(p['experiment_train_path'], pattern='full_time')
+
     p['experiment_predict_full_time_path'] = rechunk(
         p['experiment_predict_path'],
         pattern='full_time',

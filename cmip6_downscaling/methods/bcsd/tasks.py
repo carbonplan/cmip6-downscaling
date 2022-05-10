@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import warnings
+from datetime import timedelta
 
 import xarray as xr
 from carbonplan_data.metadata import get_cf_global_attrs
@@ -13,7 +14,7 @@ from cmip6_downscaling import __version__ as version, config
 from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
 from cmip6_downscaling.methods.bcsd.utils import reconstruct_finescale
 from cmip6_downscaling.methods.common.containers import RunParameters
-from cmip6_downscaling.methods.common.utils import blocking_to_zarr, zmetadata_exists
+from cmip6_downscaling.methods.common.utils import zmetadata_exists
 from cmip6_downscaling.utils import str_to_hash
 
 warnings.filterwarnings(
@@ -28,7 +29,7 @@ results_dir = UPath(config.get("storage.results.uri")) / version
 use_cache = config.get('run_options.use_cache')
 
 
-@task(log_stdout=True)
+@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
 def spatial_anomalies(obs_full_time_path: UPath, interpolated_obs_full_time_path: UPath) -> UPath:
     """Returns spatial anomalies
     Calculate the seasonal cycle (12 timesteps) spatial anomaly associated
@@ -73,18 +74,62 @@ def spatial_anomalies(obs_full_time_path: UPath, interpolated_obs_full_time_path
     # calculate the difference between the actual obs (with finer spatial heterogeneity)
     # and the interpolated coarse obs this will be saved and added to the
     # spatially-interpolated coarse predictions to add the spatial heterogeneity back in.
+
     spatial_anomalies = obs_full_time_ds - interpolated_obs_full_time_ds
     seasonal_cycle_spatial_anomalies = spatial_anomalies.groupby("time.month").mean()
     seasonal_cycle_spatial_anomalies.attrs.update(
         {'title': 'bcsd_spatial_anomalies'}, **get_cf_global_attrs(version=version)
     )
-
-    blocking_to_zarr(seasonal_cycle_spatial_anomalies, target)
+    seasonal_cycle_spatial_anomalies.to_zarr(target, mode='w')
 
     return target
 
 
-@task(log_stdout=True)
+def _fit_and_predict_wrapper(xtrain, ytrain, xpred, run_parameters, dim='time'):
+    """Wrapper for map_blocks for fit and predict task
+
+    Parameters
+    ----------
+    xtrain : xr.Dataset
+        Experiment training dataset
+    ytrain : xr.Dataset
+        Observation training dataset
+    xpred : xr.Dataset
+        Experiment prediction dataset
+    run_parameters : RunParameters
+        Prefect run parameters
+    dim : str, optional
+        dimension, by default 'time'
+
+    Returns
+    -------
+    xr.Dataset
+        Output bias corrected dataset
+
+    Raises
+    ------
+    ValueError
+        raise ValueError if the given variable is not implimented.
+    """
+    xpred = xpred.rename({'t2': 'time'})
+    if run_parameters.variable in ABSOLUTE_VARS:
+        model = BcsdTemperature(return_anoms=False)
+    elif run_parameters.variable in RELATIVE_VARS:
+        model = BcsdPrecipitation(return_anoms=False)
+    else:
+        raise ValueError('run_parameters.variable not found in ABSOLUTE_VARS OR RELATIVE_VARS.')
+
+    pointwise_model = PointWiseDownscaler(model=model, dim=dim)
+
+    pointwise_model.fit(xtrain[run_parameters.variable], ytrain[run_parameters.variable])
+
+    bias_corrected_da = pointwise_model.predict(xpred[run_parameters.variable])
+    bias_corrected_ds = bias_corrected_da.astype('float32').to_dataset(name=run_parameters.variable)
+
+    return bias_corrected_ds
+
+
+@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
 def fit_and_predict(
     experiment_train_full_time_path: UPath,
     experiment_predict_full_time_path: UPath,
@@ -129,35 +174,33 @@ def fit_and_predict(
         print(f"found existing target: {target}")
         return target
 
-    if run_parameters.variable in ABSOLUTE_VARS:
-        bcsd_model = BcsdTemperature(return_anoms=False)
-    elif run_parameters.variable in RELATIVE_VARS:
-        bcsd_model = BcsdPrecipitation(return_anoms=False)
-    else:
-        raise ValueError('variable not found in ABSOLUTE_VARS OR RELATIVE_VARS.')
+    xtrain = xr.open_zarr(coarse_obs_full_time_path)
+    ytrain = xr.open_zarr(experiment_train_full_time_path)
+    xpred = xr.open_zarr(experiment_predict_full_time_path)
 
-    pointwise_model = PointWiseDownscaler(model=bcsd_model, dim="time")
-
-    coarse_obs_full_time_ds = xr.open_zarr(coarse_obs_full_time_path)
-    experiment_train_full_time_ds = xr.open_zarr(experiment_train_full_time_path)
-    experiment_predict_full_time_ds = xr.open_zarr(experiment_predict_full_time_path)
-
-    pointwise_model.fit(
-        experiment_train_full_time_ds[run_parameters.variable],
-        coarse_obs_full_time_ds[run_parameters.variable],
-    )
-    bias_corrected_da = pointwise_model.predict(
-        experiment_predict_full_time_ds[run_parameters.variable]
+    # Create a template dataset for map blocks
+    # This feals a bit fragile.
+    template_var = list(xpred.data_vars.keys())[0]
+    template = (
+        xpred[[template_var]].astype('float32').rename({template_var: run_parameters.variable})
     )
 
-    bias_corrected_ds = bias_corrected_da.astype('float32').to_dataset(name=run_parameters.variable)
-    bias_corrected_ds.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
+    out = xr.map_blocks(
+        _fit_and_predict_wrapper,
+        xtrain,
+        args=(ytrain, xpred.rename({'time': 't2'}), run_parameters),
+        kwargs={'dim': 'time'},
+        template=template,
+    )
 
-    blocking_to_zarr(bias_corrected_ds, target)
+    out.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
+
+    out.to_zarr(target, mode='w')
+
     return target
 
 
-@task
+@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
 def postprocess_bcsd(
     bias_corrected_fine_full_time_path: UPath, spatial_anomalies_path: UPath
 ) -> UPath:
@@ -203,6 +246,6 @@ def postprocess_bcsd(
         template=bias_corrected_fine_full_time_ds,
     )
     bcsd_results_ds.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
+    bcsd_results_ds.to_zarr(target, mode='w')
 
-    blocking_to_zarr(bcsd_results_ds, target)
     return target

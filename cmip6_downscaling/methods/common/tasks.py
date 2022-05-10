@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import contextlib
 import datetime
 import json
 import os
 import warnings
 from dataclasses import asdict
+from datetime import timedelta
 from pathlib import PosixPath
 
 import datatree
@@ -27,7 +29,6 @@ from cmip6_downscaling.data.cmip import get_gcm
 from cmip6_downscaling.data.observations import open_era5
 from cmip6_downscaling.methods.common.containers import RunParameters
 from cmip6_downscaling.methods.common.utils import (
-    blocking_to_zarr,
     calc_auspicious_chunks_dict,
     resample_wrapper,
     subset_dataset,
@@ -49,13 +50,13 @@ use_cache = config.get('run_options.use_cache')
 print(config.config)
 
 
-@task
+@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
 def make_run_parameters(**kwargs) -> RunParameters:
     """Prefect task wrapper for RunParameters"""
     return RunParameters(**kwargs)
 
 
-@task(log_stdout=True)
+@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
 def get_obs(run_parameters: RunParameters) -> UPath:
     """Task to return observation data subset from input parameters.
 
@@ -93,13 +94,17 @@ def get_obs(run_parameters: RunParameters) -> UPath:
         run_parameters.bbox,
         chunking_schema={'time': 365, 'lat': 150, 'lon': 150},
     )
-    del subset[run_parameters.variable].encoding['chunks']
+
+    if run_parameters.variable != 'pr':
+        del subset[run_parameters.variable].encoding['chunks']
+
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
-    blocking_to_zarr(subset, target)
+    store = subset.to_zarr(target, mode='w', compute=False)
+    store.compute(retries=5)
     return target
 
 
-@task(log_stdout=True)
+@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
 def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     """Prefect task that returns cmip GCM data from input run parameters.
 
@@ -115,7 +120,6 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     UPath
         UPath to experiment dataset.
     """
-
     time_period = getattr(run_parameters, time_subset)
     frmt_str = "{model}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{time_period.start}_{time_period.stop}".format(
         time_period=time_period, **asdict(run_parameters)
@@ -146,15 +150,14 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
 
     # Note: dataset is chunked into time:365 chunks to standardize leap-year chunking.
     subset = subset.chunk({'time': 365})
-    del subset[run_parameters.variable].encoding['chunks']
-
+    if run_parameters.variable != 'pr':
+        del subset[run_parameters.variable].encoding['chunks']
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
     subset.to_zarr(target, mode='w')
-    # blocking_to_zarr(subset, target)
     return target
 
 
-@task(log_stdout=True)
+@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
 def rechunk(
     path: UPath,
     pattern: str = None,
@@ -183,13 +186,11 @@ def rechunk(
     target : UPath
         Path to rechunked dataset
     """
-
     # if both defined then you'll take the spatial part of template and override one dimension with the specified pattern
     if template is not None:
         pattern_string = 'matched'
         if pattern is not None:
-            pattern_string += '_' + pattern
-    # if only pattern specified then use that pattern
+            pattern_string += f'_{pattern}'
     elif pattern is not None:
         pattern_string = pattern
 
@@ -231,12 +232,11 @@ def rechunk(
             # the chunking pattern will return the dimensions that you'll chunk along
             # so `full_time` will return `('lat', 'lon')`
             chunk_dims = config.get(f"chunk_dims.{pattern}")
-            for dim in chunk_def.keys():
+            for dim in chunk_def:
                 if dim not in chunk_dims:
                     print(f'correcting dim {dim}')
                     # override the chunksize of those unchunked dimensions to be the complete length (like passing chunksize=-1
                     chunk_def[dim] = len(ds[dim])
-    # if you don't have a target template then you'll just use the `full_time` or `full_space` approach
     elif pattern is not None:
         chunk_dims = config.get(f"chunk_dims.{pattern}")
         chunk_def = calc_auspicious_chunks_dict(ds[example_var], chunk_dims=chunk_dims)
@@ -260,19 +260,13 @@ def rechunk(
     # now that you have your chunks_dict you can check that the dataset at `path`
     # you're passing in doesn't already match that schema. because if so, we don't
     # need to bother with rechunking and we'll skip it!
-    schema_dict = {}
-    for var in ds.data_vars:
-        schema_dict[var] = DataArraySchema(chunks=chunk_def)
+    schema_dict = {var: DataArraySchema(chunks=chunk_def) for var in ds.data_vars}
     target_schema = DatasetSchema(schema_dict)
-    try:
+    with contextlib.suppress(SchemaError):
         # check to see if the initial dataset already matches the schema, in which case just
         # return the initial path and work with that
         target_schema.validate(ds)
         return path
-    except SchemaError:
-        pass
-    print(f'chunks_dict for when writing rechunked dataset for {path} to {target} is {chunks_dict}')
-
     rechunk_plan = rechunker.rechunk(
         source=group,
         target_chunks=chunks_dict,
@@ -286,11 +280,10 @@ def rechunk(
     # consolidate_metadata here since when it comes out of rechunker it isn't consolidated.
     zarr.consolidate_metadata(target_store)
     temp_store.clear()
-
     return target
 
 
-@task
+@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
 def time_summary(ds_path: UPath, freq: str) -> UPath:
     """Prefect task to create resampled data. Takes mean of `tasmax` and `tasmin` and sum of `pr`.
 
@@ -319,11 +312,12 @@ def time_summary(ds_path: UPath, freq: str) -> UPath:
     out_ds = resample_wrapper(ds, freq=freq)
 
     out_ds.attrs.update({'title': 'time_summary'}, **get_cf_global_attrs(version=version))
-    blocking_to_zarr(out_ds, target)
+    out_ds.to_zarr(target, mode='w')
+
     return target
 
 
-@task(log_stdout=True)
+@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
 def get_weights(*, run_parameters, direction, regrid_method="bilinear"):
     weights = pd.read_csv(config.get('weights.gcm_obs_weights.uri'))
     path = (
@@ -341,7 +335,7 @@ def get_weights(*, run_parameters, direction, regrid_method="bilinear"):
     return path
 
 
-@task(log_stdout=True)
+@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
 def get_pyramid_weights(*, run_parameters, levels, regrid_method="bilinear"):
     weights = pd.read_csv(config.get('weights.downscaled_pyramid_weights.uri'))
     print(weights)
@@ -352,7 +346,8 @@ def get_pyramid_weights(*, run_parameters, levels, regrid_method="bilinear"):
     return path
 
 
-@task(tags=['dask-resource:taskslots=1'], log_stdout=True)
+
+@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
 def regrid(source_path: UPath, target_grid_path: UPath, weights_path: UPath = None) -> UPath:
     """Task to regrid a dataset to target grid.
 
@@ -382,7 +377,6 @@ def regrid(source_path: UPath, target_grid_path: UPath, weights_path: UPath = No
         return target
     source_ds = xr.open_zarr(source_path)
     target_grid_ds = xr.open_zarr(target_grid_path)
-
     if weights_path:
         from ndpyramid.regrid import _reconstruct_xesmf_weights
 
@@ -395,10 +389,15 @@ def regrid(source_path: UPath, target_grid_path: UPath, weights_path: UPath = No
             reuse_weights=True,
             method="bilinear",
             extrap_method="nearest_s2d",
+            ignore_degenerate=True,
         )
     else:
         regridder = xe.Regridder(
-            source_ds, target_grid_ds, method="bilinear", extrap_method="nearest_s2d"
+            source_ds,
+            target_grid_ds,
+            method="bilinear",
+            extrap_method="nearest_s2d",
+            ignore_degenerate=True,
         )
 
     regridded_ds = regridder(source_ds, keep_attrs=True)
@@ -461,9 +460,7 @@ def _pyramid_postprocess(dt: dt.DataTree, levels: int, other_chunks: dict = None
     return dt
 
 
-@task(
-    log_stdout=True,
-)
+@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
 def pyramid(
     ds_path: UPath, weights_pyramid_path: str, levels: int = 2, other_chunks: dict = None
 ) -> UPath:
@@ -503,7 +500,11 @@ def pyramid(
     weights_pyramid = datatree.open_datatree(weights_pyramid_path, engine='zarr')
     # create pyramid
     dta = pyramid_regrid(
-        ds, target_pyramid=target_pyramid, levels=levels, weights_pyramid=weights_pyramid
+        ds,
+        target_pyramid=target_pyramid,
+        levels=levels,
+        weights_pyramid=weights_pyramid,
+        regridder_kws={'ignore_degenerate': True},
     )
 
     # write to target
@@ -511,7 +512,7 @@ def pyramid(
     return target
 
 
-@task
+@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
 def run_analyses(ds_path: UPath, run_parameters: RunParameters) -> UPath:
     """Prefect task to run the analyses on results from a downscaling run.
 
@@ -564,11 +565,8 @@ def run_analyses(ds_path: UPath, run_parameters: RunParameters) -> UPath:
         blob_name = config.get('storage.web_results.blob') / parameters.run_id / 'analyses.html'
         blob_client = blob_service_client.get_blob_client(container='$web', blob=blob_name)
         # clean up before writing
-        try:
+        with contextlib.suppress(Exception):
             blob_client.delete_blob()
-        except:  # TODO: raise specific error
-            pass
-
         #  need to specify html content type so that it will render and not download
         with open(executed_html_path, "rb") as data:
             blob_client.upload_blob(
@@ -578,17 +576,16 @@ def run_analyses(ds_path: UPath, run_parameters: RunParameters) -> UPath:
     return executed_notebook_path
 
 
-@task
+@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
 def finalize(path_dict: dict, run_parameters: RunParameters):
 
     now = datetime.datetime.utcnow().isoformat()
-    target1 = results_dir / 'runs' / run_parameters.run_id / (now + '.json')
+    target1 = results_dir / 'runs' / run_parameters.run_id / f'{now}.json'
     target2 = results_dir / 'runs' / run_parameters.run_id / 'latest.json'
     print(target1)
     print(target2)
 
-    out = {}
-    out['parameters'] = asdict(run_parameters)
+    out = {'parameters': asdict(run_parameters)}
     out['attrs'] = get_cf_global_attrs(version=version)
     out['datasets'] = {k: str(p) for k, p in path_dict.items()}
 
