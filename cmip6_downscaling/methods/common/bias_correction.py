@@ -9,7 +9,8 @@ from skdownscale.pointwise_models import (
     QuantileMappingReressor,
     TrendAwareQuantileMappingRegressor,
 )
-from skdownscale.pointwise_models.quantile import CunnaneTransformer
+
+# from skdownscale.pointwise_models.quantile import CunnaneTransformer
 from sklearn.preprocessing import QuantileTransformer, StandardScaler
 
 VALID_CORRECTIONS = ['absolute', 'relative']
@@ -24,16 +25,19 @@ def bias_correct_obs_by_method(
         if 'n_quantiles' not in bc_kwargs:
             # TODO: could speed this up by specifying 100 or 1000 (or some other arbitrarily or
             # intelligently chosen number here) but let's start with the full length of time dimension to begin
-            bc_kwargs['n_quantiles'] = len(da_obs.time)
+
+            # bc_kwargs['n_quantiles'] = len(da_obs.time)
+            bc_kwargs['n_quantiles'] = 1000
+
         qt = PointWiseDownscaler(model=QuantileTransformer(**bc_kwargs))
         qt.fit(da_obs)
         return qt.transform(da_obs)
     # TODO: construct method to not return two objects
-    elif method == 'cunnane_transform':
-        print(bc_kwargs)
-        ct = PointWiseDownscaler(model=CunnaneTransformer(**bc_kwargs))
-        ct.fit(da_obs)
-        return (ct.transform(da_obs), ct)
+    # elif method == 'cunnane_transform':
+    #     print(bc_kwargs)
+    #     ct = PointWiseDownscaler(model=CunnaneTransformer(**bc_kwargs))
+    #     ct.fit(da_obs)
+    #     return (ct.transform(da_obs), ct)
     elif method == 'z_score':
         # transform obs
         sc = PointWiseDownscaler(model=StandardScaler(**bc_kwargs))
@@ -65,7 +69,9 @@ def bias_correct_gcm_by_method(
     if method == 'quantile_transform':
         # transform gcm
         if 'n_quantiles' not in bc_kwargs:
-            bc_kwargs['n_quantiles'] = len(obs.time)
+            # bc_kwargs['n_quantiles'] = len(obs.time)
+            bc_kwargs['n_quantiles'] = 1000
+
         qt = PointWiseDownscaler(model=QuantileTransformer(**bc_kwargs))
         qt.fit(gcm_hist)
         return qt.transform(gcm_pred)
@@ -78,7 +84,10 @@ def bias_correct_gcm_by_method(
         sc.fit(gcm_hist)
         return sc.transform(gcm_pred)
     elif method == 'quantile_mapper':
-        qt_kwargs = {'n_quantiles': len(obs.time)}
+        # Note: 1000 quantiles seems like a safe #
+
+        qt_kwargs = {'n_quantiles': 1000}
+
         qm = PointWiseDownscaler(
             model=QuantileMapper(detrend=True, qt_kwargs=qt_kwargs), dim='time'
         )
