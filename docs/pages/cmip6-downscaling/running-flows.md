@@ -1,3 +1,5 @@
+import Section from '../../components/section'
+
 # Running Prefect Flows
 
 ## Why Prefect
@@ -157,3 +159,5 @@ Note: This url is specific to username, jupyter-hub name and port.
 ex:
 
 `https://prod.azure.carbonplan.2i2c.cloud/user/norlandrhagen/bcsd/proxy/8787/status`
+
+export default ({ children }) => <Section name='Running Prefect Flows'>{children}</Section>

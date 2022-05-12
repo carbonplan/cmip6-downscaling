@@ -1,4 +1,4 @@
-name: docs
+name: cmip6-downscaling-docs
 channels:
   - conda-forge
   - nodefaults
@@ -10,7 +10,29 @@ dependencies:
   - setuptools
   - sphinx
   - numpydoc
+  - myst-nb
   # this project's dependencies
+  - adlfs
+  - dask
+  - dask-kubernetes
+  - donfig
+  - fsspec
+  - gcsfs
+  - intake-esm
+  - intake-xarray
   - numpy
   - pandas
+  - prefect
+  - regionmask
+  - scikit-downscale
+  - scikit-learn
   - scipy
+  - xclim
+  - xpersist
+  - zarr
+  - universal_pathlib
+  - ndpyramid
+  - pip:
+      - git+https://github.com/carbonplan/xarray-schema
+      - carbonplan-data
+      - -e ..
