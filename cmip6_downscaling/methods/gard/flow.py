@@ -103,7 +103,6 @@ with Flow(
         template=p['experiment_predict_fine_full_time_path'],
     )
 
-    # fit and predict (TODO: put the transformation steps currently in the prep_gard_input task into the fit and predict step)
     p['model_output_path'] = fit_and_predict(
         xtrain_path=p['interpolated_obs_full_time_path'],
         ytrain_path=p['obs_full_time_path'],
