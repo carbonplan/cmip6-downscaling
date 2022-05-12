@@ -16,7 +16,7 @@ from cmip6_downscaling import __version__ as version, config
 
 from ..common.bias_correction import bias_correct_gcm_by_method
 from ..common.containers import RunParameters, str_to_hash
-from ..common.utils import zmetadata_exists
+from ..common.utils import apply_land_mask, zmetadata_exists
 from .utils import add_random_effects, get_gard_model
 
 scratch_dir = UPath(config.get("storage.scratch.uri"))
@@ -152,10 +152,10 @@ def fit_and_predict(
         return target
 
     # load in datasets
-    xtrain = xr.open_zarr(xtrain_path)
-    ytrain = xr.open_zarr(ytrain_path)
-    xpred = xr.open_zarr(xpred_path)
-    scrf = xr.open_zarr(scrf_path)
+    xtrain = xr.open_zarr(xtrain_path).pipe(apply_land_mask)
+    ytrain = xr.open_zarr(ytrain_path).pipe(apply_land_mask)
+    xpred = xr.open_zarr(xpred_path).pipe(apply_land_mask)
+    scrf = xr.open_zarr(scrf_path).pipe(apply_land_mask)
     # make sure you have the variables you need in obs
     for v in xpred.data_vars:
         assert v in ytrain.data_vars
@@ -184,7 +184,9 @@ def fit_and_predict(
     out = dask.optimize(out)[0]
     t = out.to_zarr(target, compute=False, mode='w', consolidated=False)
     t.compute(retries=5)
-    zarr.consolidate_metadata(target)
+
+    # remove apply_land_mask after scikit-downscale#110 is merged
+    zarr.pipe(apply_land_mask).consolidate_metadata(target)
     return target
 
 

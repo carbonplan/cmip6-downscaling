@@ -14,7 +14,7 @@ from cmip6_downscaling import __version__ as version, config
 from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
 from cmip6_downscaling.methods.bcsd.utils import reconstruct_finescale
 from cmip6_downscaling.methods.common.containers import RunParameters
-from cmip6_downscaling.methods.common.utils import zmetadata_exists
+from cmip6_downscaling.methods.common.utils import apply_land_mask, zmetadata_exists
 from cmip6_downscaling.utils import str_to_hash
 
 warnings.filterwarnings(
@@ -111,6 +111,7 @@ def _fit_and_predict_wrapper(xtrain, ytrain, xpred, run_parameters, dim='time'):
     ValueError
         raise ValueError if the given variable is not implimented.
     """
+
     xpred = xpred.rename({'t2': 'time'})
     if run_parameters.variable in ABSOLUTE_VARS:
         model = BcsdTemperature(return_anoms=False)
@@ -174,9 +175,9 @@ def fit_and_predict(
         print(f"found existing target: {target}")
         return target
 
-    xtrain = xr.open_zarr(coarse_obs_full_time_path)
-    ytrain = xr.open_zarr(experiment_train_full_time_path)
-    xpred = xr.open_zarr(experiment_predict_full_time_path)
+    xtrain = xr.open_zarr(coarse_obs_full_time_path).pipe(apply_land_mask)
+    ytrain = xr.open_zarr(experiment_train_full_time_path).pipe(apply_land_mask)
+    xpred = xr.open_zarr(experiment_predict_full_time_path).pipe(apply_land_mask)
 
     # Create a template dataset for map blocks
     # This feals a bit fragile.
@@ -195,7 +196,8 @@ def fit_and_predict(
 
     out.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
 
-    out.to_zarr(target, mode='w')
+    # remove apply_land_mask after scikit-downscale#110 is merged
+    out.pipe(apply_land_mask).to_zarr(target, mode='w')
 
     return target
 
