@@ -8,9 +8,7 @@ import xesmf as xe
 import zarr
 from carbonplan_data.metadata import get_cf_global_attrs
 from prefect import task
-from skdownscale.pointwise_models import (  # AnalogRegression,; PureAnalog,; PureRegression,
-    PointWiseDownscaler,
-)
+from skdownscale.pointwise_models import PointWiseDownscaler
 from skdownscale.pointwise_models.utils import default_none_kwargs
 from upath import UPath
 
