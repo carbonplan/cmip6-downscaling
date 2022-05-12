@@ -112,6 +112,7 @@ def bias_correct_gcm_by_method(
             'quantile_map',
             'detrended_quantile_map',
             'none',
-            'quantile_mapper' 'cunnane_transform',
+            'quantile_mapper',
+            'cunnane_transform',
         ]
         raise NotImplementedError(f'bias correction method must be one of {available_methods}')
