@@ -24,10 +24,8 @@ intermediate_dir = UPath(config.get("storage.intermediate.uri")) / version
 results_dir = UPath(config.get("storage.results.uri")) / version
 use_cache = config.get('run_options.use_cache')
 
-good_fit_predict_chunks = {'lat': 24, 'lon': 24, 'time': 10957}
 
-
-@task(tags=['dask-resource:taskslots=1'], log_stdout=True)
+@task(log_stdout=True)
 def coarsen_and_interpolate(fine_path: UPath, coarse_path: UPath) -> UPath:
     """
     Coarsen up obs and then interpolate it back to the original finescale grid.
@@ -174,6 +172,7 @@ def fit_and_predict(
     for var in [run_parameters.variable]:
         template[var] = template_da
 
+    # rename time variable to play nice with mapblocks - can't have same dimension name on later arguments
     out = xr.map_blocks(
         _fit_and_predict_wrapper,
         xtrain,

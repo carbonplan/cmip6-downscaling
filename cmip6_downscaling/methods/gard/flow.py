@@ -26,7 +26,6 @@ warnings.filterwarnings(
 runtime = runtimes.get_runtime()
 print(runtime)
 
-good_fit_predict_chunks = {'lat': 24, 'lon': 24, 'time': 10957}
 
 with Flow(
     name="gard", storage=runtime.storage, run_config=runtime.run_config, executor=runtime.executor
@@ -88,7 +87,6 @@ with Flow(
         target_grid_path=p['obs_path'],
         weights_path=p['gcm_to_obs_weights'],
     )
-    # TODO: do we need the templates as well for the rechunking? probably defer to bcsd flow here
     p['experiment_predict_fine_full_time_path'] = rechunk(
         p['experiment_predict_fine_full_space_path'],
         pattern="full_time",
