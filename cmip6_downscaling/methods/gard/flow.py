@@ -1,6 +1,5 @@
 import warnings
 
-import dask
 from prefect import Flow, Parameter
 
 from cmip6_downscaling import runtimes
@@ -29,7 +28,6 @@ print(runtime)
 
 good_fit_predict_chunks = {'lat': 24, 'lon': 24, 'time': 10957}
 
-print(dask.config.config)
 with Flow(
     name="gard", storage=runtime.storage, run_config=runtime.run_config, executor=runtime.executor
 ) as flow:
@@ -79,19 +77,19 @@ with Flow(
         p['interpolated_obs_full_space_path'], pattern='full_time'
     )
 
-    # # get gcm data into full space to prep for interpolation
-    # # TODO: do we need this?
+    # get gcm data into full space to prep for interpolation
+    # TODO: do we need this?
     p['experiment_predict_full_space_path'] = rechunk(
         p['experiment_predict_path'], pattern="full_space", template=p['obs_full_space_path']
     )
 
-    # # interpolate gcm to finescale. it will retain the same temporal chunking pattern (likely 25 timesteps)
+    # interpolate gcm to finescale. it will retain the same temporal chunking pattern (likely 25 timesteps)
     p['experiment_predict_fine_full_space_path'] = regrid(
         source_path=p['experiment_predict_full_space_path'],
         target_grid_path=p['obs_path'],
         weights_path=p['gcm_to_obs_weights'],
     )
-    # # TODO: do we need the templates as well for the rechunking? probably defer to bcsd flow here
+    # TODO: do we need the templates as well for the rechunking? probably defer to bcsd flow here
     p['experiment_predict_fine_full_time_path'] = rechunk(
         p['experiment_predict_fine_full_space_path'],
         pattern="full_time",
@@ -115,17 +113,17 @@ with Flow(
         run_parameters=run_parameters,
     )
 
-    # # # temporary aggregations - these come out in full time
+    # temporary aggregations - these come out in full time
     p['monthly_summary_path'] = time_summary(p['model_output_path'], freq='1MS')
     p['annual_summary_path'] = time_summary(p['model_output_path'], freq='1AS')
 
-    # # # # analysis notebook (shared with BCSD)
-    # # # analysis_location = run_analyses(model_output_path, run_parameters)
+    # analysis notebook (shared with BCSD)
+    # analysis_location = run_analyses(model_output_path, run_parameters)
 
-    # # # since pyramids require full space we now rechunk everything into full
-    # # # space before passing into pyramid step. we probably want to add a cleanup
-    # # # to this step in particular since otherwise we will have an exact
-    # # # duplicate of the daily, monthly, and annual datasets
+    # since pyramids require full space we now rechunk everything into full
+    # space before passing into pyramid step. we probably want to add a cleanup
+    # to this step in particular since otherwise we will have an exact
+    # duplicate of the daily, monthly, and annual datasets
     p['full_space_model_output_path'] = rechunk(p['model_output_path'], pattern='full_space')
 
     # # # make temporal summaries

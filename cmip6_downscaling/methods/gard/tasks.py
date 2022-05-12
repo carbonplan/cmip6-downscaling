@@ -51,8 +51,6 @@ def coarsen_and_interpolate(fine_path: UPath, coarse_path: UPath) -> UPath:
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
         interpolated_ds = xr.open_zarr(target)
-        print('the interpolated chunks look like this')
-        print(interpolated_ds.chunks)
         return target
 
     fine_ds = xr.open_zarr(fine_path)
@@ -70,8 +68,6 @@ def coarsen_and_interpolate(fine_path: UPath, coarse_path: UPath) -> UPath:
         {'title': 'coarsen_and_interpolate'}, **get_cf_global_attrs(version=version)
     )
     interpolated_ds.to_zarr(target, mode='w')
-    print('the interpolated chunks look like this')
-    print(interpolated_ds.chunks)
     return target
 
 
@@ -181,11 +177,6 @@ def fit_and_predict(
         print(f'found existing target: {target}')
         return target
 
-    print(f'xtrain dataset is located here {xtrain_path}')
-    print(f'ytrain dataset is located here {ytrain_path}')
-    print(f'xpred dataset is located here {xpred_path}')
-    print(f'scrf dataset is located here {scrf_path}')
-
     # load in datasets
     xtrain = xr.open_zarr(xtrain_path)
     ytrain = xr.open_zarr(ytrain_path)
@@ -202,7 +193,6 @@ def fit_and_predict(
     # # Create a template dataset for map blocks
     # # This feals a bit fragile.
     template_var = list(xpred.data_vars.keys())[0]
-    # .to_dataarray(dim='variable')
     template_da = xpred[template_var]
     template = xr.Dataset()
     for var in [run_parameters.variable]:
@@ -271,14 +261,6 @@ def read_scrf(prediction_path: UPath, run_parameters: RunParameters):
     scrf = scrf.sel(time=run_parameters.predict_period.time_slice)
 
     scrf = scrf.drop('spatial_ref').astype('float32')
-
-    # scrf = scrf.chunk({'time':-1}) #maybe needed
-    # scrf = scrf.chunk(
-    #     {
-    #         'lat': prediction_ds.chunks['lat'][0],
-    #         'lon': prediction_ds.chunks['lon'][0],
-    #     }
-    # )
 
     scrf = scrf.sel(
         lat=prediction_ds.lat.values, lon=prediction_ds.lon.values, time=prediction_ds.time.values
