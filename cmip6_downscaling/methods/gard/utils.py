@@ -40,8 +40,6 @@ def get_gard_model(
         )
 
 
-
-
 def add_random_effects(
     model_output: xr.Dataset, scrf: xr.Dataset, run_parameters: RunParameters
 ) -> xr.Dataset:

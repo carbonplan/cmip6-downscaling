@@ -9,7 +9,6 @@ from skdownscale.pointwise_models import (
     QuantileMappingReressor,
     TrendAwareQuantileMappingRegressor,
 )
-
 from sklearn.preprocessing import QuantileTransformer, StandardScaler
 
 VALID_CORRECTIONS = ['absolute', 'relative']
