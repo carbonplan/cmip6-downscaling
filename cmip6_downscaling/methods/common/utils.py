@@ -4,6 +4,7 @@ import pathlib
 import re
 
 import numpy as np
+import regionmask
 import xarray as xr
 import zarr
 from upath import UPath
@@ -79,6 +80,24 @@ def subset_dataset(
             subset_ds = subset_ds.chunk(chunking_schema)
 
     return subset_ds
+
+
+def apply_land_mask(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Apply a land mask to a dataset with lat/lon coordinates
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset to mask.
+
+    Returns
+    -------
+    xr.Dataset
+    """
+
+    mask = regionmask.defined_regions.natural_earth_v5_0_0.land_10.mask(ds)
+    return ds.where(mask == 0)
 
 
 def calc_auspicious_chunks_dict(
