@@ -69,8 +69,7 @@ def bias_correct_gcm_by_method(
     if method == 'quantile_transform':
         # transform gcm
         if 'n_quantiles' not in bc_kwargs:
-            # bc_kwargs['n_quantiles'] = len(obs.time)
-            bc_kwargs['n_quantiles'] = 1000
+            bc_kwargs['n_quantiles'] = len(obs.time)
 
         qt = PointWiseDownscaler(model=QuantileTransformer(**bc_kwargs))
         qt.fit(gcm_hist)
