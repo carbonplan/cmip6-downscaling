@@ -23,11 +23,8 @@ def bias_correct_obs_by_method(
 ) -> xr.DataArray:
     if method == 'quantile_transform':
         if 'n_quantiles' not in bc_kwargs:
-            # TODO: could speed this up by specifying 100 or 1000 (or some other arbitrarily or
-            # intelligently chosen number here) but let's start with the full length of time dimension to begin
-
-            # bc_kwargs['n_quantiles'] = len(da_obs.time)
-            bc_kwargs['n_quantiles'] = 1000
+            # Note: scikit-learn's quantile transform is very slow for n_quantiles > 2000.
+            bc_kwargs['n_quantiles'] = len(da_obs.time)
 
         qt = PointWiseDownscaler(model=QuantileTransformer(**bc_kwargs))
         qt.fit(da_obs)
