@@ -40,7 +40,6 @@ def bias_correct_obs_by_method(
     else:
         available_methods = [
             'quantile_transform',
-            'cunnane_transform',
             'z_score',
             'quantile_map',
             'detrended_quantile_map',
