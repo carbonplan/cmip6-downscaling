@@ -35,6 +35,7 @@ params = [
         'grid_label': 'gn',
         'table_id': 'day',
         'scenario': 'ssp370',
+        "features": ["tasmax"],
         'variable': 'tasmax',
         'latmin': '-2',
         'latmax': '2',
@@ -42,6 +43,10 @@ params = [
         'lonmax': '18.5',
         'train_dates': ['1980', '1981'],
         'predict_dates': ['2050', '2051'],
+        "bias_correction_method": "quantile_mapper",
+        "bias_correction_kwargs": {"detrend": "True"},
+        "model_type": "PureRegression",
+        "model_params": {},
     },
     {
         'method': 'gard',
@@ -51,6 +56,7 @@ params = [
         'grid_label': 'gn',
         'table_id': 'day',
         'scenario': 'ssp370',
+        "features": ["tasmax"],
         'variable': 'tasmax',
         'latmin': '-2',
         'latmax': '2',
@@ -58,6 +64,10 @@ params = [
         'lonmax': '18.5',
         'train_dates': ['1980', '1981'],
         'predict_dates': ['2050', '2051'],
+        "bias_correction_method": "quantile_mapper",
+        "bias_correction_kwargs": {"detrend": "True"},
+        "model_type": "PureRegression",
+        "model_params": {},
     },
 ]
 

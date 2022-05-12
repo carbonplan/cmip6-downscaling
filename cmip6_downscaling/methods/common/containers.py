@@ -61,12 +61,17 @@ class RunParameters:
     table_id: str
     scenario: str
     variable: str
+    features: list
     latmin: float
     latmax: float
     lonmin: float
     lonmax: float
     train_dates: list
     predict_dates: list
+    bias_correction_method: str
+    bias_correction_kwargs: dict
+    model_type: str
+    model_params: dict
 
     @property
     def bbox(self) -> BBox:

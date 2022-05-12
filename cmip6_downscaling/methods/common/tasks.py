@@ -47,6 +47,7 @@ scratch_dir = UPath(config.get("storage.scratch.uri"))
 intermediate_dir = UPath(config.get("storage.intermediate.uri")) / version
 results_dir = UPath(config.get("storage.results.uri")) / version
 use_cache = config.get('run_options.use_cache')
+print(config.config)
 
 
 @task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
@@ -123,6 +124,7 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     frmt_str = "{model}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{time_period.start}_{time_period.stop}".format(
         time_period=time_period, **asdict(run_parameters)
     )
+
     title = f"experiment ds: {frmt_str}"
     ds_hash = str_to_hash(frmt_str)
     target = intermediate_dir / 'get_experiment' / ds_hash
@@ -164,7 +166,6 @@ def rechunk(
 ) -> UPath:
     """Use `rechunker` package to adjust chunks of dataset to a form
     conducive for your processing.
-
     Parameters
     ----------
     path : UPath
@@ -178,7 +179,6 @@ def rechunk(
         target to feed to rechunker.
     max_mem : str
         The memory available for rechunking steps. Must look like "2GB". Optional, default is 2GB.
-
     Returns
     -------
     target : UPath
