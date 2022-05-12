@@ -196,7 +196,8 @@ def fit_and_predict(
 
     out.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
 
-    out.to_zarr(target, mode='w')
+    # remove apply_land_mask after scikit-downscale#110 is merged
+    out.pipe(apply_land_mask).to_zarr(target, mode='w')
 
     return target
 
