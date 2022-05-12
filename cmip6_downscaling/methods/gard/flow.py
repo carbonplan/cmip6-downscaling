@@ -78,7 +78,6 @@ with Flow(
     )
 
     # get gcm data into full space to prep for interpolation
-    # TODO: do we need this?
     p['experiment_predict_full_space_path'] = rechunk(
         p['experiment_predict_path'], pattern="full_space", template=p['obs_full_space_path']
     )
