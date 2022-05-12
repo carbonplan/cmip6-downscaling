@@ -1,20 +1,30 @@
 from __future__ import annotations
 
+import traceback
+from functools import partial
+
 import dask
-from prefect import Flow, task, unmapped
+from prefect import Flow, Parameter, task, unmapped
 from prefect.engine.signals import SKIP
 from prefect.tasks.control_flow import merge
 from prefect.tasks.control_flow.filter import FilterTask
 from upath import UPath
 
 from cmip6_downscaling import config
-from cmip6_downscaling.runtimes import PangeoRuntime
+from cmip6_downscaling.data.cmip import postprocess
+from cmip6_downscaling.runtimes import CloudRuntime
+
+config.set(
+    {
+        'runtime.cloud.extra_pip_packages': 'git+https://github.com/carbonplan/cmip6-downscaling.git@main git+https://github.com/intake/intake-esm.git'
+    }
+)
 
 folder = 'xesmf_weights/cmip6_pyramids'
 
 scratch_dir = UPath(config.get('storage.static.uri')) / folder
 
-runtime = PangeoRuntime()
+runtime = CloudRuntime()
 
 filter_results = FilterTask(
     filter_func=lambda x: not isinstance(x, (BaseException, SKIP, type(None)))
@@ -56,7 +66,11 @@ def generate_weights(store: dict, levels: int, method: str = 'bilinear') -> dict
 
     try:
         with dask.config.set({'scheduler': 'sync'}):
-            ds_in = xr.open_dataset(store['zstore'], engine='zarr', chunks={}).isel(time=0)
+            ds_in = (
+                xr.open_dataset(store['zstore'], engine='zarr', chunks={})
+                .pipe(partial(postprocess, to_standard_calendar=False))
+                .isel(time=0)
+            )
             weights_pyramid = generate_weights_pyramid(ds_in, levels, method=method)
             print(weights_pyramid)
             weights_pyramid.to_zarr(target, mode='w')
@@ -70,7 +84,7 @@ def generate_weights(store: dict, levels: int, method: str = 'bilinear') -> dict
         }
 
     except Exception as e:
-        raise SKIP(f"Failed to load {store['zstore']}") from e
+        raise SKIP(f"Failed to process {store['zstore']}\nError: {traceback.format_exc()}") from e
 
 
 @task(log_stdout=True)
@@ -89,9 +103,11 @@ with Flow(
     run_config=runtime.run_config,
     executor=runtime.executor,
 ) as flow:
+    levels = Parameter('levels', default=2)
+    method = Parameter('method', default='bilinear')
     stores = get_stores()
     attrs = filter_results(
-        generate_weights.map(stores, levels=unmapped(4), method=unmapped('bilinear'))
+        generate_weights.map(stores, levels=unmapped(levels), method=unmapped(method))
     )
     vals = merge(attrs)
     _ = catalog(vals)
