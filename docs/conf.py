@@ -36,6 +36,7 @@ extensions = [
     "numpydoc",
     "IPython.sphinxext.ipython_directive",
     "IPython.sphinxext.ipython_console_highlighting",
+    "myst_parser",
 ]
 
 autosummary_generate = True
@@ -67,7 +68,7 @@ language = "Python"
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-exclude_patterns = ["_build"]
+exclude_patterns = ["_build", "node_modules"]
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = "sphinx"
