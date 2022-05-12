@@ -153,6 +153,7 @@ class PangeoRuntime(LocalRuntime):
     def executor(self) -> Executor:
         return DaskExecutor(
             cluster_kwargs={
+                'resources': {'taskslots': 1},
                 'n_workers': config.get("runtime.pangeo.n_workers"),
                 'threads_per_worker': config.get("runtime.pangeo.threads_per_worker"),
             }

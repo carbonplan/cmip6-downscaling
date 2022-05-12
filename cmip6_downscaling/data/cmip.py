@@ -5,10 +5,10 @@ import pandas as pd
 import xarray as xr
 
 from . import cat
-from .utils import lon_to_180, to_standard_calendar
+from .utils import lon_to_180, to_standard_calendar as convert_to_standard_calendar
 
 
-def postprocess(ds: xr.Dataset) -> xr.Dataset:
+def postprocess(ds: xr.Dataset, to_standard_calendar: bool = True) -> xr.Dataset:
     """Post process input experiment
 
     - Drops band variables (if present)
@@ -22,6 +22,8 @@ def postprocess(ds: xr.Dataset) -> xr.Dataset:
     ----------
     ds : xr.Dataset
         Input dataset
+    to_standard_calendar : bool, optional
+        Whether to convert time to standard calendar, by default True
 
     Returns
     -------
@@ -52,18 +54,20 @@ def postprocess(ds: xr.Dataset) -> xr.Dataset:
         if ds.lat[0] > ds.lat[-1]:
             ds = ds.reindex({"lat": ds.lat[::-1]})
 
-        # checks calendar
-        ds = to_standard_calendar(ds)
+        if to_standard_calendar:
 
-        # Shifts time from Noon (12:00) start to Midnight (00:00) start to match with Obs
-        # ds.coords['time'] = ds['time'].resample(time='1D').first()
+            # checks calendar
+            ds = convert_to_standard_calendar(ds)
 
-        ds['time'] = pd.date_range(
-            start=ds['time'].data[0],
-            end=ds['time'].data[-1],
-            normalize=True,
-            freq="1D",
-        )
+            # Shifts time from Noon (12:00) start to Midnight (00:00) start to match with Obs
+            # ds.coords['time'] = ds['time'].resample(time='1D').first()
+
+            ds['time'] = pd.date_range(
+                start=ds['time'].data[0],
+                end=ds['time'].data[-1],
+                normalize=True,
+                freq="1D",
+            )
         return ds
 
 
