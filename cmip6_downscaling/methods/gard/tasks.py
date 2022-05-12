@@ -188,10 +188,10 @@ def fit_and_predict(
     # data transformation (this wants full-time chunking)
     # transformed_obs is for the training period
 
-    # # we need only the prediction GCM (xpred), but we'll transform it into the space of the
-    # # transformed interpolated obs (xtrain)
-    # # Create a template dataset for map blocks
-    # # This feals a bit fragile.
+    # we need only the prediction GCM (xpred), but we'll transform it into the space of the
+    # transformed interpolated obs (xtrain)
+    # Create a template dataset for map blocks
+    # This feals a bit fragile.
     template_var = list(xpred.data_vars.keys())[0]
     template_da = xpred[template_var]
     template = xr.Dataset()
