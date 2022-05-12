@@ -40,32 +40,6 @@ def get_gard_model(
         )
 
 
-def make_scrf_path(
-    obs: str,
-    label: str,
-    start_year: str,
-    end_year: str,
-):
-    """
-    Path where spatially-temporally correlated random fields (SCRF) are saved.
-
-    Parameters
-    ----------
-    obs : str
-        Name of observation dataset
-    label: str
-        The variable being predicted
-    start_year: str
-        Start year of the dataset
-    end_year: str
-        End year of the dataset
-
-    Returns
-    -------
-    scrf_path : str
-        Path of SCRF
-    """
-    return f"scrf/{obs}_{label}_{start_year}_{end_year}.zarr"
 
 
 def add_random_effects(
