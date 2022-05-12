@@ -5,14 +5,18 @@ from prefect import Flow, Parameter
 
 from cmip6_downscaling import runtimes
 from cmip6_downscaling.methods.common.tasks import (  # annual_summary,; monthly_summary,; pyramid,; run_analyses,
+    finalize,
     get_experiment,
     get_obs,
+    get_pyramid_weights,
     get_weights,
     make_run_parameters,
+    pyramid,
     rechunk,
     regrid,
+    time_summary,
 )
-from cmip6_downscaling.methods.gard.tasks import coarsen_and_interpolate, fit_and_predict
+from cmip6_downscaling.methods.gard.tasks import coarsen_and_interpolate, fit_and_predict, read_scrf
 
 warnings.filterwarnings(
     "ignore",
@@ -52,12 +56,13 @@ with Flow(
         model_params=Parameter("model_params"),
     )
     p = {}
+
     # input datasets
-    obs_path = get_obs(run_parameters)
-    obs_full_space_path = rechunk(path=obs_path, pattern='full_space')
-    obs_full_time_path = rechunk(path=obs_path, pattern='full_time')
-    experiment_train_path = get_experiment(run_parameters, time_subset='train_period')
-    experiment_predict_path = get_experiment(run_parameters, time_subset='predict_period')
+    p['obs_path'] = get_obs(run_parameters)
+    p['obs_full_space_path'] = rechunk(path=p['obs_path'], pattern='full_space')
+    p['obs_full_time_path'] = rechunk(path=p['obs_path'], pattern='full_time')
+    p['experiment_train_path'] = get_experiment(run_parameters, time_subset='train_period')
+    p['experiment_predict_path'] = get_experiment(run_parameters, time_subset='predict_period')
     p['gcm_to_obs_weights'] = get_weights(run_parameters=run_parameters, direction='gcm_to_obs')
     p['obs_to_gcm_weights'] = get_weights(run_parameters=run_parameters, direction='obs_to_gcm')
 
@@ -65,60 +70,80 @@ with Flow(
     # be chunked finely along time. but that's good to get it for regridding back to
     # the interpolated obs in next task
     # interpolated obs should have same exact chunking schema as ds at `obs_full_space_path`
-    interpolated_obs_full_space_path = coarsen_and_interpolate(
-        obs_full_space_path, experiment_train_path
+    p['interpolated_obs_full_space_path'] = coarsen_and_interpolate(
+        p['obs_full_space_path'], p['experiment_train_path']
     )
 
-    # # just allow the interpolated obs full time rechunking determine the size of the subsequent full-time chunking routines
-    interpolated_obs_full_time_path = rechunk(interpolated_obs_full_space_path, pattern='full_time')
+    # just allow the interpolated obs full time rechunking determine the size of the subsequent full-time chunking routines
+    p['interpolated_obs_full_time_path'] = rechunk(
+        p['interpolated_obs_full_space_path'], pattern='full_time'
+    )
 
     # # get gcm data into full space to prep for interpolation
     # # TODO: do we need this?
-    experiment_predict_full_space_path = rechunk(
-        experiment_predict_path, pattern="full_space", template=obs_full_space_path
+    p['experiment_predict_full_space_path'] = rechunk(
+        p['experiment_predict_path'], pattern="full_space", template=p['obs_full_space_path']
     )
 
     # # interpolate gcm to finescale. it will retain the same temporal chunking pattern (likely 25 timesteps)
-    experiment_predict_fine_full_space_path = regrid(
-        source_path=experiment_predict_full_space_path,
-        target_grid_path=obs_path,
+    p['experiment_predict_fine_full_space_path'] = regrid(
+        source_path=p['experiment_predict_full_space_path'],
+        target_grid_path=p['obs_path'],
         weights_path=p['gcm_to_obs_weights'],
     )
     # # TODO: do we need the templates as well for the rechunking? probably defer to bcsd flow here
-    experiment_predict_fine_full_time_path = rechunk(
-        experiment_predict_fine_full_space_path,
+    p['experiment_predict_fine_full_time_path'] = rechunk(
+        p['experiment_predict_fine_full_space_path'],
         pattern="full_time",
-        template=interpolated_obs_full_time_path,
+        template=p['interpolated_obs_full_time_path'],
     )
 
-    # # # fit and predict (TODO: put the transformation steps currently in the prep_gard_input task into the fit and predict step)
-    model_output_path = fit_and_predict(
-        xtrain_path=interpolated_obs_full_time_path,
-        ytrain_path=obs_full_time_path,
-        xpred_path=experiment_predict_fine_full_time_path,
+    p['scrf_path'] = read_scrf(p['experiment_predict_fine_full_time_path'], run_parameters)
+
+    p['scrf_full_time_path'] = rechunk(
+        p['scrf_path'],
+        pattern="full_time",
+        template=p['experiment_predict_fine_full_time_path'],
+    )
+
+    # fit and predict (TODO: put the transformation steps currently in the prep_gard_input task into the fit and predict step)
+    p['model_output_path'] = fit_and_predict(
+        xtrain_path=p['interpolated_obs_full_time_path'],
+        ytrain_path=p['obs_full_time_path'],
+        xpred_path=p['experiment_predict_fine_full_time_path'],
+        scrf_path=p['scrf_full_time_path'],
         run_parameters=run_parameters,
     )
-    # # temporary aggregations - these come out in full time
-    # monthly_summary_path = monthly_summary(model_output_path, run_parameters)
-    # annual_summary_path = annual_summary(model_output_path, run_parameters)
 
-    # # analysis notebook (shared with BCSD)
-    # analysis_location = run_analyses(model_output_path, run_parameters)
+    # # # temporary aggregations - these come out in full time
+    p['monthly_summary_path'] = time_summary(p['model_output_path'], freq='1MS')
+    p['annual_summary_path'] = time_summary(p['model_output_path'], freq='1AS')
 
-    # # since pyramids require full space we now rechunk everything into full
-    # # space before passing into pyramid step. we probably want to add a cleanup
-    # # to this step in particular since otherwise we will have an exact
-    # # duplicate of the daily, monthly, and annual datasets
-    # final_bcsd_full_space_path = rechunk(model_output_path, chunking_pattern='full_space')
+    # # # # analysis notebook (shared with BCSD)
+    # # # analysis_location = run_analyses(model_output_path, run_parameters)
 
-    # # make temporal summaries
-    # monthly_summary_full_space_path = rechunk(monthly_summary_path, chunking_pattern='full_space')
-    # annual_summary_full_space_path = rechunk(annual_summary_path, chunking_pattern='full_space')
+    # # # since pyramids require full space we now rechunk everything into full
+    # # # space before passing into pyramid step. we probably want to add a cleanup
+    # # # to this step in particular since otherwise we will have an exact
+    # # # duplicate of the daily, monthly, and annual datasets
+    p['full_space_model_output_path'] = rechunk(p['model_output_path'], pattern='full_space')
+
+    # # # make temporal summaries
+    p['monthly_summary_full_space_path'] = rechunk(p['monthly_summary_path'], pattern='full_space')
+    p['annual_summary_full_space_path'] = rechunk(p['annual_summary_path'], pattern='full_space')
 
     # # pyramids
-    # daily_pyramid_path = pyramid(final_bcsd_full_space_path, levels=4)
-    # monthly_pyramid_path = pyramid(monthly_summary_full_space_path, levels=4)
-    # annual_pyramid_path = pyramid(annual_summary_full_space_path, levels=4)
+    p['pyramid_weights'] = get_pyramid_weights(run_parameters=run_parameters, levels=4)
 
-    # # if config.get('run_options.cleanup_flag') is True:
-    # #     cleanup.run_rsfip(gcm_identifier, obs_identifier)
+    p['daily_pyramid_path'] = pyramid(
+        p['full_space_model_output_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
+    )
+    p['monthly_pyramid_path'] = pyramid(
+        p['full_space_model_output_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
+    )
+    p['annual_pyramid_path'] = pyramid(
+        p['full_space_model_output_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
+    )
+
+    # finalize
+    finalize(p, run_parameters)

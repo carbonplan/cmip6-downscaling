@@ -166,7 +166,6 @@ def rechunk(
 ) -> UPath:
     """Use `rechunker` package to adjust chunks of dataset to a form
     conducive for your processing.
-
     Parameters
     ----------
     path : UPath
@@ -180,7 +179,6 @@ def rechunk(
         target to feed to rechunker.
     max_mem : str
         The memory available for rechunking steps. Must look like "2GB". Optional, default is 2GB.
-
     Returns
     -------
     target : UPath
@@ -197,8 +195,8 @@ def rechunk(
     task_hash = str_to_hash(str(path) + pattern_string + str(template) + max_mem)
     target = intermediate_dir / 'rechunk' / task_hash
     path_tmp = scratch_dir / 'rechunk' / task_hash
-    print(f'writing rechunked dataset for {path} to {target}')
-
+    print(f'writing rechunked dataset to {target}')
+    print(target)
     target_store = fsspec.get_mapper(str(target))
     temp_store = fsspec.get_mapper(str(path_tmp))
 
@@ -234,7 +232,7 @@ def rechunk(
             chunk_dims = config.get(f"chunk_dims.{pattern}")
             for dim in chunk_def:
                 if dim not in chunk_dims:
-                    print(f'correcting dim {dim}')
+                    print('correcting dim')
                     # override the chunksize of those unchunked dimensions to be the complete length (like passing chunksize=-1
                     chunk_def[dim] = len(ds[dim])
     elif pattern is not None:
@@ -242,8 +240,6 @@ def rechunk(
         chunk_def = calc_auspicious_chunks_dict(ds[example_var], chunk_dims=chunk_dims)
     else:
         raise AttributeError('must either define chunking pattern or template')
-    print(f'template for when writing rechunked dataset for {path} to {target} is {template}')
-
     # Note:
     # for rechunker v 0.3.3:
     # initialize the chunks_dict that you'll pass in, filling the coordinates with
@@ -344,7 +340,6 @@ def get_pyramid_weights(*, run_parameters, levels, regrid_method="bilinear"):
     )
     print(path)
     return path
-
 
 
 @task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))

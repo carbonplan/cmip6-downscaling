@@ -1,6 +1,11 @@
+from dataclasses import asdict
+
 import dask
+import numpy as np
+import pandas as pd
 import xarray as xr
 import xesmf as xe
+import zarr
 from carbonplan_data.metadata import get_cf_global_attrs
 from prefect import task
 from skdownscale.pointwise_models import (  # AnalogRegression,; PureAnalog,; PureRegression,
@@ -14,7 +19,7 @@ from cmip6_downscaling import __version__ as version, config
 from ..common.bias_correction import bias_correct_gcm_by_method
 from ..common.containers import RunParameters, str_to_hash
 from ..common.utils import zmetadata_exists
-from .utils import add_random_effects, get_gard_model, read_scrf
+from .utils import add_random_effects, get_gard_model
 
 scratch_dir = UPath(config.get("storage.scratch.uri"))
 intermediate_dir = UPath(config.get("storage.intermediate.uri")) / version
@@ -132,8 +137,8 @@ def _fit_and_predict_wrapper(xtrain, ytrain, xpred, scrf, run_parameters, dim='t
 def fit_and_predict(
     xtrain_path: UPath,
     ytrain_path: UPath,
-    # xhist_path: UPath,
     xpred_path: UPath,
+    scrf_path: UPath,
     run_parameters: RunParameters,
     dim: str = 'time',
 ) -> UPath:
@@ -150,6 +155,8 @@ def fit_and_predict(
         Path to historical prediction dataset (interpolated GCM)
     xpred_path : UPath
         Path to future prediction dataset (interpolated GCM) chunked full_time
+    scrf_path : UPath
+        Path to scrf chunked in full_time
     run_parameters : RunParameters
         Parameters for run set-up and model specs
     dim : str, optional
@@ -164,6 +171,7 @@ def fit_and_predict(
         str(xtrain_path)
         + str(ytrain_path)
         + str(xpred_path)
+        + str(scrf_path)
         + run_parameters.run_id_hash
         + str(dim)
     )
@@ -176,21 +184,23 @@ def fit_and_predict(
     print(f'xtrain dataset is located here {xtrain_path}')
     print(f'ytrain dataset is located here {ytrain_path}')
     print(f'xpred dataset is located here {xpred_path}')
+    print(f'scrf dataset is located here {scrf_path}')
+
     # load in datasets
-    xtrain = xr.open_zarr(xtrain_path)  # .isel(lon=slice(0, 48*6), lat=slice(0, 48*6))
-    ytrain = xr.open_zarr(ytrain_path)  # .isel(lon=slice(0, 48*6), lat=slice(0, 48*6))
-    xpred = xr.open_zarr(xpred_path)  # .isel(lon=slice(0, 48*6), lat=slice(0, 48*6))
+    xtrain = xr.open_zarr(xtrain_path)
+    ytrain = xr.open_zarr(ytrain_path)
+    xpred = xr.open_zarr(xpred_path)
+    scrf = xr.open_zarr(scrf_path)
     # make sure you have the variables you need in obs
     for v in xpred.data_vars:
         assert v in ytrain.data_vars
-    scrf = read_scrf(run_parameters, xpred)
     # data transformation (this wants full-time chunking)
     # transformed_obs is for the training period
 
-    # we need only the prediction GCM (xpred), but we'll transform it into the space of the
-    # transformed interpolated obs (xtrain)
-    # Create a template dataset for map blocks
-    # This feals a bit fragile.
+    # # we need only the prediction GCM (xpred), but we'll transform it into the space of the
+    # # transformed interpolated obs (xtrain)
+    # # Create a template dataset for map blocks
+    # # This feals a bit fragile.
     template_var = list(xpred.data_vars.keys())[0]
     # .to_dataarray(dim='variable')
     template_da = xpred[template_var]
@@ -205,9 +215,85 @@ def fit_and_predict(
         kwargs={'dim': dim},
         template=template,
     )
-
     out.attrs.update({'title': 'gard_fit_and_predict'}, **get_cf_global_attrs(version=version))
     out = dask.optimize(out)[0]
-    t = out.to_zarr(target, compute=False, mode='w')
+    t = out.to_zarr(target, compute=False, mode='w', consolidated=False)
     t.compute(retries=5)
+    zarr.consolidate_metadata(target)
+    return target
+
+
+@task(log_stdout=True)
+def read_scrf(prediction_path: UPath, run_parameters: RunParameters):
+    """
+    Read spatial-temporally correlated random fields on file and subset into the correct spatial/temporal domain according to model_output.
+    The random fields are stored in decade (10 year) long time series for the global domain and pre-generated using `scrf.ipynb`.
+
+    Parameters
+    ----------
+    prediction_path : UPath
+        Path to prediction dataset
+    run_parameters : RunParameters
+
+
+    Returns
+    -------
+    scrf : xr.DataArray
+        Spatio-temporally correlated random fields (SCRF)
+    """
+    # TODO: this is a temporary creation of random fields. ultimately we probably want to have
+    # ~150 years of random fields, but this is fine.
+
+    ds_hash = str_to_hash(
+        "{obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{predict_dates[0]}_{predict_dates[1]}".format(
+            **asdict(run_parameters)
+        )
+    )
+
+    target = intermediate_dir / 'scrf' / ds_hash
+
+    if use_cache and zmetadata_exists(target):
+        print(f'found existing target: {target}')
+        return target
+    prediction_ds = xr.open_zarr(prediction_path)
+    scrf_ten_years = xr.open_zarr(f'az://static/scrf/ERA5_{run_parameters.variable}_1981_1990.zarr')
+
+    scrf_list = []
+    for year in np.arange(
+        int(run_parameters.predict_period.start), int(run_parameters.predict_period.stop) + 10, 10
+    ):
+        scrf_list.append(scrf_ten_years.drop('time'))
+    scrf = xr.concat(scrf_list, dim='time')
+    scrf['time'] = pd.date_range(
+        start=f'{run_parameters.predict_period.start}-01-01', periods=scrf.dims['time']
+    )
+
+    scrf = scrf.sel(time=run_parameters.predict_period.time_slice)
+
+    scrf = scrf.drop('spatial_ref').astype('float32')
+
+    # scrf = scrf.chunk({'time':-1}) #maybe needed
+    # scrf = scrf.chunk(
+    #     {
+    #         'lat': prediction_ds.chunks['lat'][0],
+    #         'lon': prediction_ds.chunks['lon'][0],
+    #     }
+    # )
+
+    scrf = scrf.sel(
+        lat=prediction_ds.lat.values, lon=prediction_ds.lon.values, time=prediction_ds.time.values
+    )
+    assert len(scrf.time) == len(prediction_ds.time)
+    assert len(scrf.lat) == len(prediction_ds.lat)
+    assert len(scrf.lon) == len(prediction_ds.lon)
+
+    scrf = scrf.assign_coords(
+        {'lat': prediction_ds.lat, 'lon': prediction_ds.lon, 'time': prediction_ds.time}
+    )
+
+    scrf = dask.optimize(scrf)[0]
+    t = scrf.to_zarr(target, compute=False, mode='w', consolidated=False)
+    t.compute(retries=2)
+    zarr.consolidate_metadata(target)
+
     return target

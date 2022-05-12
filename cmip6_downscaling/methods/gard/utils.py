@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from typing import Any
 
-import numpy as np
-import pandas as pd
 import xarray as xr
 from scipy.stats import norm as norm
 from skdownscale.pointwise_models import AnalogRegression, PureAnalog, PureRegression
@@ -68,57 +66,6 @@ def make_scrf_path(
         Path of SCRF
     """
     return f"scrf/{obs}_{label}_{start_year}_{end_year}.zarr"
-
-
-def read_scrf(run_parameters: RunParameters, prediction_ds: xr.Dataset):
-    """
-    Read spatial-temporally correlated random fields on file and subset into the correct spatial/temporal domain according to model_output.
-    The random fields are stored in decade (10 year) long time series for the global domain and pre-generated using `scrf.ipynb`.
-
-    Parameters
-    ----------
-    run_parameters : RunParameters
-
-
-    Returns
-    -------
-    scrf : xr.DataArray
-        Spatio-temporally correlated random fields (SCRF)
-    """
-    # TODO: this is a temporary creation of random fields. ultimately we probably want to have
-    # ~150 years of random fields, but this is fine.
-    # DEFINITELY want to check whether this should be chunked differently - want it to align
-    # with the chunks of the prediction
-    scrf_ten_years = xr.open_zarr('az://static/scrf/ERA5_tasmax_1981_1990.zarr')
-    scrf_list = []
-    for year in np.arange(1981, 2110, 10):
-        scrf_list.append(scrf_ten_years.drop('time'))
-    scrf = xr.concat(scrf_list, dim='time')
-    scrf['time'] = pd.date_range(start='1981-01-01', periods=scrf.dims['time'])
-    scrf = scrf.sel(time=slice('1981', '2100'))
-    scrf = scrf.drop('spatial_ref').astype('float32').chunk({'time': -1})
-
-    scrf = scrf.chunk(
-        {
-            'lat': prediction_ds.chunks['lat'][0],
-            'lon': prediction_ds.chunks['lon'][0],
-        }
-    )
-
-    scrf = scrf.sel(
-        lat=prediction_ds.lat.values, lon=prediction_ds.lon.values, time=prediction_ds.time.values
-    )
-    ## CURRENTLY needs calendar to be gregorian
-    ## TODO: merge in the calendar conversion for GCMs and this should work great!
-    assert len(scrf.time) == len(prediction_ds.time)
-    assert len(scrf.lat) == len(prediction_ds.lat)
-    assert len(scrf.lon) == len(prediction_ds.lon)
-
-    scrf = scrf.assign_coords(
-        {'lat': prediction_ds.lat, 'lon': prediction_ds.lon, 'time': prediction_ds.time}
-    )
-
-    return scrf
 
 
 def add_random_effects(
