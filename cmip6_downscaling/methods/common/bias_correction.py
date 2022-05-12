@@ -28,12 +28,6 @@ def bias_correct_obs_by_method(
         qt = PointWiseDownscaler(model=QuantileTransformer(**bc_kwargs))
         qt.fit(da_obs)
         return qt.transform(da_obs)
-    # TODO: construct method to not return two objects
-    # elif method == 'cunnane_transform':
-    #     print(bc_kwargs)
-    #     ct = PointWiseDownscaler(model=CunnaneTransformer(**bc_kwargs))
-    #     ct.fit(da_obs)
-    #     return (ct.transform(da_obs), ct)
     elif method == 'z_score':
         # transform obs
         sc = PointWiseDownscaler(model=StandardScaler(**bc_kwargs))
