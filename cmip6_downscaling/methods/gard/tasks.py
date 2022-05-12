@@ -72,28 +72,6 @@ def coarsen_and_interpolate(fine_path: UPath, coarse_path: UPath) -> UPath:
 
 
 def _fit_and_predict_wrapper(xtrain, ytrain, xpred, scrf, run_parameters, dim='time'):
-    """_summary_
-
-    Parameters
-    ----------
-    xtrain : _type_
-        _description_
-    ytrain : _type_
-        _description_
-    xpred : _type_
-        _description_
-    xhist : _type_
-        _description_
-    run_parameters : _type_
-        _description_
-    dim : str, optional
-        _description_, by default 'time'
-
-    Returns
-    -------
-    _type_
-        _description_
-    """
 
     xpred = xpred.rename({'t2': 'time'})
     scrf = scrf.rename({'t2': 'time'})
