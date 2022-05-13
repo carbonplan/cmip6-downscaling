@@ -165,6 +165,7 @@ def rechunk(
 ) -> UPath:
     """Use `rechunker` package to adjust chunks of dataset to a form
     conducive for your processing.
+
     Parameters
     ----------
     path : UPath
@@ -178,6 +179,7 @@ def rechunk(
         target to feed to rechunker.
     max_mem : str
         The memory available for rechunking steps. Must look like "2GB". Optional, default is 2GB.
+
     Returns
     -------
     target : UPath
@@ -314,6 +316,22 @@ def time_summary(ds_path: UPath, freq: str) -> UPath:
 
 @task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
 def get_weights(*, run_parameters, direction, regrid_method="bilinear"):
+    """Retrieve pre-generated regridding weights.
+
+    Parameters
+    ----------
+    run_parameters : dict
+        Dictionary of run parameters
+    direction : str
+        Direction of regridding.
+    regrid_method : str
+        Regridding method.
+
+    Returns
+    -------
+    path : UPath
+        Path to weights file.
+    """
     weights = pd.read_csv(config.get('weights.gcm_obs_weights.uri'))
     path = (
         weights[
@@ -331,7 +349,23 @@ def get_weights(*, run_parameters, direction, regrid_method="bilinear"):
 
 
 @task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
-def get_pyramid_weights(*, run_parameters, levels, regrid_method="bilinear"):
+def get_pyramid_weights(*, run_parameters, levels: int, regrid_method: str = "bilinear"):
+    """Retrieve pre-generated regridding pyramids weights.
+
+    Parameters
+    ----------
+    run_parameters : dict
+        Dictionary of run parameters
+    levels : int
+        Number of levels in the pyramid.
+    regrid_method : str
+        Regridding method.
+
+    Returns
+    -------
+    path : UPath
+        Path to pyramid weights file.
+    """
     weights = pd.read_csv(config.get('weights.downscaled_pyramid_weights.uri'))
     print(weights)
     path = (
@@ -513,6 +547,7 @@ def run_analyses(ds_path: UPath, run_parameters: RunParameters) -> UPath:
     Parameters
     ----------
     ds_path : UPath
+        Path to input dataset
     run_parameters : RunParameters
         Downscaling run parameter container
 
@@ -572,6 +607,16 @@ def run_analyses(ds_path: UPath, run_parameters: RunParameters) -> UPath:
 
 @task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
 def finalize(path_dict: dict, run_parameters: RunParameters):
+    """Prefect task to finalize the downscaling run.
+
+    Parameters
+    ----------
+    path_dict : dict
+        Dictionary of paths to write to
+    run_parameters : RunParameters
+        Downscaling run parameter container
+
+    """
 
     now = datetime.datetime.utcnow().isoformat()
     target1 = results_dir / 'runs' / run_parameters.run_id / f'{now}.json'
