@@ -7,7 +7,7 @@ import datatree
 import xarray as xr
 import zarr
 
-from .methods.common.utils import zmetadata_exists
+from cmip6_downscaling.methods.common.utils import zmetadata_exists
 
 
 def str_to_hash(s: str) -> str:
