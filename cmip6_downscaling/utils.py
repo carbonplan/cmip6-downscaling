@@ -7,14 +7,13 @@ import datatree
 import xarray as xr
 import zarr
 
-from cmip6_downscaling.methods.common.utils import zmetadata_exists
-
 
 def str_to_hash(s: str) -> str:
     return blake2b(s.encode(), digest_size=8).hexdigest()
 
 
 def write(ds: xr.Dataset | datatree.DataTree, target, use_cache: bool = True) -> str:
+    from .methods.common.utils import zmetadata_exists
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
