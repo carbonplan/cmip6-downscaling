@@ -12,7 +12,7 @@ from upath import UPath
 
 from cmip6_downscaling import __version__ as version, config, runtimes
 from cmip6_downscaling.data.cmip import postprocess
-from cmip6_downscaling.methods.common.utils import zmetadata_exists
+from cmip6_downscaling.utils import write
 
 config.set(
     {
@@ -86,29 +86,6 @@ def preprocess(ds) -> xr.Dataset:
     time_slice = slice('1950', '2100')
     ds = ds.sel(time=time_slice).pipe(partial(postprocess, to_standard_calendar=False))
     return ds
-
-
-def write(ds, target, use_cache: bool = use_cache) -> str:
-    import dask
-    import xarray as xr
-    import zarr
-
-    if use_cache and zmetadata_exists(target):
-        print(f'found existing target: {target}')
-        return target
-
-    else:
-        print(f'writing target: {target}')
-        out = dask.optimize(ds)[0]
-        if isinstance(ds, xr.Dataset):
-            t = out.to_zarr(target, mode='w', compute=False, consolidated=False)
-            t.compute(retries=5)
-            zarr.consolidate_metadata(target)
-        else:
-            # datatree doesn't support compute=False yet
-            ds.to_zarr(target, mode='w')
-
-    return target
 
 
 def _compute_summary_helper(path, freq, chunks):
