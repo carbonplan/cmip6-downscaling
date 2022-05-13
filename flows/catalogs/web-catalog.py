@@ -4,11 +4,11 @@ from cmip6_downscaling import config, runtimes
 
 config.set(
     {
-        'runtime.cloud.extra_pip_packages': 'git+https://github.com/carbonplan/cmip6-downscaling.git@main git+https://github.com/intake/intake-esm.git git+https://github.com/ncar-xdev/ecgtools.git'
+        'runtime.cloud.extra_pip_packages': 'git+https://github.com/carbonplan/cmip6-downscaling.git git+https://github.com/intake/intake-esm.git git+https://github.com/ncar-xdev/ecgtools.git'
     }
 )
 
-runtime = runtimes.CloudRuntime()
+runtime = runtimes.PangeoRuntime()
 
 
 def parse_cmip6(store):
