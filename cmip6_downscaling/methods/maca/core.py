@@ -2,11 +2,80 @@ from __future__ import annotations
 
 import numpy as np
 import xarray as xr
-
+import xesmf as xe
 from skdownscale.pointwise_models import EquidistantCdfMatcher, PointWiseDownscaler
 from sklearn.linear_model import LinearRegression
 
-from .utils import generate_batches
+from .utils import add_circular_temporal_pad, generate_batches, pad_with_edge_year
+
+
+def epoch_trend(
+    data: xr.Dataset,
+    historical_period: slice,
+    day_rolling_window: int = 21,
+    year_rolling_window: int = 31,
+) -> xr.Dataset:
+    """
+    Calculate the epoch trend as a multi-day, multi-year rolling average. The trend is calculated as the anomaly
+    against the historical mean (also a multi-day rolling average).
+
+    Parameters
+    ----------
+    data : xr.Dataset
+        Data to calculate epoch trend on
+    historical_period : slice
+        Slice indicating the historical period to be used when calculating historical mean
+    day_rolling_window : int
+        Number of days to include when calculating the rolling average
+    year_rolling_window : int
+        Number of years to include when calculating the rolling average
+
+    Returns
+    -------
+    trend : xr.Dataset
+        The long term average trend
+    """
+    # the rolling windows need to be odd numbers since the rolling average is centered
+    assert day_rolling_window % 2 == 1
+    d_offset = int((day_rolling_window - 1) / 2)
+
+    assert year_rolling_window % 2 == 1
+    y_offset = int((year_rolling_window - 1) / 2)
+
+    # get historical mean as a rolling average -- the result has one number for each day of year
+    # which is the average of the neighboring day of years over multiple years
+    padded = add_circular_temporal_pad(data=data.sel(time=historical_period), offset=d_offset)
+    hist_mean = (
+        padded.rolling(time=day_rolling_window, center=True)
+        .mean()
+        .dropna('time')
+        .groupby("time.dayofyear")
+        .mean()
+    )
+
+    # get rolling average for the entire data -- the result has one number for each day in the entire time series
+    # which is the average of the neighboring day of years in neighboring years
+    padded = add_circular_temporal_pad(data=data, offset=d_offset)
+    func = lambda x: x.rolling(time=year_rolling_window, center=True).mean()
+    rolling_doy_mean = (
+        padded.rolling(time=day_rolling_window, center=True)
+        .mean()
+        .dropna('time')
+        .groupby('time.dayofyear')
+        .apply(func)
+        .dropna('time')
+    ).compute()  # TODO: this .compute is needed otherwise the pad_with_edge_year function below returns all nulls for unknown reasons, root cause?
+
+    # repeat the first/last year to cover the time periods without enough data for the rolling average
+    for i in range(y_offset):
+        rolling_doy_mean = pad_with_edge_year(rolling_doy_mean)
+
+    # remove historical mean from rolling average, leaving trend as the anamoly
+    trend = rolling_doy_mean.groupby('time.dayofyear') - hist_mean
+
+    assert trend.isnull().sum().values == 0
+
+    return trend
 
 
 def get_doy_mask(
@@ -52,16 +121,16 @@ def get_doy_mask(
     return mask
 
 
-def maca_bias_correction(
+def bias_correction(
     ds_gcm: xr.Dataset,
-    ds_obs: str,
+    ds_obs: xr.Dataset,
     variables: list[str],
-    batch_size: int | None = 15,
-    buffer_size: int | None = 15,
+    batch_size: int = 15,
+    buffer_size: int = 15,
 ) -> xr.Dataset:
     """
     Run bias correction as it is done in the MACA method.
-    
+
     The bias correction is performed using the Equidistant CDF matching method in batches.
     Neighboring day of years are bias corrected together with a buffer. That is, with a batch
     size of 15 and a buffer size of 15, the 45 neighboring days of year are bias corrected
@@ -89,7 +158,6 @@ def maca_bias_correction(
     See Also
     --------
     https://climate.northwestknowledge.net/MACA/MACAmethod.php
-
     """
     if isinstance(variables, str):
         variables = [variables]
@@ -146,15 +214,14 @@ def maca_bias_correction(
     return ds_out
 
 
-def maca_construct_analogs(
+def construct_analogs(
     ds_gcm: xr.Dataset,
     ds_obs_coarse: xr.Dataset,
     ds_obs_fine: xr.Dataset,
     label: str,
     n_analogs: int = 10,
     doy_range: int = 45,
-    **kwargs,
-) -> xr.DataArray:
+) -> xr.Dataset:
     """
     Find analog days for each coarse scale GCM day from coarsened observations, then use the fine scale versions of
     these analogs to construct the downscaled GCM data. The fine scale analogs are combined together using a linear
@@ -170,11 +237,11 @@ def maca_construct_analogs(
         Observation dataset coarsened to the GCM resolution
     ds_obs_fine : xr.Dataset
         Observation dataset, original/fine resolution
-    label: str
+    label : str
         Name of variable to be downscaled
-    n_analogs: int
+    n_analogs : int
         Number of analog days to look for
-    doy_range: int
+    doy_range : int
         The range of day of year to look for analogs within
 
     Returns
@@ -283,4 +350,5 @@ def maca_construct_analogs(
 
     downscaled = xr.concat(downscaled, dim='time').sortby('time')
     downscaled = downscaled.to_dataset(name=label)
+
     return downscaled
