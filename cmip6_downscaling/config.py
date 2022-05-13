@@ -9,7 +9,7 @@ _defaults = {
             'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
         },
         'intermediate': {
-            'uri': 'az://flow-outputs/intermediates',
+            'uri': 'az://scratch/intermediates',
             'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
         },
         'results': {
@@ -50,7 +50,7 @@ _defaults = {
         },
         'gcm_obs_weights': {'uri': 'az://static/xesmf_weights/gcm_obs/weights.csv'},
     },
-    'run_options': {'runtime': "pangeo", 'cleanup_flag': True, 'use_cache': True},
+    'run_options': {'runtime': "pangeo", 'use_cache': True},
     "runtime": {
         "cloud": {
             "storage_prefix": "az://",

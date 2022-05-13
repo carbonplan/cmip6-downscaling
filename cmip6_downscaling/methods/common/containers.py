@@ -100,7 +100,7 @@ class RunParameters:
 
     @property
     def run_id(self):
-        return f"{self.method}_{self.obs}_{self.model}_{self.scenario}_{self.variable}_{self.latmin}_{self.latmax}_{self.lonmin}_{self.lonmax}_{self.train_dates[0]}_{self.train_dates[1]}_{self.predict_dates[0]}_{self.predict_dates[1]}"
+        return f"{self.method}_{self.obs}_{self.model}_{self.member}_{self.scenario}_{self.variable}_{self.latmin}_{self.latmax}_{self.lonmin}_{self.lonmax}_{self.train_dates[0]}_{self.train_dates[1]}_{self.predict_dates[0]}_{self.predict_dates[1]}"
 
     @property
     def run_id_hash(self):
