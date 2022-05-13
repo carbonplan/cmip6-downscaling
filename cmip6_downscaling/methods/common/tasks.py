@@ -47,7 +47,6 @@ scratch_dir = UPath(config.get("storage.scratch.uri"))
 intermediate_dir = UPath(config.get("storage.intermediate.uri")) / version
 results_dir = UPath(config.get("storage.results.uri")) / version
 use_cache = config.get('run_options.use_cache')
-print(config.config)
 
 
 @task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))

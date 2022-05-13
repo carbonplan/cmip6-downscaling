@@ -3,12 +3,11 @@ import warnings
 from prefect import Flow, Parameter
 
 from cmip6_downscaling import runtimes
-from cmip6_downscaling.methods.common.tasks import (  # annual_summary,; monthly_summary,; pyramid,; run_analyses,
+from cmip6_downscaling.methods.common.tasks import (  # annual_summary,; monthly_summary,; pyramid,; run_analyses,; get_weights,
     finalize,
     get_experiment,
     get_obs,
     get_pyramid_weights,
-    get_weights,
     make_run_parameters,
     pyramid,
     rechunk,
@@ -60,8 +59,6 @@ with Flow(
     p['obs_full_time_path'] = rechunk(path=p['obs_path'], pattern='full_time')
     p['experiment_train_path'] = get_experiment(run_parameters, time_subset='train_period')
     p['experiment_predict_path'] = get_experiment(run_parameters, time_subset='predict_period')
-    p['gcm_to_obs_weights'] = get_weights(run_parameters=run_parameters, direction='gcm_to_obs')
-    p['obs_to_gcm_weights'] = get_weights(run_parameters=run_parameters, direction='obs_to_gcm')
 
     # after regridding coarse_obs will have smaller array size in space but still
     # be chunked finely along time. but that's good to get it for regridding back to
@@ -85,7 +82,7 @@ with Flow(
     p['experiment_predict_fine_full_space_path'] = regrid(
         source_path=p['experiment_predict_full_space_path'],
         target_grid_path=p['obs_path'],
-        weights_path=p['gcm_to_obs_weights'],
+        weights_path=None,
     )
     p['experiment_predict_fine_full_time_path'] = rechunk(
         p['experiment_predict_fine_full_space_path'],

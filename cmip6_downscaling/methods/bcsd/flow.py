@@ -10,12 +10,11 @@ from cmip6_downscaling.methods.bcsd.tasks import (
     postprocess_bcsd,
     spatial_anomalies,
 )
-from cmip6_downscaling.methods.common.tasks import (  # run_analyses,
+from cmip6_downscaling.methods.common.tasks import (  # run_analyses,; get_weights,
     finalize,
     get_experiment,
     get_obs,
     get_pyramid_weights,
-    get_weights,
     make_run_parameters,
     pyramid,
     rechunk,
@@ -46,20 +45,22 @@ with Flow(
         table_id=Parameter("table_id"),
         scenario=Parameter("scenario"),
         variable=Parameter("variable"),
+        features=Parameter("features"),
         latmin=Parameter("latmin"),
         latmax=Parameter("latmax"),
         lonmin=Parameter("lonmin"),
         lonmax=Parameter("lonmax"),
         train_dates=Parameter("train_period"),
         predict_dates=Parameter("predict_period"),
+        bias_correction_method=Parameter("bias_correction_method"),
+        bias_correction_kwargs=Parameter("bias_correction_kwargs"),
+        model_type=Parameter("model_type"),
+        model_params=Parameter("model_params"),
     )
 
     p = {}
 
     # input datasets
-    p['gcm_to_obs_weights'] = get_weights(run_parameters=run_parameters, direction='gcm_to_obs')
-    p['obs_to_gcm_weights'] = get_weights(run_parameters=run_parameters, direction='obs_to_gcm')
-
     p['obs_path'] = get_obs(run_parameters)
 
     p['obs_full_space_path'] = rechunk(path=p['obs_path'], pattern='full_space')
@@ -71,14 +72,14 @@ with Flow(
     # the interpolated obs in next task
 
     p['coarse_obs_path'] = regrid(
-        p['obs_full_space_path'], p['experiment_train_path'], weights_path=p['obs_to_gcm_weights']
+        p['obs_full_space_path'], p['experiment_train_path'], weights_path=None
     )
 
     # interpolated obs should have same exact chunking schema as ds at `p['obs_full_space_path']`
     p['interpolated_obs_path'] = regrid(
         source_path=p['coarse_obs_path'],
         target_grid_path=p['obs_path'],
-        weights_path=p['gcm_to_obs_weights'],
+        weights_path=None,
     )
 
     p['interpolated_obs_full_time_path'] = rechunk(
@@ -110,7 +111,7 @@ with Flow(
     p['bias_corrected_fine_full_space_path'] = regrid(
         source_path=p['bias_corrected_full_space_path'],
         target_grid_path=p['obs_path'],
-        weights_path=p['gcm_to_obs_weights'],
+        weights_path=None,
     )
 
     p['bias_corrected_fine_full_time_path'] = rechunk(

@@ -3,6 +3,7 @@ from __future__ import annotations
 import warnings
 from datetime import timedelta
 
+import dask
 import xarray as xr
 from carbonplan_data.metadata import get_cf_global_attrs
 from prefect import task
@@ -175,9 +176,9 @@ def fit_and_predict(
         print(f"found existing target: {target}")
         return target
 
-    xtrain = xr.open_zarr(coarse_obs_full_time_path).pipe(apply_land_mask)
-    ytrain = xr.open_zarr(experiment_train_full_time_path).pipe(apply_land_mask)
-    xpred = xr.open_zarr(experiment_predict_full_time_path).pipe(apply_land_mask)
+    xtrain = xr.open_zarr(coarse_obs_full_time_path)
+    ytrain = xr.open_zarr(experiment_train_full_time_path)
+    xpred = xr.open_zarr(experiment_predict_full_time_path)
 
     # Create a template dataset for map blocks
     # This feals a bit fragile.
@@ -193,11 +194,10 @@ def fit_and_predict(
         kwargs={'dim': 'time'},
         template=template,
     )
-
+    out = dask.optimize(out)[0]
     out.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
 
-    # remove apply_land_mask after scikit-downscale#110 is merged
-    out.pipe(apply_land_mask).to_zarr(target, mode='w')
+    out.to_zarr(target, mode='w')
 
     return target
 
@@ -247,6 +247,9 @@ def postprocess_bcsd(
         args=[spatial_anomalies_ds],
         template=bias_corrected_fine_full_time_ds,
     )
+    # masking out ocean regions
+    bcsd_results_ds = apply_land_mask(bcsd_results_ds)
+
     bcsd_results_ds.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
     bcsd_results_ds.to_zarr(target, mode='w')
 
