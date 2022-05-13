@@ -182,11 +182,11 @@ def fit_and_predict(
     )
     out.attrs.update({'title': 'gard_fit_and_predict'}, **get_cf_global_attrs(version=version))
     out = dask.optimize(out)[0]
-    t = out.to_zarr(target, compute=False, mode='w', consolidated=False)
+    # remove apply_land_mask after scikit-downscale#110 is merged
+    t = out.pipe(apply_land_mask).to_zarr(target, compute=False, mode='w', consolidated=False)
     t.compute(retries=5)
 
-    # remove apply_land_mask after scikit-downscale#110 is merged
-    zarr.pipe(apply_land_mask).consolidate_metadata(target)
+    zarr.consolidate_metadata(target)
     return target
 
 
