@@ -2,7 +2,7 @@ import warnings
 
 from prefect import Flow, Parameter
 
-from cmip6_downscaling import runtimes
+from cmip6_downscaling import config, runtimes
 from cmip6_downscaling.methods.common.tasks import (  # annual_summary,; monthly_summary,; pyramid,; run_analyses,; get_weights,
     finalize,
     get_experiment,
@@ -119,22 +119,24 @@ with Flow(
     # duplicate of the daily, monthly, and annual datasets
     p['full_space_model_output_path'] = rechunk(p['model_output_path'], pattern='full_space')
 
-    # # # make temporal summaries
+    # make temporal summaries
     p['monthly_summary_full_space_path'] = rechunk(p['monthly_summary_path'], pattern='full_space')
     p['annual_summary_full_space_path'] = rechunk(p['annual_summary_path'], pattern='full_space')
 
-    # # pyramids
-    p['pyramid_weights'] = get_pyramid_weights(run_parameters=run_parameters, levels=4)
+    if config.get('run_options.generate_pyramids'):
 
-    p['daily_pyramid_path'] = pyramid(
-        p['full_space_model_output_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
-    )
-    p['monthly_pyramid_path'] = pyramid(
-        p['full_space_model_output_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
-    )
-    p['annual_pyramid_path'] = pyramid(
-        p['full_space_model_output_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
-    )
+        # pyramids
+        p['pyramid_weights'] = get_pyramid_weights(run_parameters=run_parameters, levels=4)
+
+        p['daily_pyramid_path'] = pyramid(
+            p['full_space_model_output_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
+        )
+        p['monthly_pyramid_path'] = pyramid(
+            p['full_space_model_output_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
+        )
+        p['annual_pyramid_path'] = pyramid(
+            p['full_space_model_output_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
+        )
 
     # finalize
     finalize(p, run_parameters)
