@@ -20,18 +20,20 @@ dependencies:
   - gcsfs
   - intake-esm
   - intake-xarray
+  - ndpyramid
   - numpy
   - pandas
   - prefect
+  - rechunker
   - regionmask
   - scikit-downscale
   - scikit-learn
   - scipy
+  - universal_pathlib
   - xclim
+  - xesmf
   - xpersist
   - zarr
-  - universal_pathlib
-  - ndpyramid
   - pip:
       - git+https://github.com/carbonplan/xarray-schema
       - carbonplan-data

@@ -27,8 +27,8 @@ use_cache = config.get('run_options.use_cache')
 
 @task(log_stdout=True)
 def coarsen_and_interpolate(fine_path: UPath, coarse_path: UPath) -> UPath:
-    """
-    Coarsen up obs and then interpolate it back to the original finescale grid.
+    """Coarsen up obs and then interpolate it back to the original finescale grid.
+
     Parameters
     ----------
     fine_path : UPath
@@ -134,7 +134,7 @@ def fit_and_predict(
 
     Returns
     -------
-    UPath
+    path : UPath
         Path to output dataset chunked full_time
     """
     ds_hash = str_to_hash(
@@ -201,6 +201,7 @@ def read_scrf(prediction_path: UPath, run_parameters: RunParameters):
     prediction_path : UPath
         Path to prediction dataset
     run_parameters : RunParameters
+        Parameters for run set-up and model specs
 
 
     Returns
