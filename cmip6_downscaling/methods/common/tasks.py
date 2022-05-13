@@ -120,7 +120,7 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
         UPath to experiment dataset.
     """
     time_period = getattr(run_parameters, time_subset)
-    frmt_str = "{model}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{time_period.start}_{time_period.stop}".format(
+    frmt_str = "{model}_{member}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{time_period.start}_{time_period.stop}".format(
         time_period=time_period, **asdict(run_parameters)
     )
 
