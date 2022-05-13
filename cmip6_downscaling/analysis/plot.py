@@ -12,12 +12,12 @@ styles.mpl.set_theme(style='carbonplan_light')
 
 
 def plot_cdfs(
-    obs_ds: xr.Dataset,
-    historical_downscaled: xr.Dataset,
-    future_downscaled: xr.Dataset,
+    obs: xr.Dataset,
     top_cities: pd.DataFrame,
-    training_period: slice,
-    future_period: slice,
+    train_period: slice,
+    predict_period: slice,
+    historical_downscaled: xr.Dataset = None,
+    future_downscaled: xr.Dataset = None,
     historical_gcm: xr.Dataset = None,
     future_gcm: xr.Dataset = None,
     ncols: int = 4,
@@ -27,17 +27,17 @@ def plot_cdfs(
 
     Parameters
     ----------
-    obs_ds : xr.Dataset
+    obs : xr.Dataset
         observed dataset with dimensions ('time', 'city')
     historical_downscaled : xr.Dataset
-        historical dataset with dimensions ('time', 'city')
+        historical dataset with dimensions ('time', 'city'), by default None
     future_downscaled : xr.Dataset
-        future downscaled dataset with dimensions ('time', 'city')
+        future downscaled dataset with dimensions ('time', 'city'), by default None
     top_cities : pd.DataFrame
         dataframe with cities and their locations ('lat', 'lng')
-    training_period : slice
+    train_period : slice
         training period, likely something like slice('1980', '2010')
-    future_period : slice
+    predict_period : slice
         future period, likely something like slice('1980', '2010')
     historical_gcm : xr.Dataset, optional
         raw historical gcm with dimensions ('time', 'city'), by default None
@@ -57,7 +57,7 @@ def plot_cdfs(
     """
     fig, axarr = plt.subplots(
         ncols=ncols,
-        nrows=(int(len(obs_ds.cities) / ncols)) + 1,
+        nrows=(int(len(obs.cities) / ncols)) + 1,
         figsize=(15, 60),
         sharey=True,
         sharex=sharex,
@@ -65,27 +65,29 @@ def plot_cdfs(
     for i, city in enumerate(top_cities.city.values):
         ax = axarr.reshape(-1)[i]
         sns.ecdfplot(
-            data=obs_ds.isel(cities=i),
-            label=f'ERA5 ({training_period.start}-{training_period.stop})',
+            data=obs.isel(cities=i),
+            label=f'ERA5 ({train_period.start}-{train_period.stop})',
             ax=ax,
             color='#1b1e23',
         )
-        sns.ecdfplot(
-            data=historical_downscaled.isel(cities=i),
-            label=f'Downscaled GCM ({training_period.start}-{training_period.stop})',
-            color='#8b9fd1',
-            ax=ax,
-        )
-        sns.ecdfplot(
-            data=future_downscaled.isel(cities=i),
-            label=f'Downscaled GCM ({future_period.start}-{future_period.stop})',
-            ax=ax,
-            color='#f16f71',
-        )
+        if historical_downscaled is not None:
+            sns.ecdfplot(
+                data=historical_downscaled.isel(cities=i),
+                label=f'Downscaled GCM ({train_period.start}-{train_period.stop})',
+                color='#8b9fd1',
+                ax=ax,
+            )
+        if future_downscaled is not None:
+            sns.ecdfplot(
+                data=future_downscaled.isel(cities=i),
+                label=f'Downscaled GCM ({predict_period.start}-{predict_period.stop})',
+                ax=ax,
+                color='#f16f71',
+            )
         if historical_gcm is not None:
             sns.ecdfplot(
                 data=historical_gcm.isel(cities=i),
-                label=f'Raw GCM ({training_period.start}-{training_period.stop})',
+                label=f'Raw GCM ({train_period.start}-{train_period.stop})',
                 ax=ax,
                 color='#8b9fd1',
                 linestyle='--',
@@ -93,7 +95,7 @@ def plot_cdfs(
         if future_gcm is not None:
             sns.ecdfplot(
                 data=future_gcm.isel(cities=i),
-                label=f'Raw GCM ({future_period.start}-{future_period.stop})',
+                label=f'Raw GCM ({predict_period.start}-{predict_period.stop})',
                 ax=ax,
                 color='#f16f71',
                 linestyle='--',
@@ -152,12 +154,14 @@ def plot_values_and_difference(
     )
     var_limit = {
         'tasmax': {
-            'mean': 0.25,
-            'std': 1,
-            'percentile1': 1,
-            'percentile5': 1,
+            'mean': 0.1,
+            'median': 2,
+            'std': 3,
+            'percentile1': 5,
+            'percentile5': 2,
             'percentile95': 2,
-            'percentile99': 2,
+            'percentile99': 5,
+
         }
     }
 
@@ -196,8 +200,8 @@ def plot_values_and_difference(
         (ds2 - ds1).plot(
             ax=axarr[2],
             cmap='orangeblue_light_r',
-            vmin=-diff_limit,
-            vmax=diff_limit,
+            vmin=-var_limit[variable][metric],
+            vmax=var_limit[variable][metric],
             cbar_kwargs={'label': 'Difference (middle - left)'},
         )
 
