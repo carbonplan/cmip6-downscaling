@@ -96,9 +96,10 @@ def get_obs(run_parameters: RunParameters) -> UPath:
     )
 
     for key in subset.variables:
-        subset[key].encoding.pop('chunks', None)
+        subset[key].encoding = {}
 
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
+    print(f'writing {target}', subset)
     store = subset.to_zarr(target, mode='w', compute=False)
     store.compute(retries=5)
     return target
@@ -151,7 +152,7 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     # Note: dataset is chunked into time:365 chunks to standardize leap-year chunking.
     subset = subset.chunk({'time': 365})
     for key in subset.variables:
-        subset[key].encoding.pop('chunks', None)
+        subset[key].encoding = {}
 
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
     subset.to_zarr(target, mode='w')
