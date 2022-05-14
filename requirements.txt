@@ -1,20 +1,25 @@
-adlfs
+adlfs >= 2022.2.0
+carbonplan_data
+cmip6_preprocessing
 dask[complete]
 dask-kubernetes
-donfig
+donfig >= 0.7.0
 fsspec
-google-cloud-storage
-gcsfs
-gstools
 intake
 intake-esm
 intake-xarray
-prefect
+ndpyramid == 0.0.5
+pandas
+pangeo-xesmf == 0.6.2
+prefect == 0.15.13
+rechunker == 0.4.0
 regionmask
-scikit-downscale
+scikit-downscale >= 0.1.2
 scikit-learn
-tenacity
-xarray
-xpersist
+scipy
+universal-pathlib >= 0.0.12
+xarray >= 2022.3.0
+xarray-datatree == 0.0.4
+xarray_schema >= 0.0.3
 xclim
-zarr
+zarr >= 2.11.3
