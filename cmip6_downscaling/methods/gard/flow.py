@@ -140,5 +140,7 @@ with Flow(
         )
 
     # finalize
-    finalize(p, run_parameters)
-    finalize_on_failure(p, run_parameters)
+    finalize(run_parameters=run_parameters, **p)
+    finalize_on_failure(run_parameters=run_parameters, **p)
+
+flow.set_reference_tasks([finalize])

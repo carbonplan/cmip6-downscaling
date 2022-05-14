@@ -608,17 +608,18 @@ def run_analyses(ds_path: UPath, run_parameters: RunParameters) -> UPath:
 
 
 @task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
-def finalize(path_dict: dict, run_parameters: RunParameters):
+def finalize(run_parameters: RunParameters = None, **paths):
     """Prefect task to finalize the downscaling run.
 
     Parameters
     ----------
-    path_dict : dict
-        Dictionary of paths to write to
     run_parameters : RunParameters
         Downscaling run parameter container
-
+    paths : dict
+        Dictionary of paths to write result file
     """
+
+    path_dict = dict(**paths)
 
     now = datetime.datetime.utcnow().isoformat()
     target1 = results_dir / 'runs' / run_parameters.run_id / f'{now}.json'
@@ -638,16 +639,18 @@ def finalize(path_dict: dict, run_parameters: RunParameters):
 
 
 @task(log_stdout=True, trigger=any_failed)
-def finalize_on_failure(path_dict: dict, run_parameters: RunParameters):
+def finalize_on_failure(run_parameters: RunParameters = None, **paths):
     """Prefect task to finalize the downscaling run.
 
     Parameters
     ----------
-    path_dict : dict
-        Dictionary of paths to write to
     run_parameters : RunParameters
         Downscaling run parameter container
+    paths : dict
+        Dictionary of paths to write to result file
     """
+
+    path_dict = dict(**paths)
 
     now = datetime.datetime.utcnow().isoformat()
     target1 = results_dir / 'failed-runs' / run_parameters.run_id / f'{now}.json'
