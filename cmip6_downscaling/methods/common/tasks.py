@@ -94,8 +94,8 @@ def get_obs(run_parameters: RunParameters) -> UPath:
         chunking_schema={'time': 365, 'lat': 150, 'lon': 150},
     )
 
-    if run_parameters.variable != 'pr':
-        del subset[run_parameters.variable].encoding['chunks']
+    for key in subset.variables:
+        subset[key].encoding.pop('chunks', None)
 
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
     store = subset.to_zarr(target, mode='w', compute=False)
@@ -149,8 +149,9 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
 
     # Note: dataset is chunked into time:365 chunks to standardize leap-year chunking.
     subset = subset.chunk({'time': 365})
-    if run_parameters.variable != 'pr':
-        del subset[run_parameters.variable].encoding['chunks']
+    for key in subset.variables:
+        subset[key].encoding.pop('chunks', None)
+
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
     subset.to_zarr(target, mode='w')
     return target
