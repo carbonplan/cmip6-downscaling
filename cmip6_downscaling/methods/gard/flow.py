@@ -1,6 +1,8 @@
 import warnings
 
+import dask
 from prefect import Flow, Parameter
+from sklearn.utils.validation import DataConversionWarning
 
 from cmip6_downscaling import config, runtimes
 from cmip6_downscaling.methods.common.tasks import (
@@ -17,10 +19,15 @@ from cmip6_downscaling.methods.common.tasks import (
 )
 from cmip6_downscaling.methods.gard.tasks import coarsen_and_interpolate, fit_and_predict, read_scrf
 
+dask.config.set({"array.slicing.split_large_chunks": True})
 warnings.filterwarnings(
     "ignore",
     "(.*) filesystem path not explicitly implemented. falling back to default implementation. This filesystem may not be tested",
     category=UserWarning,
+)
+warnings.filterwarnings(
+    action='ignore',
+    category=DataConversionWarning,
 )
 
 runtime = runtimes.get_runtime()
