@@ -3,7 +3,6 @@ carbonplan_data
 cmip6_preprocessing
 dask[complete]
 dask-kubernetes
-datatree == 0.0.4
 donfig >= 0.7.0
 fsspec
 intake
@@ -11,6 +10,7 @@ intake-esm
 intake-xarray
 ndpyramid == 0.0.5
 pandas
+pangeo-xesmf == 0.6.2
 prefect == 0.15.13
 rechunker == 0.5.0
 regionmask
@@ -19,7 +19,7 @@ scikit-learn
 scipy
 universal-pathlib >= 0.0.12
 xarray >= 2022.3.0
+xarray-datatree == 0.0.4
 xarray_schema >= 0.0.3
-pangeo-xesmf == 0.6.2
 xclim
 zarr >= 2.11.3
