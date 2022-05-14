@@ -79,6 +79,7 @@ def load_cmip(
     table_ids: str = None,
     grid_labels: str = None,
     variable_ids: list[str] = None,
+    time_slice: slice = None,
 ) -> xr.Dataset:
     """Loads CMIP6 GCM dataset based on input criteria.
 
@@ -98,6 +99,8 @@ def load_cmip(
         grid_labels in CMIP6 catalog, by default ["gn"]
     variable_ids : list, optional
         variable_ids in CMIP6 catalog, by default ['tasmax']
+    time_slice : slice, optional
+        Time slice to subset dataset with
 
     Returns
     -------
@@ -121,7 +124,10 @@ def load_cmip(
         if len(keys) != 1:
             raise ValueError(f'intake-esm search returned {len(keys)}, expected exactly 1.')
 
-        ds = col_subset[keys[0]]().to_dask().pipe(postprocess)
+        ds = col_subset[keys[0]]().to_dask()
+        if time_slice:
+            ds = ds.sel(time=time_slice)
+        ds = ds.pipe(postprocess)
 
         # convert to mm/day - helpful to prevent rounding errors from very tiny numbers
         if 'pr' in ds:
@@ -173,6 +179,7 @@ def get_gcm(
         grid_labels=grid_label,
         source_ids=source_id,
         variable_ids=variable,
+        time_slice=time_slice,
     )
     if float(time_slice.stop) < 2015:
         # you're working with historical data
