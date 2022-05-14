@@ -3,8 +3,9 @@ import warnings
 from prefect import Flow, Parameter
 
 from cmip6_downscaling import config, runtimes
-from cmip6_downscaling.methods.common.tasks import (  # annual_summary,; monthly_summary,; pyramid,; run_analyses,; get_weights,
+from cmip6_downscaling.methods.common.tasks import (
     finalize,
+    finalize_on_failure,
     get_experiment,
     get_obs,
     get_pyramid_weights,
@@ -140,3 +141,4 @@ with Flow(
 
     # finalize
     finalize(p, run_parameters)
+    finalize_on_failure(p, run_parameters)

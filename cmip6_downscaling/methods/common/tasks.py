@@ -20,6 +20,7 @@ from carbonplan_data.metadata import get_cf_global_attrs
 from carbonplan_data.utils import set_zarr_encoding
 from ndpyramid import pyramid_regrid
 from prefect import task
+from prefect.triggers import any_failed
 from upath import UPath
 from xarray_schema import DataArraySchema, DatasetSchema
 from xarray_schema.base import SchemaError
@@ -622,6 +623,35 @@ def finalize(path_dict: dict, run_parameters: RunParameters):
     now = datetime.datetime.utcnow().isoformat()
     target1 = results_dir / 'runs' / run_parameters.run_id / f'{now}.json'
     target2 = results_dir / 'runs' / run_parameters.run_id / 'latest.json'
+    print(target1)
+    print(target2)
+
+    out = {'parameters': asdict(run_parameters)}
+    out['attrs'] = get_cf_global_attrs(version=version)
+    out['datasets'] = {k: str(p) for k, p in path_dict.items()}
+
+    with target1.open(mode='w') as f:
+        json.dump(out, f, indent=2)
+
+    with target2.open(mode='w') as f:
+        json.dump(out, f, indent=2)
+
+
+@task(log_stdout=True, trigger=any_failed)
+def finalize_on_failure(path_dict: dict, run_parameters: RunParameters):
+    """Prefect task to finalize the downscaling run.
+
+    Parameters
+    ----------
+    path_dict : dict
+        Dictionary of paths to write to
+    run_parameters : RunParameters
+        Downscaling run parameter container
+    """
+
+    now = datetime.datetime.utcnow().isoformat()
+    target1 = results_dir / 'failed-runs' / run_parameters.run_id / f'{now}.json'
+    target2 = results_dir / 'failed-runs' / run_parameters.run_id / 'latest.json'
     print(target1)
     print(target2)
 

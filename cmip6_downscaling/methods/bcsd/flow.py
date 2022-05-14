@@ -12,6 +12,7 @@ from cmip6_downscaling.methods.bcsd.tasks import (
 )
 from cmip6_downscaling.methods.common.tasks import (  # run_analyses,; get_weights,
     finalize,
+    finalize_on_failure,
     get_experiment,
     get_obs,
     get_pyramid_weights,
@@ -159,3 +160,4 @@ with Flow(
 
     # finalize
     finalize(p, run_parameters)
+    finalize_on_failure(p, run_parameters)
