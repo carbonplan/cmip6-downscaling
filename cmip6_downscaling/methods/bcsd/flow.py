@@ -25,7 +25,7 @@ from cmip6_downscaling.methods.common.tasks import (  # run_analyses,; get_weigh
     time_summary,
 )
 
-dask.config.set({"array.slicing.split_large_chunks": True})
+dask.config.set({"array.slicing.split_large_chunks": False})
 warnings.filterwarnings(
     "ignore",
     "(.*) filesystem path not explicitly implemented. falling back to default implementation. This filesystem may not be tested",
