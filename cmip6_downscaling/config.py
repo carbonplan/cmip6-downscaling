@@ -9,7 +9,7 @@ _defaults = {
             'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
         },
         'intermediate': {
-            'uri': 'az://flow-outputs/intermediates',
+            'uri': 'az://scratch/intermediates',
             'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
         },
         'results': {
@@ -50,7 +50,7 @@ _defaults = {
         },
         'gcm_obs_weights': {'uri': 'az://static/xesmf_weights/gcm_obs/weights.csv'},
     },
-    'run_options': {'runtime': "pangeo", 'cleanup_flag': True, 'use_cache': True},
+    'run_options': {'runtime': "pangeo", 'use_cache': True, 'generate_pyramids': False},
     "runtime": {
         "cloud": {
             "storage_prefix": "az://",
@@ -58,7 +58,7 @@ _defaults = {
                 'container': 'prefect',
             },
             "agent": "az-eu-west",
-            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git@cloud_runner git+https://github.com/pangeo-data/rechunker",
+            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git git+https://github.com/pangeo-data/rechunker git+https://github.com/pangeo-data/scikit-downscale",
             "kubernetes_cpu": 2,
             "kubernetes_memory": "4Gi",
             "image": "carbonplan/cmip6-downscaling-prefect:latest",
@@ -92,7 +92,7 @@ _defaults = {
         "pangeo": {
             "storage_prefix": "az://",
             "storage_options": {'directory': './'},
-            'n_workers': 12,
+            'n_workers': 10,
             'threads_per_worker': 1,
         },
     },

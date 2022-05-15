@@ -3,6 +3,7 @@ from __future__ import annotations
 import warnings
 from datetime import timedelta
 
+import dask
 import xarray as xr
 from carbonplan_data.metadata import get_cf_global_attrs
 from prefect import task
@@ -14,7 +15,7 @@ from cmip6_downscaling import __version__ as version, config
 from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
 from cmip6_downscaling.methods.bcsd.utils import reconstruct_finescale
 from cmip6_downscaling.methods.common.containers import RunParameters
-from cmip6_downscaling.methods.common.utils import zmetadata_exists
+from cmip6_downscaling.methods.common.utils import apply_land_mask, zmetadata_exists
 from cmip6_downscaling.utils import str_to_hash
 
 warnings.filterwarnings(
@@ -111,6 +112,7 @@ def _fit_and_predict_wrapper(xtrain, ytrain, xpred, run_parameters, dim='time'):
     ValueError
         raise ValueError if the given variable is not implimented.
     """
+
     xpred = xpred.rename({'t2': 'time'})
     if run_parameters.variable in ABSOLUTE_VARS:
         model = BcsdTemperature(return_anoms=False)
@@ -192,7 +194,7 @@ def fit_and_predict(
         kwargs={'dim': 'time'},
         template=template,
     )
-
+    out = dask.optimize(out)[0]
     out.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
 
     out.to_zarr(target, mode='w')
@@ -245,6 +247,9 @@ def postprocess_bcsd(
         args=[spatial_anomalies_ds],
         template=bias_corrected_fine_full_time_ds,
     )
+    # masking out ocean regions
+    bcsd_results_ds = apply_land_mask(bcsd_results_ds)
+
     bcsd_results_ds.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
     bcsd_results_ds.to_zarr(target, mode='w')
 

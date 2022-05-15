@@ -1,14 +1,16 @@
 import warnings
 
+import dask
 from prefect import Flow, Parameter
+from sklearn.utils.validation import DataConversionWarning
 
-from cmip6_downscaling import runtimes
-from cmip6_downscaling.methods.common.tasks import (  # annual_summary,; monthly_summary,; pyramid,; run_analyses,
+from cmip6_downscaling import config, runtimes
+from cmip6_downscaling.methods.common.tasks import (
     finalize,
+    finalize_on_failure,
     get_experiment,
     get_obs,
     get_pyramid_weights,
-    get_weights,
     make_run_parameters,
     pyramid,
     rechunk,
@@ -17,10 +19,15 @@ from cmip6_downscaling.methods.common.tasks import (  # annual_summary,; monthly
 )
 from cmip6_downscaling.methods.gard.tasks import coarsen_and_interpolate, fit_and_predict, read_scrf
 
+dask.config.set({"array.slicing.split_large_chunks": False})
 warnings.filterwarnings(
     "ignore",
     "(.*) filesystem path not explicitly implemented. falling back to default implementation. This filesystem may not be tested",
     category=UserWarning,
+)
+warnings.filterwarnings(
+    action='ignore',
+    category=DataConversionWarning,
 )
 
 runtime = runtimes.get_runtime()
@@ -45,8 +52,8 @@ with Flow(
         latmax=Parameter("latmax"),
         lonmin=Parameter("lonmin"),
         lonmax=Parameter("lonmax"),
-        train_dates=Parameter("train_period"),
-        predict_dates=Parameter("predict_period"),
+        train_dates=Parameter("train_dates"),
+        predict_dates=Parameter("predict_dates"),
         bias_correction_method=Parameter("bias_correction_method"),
         bias_correction_kwargs=Parameter("bias_correction_kwargs"),
         model_type=Parameter("model_type"),
@@ -60,8 +67,6 @@ with Flow(
     p['obs_full_time_path'] = rechunk(path=p['obs_path'], pattern='full_time')
     p['experiment_train_path'] = get_experiment(run_parameters, time_subset='train_period')
     p['experiment_predict_path'] = get_experiment(run_parameters, time_subset='predict_period')
-    p['gcm_to_obs_weights'] = get_weights(run_parameters=run_parameters, direction='gcm_to_obs')
-    p['obs_to_gcm_weights'] = get_weights(run_parameters=run_parameters, direction='obs_to_gcm')
 
     # after regridding coarse_obs will have smaller array size in space but still
     # be chunked finely along time. but that's good to get it for regridding back to
@@ -85,7 +90,7 @@ with Flow(
     p['experiment_predict_fine_full_space_path'] = regrid(
         source_path=p['experiment_predict_full_space_path'],
         target_grid_path=p['obs_path'],
-        weights_path=p['gcm_to_obs_weights'],
+        weights_path=None,
     )
     p['experiment_predict_fine_full_time_path'] = rechunk(
         p['experiment_predict_fine_full_space_path'],
@@ -122,22 +127,27 @@ with Flow(
     # duplicate of the daily, monthly, and annual datasets
     p['full_space_model_output_path'] = rechunk(p['model_output_path'], pattern='full_space')
 
-    # # # make temporal summaries
+    # make temporal summaries
     p['monthly_summary_full_space_path'] = rechunk(p['monthly_summary_path'], pattern='full_space')
     p['annual_summary_full_space_path'] = rechunk(p['annual_summary_path'], pattern='full_space')
 
-    # # pyramids
-    p['pyramid_weights'] = get_pyramid_weights(run_parameters=run_parameters, levels=4)
+    if config.get('run_options.generate_pyramids'):
 
-    p['daily_pyramid_path'] = pyramid(
-        p['full_space_model_output_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
-    )
-    p['monthly_pyramid_path'] = pyramid(
-        p['full_space_model_output_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
-    )
-    p['annual_pyramid_path'] = pyramid(
-        p['full_space_model_output_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
-    )
+        # pyramids
+        p['pyramid_weights'] = get_pyramid_weights(run_parameters=run_parameters, levels=4)
+
+        p['daily_pyramid_path'] = pyramid(
+            p['full_space_model_output_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
+        )
+        p['monthly_pyramid_path'] = pyramid(
+            p['full_space_model_output_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
+        )
+        p['annual_pyramid_path'] = pyramid(
+            p['full_space_model_output_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
+        )
 
     # finalize
-    finalize(p, run_parameters)
+    ref = finalize(run_parameters=run_parameters, **p)
+    finalize_on_failure(run_parameters=run_parameters, **p)
+
+flow.set_reference_tasks([ref])

@@ -16,7 +16,7 @@ from cmip6_downscaling import __version__ as version, config
 
 from ..common.bias_correction import bias_correct_gcm_by_method
 from ..common.containers import RunParameters, str_to_hash
-from ..common.utils import zmetadata_exists
+from ..common.utils import apply_land_mask, zmetadata_exists
 from .utils import add_random_effects, get_gard_model
 
 scratch_dir = UPath(config.get("storage.scratch.uri"))
@@ -27,8 +27,8 @@ use_cache = config.get('run_options.use_cache')
 
 @task(log_stdout=True)
 def coarsen_and_interpolate(fine_path: UPath, coarse_path: UPath) -> UPath:
-    """
-    Coarsen up obs and then interpolate it back to the original finescale grid.
+    """Coarsen up obs and then interpolate it back to the original finescale grid.
+
     Parameters
     ----------
     fine_path : UPath
@@ -134,7 +134,7 @@ def fit_and_predict(
 
     Returns
     -------
-    UPath
+    path : UPath
         Path to output dataset chunked full_time
     """
     ds_hash = str_to_hash(
@@ -152,10 +152,10 @@ def fit_and_predict(
         return target
 
     # load in datasets
-    xtrain = xr.open_zarr(xtrain_path)
-    ytrain = xr.open_zarr(ytrain_path)
-    xpred = xr.open_zarr(xpred_path)
-    scrf = xr.open_zarr(scrf_path)
+    xtrain = xr.open_zarr(xtrain_path).pipe(apply_land_mask)
+    ytrain = xr.open_zarr(ytrain_path).pipe(apply_land_mask)
+    xpred = xr.open_zarr(xpred_path).pipe(apply_land_mask)
+    scrf = xr.open_zarr(scrf_path).pipe(apply_land_mask)
     # make sure you have the variables you need in obs
     for v in xpred.data_vars:
         assert v in ytrain.data_vars
@@ -182,8 +182,10 @@ def fit_and_predict(
     )
     out.attrs.update({'title': 'gard_fit_and_predict'}, **get_cf_global_attrs(version=version))
     out = dask.optimize(out)[0]
-    t = out.to_zarr(target, compute=False, mode='w', consolidated=False)
+    # remove apply_land_mask after scikit-downscale#110 is merged
+    t = out.pipe(apply_land_mask).to_zarr(target, compute=False, mode='w', consolidated=False)
     t.compute(retries=5)
+
     zarr.consolidate_metadata(target)
     return target
 
@@ -199,6 +201,7 @@ def read_scrf(prediction_path: UPath, run_parameters: RunParameters):
     prediction_path : UPath
         Path to prediction dataset
     run_parameters : RunParameters
+        Parameters for run set-up and model specs
 
 
     Returns

@@ -20,6 +20,7 @@ from carbonplan_data.metadata import get_cf_global_attrs
 from carbonplan_data.utils import set_zarr_encoding
 from ndpyramid import pyramid_regrid
 from prefect import task
+from prefect.triggers import any_failed
 from upath import UPath
 from xarray_schema import DataArraySchema, DatasetSchema
 from xarray_schema.base import SchemaError
@@ -47,7 +48,6 @@ scratch_dir = UPath(config.get("storage.scratch.uri"))
 intermediate_dir = UPath(config.get("storage.intermediate.uri")) / version
 results_dir = UPath(config.get("storage.results.uri")) / version
 use_cache = config.get('run_options.use_cache')
-print(config.config)
 
 
 @task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
@@ -95,10 +95,11 @@ def get_obs(run_parameters: RunParameters) -> UPath:
         chunking_schema={'time': 365, 'lat': 150, 'lon': 150},
     )
 
-    if run_parameters.variable != 'pr':
-        del subset[run_parameters.variable].encoding['chunks']
+    for key in subset.variables:
+        subset[key].encoding = {}
 
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
+    print(f'writing {target}', subset)
     store = subset.to_zarr(target, mode='w', compute=False)
     store.compute(retries=5)
     return target
@@ -121,7 +122,7 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
         UPath to experiment dataset.
     """
     time_period = getattr(run_parameters, time_subset)
-    frmt_str = "{model}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{time_period.start}_{time_period.stop}".format(
+    frmt_str = "{model}_{member}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{time_period.start}_{time_period.stop}".format(
         time_period=time_period, **asdict(run_parameters)
     )
 
@@ -150,8 +151,9 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
 
     # Note: dataset is chunked into time:365 chunks to standardize leap-year chunking.
     subset = subset.chunk({'time': 365})
-    if run_parameters.variable != 'pr':
-        del subset[run_parameters.variable].encoding['chunks']
+    for key in subset.variables:
+        subset[key].encoding = {}
+
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
     subset.to_zarr(target, mode='w')
     return target
@@ -166,6 +168,7 @@ def rechunk(
 ) -> UPath:
     """Use `rechunker` package to adjust chunks of dataset to a form
     conducive for your processing.
+
     Parameters
     ----------
     path : UPath
@@ -179,6 +182,7 @@ def rechunk(
         target to feed to rechunker.
     max_mem : str
         The memory available for rechunking steps. Must look like "2GB". Optional, default is 2GB.
+
     Returns
     -------
     target : UPath
@@ -315,6 +319,22 @@ def time_summary(ds_path: UPath, freq: str) -> UPath:
 
 @task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
 def get_weights(*, run_parameters, direction, regrid_method="bilinear"):
+    """Retrieve pre-generated regridding weights.
+
+    Parameters
+    ----------
+    run_parameters : dict
+        Dictionary of run parameters
+    direction : str
+        Direction of regridding.
+    regrid_method : str
+        Regridding method.
+
+    Returns
+    -------
+    path : UPath
+        Path to weights file.
+    """
     weights = pd.read_csv(config.get('weights.gcm_obs_weights.uri'))
     path = (
         weights[
@@ -332,7 +352,23 @@ def get_weights(*, run_parameters, direction, regrid_method="bilinear"):
 
 
 @task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
-def get_pyramid_weights(*, run_parameters, levels, regrid_method="bilinear"):
+def get_pyramid_weights(*, run_parameters, levels: int, regrid_method: str = "bilinear"):
+    """Retrieve pre-generated regridding pyramids weights.
+
+    Parameters
+    ----------
+    run_parameters : dict
+        Dictionary of run parameters
+    levels : int
+        Number of levels in the pyramid.
+    regrid_method : str
+        Regridding method.
+
+    Returns
+    -------
+    path : UPath
+        Path to pyramid weights file.
+    """
     weights = pd.read_csv(config.get('weights.downscaled_pyramid_weights.uri'))
     print(weights)
     path = (
@@ -514,6 +550,7 @@ def run_analyses(ds_path: UPath, run_parameters: RunParameters) -> UPath:
     Parameters
     ----------
     ds_path : UPath
+        Path to input dataset
     run_parameters : RunParameters
         Downscaling run parameter container
 
@@ -572,11 +609,53 @@ def run_analyses(ds_path: UPath, run_parameters: RunParameters) -> UPath:
 
 
 @task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
-def finalize(path_dict: dict, run_parameters: RunParameters):
+def finalize(run_parameters: RunParameters = None, **paths):
+    """Prefect task to finalize the downscaling run.
+
+    Parameters
+    ----------
+    run_parameters : RunParameters
+        Downscaling run parameter container
+    paths : dict
+        Dictionary of paths to write result file
+    """
+
+    path_dict = dict(**paths)
 
     now = datetime.datetime.utcnow().isoformat()
     target1 = results_dir / 'runs' / run_parameters.run_id / f'{now}.json'
     target2 = results_dir / 'runs' / run_parameters.run_id / 'latest.json'
+    print(target1)
+    print(target2)
+
+    out = {'parameters': asdict(run_parameters)}
+    out['attrs'] = get_cf_global_attrs(version=version)
+    out['datasets'] = {k: str(p) for k, p in path_dict.items()}
+
+    with target1.open(mode='w') as f:
+        json.dump(out, f, indent=2)
+
+    with target2.open(mode='w') as f:
+        json.dump(out, f, indent=2)
+
+
+@task(log_stdout=True, trigger=any_failed)
+def finalize_on_failure(run_parameters: RunParameters = None, **paths):
+    """Prefect task to finalize the downscaling run.
+
+    Parameters
+    ----------
+    run_parameters : RunParameters
+        Downscaling run parameter container
+    paths : dict
+        Dictionary of paths to write to result file
+    """
+
+    path_dict = dict(**paths)
+
+    now = datetime.datetime.utcnow().isoformat()
+    target1 = results_dir / 'failed-runs' / run_parameters.run_id / f'{now}.json'
+    target2 = results_dir / 'failed-runs' / run_parameters.run_id / 'latest.json'
     print(target1)
     print(target2)
 
