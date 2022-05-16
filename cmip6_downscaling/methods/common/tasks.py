@@ -538,6 +538,8 @@ def pyramid(
         regridder_kws={'ignore_degenerate': True},
     )
 
+    dta = _pyramid_postprocess(dta, levels=levels, other_chunks=other_chunks)
+
     # write to target
     dta.to_zarr(target, mode='w')
     return target
