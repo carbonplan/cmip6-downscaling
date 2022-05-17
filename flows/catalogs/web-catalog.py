@@ -80,6 +80,7 @@ def parse_cmip6(store):
             'aggregation': aggregation,
             'uri': uri,
             'original_dataset_uris': original_dataset_uris,
+            'method': 'raw',
         }
 
     except Exception:
@@ -180,7 +181,11 @@ def get_cmip6_downscaled_pyramids(path):
         with fs.open(run) as f:
             data = json.load(f)
 
-        datasets += parse_cmip6_downscaled_pyramid(data)
+        if any(
+            data['datasets'].get(arg) is not None
+            for arg in ['daily_pyramid_path', 'monthly_pyramid_path', 'annual_pyramid_path']
+        ):
+            datasets += parse_cmip6_downscaled_pyramid(data)
     return datasets
 
 
@@ -230,7 +235,7 @@ with Flow(
     )
     downscaled_pyramids = Parameter(
         'downscaled-pyramids-path',
-        default='az://flow-outputs/results/0.0.post563+dirty/runs/**/latest.json',
+        default='az://flow-outputs/results/0.1.[3,5]/runs/*/latest.json',
     )
     cmip6_raw_pyramids = get_cmip6_pyramids(paths)
     cmip6_downscaled_pyramids = get_cmip6_downscaled_pyramids(downscaled_pyramids)
