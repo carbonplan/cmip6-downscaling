@@ -301,7 +301,7 @@ def time_summary(ds_path: UPath, freq: str) -> UPath:
     """
 
     ds_hash = str_to_hash(str(ds_path) + freq)
-    target = intermediate_dir / 'time_summary' / ds_hash
+    target = results_dir / 'time_summary' / ds_hash
     print(target)
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')

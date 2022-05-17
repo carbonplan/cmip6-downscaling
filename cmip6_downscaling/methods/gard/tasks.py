@@ -145,7 +145,7 @@ def fit_and_predict(
         + run_parameters.run_id_hash
         + str(dim)
     )
-    target = intermediate_dir / 'gard_fit_and_predict' / ds_hash
+    target = results_dir / 'gard_fit_and_predict' / ds_hash
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
