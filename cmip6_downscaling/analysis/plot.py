@@ -22,6 +22,7 @@ def plot_cdfs(
     future_gcm: xr.Dataset = None,
     ncols: int = 4,
     sharex: bool = True,
+    var_limits: list = None,
 ) -> mpl.figure.Figure:
     """Plot cdfs of individual pixels
 
@@ -58,53 +59,74 @@ def plot_cdfs(
     fig, axarr = plt.subplots(
         ncols=ncols,
         nrows=(int(len(obs.cities) / ncols)) + 1,
-        figsize=(15, 60),
+        figsize=(15, 50),
         sharey=True,
         sharex=sharex,
     )
     for i, city in enumerate(top_cities.city.values):
+        plots, labels = [], []
         ax = axarr.reshape(-1)[i]
-        sns.ecdfplot(
-            data=obs.isel(cities=i),
-            label=f'ERA5 ({train_period.start}-{train_period.stop})',
-            ax=ax,
-            color='#1b1e23',
+        plots.append(
+            sns.ecdfplot(
+                data=obs.isel(cities=i),
+                label=f'ERA5 ({train_period.start}-{train_period.stop})',
+                ax=ax,
+                color='#1b1e23',
+            )
         )
+        labels.append(f'ERA5 ({train_period.start}-{train_period.stop})')
         if historical_downscaled is not None:
-            sns.ecdfplot(
-                data=historical_downscaled.isel(cities=i),
-                label=f'Downscaled GCM ({train_period.start}-{train_period.stop})',
-                color='#8b9fd1',
-                ax=ax,
+            plots.append(
+                sns.ecdfplot(
+                    data=historical_downscaled.isel(cities=i),
+                    label=f'Downscaled GCM ({train_period.start}-{train_period.stop})',
+                    color='#8b9fd1',
+                    ax=ax,
+                )
             )
+            labels.append(f'Downscaled GCM ({train_period.start}-{train_period.stop})')
         if future_downscaled is not None:
-            sns.ecdfplot(
-                data=future_downscaled.isel(cities=i),
-                label=f'Downscaled GCM ({predict_period.start}-{predict_period.stop})',
-                ax=ax,
-                color='#f16f71',
+            plots.append(
+                sns.ecdfplot(
+                    data=future_downscaled.isel(cities=i),
+                    label=f'Downscaled GCM ({predict_period.start}-{predict_period.stop})',
+                    ax=ax,
+                    color='#f16f71',
+                )
             )
+            labels.append(f'Downscaled GCM ({predict_period.start}-{predict_period.stop})')
         if historical_gcm is not None:
-            sns.ecdfplot(
-                data=historical_gcm.isel(cities=i),
-                label=f'Raw GCM ({train_period.start}-{train_period.stop})',
-                ax=ax,
-                color='#8b9fd1',
-                linestyle='--',
+            plots.append(
+                sns.ecdfplot(
+                    data=historical_gcm.isel(cities=i),
+                    label=f'Raw GCM ({train_period.start}-{train_period.stop})',
+                    ax=ax,
+                    color='#8b9fd1',
+                    linestyle='--',
+                )
             )
+            labels.append(f'Raw GCM ({train_period.start}-{train_period.stop})')
         if future_gcm is not None:
-            sns.ecdfplot(
-                data=future_gcm.isel(cities=i),
-                label=f'Raw GCM ({predict_period.start}-{predict_period.stop})',
-                ax=ax,
-                color='#f16f71',
-                linestyle='--',
+            plots.append(
+                sns.ecdfplot(
+                    data=future_gcm.isel(cities=i),
+                    label=f'Raw GCM ({predict_period.start}-{predict_period.stop})',
+                    ax=ax,
+                    color='#f16f71',
+                    linestyle='--',
+                )
             )
+            labels.append(f'Raw GCM ({predict_period.start}-{predict_period.stop})')
 
         ax.set_title(city)
-    plt.legend()
-    plt.close()
-    return fig
+
+        if var_limits is not None:
+            ax.set_xlim(var_limits[0], var_limits[1])
+        if i == 0:
+            fig.legend()
+    plt.tight_layout()
+    # fig.legend(labels, plots)
+    # return fig, axarr
 
 
 def plot_values_and_difference(
@@ -161,10 +183,32 @@ def plot_values_and_difference(
             'percentile5': 2,
             'percentile95': 2,
             'percentile99': 5,
-
-        }
+            'daysover30': 10,
+            'daysover40': 10,
+        },
+        'tasmin': {
+            'mean': 0.1,
+            'median': 2,
+            'std': 3,
+            'percentile1': 5,
+            'percentile5': 2,
+            'percentile95': 2,
+            'percentile99': 5,
+            'daysover30': 10,
+            'daysover40': 10,
+        },
+        'pr': {
+            'mean': 25,
+            'median': 25,
+            'std': 25,
+            'percentile1': 10,
+            'percentile5': 10,
+            'percentile95': 10,
+            'percentile99': 10,
+        },
     }
-
+    if diff_limit:
+        var_limit = {variable: {metric: diff_limit}}
     if city_coords is not None:
         plot1 = axarr[0].scatter(
             x=city_coords.lon,
@@ -195,8 +239,8 @@ def plot_values_and_difference(
         )
         fig.colorbar(diff, ax=axarr[2]).set_label(f'{variable}')
     else:
-        ds1.plot(ax=axarr[0], cmap='fire_light', cbar_kwargs=cbar_kwargs)
-        ds2.plot(ax=axarr[1], cmap='fire_light', cbar_kwargs=cbar_kwargs)
+        ds1.plot(ax=axarr[0], cmap='fire_light', cbar_kwargs=cbar_kwargs, robust=True)
+        ds2.plot(ax=axarr[1], cmap='fire_light', cbar_kwargs=cbar_kwargs, robust=True)
         (ds2 - ds1).plot(
             ax=axarr[2],
             cmap='orangeblue_light_r',
@@ -229,7 +273,7 @@ def plot_seasonal(ds1: xr.Dataset, ds2: xr.Dataset) -> mpl.figure.Figure:
         Figure
     """
     fig, axarr = plt.subplots(
-        ncols=4, nrows=3, subplot_kw={'projection': ccrs.PlateCarree()}, figsize=(10, 6)
+        ncols=4, nrows=3, subplot_kw={'projection': ccrs.PlateCarree()}, figsize=(16, 10)
     )
     seasons = ['DJF', 'JJA', 'MAM', 'SON']
     col_ds_list = [ds1, ds2, ds2 - ds1]
@@ -237,8 +281,8 @@ def plot_seasonal(ds1: xr.Dataset, ds2: xr.Dataset) -> mpl.figure.Figure:
 
     for j, ds in enumerate(col_ds_list):
         for i, season in enumerate(seasons):
-            ds.sel(season=season).plot(ax=axarr[j, i], cmap=cmaps[j])
+            ds.sel(season=season).plot(ax=axarr[j, i], cmap=cmaps[j], robust=True)
             axarr[j, i].coastlines()
-    plt.tight_layout()
+    # plt.tight_layout()
     plt.close()
     return fig

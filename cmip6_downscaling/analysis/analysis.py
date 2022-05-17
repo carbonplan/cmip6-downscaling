@@ -8,7 +8,7 @@ import xarray as xr
 from .qaqc import make_qaqc_ds
 
 
-def qaqc_checks(ds: xr.Dataset) -> tuple[xr.Dataset, xr.Dataset]:
+def qaqc_checks(ds: xr.Dataset, checks: list) -> tuple[xr.Dataset, xr.Dataset]:
     '''
     Create the temporal and spatial summaries of a handful of QAQC
     analyses - nans, aphysical quantities
@@ -24,7 +24,7 @@ def qaqc_checks(ds: xr.Dataset) -> tuple[xr.Dataset, xr.Dataset]:
     Xarray Dataset, Xarray Dataset
         Temporal and spatial summaries of QAQC analyses
     '''
-    qaqc_ds = make_qaqc_ds(ds)
+    qaqc_ds = make_qaqc_ds(ds, checks)
     annual_qaqc_ts = qaqc_ds.groupby('time.year').sum().sum(dim=['lat', 'lon']).to_dataframe()
     qaqc_maps = qaqc_ds.sum(dim='time')
     return annual_qaqc_ts, qaqc_maps
