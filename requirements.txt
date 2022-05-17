@@ -12,7 +12,7 @@ ndpyramid == 0.0.5
 pandas
 pangeo-xesmf == 0.6.2
 prefect == 0.15.13
-rechunker == 0.5.0
+xbatcher == 0.5.0
 regionmask
 scikit-downscale >= 0.1.2
 scikit-learn
