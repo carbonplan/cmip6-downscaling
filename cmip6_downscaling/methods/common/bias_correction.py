@@ -71,7 +71,7 @@ def bias_correct_gcm_by_method(
         sc.fit(gcm_hist)
         return sc.transform(gcm_pred)
     elif method == 'quantile_mapper':
-        qm = PointWiseDownscaler(model=QuantileMapper(detrend=True), dim='time')
+        qm = PointWiseDownscaler(model=QuantileMapper(**bc_kwargs), dim='time')
         qm.fit(obs)
         return qm.transform(gcm_pred)
 
