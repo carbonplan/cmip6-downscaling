@@ -6,13 +6,7 @@ import dask
 from prefect import Flow, Parameter
 from sklearn.utils.validation import DataConversionWarning
 
-from cmip6_downscaling import config, runtimes
-from cmip6_downscaling.methods.bcsd.tasks import (
-    fit_and_predict,
-    postprocess_bcsd,
-    spatial_anomalies,
-)
-from cmip6_downscaling.methods.common.tasks import (  # run_analyses,; get_weights,
+from ..common.tasks import (  # run_analyses,; get_weights,
     finalize,
     finalize_on_failure,
     get_experiment,
@@ -24,6 +18,8 @@ from cmip6_downscaling.methods.common.tasks import (  # run_analyses,; get_weigh
     regrid,
     time_summary,
 )
+from . import config, runtimes
+from .tasks import fit_and_predict, postprocess_bcsd, spatial_anomalies
 
 dask.config.set({"array.slicing.split_large_chunks": False})
 warnings.filterwarnings(

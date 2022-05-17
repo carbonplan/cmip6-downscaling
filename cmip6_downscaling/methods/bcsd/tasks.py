@@ -11,12 +11,12 @@ from skdownscale.pointwise_models import PointWiseDownscaler
 from skdownscale.pointwise_models.bcsd import BcsdPrecipitation, BcsdTemperature
 from upath import UPath
 
-from cmip6_downscaling import __version__ as version, config
-from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
-from cmip6_downscaling.methods.bcsd.utils import reconstruct_finescale
-from cmip6_downscaling.methods.common.containers import RunParameters
-from cmip6_downscaling.methods.common.utils import apply_land_mask, zmetadata_exists
-from cmip6_downscaling.utils import str_to_hash
+from ...constants import ABSOLUTE_VARS, RELATIVE_VARS
+from ...utils import str_to_hash
+from .. import __version__ as version, config
+from ..common.containers import RunParameters
+from ..common.utils import apply_land_mask, zmetadata_exists
+from .utils import reconstruct_finescale
 
 warnings.filterwarnings(
     "ignore",
