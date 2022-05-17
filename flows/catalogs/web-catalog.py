@@ -124,7 +124,7 @@ def parse_cmip6_downscaled_pyramid(data):
         entry = records[0]
         query['institution_id'] = entry['institution_id']
         query['activity_id'] = entry['activity_id']
-        query['original_datasets_uris'] = [
+        query['original_dataset_uris'] = [
             f"https://cmip6downscaling.azureedge.net/{str(entry['zstore']).split('//')[-1]}"
         ]
 
