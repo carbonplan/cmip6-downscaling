@@ -23,10 +23,10 @@ from cmip6_downscaling.workflows.paths import (
 )
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching, regrid_ds
 
-from ..methods.detrend import calc_epoch_trend, remove_epoch_trend
-from ..methods.maca import maca_bias_correction, maca_construct_analogs
-from ..methods.regions import combine_outputs, generate_subdomains
-from . import config, runtimes
+from ..cmip6_downscaling.methods.detrend import calc_epoch_trend, remove_epoch_trend
+from ..cmip6_downscaling.methods.maca import maca_bias_correction, maca_construct_analogs
+from ..cmip6_downscaling.methods.regions import combine_outputs, generate_subdomains
+from ..cmip6_downscaling.workflows import config, runtimes
 
 runtime = runtimes.get_runtime()
 
