@@ -136,9 +136,9 @@ with Flow(
         # pyramids
         p['pyramid_weights'] = get_pyramid_weights(run_parameters=run_parameters, levels=4)
 
-        p['daily_pyramid_path'] = pyramid(
-            p['full_space_model_output_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
-        )
+        # p['daily_pyramid_path'] = pyramid(
+        #     p['full_space_model_output_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
+        # )
         p['monthly_pyramid_path'] = pyramid(
             p['full_space_model_output_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
         )
