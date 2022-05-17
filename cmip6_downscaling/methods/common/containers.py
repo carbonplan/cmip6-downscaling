@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .utils import str_to_hash
+from ...utils import str_to_hash
 
 
 @dataclass
