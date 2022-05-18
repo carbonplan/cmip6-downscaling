@@ -24,17 +24,12 @@ from upath import UPath
 from xarray_schema import DataArraySchema, DatasetSchema
 from xarray_schema.base import SchemaError
 
-from cmip6_downscaling import __version__ as version, config
-from cmip6_downscaling.data.cmip import get_gcm
-from cmip6_downscaling.data.observations import open_era5
-from cmip6_downscaling.methods.common.containers import RunParameters
-from cmip6_downscaling.methods.common.utils import (
-    calc_auspicious_chunks_dict,
-    resample_wrapper,
-    subset_dataset,
-    zmetadata_exists,
-)
-from cmip6_downscaling.utils import str_to_hash
+from ... import __version__ as version, config
+from ...data.cmip import get_gcm
+from ...data.observations import open_era5
+from ...utils import str_to_hash
+from .containers import RunParameters
+from .utils import calc_auspicious_chunks_dict, resample_wrapper, subset_dataset, zmetadata_exists
 
 warnings.filterwarnings(
     "ignore",
