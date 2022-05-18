@@ -183,7 +183,7 @@ def fit_and_predict(
     out = dask.optimize(out)[0]
     # remove apply_land_mask after scikit-downscale#110 is merged
     t = out.pipe(apply_land_mask).to_zarr(target, compute=False, mode='w', consolidated=False)
-    t.compute(retries=5)
+    t.compute(retries=2)
 
     zarr.consolidate_metadata(target)
     return target
