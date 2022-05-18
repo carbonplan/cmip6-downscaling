@@ -5,6 +5,11 @@ from prefect import Flow, Parameter, task
 from xpersist import CacheStore
 from xpersist.prefect.result import XpersistResult
 
+from cmip6_downscaling import config, runtimes
+from cmip6_downscaling.methods.detrend import calc_epoch_trend, remove_epoch_trend
+from cmip6_downscaling.methods.maca import maca_bias_correction, maca_construct_analogs
+from cmip6_downscaling.methods.regions import combine_outputs, generate_subdomains
+
 # TODO: figure out where these are located
 from cmip6_downscaling.tasks.common_tasks import (
     get_coarse_obs_task,
@@ -22,11 +27,6 @@ from cmip6_downscaling.workflows.paths import (
     make_maca_output_path,
 )
 from cmip6_downscaling.workflows.utils import rechunk_zarr_array_with_caching, regrid_ds
-
-from ..methods.detrend import calc_epoch_trend, remove_epoch_trend
-from ..methods.maca import maca_bias_correction, maca_construct_analogs
-from ..methods.regions import combine_outputs, generate_subdomains
-from . import config, runtimes
 
 runtime = runtimes.get_runtime()
 
