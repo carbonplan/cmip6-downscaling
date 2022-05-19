@@ -275,7 +275,7 @@ def rechunk(
         temp_store=temp_store,
         target_options={k: {'compressor': zarr.Blosc(clevel=1)} for k in chunks_dict},
         temp_options={k: {'compressor': None} for k in chunks_dict},
-        executor='prefect',
+        executor='dask',
     )
 
     rechunk_plan.execute()
