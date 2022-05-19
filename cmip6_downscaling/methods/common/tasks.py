@@ -273,7 +273,7 @@ def rechunk(
         max_mem=max_mem,
         target_store=target_store,
         temp_store=temp_store,
-        target_options={k: {'compressor': zarr.Blosc(complevel=1)} for k in chunks_dict},
+        target_options={k: {'compressor': zarr.Blosc(clevel=1)} for k in chunks_dict},
         temp_options={k: {'compressor': None} for k in chunks_dict},
         executor='dask',
     )
