@@ -440,6 +440,20 @@ def _load_coords(ds: xr.Dataset) -> xr.Dataset:
     return ds
 
 
+def _apply_land_mask(pyramid: dt.DataTree, target_pyramid: dt.DataTree) -> dt.DataTree:
+
+    levels = len(pyramid.children)
+    for level in range(levels):
+        ds = pyramid[f'{level}'].ds
+        mask = target_pyramid[f'{level}'].ds.land
+        out = ds.where(mask > 0)
+        for variable in ds.data_vars:
+            out[variable].encoding = ds[variable].encoding
+            out[variable].attrs = ds[variable].attrs
+        pyramid[f'{level}'].ds = out
+    return pyramid
+
+
 def _pyramid_postprocess(dt: dt.DataTree, levels: int, other_chunks: dict = None) -> dt.DataTree:
     '''Postprocess data pyramid
 
@@ -533,6 +547,7 @@ def pyramid(
     )
 
     dta = _pyramid_postprocess(dta, levels=levels, other_chunks=other_chunks)
+    dta = _apply_land_mask(dta, target_pyramid)
 
     # write to target
     dta.to_zarr(target, mode='w')
