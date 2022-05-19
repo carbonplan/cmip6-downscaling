@@ -19,6 +19,8 @@ from cmip6_downscaling.methods.common.tasks import (
 )
 from cmip6_downscaling.methods.gard.tasks import coarsen_and_interpolate, fit_and_predict, read_scrf
 
+config.set({'run_options.use_cache': False})
+
 dask.config.set({"array.slicing.split_large_chunks": False})
 warnings.filterwarnings(
     "ignore",
