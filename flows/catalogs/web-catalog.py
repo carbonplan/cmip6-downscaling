@@ -1,3 +1,4 @@
+import functools
 import json
 
 import fsspec
@@ -11,10 +12,10 @@ config.set(
     }
 )
 
-runtime = runtimes.PangeoRuntime()
+runtime = runtimes.CloudRuntime()
 
 
-def parse_cmip6(store):
+def parse_cmip6(store, cdn):
     import traceback
 
     import intake
@@ -62,15 +63,12 @@ def parse_cmip6(store):
             elif variable_id in {'pr'}:
                 aggregation = 'sum'
 
-        uri = f"https://cmip6downscaling.azureedge.net/{str(path).split('//')[-1]}"
+        uri = f"{cdn}/{str(path).split('//')[-1]}"
         cat_url = "https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.json"
         cat = intake.open_esm_datastore(cat_url)
         stores = cat.search(**query).df.zstore.tolist()
         if stores:
-            original_dataset_uris = [
-                f"https://cmip6downscaling.azureedge.net/{dataset.split('//')[-1]}"
-                for dataset in stores
-            ]
+            original_dataset_uris = [f"{cdn}/{dataset.split('//')[-1]}" for dataset in stores]
         else:
             original_dataset_uris = []
         return {
@@ -88,7 +86,7 @@ def parse_cmip6(store):
 
 
 @task(log_stdout=True)
-def get_cmip6_pyramids(paths: list[str]):
+def get_cmip6_pyramids(paths: list[str], cdn: str):
     import ecgtools
 
     builder = ecgtools.Builder(
@@ -97,12 +95,12 @@ def get_cmip6_pyramids(paths: list[str]):
         joblib_parallel_kwargs={'n_jobs': -1, 'verbose': 1},
         exclude_patterns=["*.json"],
     )
-    builder.build(parsing_func=parse_cmip6)
+    builder.build(parsing_func=functools.partial(parse_cmip6, cdn=cdn))
 
     return builder.df.to_dict(orient='records')
 
 
-def parse_cmip6_downscaled_pyramid(data):
+def parse_cmip6_downscaled_pyramid(data, cdn: str):
     import intake
     from upath import UPath
 
@@ -124,9 +122,7 @@ def parse_cmip6_downscaled_pyramid(data):
         entry = records[0]
         query['institution_id'] = entry['institution_id']
         query['activity_id'] = entry['activity_id']
-        query['original_dataset_uris'] = [
-            f"https://cmip6downscaling.azureedge.net/{str(entry['zstore']).split('//')[-1]}"
-        ]
+        query['original_dataset_uris'] = [f"{cdn}/{str(entry['zstore']).split('//')[-1]}"]
 
     template = {**query, 'method': parameters['method']}
     results = []
@@ -135,7 +131,7 @@ def parse_cmip6_downscaled_pyramid(data):
             **template,
             **{
                 'timescale': 'day',
-                'uri': f"https://cmip6downscaling.azureedge.net/{str(datasets['daily_pyramid_path']).split('//')[-1]}",
+                'uri': f"{cdn}/{str(datasets['daily_pyramid_path']).split('//')[-1]}",
                 'name': UPath(datasets['daily_pyramid_path']).name,
             },
         }
@@ -145,7 +141,7 @@ def parse_cmip6_downscaled_pyramid(data):
             **template,
             **{
                 'timescale': 'month',
-                'uri': f"https://cmip6downscaling.azureedge.net/{str(datasets['monthly_pyramid_path']).split('//')[-1]}",
+                'uri': f"{cdn}/{str(datasets['monthly_pyramid_path']).split('//')[-1]}",
                 'name': UPath(datasets['monthly_pyramid_path']).name,
             },
         }
@@ -155,7 +151,7 @@ def parse_cmip6_downscaled_pyramid(data):
             **template,
             **{
                 'timescale': 'year',
-                'uri': f"https://cmip6downscaling.azureedge.net/{str(datasets['annual_pyramid_path']).split('//')[-1]}",
+                'uri': f"{cdn}t/{str(datasets['annual_pyramid_path']).split('//')[-1]}",
                 'name': UPath(datasets['annual_pyramid_path']).name,
             },
         }
@@ -171,7 +167,7 @@ def parse_cmip6_downscaled_pyramid(data):
 
 
 @task(log_stdout=True)
-def get_cmip6_downscaled_pyramids(path):
+def get_cmip6_downscaled_pyramids(path, cdn):
 
     mapper = fsspec.get_mapper(path)
     fs = mapper.fs
@@ -185,7 +181,7 @@ def get_cmip6_downscaled_pyramids(path):
             data['datasets'].get(arg) is not None
             for arg in ['daily_pyramid_path', 'monthly_pyramid_path', 'annual_pyramid_path']
         ):
-            datasets += parse_cmip6_downscaled_pyramid(data)
+            datasets += parse_cmip6_downscaled_pyramid(data, cdn)
     return datasets
 
 
@@ -237,8 +233,12 @@ with Flow(
         'downscaled-pyramids-path',
         default='az://flow-outputs/results/0.1.[3,5]/runs/*/latest.json',
     )
-    cmip6_raw_pyramids = get_cmip6_pyramids(paths)
-    cmip6_downscaled_pyramids = get_cmip6_downscaled_pyramids(downscaled_pyramids)
+
+    # https://cmip6downscaling.azureedge.net
+    cdn = Parameter('cdn', default='https://cmip6downscaling.blob.core.windows.net')
+
+    cmip6_raw_pyramids = get_cmip6_pyramids(paths, cdn)
+    cmip6_downscaled_pyramids = get_cmip6_downscaled_pyramids(downscaled_pyramids, cdn)
     create_catalog(
         catalog_path=web_catalog_path,
         cmip6_raw_pyramids=cmip6_raw_pyramids,
