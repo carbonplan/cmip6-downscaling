@@ -4,8 +4,8 @@ import dask
 from prefect import Flow, Parameter
 from sklearn.utils.validation import DataConversionWarning
 
-from cmip6_downscaling import config, runtimes
-from cmip6_downscaling.methods.common.tasks import (
+from ... import config, runtimes
+from ...methods.common.tasks import (
     finalize,
     finalize_on_failure,
     get_experiment,
@@ -17,9 +17,9 @@ from cmip6_downscaling.methods.common.tasks import (
     regrid,
     time_summary,
 )
-from cmip6_downscaling.methods.gard.tasks import coarsen_and_interpolate, fit_and_predict, read_scrf
+from ...methods.gard.tasks import coarsen_and_interpolate, fit_and_predict, read_scrf
 
-dask.config.set({"array.slicing.split_large_chunks": True})
+dask.config.set({"array.slicing.split_large_chunks": False})
 warnings.filterwarnings(
     "ignore",
     "(.*) filesystem path not explicitly implemented. falling back to default implementation. This filesystem may not be tested",
@@ -136,9 +136,9 @@ with Flow(
         # pyramids
         p['pyramid_weights'] = get_pyramid_weights(run_parameters=run_parameters, levels=4)
 
-        p['daily_pyramid_path'] = pyramid(
-            p['full_space_model_output_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
-        )
+        # p['daily_pyramid_path'] = pyramid(
+        #     p['full_space_model_output_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
+        # )
         p['monthly_pyramid_path'] = pyramid(
             p['full_space_model_output_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
         )

@@ -6,7 +6,6 @@ import json
 import os
 import warnings
 from dataclasses import asdict
-from datetime import timedelta
 from pathlib import PosixPath
 
 import datatree
@@ -25,17 +24,12 @@ from upath import UPath
 from xarray_schema import DataArraySchema, DatasetSchema
 from xarray_schema.base import SchemaError
 
-from cmip6_downscaling import __version__ as version, config
-from cmip6_downscaling.data.cmip import get_gcm
-from cmip6_downscaling.data.observations import open_era5
-from cmip6_downscaling.methods.common.containers import RunParameters
-from cmip6_downscaling.methods.common.utils import (
-    calc_auspicious_chunks_dict,
-    resample_wrapper,
-    subset_dataset,
-    zmetadata_exists,
-)
-from cmip6_downscaling.utils import str_to_hash
+from ... import __version__ as version, config
+from ...data.cmip import get_gcm
+from ...data.observations import open_era5
+from ...utils import str_to_hash
+from .containers import RunParameters
+from .utils import calc_auspicious_chunks_dict, resample_wrapper, subset_dataset, zmetadata_exists
 
 warnings.filterwarnings(
     "ignore",
@@ -50,13 +44,13 @@ results_dir = UPath(config.get("storage.results.uri")) / version
 use_cache = config.get('run_options.use_cache')
 
 
-@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
+@task(log_stdout=True)
 def make_run_parameters(**kwargs) -> RunParameters:
     """Prefect task wrapper for RunParameters"""
     return RunParameters(**kwargs)
 
 
-@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
+@task(log_stdout=True)
 def get_obs(run_parameters: RunParameters) -> UPath:
     """Task to return observation data subset from input parameters.
 
@@ -101,11 +95,11 @@ def get_obs(run_parameters: RunParameters) -> UPath:
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
     print(f'writing {target}', subset)
     store = subset.to_zarr(target, mode='w', compute=False)
-    store.compute(retries=5)
+    store.compute(retries=2)
     return target
 
 
-@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
+@task(log_stdout=True)
 def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     """Prefect task that returns cmip GCM data from input run parameters.
 
@@ -159,7 +153,7 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     return target
 
 
-@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
+@task(log_stdout=True)
 def rechunk(
     path: UPath,
     pattern: str = None,
@@ -283,7 +277,7 @@ def rechunk(
     return target
 
 
-@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
+@task(log_stdout=True)
 def time_summary(ds_path: UPath, freq: str) -> UPath:
     """Prefect task to create resampled data. Takes mean of `tasmax` and `tasmin` and sum of `pr`.
 
@@ -301,7 +295,7 @@ def time_summary(ds_path: UPath, freq: str) -> UPath:
     """
 
     ds_hash = str_to_hash(str(ds_path) + freq)
-    target = intermediate_dir / 'time_summary' / ds_hash
+    target = results_dir / 'time_summary' / ds_hash
     print(target)
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
@@ -317,7 +311,7 @@ def time_summary(ds_path: UPath, freq: str) -> UPath:
     return target
 
 
-@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
+@task(log_stdout=True)
 def get_weights(*, run_parameters, direction, regrid_method="bilinear"):
     """Retrieve pre-generated regridding weights.
 
@@ -351,7 +345,7 @@ def get_weights(*, run_parameters, direction, regrid_method="bilinear"):
     return path
 
 
-@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
+@task(log_stdout=True)
 def get_pyramid_weights(*, run_parameters, levels: int, regrid_method: str = "bilinear"):
     """Retrieve pre-generated regridding pyramids weights.
 
@@ -378,7 +372,7 @@ def get_pyramid_weights(*, run_parameters, levels: int, regrid_method: str = "bi
     return path
 
 
-@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
+@task(log_stdout=True)
 def regrid(source_path: UPath, target_grid_path: UPath, weights_path: UPath = None) -> UPath:
     """Task to regrid a dataset to target grid.
 
@@ -491,7 +485,7 @@ def _pyramid_postprocess(dt: dt.DataTree, levels: int, other_chunks: dict = None
     return dt
 
 
-@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
+@task(log_stdout=True)
 def pyramid(
     ds_path: UPath, weights_pyramid_path: str, levels: int = 2, other_chunks: dict = None
 ) -> UPath:
@@ -538,12 +532,14 @@ def pyramid(
         regridder_kws={'ignore_degenerate': True},
     )
 
+    dta = _pyramid_postprocess(dta, levels=levels, other_chunks=other_chunks)
+
     # write to target
     dta.to_zarr(target, mode='w')
     return target
 
 
-@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
+@task(log_stdout=True)
 def run_analyses(ds_path: UPath, run_parameters: RunParameters) -> UPath:
     """Prefect task to run the analyses on results from a downscaling run.
 
@@ -608,7 +604,7 @@ def run_analyses(ds_path: UPath, run_parameters: RunParameters) -> UPath:
     return executed_notebook_path
 
 
-@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
+@task(log_stdout=True)
 def finalize(run_parameters: RunParameters = None, **paths):
     """Prefect task to finalize the downscaling run.
 

@@ -8,7 +8,7 @@ import pandas as pd
 import xarray as xr
 from prefect import Flow, task
 
-from .. import runtimes
+from cmip6_downscaling import runtimes
 
 # vars/pathing -----------------------------------------------------------
 
@@ -25,8 +25,7 @@ json_catalog_path = "az://cmip6/pangeo-cmip6.json"
 
 def open_json_catalog():
     """Loads local CMIP6 JSON intake catalog"""
-    data = json.load(open("cmip_catalog.json"))
-    return data
+    return json.load(open("cmip_catalog.json"))
 
 
 def write_json_catalog_to_azure():
@@ -38,7 +37,7 @@ def write_json_catalog_to_azure():
 
 def create_catalog_df():
     """Creates an empty DataFrame for a catalog"""
-    df = pd.DataFrame(
+    return pd.DataFrame(
         columns=[
             "activity_id",
             "institution_id",
@@ -53,7 +52,6 @@ def create_catalog_df():
             "version",
         ]
     )
-    return df
 
 
 def save_empty_catalog():
@@ -71,15 +69,14 @@ def load_csv_catalog():
     """Loads existing csv catalog, if catalog is missing creates an empty one"""
     try:
         df = pd.read_csv(csv_catalog_path, storage_options={"connection_string": connection_string})
-    except:
+    except Exception:
         df = save_empty_catalog()
     return df
 
 
 def rename_gs_to_az(src):
     """String formatting to update the prefix of the CMIP6 gs store location to Azure"""
-    tgt = "az://cmip6/" + src.split("CMIP6/")[1]
-    return tgt
+    return "az://cmip6/" + src.split("CMIP6/")[1]
 
 
 def zarr_is_complete(store, check=".zmetadata"):
@@ -105,16 +102,12 @@ def map_src_tgt(src, tgt, connection_string):
 
 def load_zarr_store(src_map):
     """Given a mapped source, loads Zarr store and returns xarray dataset"""
-    xdf = xr.open_zarr(src_map, decode_cf=False, consolidated=True)
-    return xdf
+    return xr.open_zarr(src_map, decode_cf=False, consolidated=True)
 
 
 def copy_cleaned_data(xdf, tgt_map, overwrite=True):
     """Copies xarray dataset to zarr store for given target"""
-    if overwrite is True:
-        mode = "w"
-    else:
-        mode = "r"
+    mode = "w" if overwrite is True else "r"
     xdf.to_zarr(tgt_map, mode=mode, consolidated=True)
 
 
@@ -122,8 +115,7 @@ def retrive_cmip6_catalog():
     """Returns historical and scenario results as intake catalogs"""
     col = intake.open_esm_datastore(col_url)
 
-    # get all possible simulations
-    full_subset = col.search(
+    return col.search(
         activity_id=["CMIP", "ScenarioMIP"],
         experiment_id=["historical", "ssp245", "ssp370", "ssp585"],
         member_id="r1i1p1f1",
@@ -131,8 +123,6 @@ def retrive_cmip6_catalog():
         grid_label="gn",
         variable_id=variable_ids,
     )
-
-    return full_subset  # hist_subset, ssp_subset
 
 
 # Prefect Task(s) -----------------------------------------------------------
