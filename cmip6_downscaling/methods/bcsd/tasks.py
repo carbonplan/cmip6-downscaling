@@ -10,9 +10,9 @@ from skdownscale.pointwise_models import PointWiseDownscaler
 from skdownscale.pointwise_models.bcsd import BcsdPrecipitation, BcsdTemperature
 from upath import UPath
 
+from ... import __version__ as version, config
 from ...constants import ABSOLUTE_VARS, RELATIVE_VARS
 from ...utils import str_to_hash
-from .. import __version__ as version, config
 from ..common.containers import RunParameters
 from ..common.utils import apply_land_mask, zmetadata_exists
 from .utils import reconstruct_finescale
