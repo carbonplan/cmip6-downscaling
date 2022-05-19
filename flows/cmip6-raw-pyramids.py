@@ -95,6 +95,7 @@ def _compute_summary_helper(path, freq, chunks):
         **{'array.slicing.split_large_chunks': False}
     ):
         ds = xr.open_zarr(path).pipe(preprocess)
+        time_attrs, time_encoding = ds.time.attrs, ds.time.encoding
         if ds.attrs['variable_id'] in {'tasmax', 'tasmin'}:
             out = ds.resample(time=freq).mean(dim='time')
         elif ds.attrs['variable_id'] in {'pr'}:
@@ -102,7 +103,10 @@ def _compute_summary_helper(path, freq, chunks):
             out['pr'].attrs['units'] = 'mm'
         else:
             raise NotImplementedError('variable not implemented')
-        return out.astype('float32').chunk(chunks)
+        out = out.astype('float32').chunk(chunks)
+        out.time.attrs = time_attrs
+        out.time.encoding = {'units': time_encoding['units'], 'calendar': time_encoding['calendar']}
+        return out
 
 
 @task(log_stdout=True)
@@ -120,6 +124,18 @@ def compute_summary(assets: list[tuple(str, str)]) -> dict[str, list[str]]:
                 failures.append(asset)
                 print(f'***{asset}***:\n{traceback.format_exc()}')
     return {'successes': successes, 'failures': failures}
+
+
+def apply_land_mask(pyramid, target_pyramid):
+
+    levels = len(pyramid.children)
+    for level in range(levels):
+        ds = pyramid[f'{level}'].ds
+        mask = target_pyramid[f'{level}'].ds.land
+        out = ds.where(mask > 0)
+        pyramid[f'{level}'].ds = out
+
+    return pyramid
 
 
 @task(log_stdout=True)
@@ -165,6 +181,7 @@ def compute_pyramids(results: dict[str, list[str]], levels: int) -> dict[str, li
                     weights_pyramid=weights_pyramid,
                     regridder_kws={'ignore_degenerate': True, 'extrap_method': "nearest_s2d"},
                 )
+                dta = apply_land_mask(dta, target_pyramid)
                 write(dta, target)
                 successes.append(target)
         except Exception:
@@ -205,7 +222,13 @@ with Flow(
     source_id = Parameter("source_id", default=["MIROC6", "AWI-CM-1-1-M", "BCC-CSM2-MR"])
     variable_id = Parameter("variable_id", default=["tasmax", "tasmin", "pr"])
     experiment_id = Parameter("experiment_id", default=["historical", "ssp245", "ssp370", "ssp585"])
-    assets = get_assets()
+    member_id = Parameter("member_id", default=['r1i1p1f1'])
+    assets = get_assets(
+        source_id=source_id,
+        variable_id=variable_id,
+        experiment_id=experiment_id,
+        member_id=member_id,
+    )
     results = compute_summary(assets)
     report(results)
     pyramids_results = compute_pyramids(results, levels)
