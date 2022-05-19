@@ -164,7 +164,7 @@ def rechunk(
     path: UPath,
     pattern: str = None,
     template: UPath = None,
-    max_mem: str = "10GB",
+    max_mem: str = "5GB",
 ) -> UPath:
     """Use `rechunker` package to adjust chunks of dataset to a form
     conducive for your processing.
@@ -181,7 +181,7 @@ def rechunk(
         The path to the file you want to use as a chunking template. The utility will grab the chunk sizes and use them as the chunk
         target to feed to rechunker.
     max_mem : str
-        The memory available for rechunking steps. Must look like "2GB". Optional, default is 10GB.
+        The memory available for rechunking steps. Must look like "2GB". Optional, default is 5GB.
 
     Returns
     -------
