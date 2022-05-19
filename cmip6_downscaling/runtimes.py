@@ -5,7 +5,8 @@ from abc import abstractmethod
 from functools import cached_property
 
 import dask
-from dask_kubernetes import KubeCluster, make_pod_spec
+
+# from dask_kubernetes import KubeCluster, make_pod_spec
 from prefect.executors import DaskExecutor, Executor, LocalDaskExecutor, LocalExecutor
 from prefect.run_configs import KubernetesRun, LocalRun, RunConfig
 from prefect.storage import Azure, Local, Storage
@@ -87,24 +88,13 @@ class CloudRuntime(BaseRuntime):
     @cached_property
     def executor(self) -> Executor:
 
-        pod_spec = make_pod_spec(
-            image=config.get("runtime.cloud.image"),
-            memory_limit=config.get("runtime.cloud.pod_memory_limit"),
-            memory_request=config.get("runtime.cloud.pod_memory_request"),
-            threads_per_worker=config.get("runtime.cloud.pod_threads_per_worker"),
-            cpu_limit=config.get("runtime.cloud.pod_cpu_limit"),
-            cpu_request=config.get("runtime.cloud.pod_cpu_request"),
-            env=self._generate_env(),
-        )
-
         executor = DaskExecutor(
-            cluster_class=lambda: KubeCluster(
-                pod_spec, deploy_mode=config.get("runtime.cloud.deploy_mode")
-            ),
-            adapt_kwargs={
-                "minimum": config.get("runtime.cloud.adapt_min"),
-                "maximum": config.get("runtime.cloud.adapt_max"),
-            },
+            cluster_kwargs={
+                'resources': {'taskslots': 1},
+                # intentionally reusing the pangeo namespace here during testing
+                'n_workers': config.get("runtime.pangeo.n_workers"),
+                'threads_per_worker': config.get("runtime.pangeo.threads_per_worker"),
+            }
         )
 
         return executor
