@@ -12,6 +12,7 @@ from upath import UPath
 
 from cmip6_downscaling import __version__ as version, config, runtimes
 from cmip6_downscaling.data.cmip import postprocess
+from cmip6_downscaling.methods.common import _apply_land_mask
 from cmip6_downscaling.utils import write
 
 config.set(
@@ -131,20 +132,6 @@ def compute_summary(assets: list[tuple(str, str)]) -> dict[str, list[str]]:
     return {'successes': successes, 'failures': failures}
 
 
-def apply_land_mask(pyramid, target_pyramid):
-
-    levels = len(pyramid.children)
-    for level in range(levels):
-        ds = pyramid[f'{level}'].ds
-        mask = target_pyramid[f'{level}'].ds.land
-        out = ds.where(mask > 0)
-        for variable in ds.data_vars:
-            out[variable].encoding = ds[variable].encoding
-            out[variable].attrs = ds[variable].attrs
-        pyramid[f'{level}'].ds = out
-    return pyramid
-
-
 @task(log_stdout=True)
 def compute_pyramids(results: dict[str, list[str]], levels: int) -> dict[str, list[str]]:
     import datatree
@@ -188,7 +175,7 @@ def compute_pyramids(results: dict[str, list[str]], levels: int) -> dict[str, li
                     weights_pyramid=weights_pyramid,
                     regridder_kws={'ignore_degenerate': True, 'extrap_method': "nearest_s2d"},
                 )
-                dta = apply_land_mask(dta, target_pyramid)
+                dta = _apply_land_mask(dta, target_pyramid)
                 write(dta, target)
                 successes.append(target)
         except Exception:
