@@ -60,7 +60,7 @@ _defaults = {
             "agent": "az-eu-west",
             "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git@patch/prefect-single-node-deploy git+https://github.com/pangeo-data/scikit-downscale@0.1.3",
             "kubernetes_cpu": 15,
-            "kubernetes_memory": "250Gi",
+            "kubernetes_memory": "240Gi",
             "image": "carbonplan/cmip6-downscaling-prefect:2022.04.12",
             'n_workers': 16,
             'threads_per_worker': 1,
