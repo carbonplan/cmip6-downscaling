@@ -12,7 +12,7 @@ from upath import UPath
 
 from cmip6_downscaling import __version__ as version, config, runtimes
 from cmip6_downscaling.data.cmip import postprocess
-from cmip6_downscaling.methods.common import _apply_land_mask
+from cmip6_downscaling.methods.common.tasks import _apply_land_mask
 from cmip6_downscaling.utils import write
 
 config.set(
