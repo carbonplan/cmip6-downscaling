@@ -16,7 +16,7 @@ from cmip6_downscaling.utils import write
 
 config.set(
     {
-        'runtime.cloud.extra_pip_packages': 'git+https://github.com/carbonplan/cmip6-downscaling.git@main git+https://github.com/intake/intake-esm.git'
+        'runtime.cloud.extra_pip_packages': 'git+https://github.com/carbonplan/cmip6-downscaling.git git+https://github.com/intake/intake-esm.git'
     }
 )
 
@@ -75,6 +75,7 @@ def get_pyramid_weights(
             (weights.regrid_method == regrid_method)
             & (weights.levels == levels)
             & (weights.source_id == source_id)
+            & (weights.grid_label == grid_label)
             & (weights.table_id == table_id)
         ]
         .iloc[0]
@@ -83,9 +84,12 @@ def get_pyramid_weights(
 
 
 def preprocess(ds) -> xr.Dataset:
-    time_slice = slice('1950', '2100')
-    ds = ds.sel(time=time_slice).pipe(partial(postprocess, to_standard_calendar=False))
-    return ds
+    import xarray as xr
+
+    with xr.set_options(keep_attrs=True):
+        time_slice = slice('1950', '2100')
+        ds = ds.sel(time=time_slice).pipe(partial(postprocess, to_standard_calendar=False))
+        return ds
 
 
 def _compute_summary_helper(path, freq, chunks):
@@ -95,7 +99,8 @@ def _compute_summary_helper(path, freq, chunks):
         **{'array.slicing.split_large_chunks': False}
     ):
         ds = xr.open_zarr(path).pipe(preprocess)
-        time_attrs, time_encoding = ds.time.attrs, ds.time.encoding
+        time_attrs = ds.time.attrs
+        time_encoding = ds.time.encoding
         if ds.attrs['variable_id'] in {'tasmax', 'tasmin'}:
             out = ds.resample(time=freq).mean(dim='time')
         elif ds.attrs['variable_id'] in {'pr'}:
@@ -133,8 +138,10 @@ def apply_land_mask(pyramid, target_pyramid):
         ds = pyramid[f'{level}'].ds
         mask = target_pyramid[f'{level}'].ds.land
         out = ds.where(mask > 0)
+        for variable in ds.data_vars:
+            out[variable].encoding = ds[variable].encoding
+            out[variable].attrs = ds[variable].attrs
         pyramid[f'{level}'].ds = out
-
     return pyramid
 
 
@@ -182,7 +189,7 @@ def compute_pyramids(results: dict[str, list[str]], levels: int) -> dict[str, li
                     regridder_kws={'ignore_degenerate': True, 'extrap_method': "nearest_s2d"},
                 )
                 dta = apply_land_mask(dta, target_pyramid)
-                write(dta, target)
+                write(dta, target, use_cache=False)
                 successes.append(target)
         except Exception:
             failures.append(store)
@@ -224,9 +231,10 @@ with Flow(
     experiment_id = Parameter("experiment_id", default=["historical", "ssp245", "ssp370", "ssp585"])
     member_id = Parameter("member_id", default=['r1i1p1f1'])
     assets = get_assets(
+        cat_url,
         source_id=source_id,
-        variable_id=variable_id,
         experiment_id=experiment_id,
+        variable_id=variable_id,
         member_id=member_id,
     )
     results = compute_summary(assets)
