@@ -12,8 +12,7 @@ from skdownscale.pointwise_models import PointWiseDownscaler
 from skdownscale.pointwise_models.utils import default_none_kwargs
 from upath import UPath
 
-from cmip6_downscaling import __version__ as version, config
-
+from ... import __version__ as version, config
 from ..common.bias_correction import bias_correct_gcm_by_method
 from ..common.containers import RunParameters, str_to_hash
 from ..common.utils import apply_land_mask, zmetadata_exists

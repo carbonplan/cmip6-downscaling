@@ -17,5 +17,4 @@ def reconstruct_finescale(ds: xr.Dataset, spatial_anomaly: xr.Dataset = None):
     reconstructed : xr.Dataset
         Finescale dataset with spatial heterogeneity added back in
     """
-    reconstructed = ds.groupby('time.month') + spatial_anomaly
-    return reconstructed
+    return ds.groupby('time.month') + spatial_anomaly

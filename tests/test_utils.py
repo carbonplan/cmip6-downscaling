@@ -3,6 +3,7 @@ import pytest
 import xarray as xr
 
 from cmip6_downscaling.data.utils import lon_to_180, to_standard_calendar
+from cmip6_downscaling.utils import str_to_hash, write
 
 
 def create_test_ds(xname, yname, zname, xlen, ylen, zlen):
@@ -50,3 +51,19 @@ def test_to_standard_calendar(da_noleap):
     assert da_noleap.sizes['time'] == 365
     assert da_std.sizes['time'] == 366
     assert not da_std.isnull().any().compute().item()
+
+
+def test_str_to_hash():
+    s = "test"
+    h = str_to_hash(s)
+    assert h == "96ad3bb4a2d666d3"
+
+
+def test_write(tmp_path):
+    ds = create_test_ds("lon", "lat", "time", 40, 20, 6)
+    target = tmp_path / "test.zarr"
+    write(ds, target)
+    assert target.is_dir()
+    assert target.exists()
+
+    xr.testing.assert_identical(ds, xr.open_zarr(target))
