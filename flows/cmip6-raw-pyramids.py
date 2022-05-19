@@ -189,7 +189,7 @@ def compute_pyramids(results: dict[str, list[str]], levels: int) -> dict[str, li
                     regridder_kws={'ignore_degenerate': True, 'extrap_method': "nearest_s2d"},
                 )
                 dta = apply_land_mask(dta, target_pyramid)
-                write(dta, target, use_cache=False)
+                write(dta, target)
                 successes.append(target)
         except Exception:
             failures.append(store)
