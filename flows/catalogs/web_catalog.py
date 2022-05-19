@@ -12,7 +12,7 @@ config.set(
     }
 )
 
-runtime = runtimes.CloudRuntime()
+runtime = runtimes.PangeoRuntime()
 
 
 def parse_cmip6(store, cdn):
