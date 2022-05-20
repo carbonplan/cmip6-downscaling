@@ -8,6 +8,7 @@ import xesmf as xe
 import zarr
 from carbonplan_data.metadata import get_cf_global_attrs
 from prefect import task
+from scipy.special import cbrt
 from skdownscale.pointwise_models import PointWiseDownscaler
 from skdownscale.pointwise_models.utils import default_none_kwargs
 from upath import UPath
@@ -86,21 +87,29 @@ def _fit_and_predict_wrapper(xtrain, ytrain, xpred, scrf, run_parameters, dim='t
         .to_dataset(dim='variable')
         .rename({'variable_0': run_parameters.variable})
     )
-
     # model definition
     model = PointWiseDownscaler(
         model=get_gard_model(run_parameters.model_type, run_parameters.model_params), dim=dim
     )
-
+    print(model)
     # model fitting
-    model.fit(xtrain[run_parameters.variable], ytrain[run_parameters.variable])
+    if run_parameters.variable == 'pr':
+        model.fit(cbrt(xtrain[run_parameters.variable]), cbrt(ytrain[run_parameters.variable]))
+        out = model.predict(cbrt(bias_corrected_gcm_pred[run_parameters.variable])).to_dataset(
+            dim='variable'
+        )
+        out['pred'] = out['pred'] ** 3
+
+    else:
+        model.fit(xtrain[run_parameters.variable], ytrain[run_parameters.variable])
+        out = model.predict(bias_corrected_gcm_pred[run_parameters.variable]).to_dataset(
+            dim='variable'
+        )
 
     # model prediction
-    out = model.predict(bias_corrected_gcm_pred[run_parameters.variable]).to_dataset(dim='variable')
-
     downscaled = add_random_effects(out, scrf, run_parameters)
 
-    return downscaled
+    return downscaled, out
 
 
 @task(log_stdout=True)
