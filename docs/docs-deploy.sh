@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [[ "$VERCEL_ENV" == production || "$VERCEL_GIT_COMMIT_MESSAGE" == *[docs]* ]] ; then
+if [[ "$VERCEL_ENV" == production || "$VERCEL_GIT_COMMIT_MESSAGE" == *"[docs]"* ]] ; then
   # Proceed with the build
 	echo "✅ - Build can proceed"
   exit 1;
