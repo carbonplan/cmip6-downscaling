@@ -91,7 +91,6 @@ def _fit_and_predict_wrapper(xtrain, ytrain, xpred, scrf, run_parameters, dim='t
     model = PointWiseDownscaler(
         model=get_gard_model(run_parameters.model_type, run_parameters.model_params), dim=dim
     )
-    print(model)
     # model fitting
     if run_parameters.variable == 'pr':
         model.fit(cbrt(xtrain[run_parameters.variable]), cbrt(ytrain[run_parameters.variable]))
@@ -107,9 +106,9 @@ def _fit_and_predict_wrapper(xtrain, ytrain, xpred, scrf, run_parameters, dim='t
         )
 
     # model prediction
-    downscaled = add_random_effects(out, scrf, run_parameters)
+    downscaled = add_random_effects(out, scrf.scrf, run_parameters)
 
-    return downscaled, out
+    return downscaled
 
 
 @task(log_stdout=True)

@@ -42,7 +42,7 @@ def get_gard_model(
 
 
 def add_random_effects(
-    model_output: xr.Dataset, scrf: xr.Dataset, run_parameters: RunParameters
+    model_output: xr.Dataset, scrf: xr.DataArray, run_parameters: RunParameters
 ) -> xr.Dataset:
     if run_parameters.model_params is not None:
         thresh = run_parameters.model_params.get('thresh')
