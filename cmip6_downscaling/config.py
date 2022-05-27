@@ -65,19 +65,6 @@ _defaults = {
             'n_workers': 16,
             'threads_per_worker': 1,
         },
-        "gateway": {
-            "storage_prefix": "az://",
-            "storage_options": {
-                'container': 'prefect',
-            },
-            "cluster_name": '',  #
-            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git",
-            "image": "carbonplan/cmip6-downscaling-prefect:2022.04.12",
-            "worker_cores": 1,
-            "worker_memory": 16,  # Gi
-            "adapt_min": 1,
-            "adapt_max": 60,
-        },
         "local": {"storage_prefix": "/tmp/", "storage_options": {'directory': './'}},
         "test": {
             "storage_prefix": "/tmp/",
