@@ -198,3 +198,11 @@ def resample_wrapper(ds, freq='1MS'):
     template = _resample_func(ds, freq=freq).chunk({'time': -1})
     # Apply map_blocks input dataset
     return xr.map_blocks(_resample_func, ds, kwargs={'freq': freq}, template=template)
+
+
+def set_zarr_encoding(ds: xr.Dataset):
+
+    for da in ds.data_vars.values():
+        da.encoding = {'compressor': zarr.Blosc(clevel=1)}
+
+    return ds

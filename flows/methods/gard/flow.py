@@ -19,6 +19,8 @@ from cmip6_downscaling.methods.common.tasks import (
 )
 from cmip6_downscaling.methods.gard.tasks import coarsen_and_interpolate, fit_and_predict, read_scrf
 
+config.set({'run_options.use_cache': False})
+
 dask.config.set({"array.slicing.split_large_chunks": False})
 warnings.filterwarnings(
     "ignore",
@@ -121,17 +123,21 @@ with Flow(
     # analysis notebook (shared with BCSD)
     # analysis_location = run_analyses(model_output_path, run_parameters)
 
-    # since pyramids require full space we now rechunk everything into full
-    # space before passing into pyramid step. we probably want to add a cleanup
-    # to this step in particular since otherwise we will have an exact
-    # duplicate of the daily, monthly, and annual datasets
-    p['full_space_model_output_path'] = rechunk(p['model_output_path'], pattern='full_space')
-
-    # make temporal summaries
-    p['monthly_summary_full_space_path'] = rechunk(p['monthly_summary_path'], pattern='full_space')
-    p['annual_summary_full_space_path'] = rechunk(p['annual_summary_path'], pattern='full_space')
-
     if config.get('run_options.generate_pyramids'):
+
+        # since pyramids require full space we now rechunk everything into full
+        # space before passing into pyramid step. we probably want to add a cleanup
+        # to this step in particular since otherwise we will have an exact
+        # duplicate of the daily, monthly, and annual datasets
+        p['full_space_model_output_path'] = rechunk(p['model_output_path'], pattern='full_space')
+
+        # make temporal summaries
+        p['monthly_summary_full_space_path'] = rechunk(
+            p['monthly_summary_path'], pattern='full_space'
+        )
+        p['annual_summary_full_space_path'] = rechunk(
+            p['annual_summary_path'], pattern='full_space'
+        )
 
         # pyramids
         p['pyramid_weights'] = get_pyramid_weights(run_parameters=run_parameters, levels=4)
@@ -140,10 +146,12 @@ with Flow(
         #     p['full_space_model_output_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
         # )
         p['monthly_pyramid_path'] = pyramid(
-            p['full_space_model_output_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
+            p['monthly_summary_full_space_path'],
+            weights_pyramid_path=p['pyramid_weights'],
+            levels=4,
         )
         p['annual_pyramid_path'] = pyramid(
-            p['full_space_model_output_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
+            p['annual_summary_full_space_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
         )
 
     # finalize
