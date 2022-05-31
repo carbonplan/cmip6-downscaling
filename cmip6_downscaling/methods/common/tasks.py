@@ -6,7 +6,6 @@ import json
 import os
 import warnings
 from dataclasses import asdict
-from datetime import timedelta
 from pathlib import PosixPath
 
 import datatree
@@ -17,7 +16,7 @@ import rechunker
 import xarray as xr
 import zarr
 from carbonplan_data.metadata import get_cf_global_attrs
-from carbonplan_data.utils import set_zarr_encoding
+from carbonplan_data.utils import set_zarr_encoding as set_web_zarr_encoding
 from ndpyramid import pyramid_regrid
 from prefect import task
 from prefect.triggers import any_failed
@@ -25,17 +24,18 @@ from upath import UPath
 from xarray_schema import DataArraySchema, DatasetSchema
 from xarray_schema.base import SchemaError
 
-from cmip6_downscaling import __version__ as version, config
-from cmip6_downscaling.data.cmip import get_gcm
-from cmip6_downscaling.data.observations import open_era5
-from cmip6_downscaling.methods.common.containers import RunParameters
-from cmip6_downscaling.methods.common.utils import (
+from ... import __version__ as version, config
+from ...data.cmip import get_gcm
+from ...data.observations import open_era5
+from ...utils import str_to_hash
+from .containers import RunParameters
+from .utils import (
     calc_auspicious_chunks_dict,
     resample_wrapper,
+    set_zarr_encoding,
     subset_dataset,
     zmetadata_exists,
 )
-from cmip6_downscaling.utils import str_to_hash
 
 warnings.filterwarnings(
     "ignore",
@@ -50,13 +50,13 @@ results_dir = UPath(config.get("storage.results.uri")) / version
 use_cache = config.get('run_options.use_cache')
 
 
-@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
+@task(log_stdout=True)
 def make_run_parameters(**kwargs) -> RunParameters:
     """Prefect task wrapper for RunParameters"""
     return RunParameters(**kwargs)
 
 
-@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
+@task(log_stdout=True)
 def get_obs(run_parameters: RunParameters) -> UPath:
     """Task to return observation data subset from input parameters.
 
@@ -100,12 +100,12 @@ def get_obs(run_parameters: RunParameters) -> UPath:
 
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
     print(f'writing {target}', subset)
-    store = subset.to_zarr(target, mode='w', compute=False)
-    store.compute(retries=5)
+    store = subset.pipe(set_zarr_encoding).to_zarr(target, mode='w', compute=False)
+    store.compute(retries=2)
     return target
 
 
-@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
+@task(log_stdout=True)
 def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     """Prefect task that returns cmip GCM data from input run parameters.
 
@@ -155,16 +155,16 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
         subset[key].encoding = {}
 
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
-    subset.to_zarr(target, mode='w')
+    subset.pipe(set_zarr_encoding).to_zarr(target, mode='w')
     return target
 
 
-@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
+@task(log_stdout=True)
 def rechunk(
     path: UPath,
     pattern: str = None,
     template: UPath = None,
-    max_mem: str = "2GB",
+    max_mem: str = "5GB",
 ) -> UPath:
     """Use `rechunker` package to adjust chunks of dataset to a form
     conducive for your processing.
@@ -181,7 +181,7 @@ def rechunk(
         The path to the file you want to use as a chunking template. The utility will grab the chunk sizes and use them as the chunk
         target to feed to rechunker.
     max_mem : str
-        The memory available for rechunking steps. Must look like "2GB". Optional, default is 2GB.
+        The memory available for rechunking steps. Must look like "2GB". Optional, default is 5GB.
 
     Returns
     -------
@@ -273,6 +273,9 @@ def rechunk(
         max_mem=max_mem,
         target_store=target_store,
         temp_store=temp_store,
+        target_options={k: {'compressor': zarr.Blosc(clevel=1)} for k in chunks_dict},
+        temp_options={k: {'compressor': None} for k in chunks_dict},
+        executor='dask',
     )
 
     rechunk_plan.execute()
@@ -283,7 +286,7 @@ def rechunk(
     return target
 
 
-@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
+@task(log_stdout=True)
 def time_summary(ds_path: UPath, freq: str) -> UPath:
     """Prefect task to create resampled data. Takes mean of `tasmax` and `tasmin` and sum of `pr`.
 
@@ -301,7 +304,7 @@ def time_summary(ds_path: UPath, freq: str) -> UPath:
     """
 
     ds_hash = str_to_hash(str(ds_path) + freq)
-    target = intermediate_dir / 'time_summary' / ds_hash
+    target = results_dir / 'time_summary' / ds_hash
     print(target)
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
@@ -312,12 +315,12 @@ def time_summary(ds_path: UPath, freq: str) -> UPath:
     out_ds = resample_wrapper(ds, freq=freq)
 
     out_ds.attrs.update({'title': 'time_summary'}, **get_cf_global_attrs(version=version))
-    out_ds.to_zarr(target, mode='w')
+    out_ds.pipe(set_zarr_encoding).to_zarr(target, mode='w')
 
     return target
 
 
-@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
+@task(log_stdout=True)
 def get_weights(*, run_parameters, direction, regrid_method="bilinear"):
     """Retrieve pre-generated regridding weights.
 
@@ -351,7 +354,7 @@ def get_weights(*, run_parameters, direction, regrid_method="bilinear"):
     return path
 
 
-@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
+@task(log_stdout=True)
 def get_pyramid_weights(*, run_parameters, levels: int, regrid_method: str = "bilinear"):
     """Retrieve pre-generated regridding pyramids weights.
 
@@ -378,7 +381,7 @@ def get_pyramid_weights(*, run_parameters, levels: int, regrid_method: str = "bi
     return path
 
 
-@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
+@task(log_stdout=True)
 def regrid(source_path: UPath, target_grid_path: UPath, weights_path: UPath = None) -> UPath:
     """Task to regrid a dataset to target grid.
 
@@ -435,7 +438,7 @@ def regrid(source_path: UPath, target_grid_path: UPath, weights_path: UPath = No
     regridded_ds.attrs.update(
         {'title': source_ds.attrs['title']}, **get_cf_global_attrs(version=version)
     )
-    regridded_ds.to_zarr(target, mode='w')
+    regridded_ds.pipe(set_zarr_encoding).to_zarr(target, mode='w')
     return target
 
 
@@ -479,7 +482,7 @@ def _pyramid_postprocess(dt: dt.DataTree, levels: int, other_chunks: dict = None
             dt[slevel].ds['date_str'] = dt[slevel].ds['date_str'].chunk(-1)
 
         # set dataset encoding
-        dt[slevel].ds = set_zarr_encoding(
+        dt[slevel].ds = set_web_zarr_encoding(
             dt[slevel].ds, codec_config={"id": "zlib", "level": 1}, float_dtype="float32"
         )
         for var in ['time', 'time_bnds']:
@@ -491,7 +494,7 @@ def _pyramid_postprocess(dt: dt.DataTree, levels: int, other_chunks: dict = None
     return dt
 
 
-@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
+@task(log_stdout=True)
 def pyramid(
     ds_path: UPath, weights_pyramid_path: str, levels: int = 2, other_chunks: dict = None
 ) -> UPath:
@@ -545,7 +548,7 @@ def pyramid(
     return target
 
 
-@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
+@task(log_stdout=True)
 def run_analyses(ds_path: UPath, run_parameters: RunParameters) -> UPath:
     """Prefect task to run the analyses on results from a downscaling run.
 
@@ -610,7 +613,27 @@ def run_analyses(ds_path: UPath, run_parameters: RunParameters) -> UPath:
     return executed_notebook_path
 
 
-@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
+def _finalize(run_parameters, kind='runs', **paths):
+    path_dict = dict(**paths)
+
+    now = datetime.datetime.utcnow().isoformat()
+    target1 = results_dir / kind / run_parameters.run_id / f'{now}.json'
+    target2 = results_dir / kind / run_parameters.run_id / 'latest.json'
+    print(f'finalize 1: {target1}')
+    print(f'finalize 2: {target2}')
+
+    out = {'parameters': asdict(run_parameters)}
+    out['attrs'] = get_cf_global_attrs(version=version)
+    out['datasets'] = {k: str(p) for k, p in path_dict.items()}
+
+    with target1.open(mode='w') as f:
+        json.dump(out, f, indent=2)
+
+    with target2.open(mode='w') as f:
+        json.dump(out, f, indent=2)
+
+
+@task(log_stdout=True)
 def finalize(run_parameters: RunParameters = None, **paths):
     """Prefect task to finalize the downscaling run.
 
@@ -621,29 +644,12 @@ def finalize(run_parameters: RunParameters = None, **paths):
     paths : dict
         Dictionary of paths to write result file
     """
-
-    path_dict = dict(**paths)
-
-    now = datetime.datetime.utcnow().isoformat()
-    target1 = results_dir / 'runs' / run_parameters.run_id / f'{now}.json'
-    target2 = results_dir / 'runs' / run_parameters.run_id / 'latest.json'
-    print(target1)
-    print(target2)
-
-    out = {'parameters': asdict(run_parameters)}
-    out['attrs'] = get_cf_global_attrs(version=version)
-    out['datasets'] = {k: str(p) for k, p in path_dict.items()}
-
-    with target1.open(mode='w') as f:
-        json.dump(out, f, indent=2)
-
-    with target2.open(mode='w') as f:
-        json.dump(out, f, indent=2)
+    _finalize(run_parameters, kind='runs', **paths)
 
 
 @task(log_stdout=True, trigger=any_failed)
 def finalize_on_failure(run_parameters: RunParameters = None, **paths):
-    """Prefect task to finalize the downscaling run.
+    """Prefect task to finalize a failed downscaling run.
 
     Parameters
     ----------
@@ -653,20 +659,4 @@ def finalize_on_failure(run_parameters: RunParameters = None, **paths):
         Dictionary of paths to write to result file
     """
 
-    path_dict = dict(**paths)
-
-    now = datetime.datetime.utcnow().isoformat()
-    target1 = results_dir / 'failed-runs' / run_parameters.run_id / f'{now}.json'
-    target2 = results_dir / 'failed-runs' / run_parameters.run_id / 'latest.json'
-    print(target1)
-    print(target2)
-
-    out = {'parameters': asdict(run_parameters)}
-    out['attrs'] = get_cf_global_attrs(version=version)
-    out['datasets'] = {k: str(p) for k, p in path_dict.items()}
-
-    with target1.open(mode='w') as f:
-        json.dump(out, f, indent=2)
-
-    with target2.open(mode='w') as f:
-        json.dump(out, f, indent=2)
+    _finalize(run_parameters, kind='failed-runs', **paths)

@@ -13,11 +13,10 @@ from skdownscale.pointwise_models import PointWiseDownscaler
 from skdownscale.pointwise_models.utils import default_none_kwargs
 from upath import UPath
 
-from cmip6_downscaling import __version__ as version, config
-
+from ... import __version__ as version, config
 from ..common.bias_correction import bias_correct_gcm_by_method
 from ..common.containers import RunParameters, str_to_hash
-from ..common.utils import apply_land_mask, zmetadata_exists
+from ..common.utils import apply_land_mask, set_zarr_encoding, zmetadata_exists
 from .utils import add_random_effects, get_gard_model
 
 scratch_dir = UPath(config.get("storage.scratch.uri"))
@@ -64,7 +63,7 @@ def coarsen_and_interpolate(fine_path: UPath, coarse_path: UPath) -> UPath:
     interpolated_ds.attrs.update(
         {'title': 'coarsen_and_interpolate'}, **get_cf_global_attrs(version=version)
     )
-    interpolated_ds.to_zarr(target, mode='w')
+    interpolated_ds.pipe(set_zarr_encoding).to_zarr(target, mode='w')
     return target
 
 
@@ -153,7 +152,7 @@ def fit_and_predict(
         + run_parameters.run_id_hash
         + str(dim)
     )
-    target = intermediate_dir / 'gard_fit_and_predict' / ds_hash
+    target = results_dir / 'gard_fit_and_predict' / ds_hash
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
@@ -191,8 +190,12 @@ def fit_and_predict(
     out.attrs.update({'title': 'gard_fit_and_predict'}, **get_cf_global_attrs(version=version))
     out = dask.optimize(out)[0]
     # remove apply_land_mask after scikit-downscale#110 is merged
-    t = out.pipe(apply_land_mask).to_zarr(target, compute=False, mode='w', consolidated=False)
-    t.compute(retries=5)
+    t = (
+        out.pipe(apply_land_mask)
+        .pipe(set_zarr_encoding)
+        .to_zarr(target, compute=False, mode='w', consolidated=False)
+    )
+    t.compute(retries=2)
 
     zarr.consolidate_metadata(target)
     return target
@@ -260,7 +263,7 @@ def read_scrf(prediction_path: UPath, run_parameters: RunParameters):
     )
 
     scrf = dask.optimize(scrf)[0]
-    t = scrf.to_zarr(target, compute=False, mode='w', consolidated=False)
+    t = scrf.pipe(set_zarr_encoding).to_zarr(target, compute=False, mode='w', consolidated=False)
     t.compute(retries=2)
     zarr.consolidate_metadata(target)
 

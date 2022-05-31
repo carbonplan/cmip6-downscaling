@@ -11,7 +11,7 @@ from upath import UPath
 from xarray_schema import DataArraySchema
 from xarray_schema.base import SchemaError
 
-import cmip6_downscaling.methods.common.containers as containers
+from . import containers
 
 
 def zmetadata_exists(path: UPath):
@@ -34,7 +34,7 @@ def blocking_to_zarr(ds: xr.Dataset, target):
     # testing a workaround
     if str(target).startswith('/'):
         print('fell back to using a string target')
-        target = 'az://flow-outputs' + str(target)
+        target = f'az://flow-outputs{str(target)}'
 
     t = ds.to_zarr(target, mode='w', compute=False)
     t.compute(retries=5)
@@ -145,9 +145,7 @@ def calc_auspicious_chunks_dict(
     data_bytesize = int(re.findall(r"\d+", str(da.dtype))[0]) / 8
     # calculate the size of the smallest minimum chunk based upon dtype and the
     # length of the unchunked dim(s). chunks_dict currently only has unchunked dims right now
-    smallest_size_one_chunk = data_bytesize * np.prod(
-        [dim_sizes[dim] for dim in chunks_dict.keys()]
-    )
+    smallest_size_one_chunk = data_bytesize * np.prod([dim_sizes[dim] for dim in chunks_dict])
 
     # the dims in chunk_dims should be of an array size (as in number of elements in the array)
     # that creates ~100 mb. `perfect_chunk` is the how many of the smallest_size_chunks you can
@@ -199,6 +197,12 @@ def resample_wrapper(ds, freq='1MS'):
     # Use _resample_func() to make template dataset
     template = _resample_func(ds, freq=freq).chunk({'time': -1})
     # Apply map_blocks input dataset
-    out_ds = xr.map_blocks(_resample_func, ds, kwargs={'freq': freq}, template=template)
+    return xr.map_blocks(_resample_func, ds, kwargs={'freq': freq}, template=template)
 
-    return out_ds
+
+def set_zarr_encoding(ds: xr.Dataset):
+
+    for da in ds.data_vars.values():
+        da.encoding = {'compressor': zarr.Blosc(clevel=1)}
+
+    return ds

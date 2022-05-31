@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import warnings
-from datetime import timedelta
 
 import dask
 import xarray as xr
@@ -11,12 +10,12 @@ from skdownscale.pointwise_models import PointWiseDownscaler
 from skdownscale.pointwise_models.bcsd import BcsdPrecipitation, BcsdTemperature
 from upath import UPath
 
-from cmip6_downscaling import __version__ as version, config
-from cmip6_downscaling.constants import ABSOLUTE_VARS, RELATIVE_VARS
-from cmip6_downscaling.methods.bcsd.utils import reconstruct_finescale
-from cmip6_downscaling.methods.common.containers import RunParameters
-from cmip6_downscaling.methods.common.utils import apply_land_mask, zmetadata_exists
-from cmip6_downscaling.utils import str_to_hash
+from ... import __version__ as version, config
+from ...constants import ABSOLUTE_VARS, RELATIVE_VARS
+from ...utils import str_to_hash
+from ..common.containers import RunParameters
+from ..common.utils import apply_land_mask, zmetadata_exists
+from .utils import reconstruct_finescale
 
 warnings.filterwarnings(
     "ignore",
@@ -30,7 +29,7 @@ results_dir = UPath(config.get("storage.results.uri")) / version
 use_cache = config.get('run_options.use_cache')
 
 
-@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
+@task(log_stdout=True)
 def spatial_anomalies(obs_full_time_path: UPath, interpolated_obs_full_time_path: UPath) -> UPath:
     """Returns spatial anomalies
     Calculate the seasonal cycle (12 timesteps) spatial anomaly associated
@@ -131,7 +130,7 @@ def _fit_and_predict_wrapper(xtrain, ytrain, xpred, run_parameters, dim='time'):
     return bias_corrected_ds
 
 
-@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
+@task(log_stdout=True)
 def fit_and_predict(
     experiment_train_full_time_path: UPath,
     experiment_predict_full_time_path: UPath,
@@ -202,7 +201,7 @@ def fit_and_predict(
     return target
 
 
-@task(log_stdout=True, max_retries=3, retry_delay=timedelta(seconds=5))
+@task(log_stdout=True)
 def postprocess_bcsd(
     bias_corrected_fine_full_time_path: UPath, spatial_anomalies_path: UPath
 ) -> UPath:
