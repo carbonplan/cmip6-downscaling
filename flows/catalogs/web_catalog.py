@@ -151,7 +151,7 @@ def parse_cmip6_downscaled_pyramid(data, cdn: str):
             **template,
             **{
                 'timescale': 'year',
-                'uri': f"{cdn}t/{str(datasets['annual_pyramid_path']).split('//')[-1]}",
+                'uri': f"{cdn}/{str(datasets['annual_pyramid_path']).split('//')[-1]}",
                 'name': UPath(datasets['annual_pyramid_path']).name,
             },
         }
