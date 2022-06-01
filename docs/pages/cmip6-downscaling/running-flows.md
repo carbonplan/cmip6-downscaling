@@ -1,8 +1,6 @@
 import Section from '../../components/section'
 
-# Running Prefect Flows
-
-## Why Prefect
+# Running Flows
 
 In this project each downscaling method [BCSD, GARD, MACA] has it's own workflow for generating results. These data production workflows are handled by the python library, prefect, which encapsulates the data processing steps into individual tasks, which are organized into a 'Flow'.
 
@@ -23,8 +21,6 @@ The current runtime options are:
 [`CI`](https://github.com/carbonplan/cmip6-downscaling/blob/a0379110c33b557f959a1d6fa53e9f93891a45b3/cmip6_downscaling/runtimes.py#L130) `executor: local` - Runtime used for Continuous Integration
 
 [`pangeo`](https://github.com/carbonplan/cmip6-downscaling/blob/a0379110c33b557f959a1d6fa53e9f93891a45b3/cmip6_downscaling/runtimes.py#L140) `executor: dask-distrubted` - Runtime for processesing on jupyter-hub
-
-[`gateway`](https://github.com/carbonplan/cmip6-downscaling/blob/a0379110c33b557f959a1d6fa53e9f93891a45b3/cmip6_downscaling/runtimes.py#L165) `executor: dask-distrubted` - Runtime used for scaling with a dask-gateway cluser
 
 ## Modifying Flow Config
 
