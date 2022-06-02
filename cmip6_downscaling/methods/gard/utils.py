@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 import xarray as xr
+from scipy.special import cbrt
 from scipy.stats import norm as norm
 from skdownscale.pointwise_models import AnalogRegression, PureAnalog, PureRegression
 
@@ -41,7 +42,7 @@ def get_gard_model(
 
 
 def add_random_effects(
-    model_output: xr.Dataset, scrf: xr.Dataset, run_parameters: RunParameters
+    model_output: xr.Dataset, scrf: xr.DataArray, run_parameters: RunParameters
 ) -> xr.Dataset:
     if run_parameters.model_params is not None:
         thresh = run_parameters.model_params.get('thresh')
@@ -66,12 +67,18 @@ def add_random_effects(
         r_normal = xr.apply_ufunc(
             norm.ppf, new_uniform, dask='parallelized', output_dtypes=[new_uniform.dtype]
         )
-
-        downscaled = model_output['pred'] + r_normal * model_output['prediction_error']
+        if run_parameters.variable == 'pr':
+            downscaled = (
+                cbrt(model_output['pred']) + (model_output['prediction_error'] * r_normal)
+            ) ** 3
+        else:
+            downscaled = model_output['pred'] + r_normal * model_output['prediction_error']
 
         # what do we do for thresholds like heat wave?
         valids = xr.ufuncs.logical_or(mask, downscaled >= 0)
         downscaled = downscaled.where(valids, 0)
+        downscaled = downscaled.where(downscaled >= 0, 0)
+
     else:
         downscaled = model_output['pred'] + scrf['scrf'] * model_output['prediction_error']
 

@@ -57,6 +57,23 @@ def bias_correct_gcm_by_method(
     if method == 'cunnane_transform':
         return bc_kwargs['transformer_interp'].transform(gcm_pred)
 
+    elif method == 'z_score':
+        # transform gcm
+        sc = PointWiseDownscaler(model=StandardScaler(**bc_kwargs))
+        sc.fit(gcm_hist)
+        return sc.transform(gcm_pred)
+    elif method == 'quantile_mapper':
+        qm = PointWiseDownscaler(model=QuantileMapper(**bc_kwargs), dim='time')
+        qm.fit(obs)
+        return qm.transform(gcm_pred)
+
+    # TODO: test to see QuantileMappingReressor and TrendAwareQuantileMappingRegressor
+    # can handle multiple variables at once
+    elif method == 'quantile_map':
+        qm = PointWiseDownscaler(model=QuantileMappingReressor(**bc_kwargs), dim='time')
+        qm.fit(gcm_hist, obs)
+        return qm.predict(gcm_pred)
+
     elif method == 'detrended_quantile_map':
         qm = PointWiseDownscaler(
             TrendAwareQuantileMappingRegressor(QuantileMappingReressor(**bc_kwargs))
@@ -67,16 +84,6 @@ def bias_correct_gcm_by_method(
     elif method == 'none':
         return gcm_pred
 
-    elif method == 'quantile_map':
-        qm = PointWiseDownscaler(model=QuantileMappingReressor(**bc_kwargs), dim='time')
-        qm.fit(gcm_hist, obs)
-        return qm.predict(gcm_pred)
-
-    elif method == 'quantile_mapper':
-        qm = PointWiseDownscaler(model=QuantileMapper(detrend=True), dim='time')
-        qm.fit(obs)
-        return qm.transform(gcm_pred)
-
     elif method == 'quantile_transform':
         # transform gcm
         if 'n_quantiles' not in bc_kwargs:
@@ -85,11 +92,6 @@ def bias_correct_gcm_by_method(
         qt = PointWiseDownscaler(model=QuantileTransformer(**bc_kwargs))
         qt.fit(gcm_hist)
         return qt.transform(gcm_pred)
-    elif method == 'z_score':
-        # transform gcm
-        sc = PointWiseDownscaler(model=StandardScaler(**bc_kwargs))
-        sc.fit(gcm_hist)
-        return sc.transform(gcm_pred)
     else:
         available_methods = [
             'quantile_transform',
