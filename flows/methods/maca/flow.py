@@ -67,35 +67,32 @@ with Flow(
 
     # get coarsened resolution observations
     # this coarse obs is going to be used in bias correction next, so rechunk into full time first
-    p['coarse_obs_path'] = regrid(
+    p['coarse_obs_full_space_path'] = regrid(
         p['obs_full_space_path'], p['experiment_train_path'], weights_path=p['obs_to_gcm_weights']
     )
+    p['coarse_obs_full_time_path'] = rechunk(
+        p['coarse_obs_full_space_path'], pattern='full_time'
+    )
+
 
     ## Step 2: Epoch Adjustment -- all variables undergo this epoch adjustment
     # TODO: in order to properly do a 31 year average, might need to run this step with the entire future period in GCMs
     # but this might be too memory intensive in the later task
     # BIG JOB
-    p['coarse_epoch_trend_path'], p['detrended_data_path'] = epoch_trend(
-        p['experiment_train_path'], run_parameters
-    )
+    p['coarse_epoch_trend_path'], p['detrended_data_path'] = epoch_trend(p['experiment_train_path'], run_parameters)
 
     # get gcm
     # 1981-2100 extent time subset
-    p['experiment_predict_full_time_path'] = rechunk(
-        p['experiment_predict_path'], pattern='full_time'
-    )
+    p['experiment_predict_full_time_path'] = rechunk(p['experiment_predict_path'], pattern='full_time')
 
     ## Step 3: Coarse Bias Correction
     # rechunk to make detrended data match the coarse obs
-    # TODO: check whether we want full-time AND template (or just template)
-    p['detrend_gcm_rechunk_coarse_obs_path'] = rechunk(
-        p['experiment_predict_path'], template=p['coarse_obs_path']
-    )
+    p['detrend_gcm_full_time'] = rechunk(p['detrended_data_path'], template=p['coarse_obs_full_time_path'])
 
     # inputs should be in full-time
-    p['bias_corrected_gcm_path'] = bias_correction(
+    p['bias_corrected_gcm_full_time_path'] = bias_correction(
         gcm_path=p['detrended_data_path'],
-        obs_path=p['coarse_obs_path'],
+        obs_path=p['coarse_obs_full_time_path'],
         run_parameters=run_parameters,
     )
 
@@ -120,57 +117,16 @@ with Flow(
 
     ## Step 4: Constructed Analogs
     # rechunk into full space and cache the output
-    p['bc_gcm_full_space'] = rechunk(p['bc_gcm'], pattern='full_space')
+    p['bias_corrected_gcm_full_space_path'] = rechunk(p['bias_corrected_gcm_full_time_path'], pattern='full_space')
 
     # everything should be rechunked to full space and then subset
-    p['coarse_obs_path'] = regrid(
-        p['obs_full_space_path'], p['experiment_train_path'], weights_path=p['obs_to_gcm_weights']
+    p['bias_corrected_gcm_region_paths'] = split_by_region(p['bias_corrected_gcm_full_space_path'])
+    p['coarse_obs_region_paths'] = split_by_region(p['coarse_obs_full_space_path'])
+    p['obs_region_paths'] = split_by_region(p['obs_full_space_path'])
+
+    p['constructed_analogs_region_paths'] = construct_analogs.map(
+        p['bias_corrected_gcm_region_paths'], p['coarse_obs_region_paths'], p['obs_region_paths']
     )
-
-    p['bc_gcm_region_paths'] = split_by_region(p['bc_gcm_full_space_path'])
-    p['coarse_obs_region_paths'] = split_by_region(p['coarse_obs_path'])
-    p['fine_obs_region_paths'] = split_by_region(p['fine_obs_path'])
-
-    p['constructed_analogs_path'] = construct_analogs.map(
-        p['bc_gcm_region_paths'], p['coarse_obs_region_paths'], p['fine_obs_region_paths']
-    )
-
-    p['full_grid_detrended_path'] = combine_regions(
-        p['constructed_analogs_path'], p['fine_obs_path']
-    )
-
-    # combine these two?
-    # p['full_grid_path'] = maca_reapply_trend(p['full_grid_detrended_path'])
-    # p['final_full_grid_path'] = bias_correct_final( p['full_grid_path'])
-
-    # all inputs into the map function needs to be a list
-    # ds_gcm_list, ds_obs_coarse_list, ds_obs_fine_list = subset_task(
-    #     ds_gcm=bias_corrected_gcm_full_space,
-    #     ds_obs_coarse=ds_obs_coarse_full_space,
-    #     ds_obs_fine=ds_obs_full_space,
-    #     subdomains_list=subdomains_list,
-    # )
-
-    # downscaling by constructing analogs
-    # downscaled_gcm_list = maca_construct_analogs_task.map(
-    #     ds_gcm=ds_gcm_list,
-    #     ds_obs_coarse=ds_obs_coarse_list,
-    #     ds_obs_fine=ds_obs_fine_list,
-    #     subdomain_bound=subdomains_list,
-    #     n_analogs=[constructed_analog_n_analogs] * n_subdomains,
-    #     doy_range=[constructed_analog_doy_range] * n_subdomains,
-    #     gcm_identifier=[gcm_identifier] * n_subdomains,
-    #     label=[label] * n_subdomains,
-    # )
-
-    # combine back into full domain
-    # combined_downscaled_output = combine_outputs_task(
-    #     ds_list=downscaled_gcm_list,
-    #     subdomains_dict=subdomains_dict,
-    #     mask=mask,
-    #     gcm_identifier=gcm_identifier,
-    #     label=label,
-    # )
 
     # ## Step 5: Epoch Replacement
     # if label in ['pr', 'huss', 'vas', 'uas']:
@@ -190,8 +146,16 @@ with Flow(
     #     gcm_identifier=gcm_identifier,
     # )
 
+    # need to decide if this can be done on a region-by-region basis. Perhaps we need to fine-grain coarse_epoch_trend_path before this.
+    p['epoch_replaced_region_paths'] = 'TODO'  # epoch_replacement.map(p['constructed_analogs_region_paths'], p['coarse_epoch_trend_path'], parameters=run_parameters)
+
     ## Step 6: Fine Bias Correction
-    p['final_maca_full_time_path'] = bias_correction()
+    p['final_maca_regions_paths'] = bias_correction.map(p['epoch_replaced_region_paths'], p['obs_region_paths'], run_parameters=run_parameters)
+
+    p['full_grid_detrended_path'] = combine_regions(
+        p['final_maca_regions_paths'], p['fine_obs_path']
+    )
+
 
     # final_output = maca_fine_bias_correction_task(
     #     ds_gcm=epoch_replaced_gcm,
