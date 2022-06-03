@@ -80,6 +80,6 @@ def add_random_effects(
         downscaled = downscaled.where(downscaled >= 0, 0)
 
     else:
-        downscaled = model_output['pred'] + scrf['scrf'] * model_output['prediction_error']
+        downscaled = model_output['pred'] + scrf * model_output['prediction_error']
 
     return downscaled.to_dataset(name=run_parameters.variable)
