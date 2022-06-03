@@ -30,6 +30,7 @@ from ...data.observations import open_era5
 from ...utils import str_to_hash
 from .containers import RunParameters
 from .utils import (
+    apply_land_mask,
     calc_auspicious_chunks_dict,
     resample_wrapper,
     set_zarr_encoding,
@@ -409,30 +410,30 @@ def regrid(source_path: UPath, target_grid_path: UPath, weights_path: UPath = No
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
         return target
-    source_ds = xr.open_zarr(source_path)
-    target_grid_ds = xr.open_zarr(target_grid_path)
-    if weights_path:
-        from ndpyramid.regrid import _reconstruct_xesmf_weights
+    source_ds = xr.open_zarr(source_path).pipe(apply_land_mask)
+    target_grid_ds = xr.open_zarr(target_grid_path).pipe(apply_land_mask)
+    # if weights_path:
+    #     from ndpyramid.regrid import _reconstruct_xesmf_weights
 
-        weights = _reconstruct_xesmf_weights(xr.open_zarr(weights_path))
-        print(weights_path)
-        regridder = xe.Regridder(
-            source_ds,
-            target_grid_ds,
-            weights=weights,
-            reuse_weights=True,
-            method="bilinear",
-            extrap_method="nearest_s2d",
-            ignore_degenerate=True,
-        )
-    else:
-        regridder = xe.Regridder(
-            source_ds,
-            target_grid_ds,
-            method="bilinear",
-            extrap_method="nearest_s2d",
-            ignore_degenerate=True,
-        )
+    #     weights = _reconstruct_xesmf_weights(xr.open_zarr(weights_path))
+    #     print(weights_path)
+    #     regridder = xe.Regridder(
+    #         source_ds,
+    #         target_grid_ds,
+    #         weights=weights,
+    #         reuse_weights=True,
+    #         method="bilinear",
+    #         extrap_method="nearest_s2d",
+    #         ignore_degenerate=True,
+    #     )
+    # else:
+    regridder = xe.Regridder(
+        source_ds,
+        target_grid_ds,
+        method="bilinear",
+        extrap_method="nearest_s2d",
+        ignore_degenerate=True,
+    )
 
     regridded_ds = regridder(source_ds, keep_attrs=True)
     regridded_ds.attrs.update(

@@ -82,7 +82,50 @@ def subset_dataset(
     return subset_ds
 
 
-def apply_land_mask(ds: xr.Dataset) -> xr.Dataset:
+def _make_landfrac_mask(ds, d_fine: float = 0.1):
+
+    import xesmf as xe
+
+    ds_fine = xe.util.grid_global(d_fine, d_fine, cf=False)  # input grid
+    ds_fine['land'] = xr.DataArray(np.ones((ds_fine.dims['y'], ds_fine.dims['x'])), dims=('y', 'x'))
+
+    ds_fine_1d_coords = xr.Dataset(
+        coords={
+            'lon': xr.DataArray(ds_fine.lon.isel(y=0).values, dims='x'),
+            'lat': xr.DataArray(ds_fine.lat.isel(x=0).values, dims='y'),
+        },
+        data_vars={'land': xr.DataArray(np.ones(ds_fine.lon.shape), dims=('y', 'x'))},
+    )
+
+    ds_fine_1d_coords = regionmask.defined_regions.natural_earth_v5_0_0.land_10.mask(
+        ds_fine_1d_coords
+    )
+    ds_fine['land'] = xr.DataArray(ds_fine_1d_coords['land'].values, dims=('y', 'x'))
+
+    regridder = xe.Regridder(ds_fine_1d_coords, ds, method='conservative')
+    out_ds = regridder(ds_fine_1d_coords)
+
+    return out_ds['land']
+
+
+def _add_landmask_to_dataset(ds, how='nulls'):
+    if 'mask' in ds:
+        return ds
+
+    if how == 'nulls':
+        mask = ds.notnull().astype('i4')
+        mask = mask.isel(**{k: 0 for k in ['time', 'month', 'level'] if k in mask.dims})
+    elif how == 'regionmask':
+        mask = regionmask.defined_regions.natural_earth_v5_0_0.land_10.mask(ds)
+    elif how == 'landfrac':
+        mask = _make_landfrac_mask(ds)
+    else:
+        raise ValueError(f'{how} not yet supported')
+    ds['mask'] = mask
+    return ds
+
+
+def apply_land_mask(ds: xr.Dataset, how='landfrac') -> xr.Dataset:
     """
     Apply a land mask to a dataset with lat/lon coordinates
 
@@ -96,7 +139,7 @@ def apply_land_mask(ds: xr.Dataset) -> xr.Dataset:
     xr.Dataset
     """
 
-    mask = regionmask.defined_regions.natural_earth_v5_0_0.land_10.mask(ds)
+    mask = _add_landmask_to_dataset(ds)
     return ds.where(mask == 0)
 
 
