@@ -82,9 +82,8 @@ def pad_with_edge_year(data: xr.Dataset) -> xr.Dataset:
             end = vector[-pend * 2 : -pend]
             vector[-pend:] = end
 
-    # TODO: change use_leap_year to True once we unify the GCMs into Gregorian calendars
-    prev_year = days_in_year(data.time[0].dt.year.values - 1, use_leap_year=False)
-    next_year = days_in_year(data.time[-1].dt.year.values + 1, use_leap_year=False)
+    prev_year = days_in_year(data.time[0].dt.year.values - 1, use_leap_year=True)
+    next_year = days_in_year(data.time[-1].dt.year.values + 1, use_leap_year=True)
     padded = data.pad({'time': (prev_year, next_year)}, mode=pad_with)
     time_coord = padded.time.values
     time_coord[:prev_year] = (data.time[:prev_year] - pd.Timedelta(prev_year, 'D')).values

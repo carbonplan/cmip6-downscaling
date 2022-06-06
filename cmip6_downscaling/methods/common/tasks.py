@@ -28,7 +28,7 @@ from ... import __version__ as version, config
 from ...data.cmip import get_gcm
 from ...data.observations import open_era5
 from ...utils import str_to_hash
-from .containers import RunParameters
+from .containers import RunParameters, TimePeriod
 from .utils import (
     calc_auspicious_chunks_dict,
     resample_wrapper,
@@ -114,17 +114,29 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     run_parameters : RunParameters
         RunParameter dataclass defined in common/conatiners.py. Constructed from prefect parameters.
     time_subset : str
-        String describing time subset request. Either 'train_period' or 'predict_period'
+        String describing time subset request. Either 'train_period', 'predict_period', or 'both'.
 
     Returns
     -------
     UPath
         UPath to experiment dataset.
     """
-    time_period = getattr(run_parameters, time_subset)
+    if time_subset == 'both':
+        time_period = TimePeriod(
+            start=str(min(int(run_parameters.train_period.start), int(run_parameters.predict_period.start))),
+            stop=str(max(int(run_parameters.train_period.stop), int(run_parameters.predict_period.stop)))
+        )
+    else:
+        time_period = getattr(run_parameters, time_subset)
     frmt_str = "{model}_{member}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{time_period.start}_{time_period.stop}".format(
         time_period=time_period, **asdict(run_parameters)
     )
+
+    if int(time_period.start) < 2015:
+        scenarios = ['historical', run_parameters.scenario]
+    else:
+        scenarios = [run_parameters.scenario]
+    scenarios = set(scenarios)
 
     title = f"experiment ds: {frmt_str}"
     ds_hash = str_to_hash(frmt_str)
@@ -135,15 +147,19 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
         print(f'found existing target: {target}')
         return target
 
-    ds = get_gcm(
-        scenario=run_parameters.scenario,
-        member_id=run_parameters.member,
-        table_id=run_parameters.table_id,
-        grid_label=run_parameters.grid_label,
-        source_id=run_parameters.model,
-        variable=run_parameters.variable,
-        time_slice=time_period.time_slice,
-    )
+    ds_list = []
+
+    for s in scenarios:
+        ds_list.append(get_gcm(
+            scenario=s,
+            member_id=run_parameters.member,
+            table_id=run_parameters.table_id,
+            grid_label=run_parameters.grid_label,
+            source_id=run_parameters.model,
+            variable=run_parameters.variable,
+            time_slice=time_period.time_slice,
+        ))
+    ds = xr.concat(ds_list, dim='time')
 
     subset = subset_dataset(
         ds, run_parameters.variable, time_period.time_slice, run_parameters.bbox
