@@ -42,6 +42,8 @@ def epoch_trend(
     assert year_rolling_window % 2 == 1
     y_offset = int((year_rolling_window - 1) / 2)
 
+    print(d_offset, y_offset)
+
     # get historical mean as a rolling average -- the result has one number for each day of year
     # which is the average of the neighboring day of years over multiple years
     padded = add_circular_temporal_pad(data=data.sel(time=historical_period), offset=d_offset)
@@ -56,7 +58,12 @@ def epoch_trend(
     # get rolling average for the entire data -- the result has one number for each day in the entire time series
     # which is the average of the neighboring day of years in neighboring years
     padded = add_circular_temporal_pad(data=data, offset=d_offset)
-    func = lambda x: x.rolling(time=year_rolling_window, center=True).mean()
+    # func = lambda x: x.rolling(time=year_rolling_window, center=True).mean()
+
+    def func(x):
+        window = min(len(x.time), year_rolling_window)
+        return x.rolling(time=window, center=True).mean()
+
     rolling_doy_mean = (
         padded.rolling(time=day_rolling_window, center=True)
         .mean()
@@ -64,7 +71,7 @@ def epoch_trend(
         .groupby('time.dayofyear')
         .apply(func)
         .dropna('time')
-    ).compute()  # TODO: this .compute is needed otherwise the pad_with_edge_year function below returns all nulls for unknown reasons, root cause?
+    )#.compute()  # TODO: this .compute is needed otherwise the pad_with_edge_year function below returns all nulls for unknown reasons, root cause?
 
     # repeat the first/last year to cover the time periods without enough data for the rolling average
     for i in range(y_offset):

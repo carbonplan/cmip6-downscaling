@@ -15,7 +15,7 @@ from cmip6_downscaling.methods.common.containers import RunParameters
 from cmip6_downscaling.methods.common.utils import zmetadata_exists
 from cmip6_downscaling.utils import str_to_hash
 
-import .core as maca_core
+from cmip6_downscaling.methods.maca import core as maca_core
 
 intermediate_dir = UPath(config.get("storage.intermediate.uri")) / version
 results_dir = UPath(config.get("storage.results.uri")) / version
@@ -79,9 +79,9 @@ def epoch_trend(
     y_offset = int((run_parameters.year_rolling_window - 1) / 2)
 
     train_start = int(run_parameters.train_period.start) - y_offset
-    train_end = int(run_parameters.train_period.end) + y_offset
+    train_end = int(run_parameters.train_period.stop) + y_offset
     predict_start = int(run_parameters.predict_period.start) - y_offset
-    predict_end = int(run_parameters.predict_period.end) + y_offset
+    predict_end = int(run_parameters.predict_period.stop) + y_offset
     # TODO: why do we do this step?
     # make sure there are no overlapping years
     if train_end > int(run_parameters.train_period.start):
@@ -90,11 +90,13 @@ def epoch_trend(
     elif train_end > predict_start:
         predict_start = train_end + 1
 
-    ds_gcm_full_time = xr.open_zarr(data_path)
+    print(f'data_path: {data_path}')
+    ds_gcm_full_time = xr.open_zarr(data_path).load()
+    print(ds_gcm_full_time)
 
     # note that this is the non-buffered slice
-    historical_period = run_parameters.train_dates.time_slice
-    predict_period = run_parameters.predict_dates.time_slice
+    historical_period = run_parameters.train_period.time_slice
+    predict_period = run_parameters.predict_period.time_slice
     trend = maca_core.epoch_trend(
         data=ds_gcm_full_time,
         historical_period=historical_period,
@@ -355,7 +357,7 @@ def split_by_region(
 
     target_paths = []
     for region in region_codes:
-        trend_target = intermediate_dir / 'epoch_trend' / str_to_hash(str(data_path) + region_def + str(region))
+        trend_target = intermediate_dir / 'split_by_region' / str_to_hash(str(data_path) + region_def + str(region))
         target_paths.append(trend_target)
 
     if use_cache and all(zmetadata_exists(p) for p in target_paths):
@@ -366,7 +368,7 @@ def split_by_region(
 
     print('splitting regions')
     mask = regions.mask(ds)
-    for target, (key, group) in zip(target_paths, ds['tasmax'].groupby(mask)):
+    for target, (key, group) in zip(target_paths, ds.groupby(mask)):
         ds = group.unstack('stacked_lat_lon')
         ds.attrs.update({'title': f'region {key}'}, **get_cf_global_attrs(version=version))
         ds.to_zarr(target, mode='w')

@@ -186,14 +186,13 @@ def get_gcm(
         variable_ids=variable,
         time_slice=time_slice,
     )
-    if float(time_slice.stop) < 2015:
-        # you're working with historical data
-        ds_gcm = load_cmip(activity_ids='CMIP', experiment_ids='historical', **kws)
-    elif float(time_slice.start) > 2014:
-        # you're working with future data
-        ds_gcm = load_cmip(activity_ids='ScenarioMIP', experiment_ids=scenario, **kws)
+
+    if scenario == 'historical':
+        activity_id = 'CMIP'
     else:
-        raise ValueError(f'time slice {time_slice} not supported')
+        activity_id = 'ScenarioMIP'
+
+    ds_gcm = load_cmip(activity_ids=activity_id, experiment_ids=scenario, **kws)
     ds_gcm = ds_gcm.reindex(time=sorted(ds_gcm.time.values))
 
     return ds_gcm
