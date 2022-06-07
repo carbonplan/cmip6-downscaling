@@ -58,7 +58,7 @@ _defaults = {
                 'container': 'prefect',
             },
             "agent": "az-eu-west",
-            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git@patch/prefect-single-node-deploy scikit-downscale==0.1.3 rechunker==0.5.0 --no-deps",
+            "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git@0.1.7 --no-deps",
             "kubernetes_cpu": 15,
             "kubernetes_memory": "224Gi",
             "image": "carbonplan/cmip6-downscaling-prefect:2022.06.01",
