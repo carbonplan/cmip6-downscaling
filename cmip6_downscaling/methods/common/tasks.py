@@ -142,11 +142,10 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
         frmt_str = "{model}_{member}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{time_period.start}_{time_period.stop}".format(
             time_period=time_period, **asdict(run_parameters))
 
-    if int(time_period.start) < 2015:
+    if int(time_period.start) < 2015 and run_parameters.scenario != 'historical':
         scenarios = ['historical', run_parameters.scenario]
     else:
         scenarios = [run_parameters.scenario]
-    scenarios = set(scenarios)
 
     title = f"experiment ds: {frmt_str}"
     ds_hash = str_to_hash(frmt_str)

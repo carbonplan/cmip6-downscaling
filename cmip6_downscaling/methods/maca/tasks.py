@@ -32,10 +32,14 @@ def bias_correction(x_path: UPath, y_path: UPath, run_parameters: RunParameters)
         print(f"found existing target: {target}")
         return target
 
+    print('x_path', x_path)
+
     x_ds = xr.open_zarr(x_path)
     y_ds = xr.open_zarr(y_path)
 
     bc_ds = maca_core.bias_correction(x_ds, y_ds, variables=[run_parameters.variable])
+
+    print('bc_ds', bc_ds)
 
     bc_ds.attrs.update({'title': 'bias_correction'}, **get_cf_global_attrs(version=version))
     bc_ds.to_zarr(target, mode='w')
@@ -90,9 +94,7 @@ def epoch_trend(
     elif train_end > predict_start:
         predict_start = train_end + 1
 
-    print(f'data_path: {data_path}')
     ds_gcm_full_time = xr.open_zarr(data_path).load()
-    print(ds_gcm_full_time)
 
     # note that this is the non-buffered slice
     historical_period = run_parameters.train_period.time_slice
@@ -104,16 +106,15 @@ def epoch_trend(
         year_rolling_window=run_parameters.year_rolling_window,
     )
 
-    hist_trend = trend.sel(time=historical_period)
-    pred_trend = trend.sel(time=predict_period)
-
-    trend = xr.combine_by_coords([hist_trend, pred_trend], combine_attrs='drop_conflicts')
+    trend = trend.chunk({'lat': 48, 'lon': 48})
     trend.attrs.update({'title': 'epoch_trend'}, **get_cf_global_attrs(version=version))
     trend.to_zarr(trend_target, mode='w')
 
     detrended_data = ds_gcm_full_time - trend
+    detrended_data = detrended_data.chunk({'time': -1, 'lat': 48, 'lon': 48})
+
     detrended_data.attrs.update({'title': 'epoch_trend - detrended'}, **get_cf_global_attrs(version=version))
-    trend.to_zarr(detrended_data, mode='w')
+    detrended_data.to_zarr(detrend_target, mode='w')
 
     return trend_target, detrend_target
 
@@ -315,6 +316,11 @@ def construct_analogs(
     fine_obs_path: UPath,
     run_parameters: RunParameters
 ) -> UPath:
+
+    print('construct_analogs')
+    print('gcm_path', gcm_path)
+    print('coarse_obs_path', coarse_obs_path)
+    print('fine_obs_path', fine_obs_path)
 
     ds_hash = str_to_hash(str(gcm_path) + str(coarse_obs_path) + str(fine_obs_path) + run_parameters.run_id_hash)
     target = intermediate_dir / 'construct_analogs' / ds_hash
