@@ -121,13 +121,13 @@ with Flow(
     # rechunk into full space and cache the output
     p['bias_corrected_gcm_full_space_path'] = rechunk(p['bias_corrected_gcm_full_time_path'], pattern='full_space')
 
-    # everything should be rechunked to full space and then subset
+    # # everything should be rechunked to full space and then subset
     p['bias_corrected_gcm_region_paths'] = split_by_region(p['bias_corrected_gcm_full_space_path'])
     p['coarse_obs_region_paths'] = split_by_region(p['coarse_obs_full_space_path'])
     p['obs_region_paths'] = split_by_region(p['obs_full_space_path'])
 
     p['constructed_analogs_region_paths'] = construct_analogs.map(
-        p['bias_corrected_gcm_region_paths'], p['coarse_obs_region_paths'], p['obs_region_paths'], run_parameters=run_parameters
+        gcm_path=p['bias_corrected_gcm_region_paths'], coarse_obs_path=p['coarse_obs_region_paths'], fine_obs_path=p['obs_region_paths'], run_parameters=run_parameters
     )
 
     # ## Step 5: Epoch Replacement

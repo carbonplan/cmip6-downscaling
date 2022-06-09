@@ -42,8 +42,6 @@ def epoch_trend(
     assert year_rolling_window % 2 == 1
     y_offset = int((year_rolling_window - 1) / 2)
 
-    print(d_offset, y_offset)
-
     # get historical mean as a rolling average -- the result has one number for each day of year
     # which is the average of the neighboring day of years over multiple years
     padded = add_circular_temporal_pad(data=data.sel(time=historical_period), offset=d_offset)
@@ -58,7 +56,6 @@ def epoch_trend(
     # get rolling average for the entire data -- the result has one number for each day in the entire time series
     # which is the average of the neighboring day of years in neighboring years
     padded = add_circular_temporal_pad(data=data, offset=d_offset)
-    # func = lambda x: x.rolling(time=year_rolling_window, center=True).mean()
 
     def func(x):
         window = min(len(x.time), year_rolling_window)
@@ -71,7 +68,7 @@ def epoch_trend(
         .groupby('time.dayofyear')
         .apply(func)
         .dropna('time')
-    )#.compute()  # TODO: this .compute is needed otherwise the pad_with_edge_year function below returns all nulls for unknown reasons, root cause?
+    )
 
     # repeat the first/last year to cover the time periods without enough data for the rolling average
     for i in range(y_offset):
@@ -79,8 +76,6 @@ def epoch_trend(
 
     # remove historical mean from rolling average, leaving trend as the anamoly
     trend = rolling_doy_mean.groupby('time.dayofyear') - hist_mean
-
-    assert trend.isnull().sum().values == 0
 
     return trend
 
@@ -172,6 +167,15 @@ def bias_correction(
     doy_gcm = ds_gcm.time.dt.dayofyear
     doy_obs = ds_obs.time.dt.dayofyear
 
+    out_chunks = ds_gcm.chunks
+
+    # print('loading')
+    # ds_gcm = ds_gcm.load()
+    # ds_obs = ds_obs.load()
+
+    print('ds_gcm', ds_gcm)
+    print('ds_obs', ds_obs)
+
     ds_out = xr.Dataset()
     for var in variables:
         if var in ['pr', 'huss', 'vas', 'uas']:
@@ -198,6 +202,8 @@ def bias_correction(
             train_x = gcm_batch[[var]]  # JH: not needed anymore? .sel(time=historical_period)
             train_y = obs_batch[var]  # JH: not needed anymore? .sel(time=historical_period)
 
+            train_x, train_y = xr.align(gcm_batch[[var]], obs_batch[var], join='inner', copy=True)
+
             # # TODO: this is a total hack to get around the different calendars of observation dataset and GCM
             # # should be able to remove once we unify all calendars
             # if len(train_x.time) > len(train_y.time):
@@ -207,18 +213,20 @@ def bias_correction(
             # train_x = train_x.assign_coords({'time': train_y.time})
 
             bias_correction_model.fit(
-                train_x.unify_chunks(),  # dataset
-                train_y.unify_chunks(),  # dataarray
+                train_x,  # dataset
+                train_y,  # dataarray
             )
 
-            bc_data = bias_correction_model.predict(X=gcm_batch.unify_chunks())
+            bc_data = bias_correction_model.predict(X=gcm_batch) 
             # needs the .compute here otherwise the code fails with errors
             # TODO: not sure if this is scalable
-            bc_result.append(bc_data.sel(time=bc_data.time.dt.dayofyear.isin(c)).compute())
+            bc_result.append(bc_data.sel(time=bc_data.time.dt.dayofyear.isin(c)))  # JH: removed .compute() from this line
 
         ds_out[var] = xr.concat(bc_result, dim='time').sortby('time')
 
-    return ds_out
+    print(ds_out)
+
+    return ds_out.chunk(out_chunks)
 
 
 def construct_analogs(
@@ -267,6 +275,10 @@ def construct_analogs(
     ds_obs_coarse = ds_obs_coarse[label]
     ds_obs_fine = ds_obs_fine[label]
 
+    print('ds_gcm', ds_gcm)
+    print('ds_obs_coarse', ds_obs_coarse)
+    # print('ds_obs_fine', ds_obs_fine)
+
     # get dimension sizes from input data
     domain_shape_coarse = (len(ds_obs_coarse.lat), len(ds_obs_coarse.lon))
     n_pixel_coarse = domain_shape_coarse[0] * domain_shape_coarse[1]
@@ -288,21 +300,26 @@ def construct_analogs(
 
     # find the indices with the lowest rmse within the day of year constraint
     dim_order = ['ndays_in_gcm', 'ndays_in_obs']
-    inds = (
-        xr.apply_ufunc(
-            np.argsort,
-            rmse.where(mask),
-            vectorize=True,
-            input_core_dims=[['ndays_in_obs']],
-            output_core_dims=[['ndays_in_obs']],
-            dask='parallelized',
-            output_dtypes=['int'],
-            dask_gufunc_kwargs={'allow_rechunk': True},
-        )
-        .isel(ndays_in_obs=slice(0, n_analogs))
-        .transpose(*dim_order)
-        .compute()
-    )
+    print('rmse', rmse)
+    print('loading rmse')
+    rmse = rmse.load()
+    inds = rmse.where(mask).argsort(axis=rmse.get_axis_num('ndays_in_obs'))
+
+    # inds = (
+    #     xr.apply_ufunc(
+    #         np.argsort,
+    #         rmse.where(mask),
+    #         vectorize=True,
+    #         input_core_dims=[['ndays_in_obs']],
+    #         output_core_dims=[['ndays_in_obs']],
+    #         # dask='parallelized',
+    #         output_dtypes=['int'],
+    #         # dask_gufunc_kwargs={'allow_rechunk': True},
+    #     )
+    #     .isel(ndays_in_obs=slice(0, n_analogs))
+    #     .transpose(*dim_order)
+    #     # .compute()
+    # )
 
     # rearrage the data into tabular format in order to train linear regression models to get coefficients
     X = X.stack(pixel_coarse=['lat', 'lon'])
@@ -313,8 +330,12 @@ def construct_analogs(
 
     # TODO: check if the rechunk can be removed
     # initialize a regridder to interpolate the residuals from coarse to fine scale later
-    coarse_template = ds_obs_coarse.isel(time=0).chunk({'lat': -1, 'lon': -1})
-    fine_template = ds_obs_fine.isel(time=0).chunk({'lat': -1, 'lon': -1})
+    coarse_template = ds_obs_coarse.isel(time=0).to_dataset(name=label)  #.chunk({'lat': -1, 'lon': -1})
+    fine_template = ds_obs_fine.isel(time=0).to_dataset(name=label)  #.chunk({'lat': -1, 'lon': -1})
+
+    print(coarse_template)
+    print(fine_template)
+
     regridder = xe.Regridder(
         coarse_template,
         fine_template,
@@ -329,12 +350,24 @@ def construct_analogs(
     for i in range(len(y)):
         # get data from the GCM day being downscaled
         yi = y.isel(ndays_in_gcm=i)
+        print('yi', yi.load())
         # get data from the coarsened obs analogs
         ind = inds.isel(ndays_in_gcm=i).values
+        print('ind', ind)
+
         xi = X.isel(ndays_in_obs=ind).transpose('pixel_coarse', 'ndays_in_obs')
+        print('xi', xi.load())
 
         # fit model
-        lr_model.fit(xi, yi)
+
+        x_valid_mask = ~np.isnan(xi)
+        y_valid_mask = ~np.isnan(yi)
+        np.testing.assert_equal(x_valid_mask, y_valid_mask)
+
+        lr_model.fit(
+            xi[x_valid_mask],
+            yi[y_valid_mask]
+        )
         # save the residuals to be interpolated and included in the final prediction
         residual = yi - lr_model.predict(xi)
 
