@@ -19,7 +19,7 @@ scikit-learn
 scipy
 universal-pathlib >= 0.0.12
 xarray >= 2022.3.0
-xarray-datatree == 0.0.5
+xarray-datatree == 0.0.6
 xarray_schema >= 0.0.3
 xclim
 zarr >= 2.11.3
