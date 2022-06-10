@@ -13,6 +13,8 @@ from xarray_schema.base import SchemaError
 
 from . import containers
 
+xr.set_options(keep_attrs=True)
+
 
 def zmetadata_exists(path: UPath):
     '''temporary workaround until path.exists() works'''

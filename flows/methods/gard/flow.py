@@ -1,6 +1,7 @@
 import warnings
 
 import dask
+import xarray as xr
 from prefect import Flow, Parameter
 from sklearn.utils.validation import DataConversionWarning
 
@@ -19,6 +20,7 @@ from cmip6_downscaling.methods.common.tasks import (
 )
 from cmip6_downscaling.methods.gard.tasks import coarsen_and_interpolate, fit_and_predict, read_scrf
 
+xr.set_options(keep_attrs=True)
 config.set({'run_options.use_cache': False})
 
 dask.config.set({"array.slicing.split_large_chunks": False})

@@ -3,6 +3,7 @@ from __future__ import annotations
 import warnings
 
 import dask
+import xarray as xr
 from prefect import Flow, Parameter
 from sklearn.utils.validation import DataConversionWarning
 
@@ -25,6 +26,7 @@ from cmip6_downscaling.methods.common.tasks import (  # run_analyses,; get_weigh
     time_summary,
 )
 
+xr.set_options(keep_attrs=True)
 dask.config.set({"array.slicing.split_large_chunks": False})
 warnings.filterwarnings(
     "ignore",

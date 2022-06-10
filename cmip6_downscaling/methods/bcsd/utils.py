@@ -1,5 +1,7 @@
 import xarray as xr
 
+xr.set_options(keep_attrs=True)
+
 
 def reconstruct_finescale(ds: xr.Dataset, spatial_anomaly: xr.Dataset = None):
     """Add the spatial anomalies back into the interpolated fine scale dataset.

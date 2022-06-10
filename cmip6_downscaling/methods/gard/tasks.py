@@ -19,6 +19,7 @@ from ..common.containers import RunParameters, str_to_hash
 from ..common.utils import apply_land_mask, set_zarr_encoding, zmetadata_exists
 from .utils import add_random_effects, get_gard_model
 
+xr.set_options(keep_attrs=True)
 scratch_dir = UPath(config.get("storage.scratch.uri"))
 intermediate_dir = UPath(config.get("storage.intermediate.uri")) / version
 results_dir = UPath(config.get("storage.results.uri")) / version

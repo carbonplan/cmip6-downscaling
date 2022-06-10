@@ -7,6 +7,8 @@ import xarray as xr
 from . import cat
 from .utils import lon_to_180, to_standard_calendar as convert_to_standard_calendar
 
+xr.set_options(keep_attrs=True)
+
 
 def postprocess(ds: xr.Dataset, to_standard_calendar: bool = True) -> xr.Dataset:
     """Post process input experiment

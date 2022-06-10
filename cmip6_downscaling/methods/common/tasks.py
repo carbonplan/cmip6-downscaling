@@ -37,6 +37,7 @@ from .utils import (
     zmetadata_exists,
 )
 
+xr.set_options(keep_attrs=True)
 warnings.filterwarnings(
     "ignore",
     "(.*) filesystem path not explicitly implemented. falling back to default implementation. This filesystem may not be tested",
