@@ -45,8 +45,8 @@ def open_era5(variables: str | list[str], time_period: slice) -> xr.Dataset:
             'long_name': 'Total precipitation',
             'nameECMWF': 'Total precipitation',
             'shortNameECMWF': 'tp',
-            'product_type': 'forecast'
-    }
+            'product_type': 'forecast',
+        }
 
     # correct error in raw data attributes for tasmin/tasmax
     if 'tasmin' in variables:
@@ -58,7 +58,7 @@ def open_era5(variables: str | list[str], time_period: slice) -> xr.Dataset:
             'nameECMWF': 'Minimum temperature at 2 metres since previous post-processing',
             'shortNameECMWF': 'mn2t',
             'nameCDM': 'Minimum_temperature_at_2_metres_since_previous_post-processing_surface_1_Hour_2',
-            'product_type': 'forecast'
+            'product_type': 'forecast',
         }
     if 'tasmax' in variables:
         ds['tasmax'].attrs = {
@@ -69,7 +69,7 @@ def open_era5(variables: str | list[str], time_period: slice) -> xr.Dataset:
             'nameECMWF': 'Maximum temperature at 2 metres since previous post-processing',
             'shortNameECMWF': 'mx2t',
             'nameCDM': 'Maximum_temperature_at_2_metres_since_previous_post-processing_surface_1_Hour_2',
-            'product_type': 'forecast'
+            'product_type': 'forecast',
         }
 
     ds = lon_to_180(ds)
