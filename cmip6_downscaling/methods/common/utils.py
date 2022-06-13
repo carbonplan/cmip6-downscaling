@@ -139,7 +139,7 @@ def apply_land_mask(ds: xr.Dataset, how='landfrac') -> xr.Dataset:
     xr.Dataset
     """
 
-    mask = _add_landmask_to_dataset(ds)
+    mask = _add_landmask_to_dataset(ds, how=how)
     return ds.where(mask == 0)
 
 
