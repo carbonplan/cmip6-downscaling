@@ -168,10 +168,11 @@ def _resample_func(ds, freq='1MS'):
     out_ds = xr.Dataset(attrs=ds.attrs)
 
     for v in ds.data_vars:
+        resampler = ds[v].resample(time=freq, keep_attrs=True)
         if v in ['tasmax', 'tasmin']:
-            out_ds[v] = ds[v].resample(time=freq).mean(dim='time')
+            out_ds[v] = resampler.mean(dim='time')
         elif v in ['pr']:
-            out_ds[v] = ds[v].resample(time=freq).sum(dim='time')
+            out_ds[v] = resampler.sum(dim='time')
         else:
             print(f'{v} not implemented')
 
