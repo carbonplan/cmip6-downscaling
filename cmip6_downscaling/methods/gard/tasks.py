@@ -54,7 +54,7 @@ def coarsen_and_interpolate(fine_path: UPath, coarse_path: UPath) -> UPath:
 
     # coarsen
     regridder = xe.Regridder(fine_ds, target_ds, "bilinear", extrap_method="nearest_s2d")
-    coarse_ds = regridder(fine_ds)
+    coarse_ds = regridder(fine_ds, keep_attrs=True)
 
     # interpolate back to the fine grid
     regridder = xe.Regridder(coarse_ds, fine_ds, "bilinear", extrap_method="nearest_s2d")
