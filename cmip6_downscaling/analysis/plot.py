@@ -71,7 +71,7 @@ def plot_cdfs(
                 data=obs.isel(cities=i),
                 label=f'ERA5 ({train_period.start}-{train_period.stop})',
                 ax=ax,
-                color='#1b1e23',
+                color='#ebebec',  # chalk, carbon is '#1b1e23',
             )
         )
         labels.append(f'ERA5 ({train_period.start}-{train_period.stop})')
