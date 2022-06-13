@@ -40,6 +40,39 @@ def open_era5(variables: str | list[str], time_period: slice) -> xr.Dataset:
         # convert to mm/day - helpful to prevent rounding errors from very tiny numbers
         ds['pr'] *= 86400
         ds['pr'] = ds['pr'].astype('float32')
+        ds['pr'].attrs = {
+            'least_significant_digit': 4,
+            'standard_name': 'precipitation_amount',
+            'units': 'mm',
+            'long_name': 'Total precipitation',
+            'nameECMWF': 'Total precipitation',
+            'shortNameECMWF': 'tp',
+            'product_type': 'forecast',
+        }
+
+    # correct error in raw data attributes for tasmin/tasmax
+    if 'tasmin' in variables:
+        ds['tasmin'].attrs = {
+            'least_significant_digit': 1,
+            'standard_name': 'air_temperature',
+            'units': 'K',
+            'long_name': 'Minimum temperature at 2 metres since previous post-processing',
+            'nameECMWF': 'Minimum temperature at 2 metres since previous post-processing',
+            'shortNameECMWF': 'mn2t',
+            'nameCDM': 'Minimum_temperature_at_2_metres_since_previous_post-processing_surface_1_Hour_2',
+            'product_type': 'forecast',
+        }
+    if 'tasmax' in variables:
+        ds['tasmax'].attrs = {
+            'least_significant_digit': 1,
+            'standard_name': 'air_temperature',
+            'units': 'K',
+            'long_name': 'Maximum temperature at 2 metres since previous post-processing',
+            'nameECMWF': 'Maximum temperature at 2 metres since previous post-processing',
+            'shortNameECMWF': 'mx2t',
+            'nameCDM': 'Maximum_temperature_at_2_metres_since_previous_post-processing_surface_1_Hour_2',
+            'product_type': 'forecast',
+        }
 
     ds = lon_to_180(ds)
 
