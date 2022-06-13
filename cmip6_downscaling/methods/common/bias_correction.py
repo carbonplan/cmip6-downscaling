@@ -11,6 +11,8 @@ from skdownscale.pointwise_models import (
 )
 from sklearn.preprocessing import QuantileTransformer, StandardScaler
 
+xr.set_options(keep_attrs=True)
+
 VALID_CORRECTIONS = ['absolute', 'relative']
 
 

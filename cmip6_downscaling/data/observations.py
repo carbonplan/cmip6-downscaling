@@ -5,6 +5,8 @@ import xarray as xr
 from . import cat
 from .utils import lon_to_180
 
+xr.set_options(keep_attrs=True)
+
 variable_name_dict = {
     "tasmax": "air_temperature_at_2_metres_1hour_Maximum",
     "tasmin": "air_temperature_at_2_metres_1hour_Minimum",

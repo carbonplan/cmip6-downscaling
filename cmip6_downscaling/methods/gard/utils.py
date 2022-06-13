@@ -9,6 +9,8 @@ from skdownscale.pointwise_models import AnalogRegression, PureAnalog, PureRegre
 
 from ..common.containers import RunParameters
 
+xr.set_options(keep_attrs=True)
+
 
 def get_gard_model(
     model_type: str,
