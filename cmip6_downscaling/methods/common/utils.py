@@ -90,7 +90,9 @@ def apply_land_mask(ds: xr.Dataset) -> xr.Dataset:
     """
     Apply a land mask to a dataset with lat/lon coordinates. Land mask is natural_earth_v5_0_0 buffered by 2 degrees.
 
-    --- Regenerate buffer file --
+    Notes
+    --------
+    # Regenerate buffer file
     import regionmask
     import geopandas as gpd
 
