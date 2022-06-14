@@ -88,7 +88,7 @@ def subset_dataset(
 
 def apply_land_mask(ds: xr.Dataset) -> xr.Dataset:
     """
-    Apply a land mask to a dataset with lat/lon coordinates. 
+    Apply a land mask to a dataset with lat/lon coordinates.
 
     Notes
     --------
