@@ -9,6 +9,7 @@ import regionmask
 import xarray as xr
 import zarr
 from upath import UPath
+import geopandas as gpd
 from xarray_schema import DataArraySchema
 from xarray_schema.base import SchemaError
 
