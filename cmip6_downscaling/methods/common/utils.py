@@ -97,7 +97,7 @@ def apply_land_mask(ds: xr.Dataset) -> xr.Dataset:
     import geopandas as gpd
 
     land = regionmask.defined_regions.natural_earth_v5_0_0.land_10.to_geodataframe()
-    buffer = land.buffer(2)
+    buffer = land.buffer(1)
 
     buffer_gpd = gpd.GeoDataFrame(geometry=gpd.GeoSeries(buffer))
     buffer_gpd.to_file('2deg_buffer_gdf.gpkg', driver="GPKG")
@@ -112,7 +112,7 @@ def apply_land_mask(ds: xr.Dataset) -> xr.Dataset:
     xr.Dataset
     """
     with fsspec.open(
-        'https://cmip6downscaling.blob.core.windows.net/static/2deg_buffer_gdf.gpkg'
+        'https://cmip6downscaling.blob.core.windows.net/static/1deg_buffer_gdf.gpkg'
     ) as file:
         gdf = gpd.read_file(file)
 
