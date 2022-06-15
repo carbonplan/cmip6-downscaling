@@ -18,6 +18,30 @@ from . import containers
 xr.set_options(keep_attrs=True)
 
 
+def validate_zarr_store(target: str):
+    """Validate a zarr store.
+
+    Parameters
+    ----------
+    target : str
+        Path to zarr store.
+
+    """
+
+    store = zarr.open_consolidated(target)
+    variables = list(store.keys())
+    errors = []
+    for variable in variables:
+        variable_array = store[variable]
+        if (variable_array.nchunks_initialized // variable_array.nchunks) != 1:
+            errors.append(
+                f'{variable} has {variable_array.nchunks - variable_array.nchunks_initialized} uninitialized chunks'
+            )
+
+    if errors:
+        raise ValueError(f'Found {len(errors)} errors: {errors}')
+
+
 def zmetadata_exists(path: UPath):
     '''temporary workaround until path.exists() works'''
 
@@ -29,7 +53,7 @@ def zmetadata_exists(path: UPath):
         return (UPath(path) / '.zmetadata').exists()
 
 
-def blocking_to_zarr(ds: xr.Dataset, target):
+def blocking_to_zarr(ds: xr.Dataset, target, validate: bool = True):
     '''helper function to write a xarray Dataset to a zarr store.
 
     The function blocks until the write is complete then writes Zarr's consolidated metadata
@@ -43,6 +67,9 @@ def blocking_to_zarr(ds: xr.Dataset, target):
     t = ds.to_zarr(target, mode='w', compute=False)
     t.compute(retries=5)
     zarr.consolidate_metadata(target)
+
+    if validate:
+        validate_zarr_store(target)
 
 
 def subset_dataset(
