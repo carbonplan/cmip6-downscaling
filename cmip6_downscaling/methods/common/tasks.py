@@ -71,26 +71,22 @@ def get_obs(run_parameters: RunParameters) -> UPath:
     UPath
         Path to subset observation dataset.
     """
-
-    title = "obs ds: {obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}".format(
-        **asdict(run_parameters)
+    feature_string = '_'.join(run_parameters.features)
+    frmt_str = "{obs}_{feature_string}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}".format(
+        **asdict(run_parameters), feature_string=feature_string
     )
-    ds_hash = str_to_hash(
-        "{obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}".format(
-            **asdict(run_parameters)
-        )
-    )
+    title = f"obs ds: {frmt_str}"
+    ds_hash = str_to_hash(frmt_str)
     target = intermediate_dir / 'get_obs' / ds_hash
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
         return target
 
-    ds = open_era5(run_parameters.variable, run_parameters.train_period)
-
+    ds = open_era5(run_parameters.features, run_parameters.train_period)
     subset = subset_dataset(
         ds,
-        run_parameters.variable,
+        run_parameters.features,
         run_parameters.train_period.time_slice,
         run_parameters.bbox,
         chunking_schema={'time': 365, 'lat': 150, 'lon': 150},
@@ -123,8 +119,10 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
         UPath to experiment dataset.
     """
     time_period = getattr(run_parameters, time_subset)
-    frmt_str = "{model}_{member}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{time_period.start}_{time_period.stop}".format(
-        time_period=time_period, **asdict(run_parameters)
+    feature_string = '_'.join(run_parameters.features)
+
+    frmt_str = "{model}_{member}_{scenario}_{feature_string}_{latmin}_{latmax}_{lonmin}_{lonmax}_{time_period.start}_{time_period.stop}".format(
+        time_period=time_period, **asdict(run_parameters), feature_string=feature_string
     )
 
     title = f"experiment ds: {frmt_str}"
@@ -142,12 +140,12 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
         table_id=run_parameters.table_id,
         grid_label=run_parameters.grid_label,
         source_id=run_parameters.model,
-        variable=run_parameters.variable,
+        variable=run_parameters.features,
         time_slice=time_period.time_slice,
     )
 
     subset = subset_dataset(
-        ds, run_parameters.variable, time_period.time_slice, run_parameters.bbox
+        ds, run_parameters.features, time_period.time_slice, run_parameters.bbox
     )
 
     # Note: dataset is chunked into time:365 chunks to standardize leap-year chunking.

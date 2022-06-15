@@ -8,7 +8,7 @@ import regionmask
 import xarray as xr
 import zarr
 from upath import UPath
-from xarray_schema import DataArraySchema
+from xarray_schema import DataArraySchema, DatasetSchema
 from xarray_schema.base import SchemaError
 
 from . import containers
@@ -45,7 +45,7 @@ def blocking_to_zarr(ds: xr.Dataset, target):
 
 def subset_dataset(
     ds: xr.Dataset,
-    variable: str,
+    features: str | list,
     time_period: slice,
     bbox: containers.BBox,
     chunking_schema: dict = None,
@@ -75,9 +75,13 @@ def subset_dataset(
         lat=bbox.lat_slice,
     )
     if chunking_schema is not None:
-        target_schema = DataArraySchema(chunks=chunking_schema)
+        target_schema_array = DataArraySchema(chunks=chunking_schema)
+        schema_dict = {}
+        for feature in features:
+            schema_dict[feature] = target_schema_array
+        target_schema_dataset = DatasetSchema(schema_dict)
         try:
-            target_schema.validate(subset_ds[variable])
+            target_schema_dataset.validate(subset_ds[features])
         except SchemaError:
             subset_ds = subset_ds.chunk(chunking_schema)
 

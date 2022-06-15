@@ -73,6 +73,7 @@ def open_era5(variables: str | list[str], time_period: slice) -> xr.Dataset:
             'nameCDM': 'Maximum_temperature_at_2_metres_since_previous_post-processing_surface_1_Hour_2',
             'product_type': 'forecast',
         }
+    # TODO adjust attrs of other variables
 
     ds = lon_to_180(ds)
 

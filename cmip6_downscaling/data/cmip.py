@@ -125,7 +125,6 @@ def load_cmip(
         keys = list(col_subset.keys())
         if len(keys) != 1:
             raise ValueError(f'intake-esm search returned {len(keys)}, expected exactly 1.')
-
         ds = col_subset[keys[0]]().to_dask()
         if time_slice:
             ds = ds.sel(time=time_slice)
@@ -147,7 +146,7 @@ def get_gcm(
     table_id: str,
     grid_label: str,
     source_id: str,
-    variable: str,
+    variable: str | list[str],
     time_slice: slice,
 ) -> xr.Dataset:
     """
