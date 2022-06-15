@@ -115,7 +115,7 @@ def apply_land_mask(ds: xr.Dataset) -> xr.Dataset:
         'https://cmip6downscaling.blob.core.windows.net/static/1deg_buffer_gdf.gpkg'
     ) as file:
         gdf = gpd.read_file(file)
-    mask = regionmask.from_geopandas(gdf).mask(ds,wrap_lon=False)
+    mask = regionmask.from_geopandas(gdf).mask(ds, wrap_lon=False)
     return ds.where(mask == 0)
 
 
