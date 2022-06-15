@@ -3,6 +3,8 @@ from __future__ import annotations
 import pathlib
 import re
 
+import fsspec
+import geopandas as gpd
 import numpy as np
 import regionmask
 import xarray as xr
@@ -86,7 +88,19 @@ def subset_dataset(
 
 def apply_land_mask(ds: xr.Dataset) -> xr.Dataset:
     """
-    Apply a land mask to a dataset with lat/lon coordinates
+    Apply a land mask to a dataset with lat/lon coordinates.
+
+    Notes
+    --------
+    # Regenerate buffer file
+    import regionmask
+    import geopandas as gpd
+
+    land = regionmask.defined_regions.natural_earth_v5_0_0.land_10.to_geodataframe()
+    buffer = land.buffer(1)
+
+    buffer_gpd = gpd.GeoDataFrame(geometry=gpd.GeoSeries(buffer))
+    buffer_gpd.to_file('2deg_buffer_gdf.gpkg', driver="GPKG")
 
     Parameters
     ----------
@@ -97,8 +111,11 @@ def apply_land_mask(ds: xr.Dataset) -> xr.Dataset:
     -------
     xr.Dataset
     """
-
-    mask = regionmask.defined_regions.natural_earth_v5_0_0.land_10.mask(ds)
+    with fsspec.open(
+        'https://cmip6downscaling.blob.core.windows.net/static/1deg_buffer_gdf.gpkg'
+    ) as file:
+        gdf = gpd.read_file(file)
+    mask = regionmask.from_geopandas(gdf).mask(ds, wrap_lon=False)
     return ds.where(mask == 0)
 
 
