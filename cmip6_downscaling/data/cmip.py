@@ -129,6 +129,9 @@ def load_cmip(
         if time_slice:
             ds = ds.sel(time=time_slice)
         ds = ds.pipe(postprocess)
+        if 'plev' in ds.coords:
+            # select the 500 mb level for winds
+            ds = ds.sel(plev=50000.0).drop('plev')
 
         # convert to mm/day - helpful to prevent rounding errors from very tiny numbers
         if 'pr' in ds:
