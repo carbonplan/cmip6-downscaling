@@ -103,7 +103,7 @@ def get_obs(run_parameters: RunParameters) -> UPath:
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
     print(f'writing {target}', subset)
     subset = set_zarr_encoding(subset)
-    blocking_to_zarr(ds = subset, target=target, validate = True, write_empty_chunks = True)
+    blocking_to_zarr(ds=subset, target=target, validate=True, write_empty_chunks=True)
 
     return target
 
@@ -160,7 +160,7 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
 
     subset = set_zarr_encoding(subset)
-    blocking_to_zarr(ds = subset, target=target, validate = True, write_empty_chunks = True)
+    blocking_to_zarr(ds=subset, target=target, validate=True, write_empty_chunks=True)
     return target
 
 
@@ -321,7 +321,7 @@ def time_summary(ds_path: UPath, freq: str) -> UPath:
 
     out_ds.attrs.update({'title': 'time_summary'}, **get_cf_global_attrs(version=version))
     out_ds = set_zarr_encoding(out_ds)
-    blocking_to_zarr(ds = out_ds, target=target, validate = True, write_empty_chunks = True)
+    blocking_to_zarr(ds=out_ds, target=target, validate=True, write_empty_chunks=True)
 
     return target
 
@@ -445,7 +445,7 @@ def regrid(source_path: UPath, target_grid_path: UPath, weights_path: UPath = No
         {'title': source_ds.attrs['title']}, **get_cf_global_attrs(version=version)
     )
     regridded_ds = set_zarr_encoding(regridded_ds)
-    blocking_to_zarr(ds = regridded_ds, target=target, validate = True, write_empty_chunks = True)
+    blocking_to_zarr(ds=regridded_ds, target=target, validate=True, write_empty_chunks=True)
 
     return target
 
@@ -553,8 +553,8 @@ def pyramid(
 
     # write to target
 
-    blocking_to_zarr(ds = dta, target=target, validate = True, write_empty_chunks = True)
-    blocking_to_zarr(ds = dta, target=target, validate = True, write_empty_chunks = True)
+    blocking_to_zarr(ds=dta, target=target, validate=True, write_empty_chunks=True)
+    blocking_to_zarr(ds=dta, target=target, validate=True, write_empty_chunks=True)
 
     return target
 
