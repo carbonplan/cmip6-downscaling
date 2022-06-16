@@ -27,7 +27,7 @@ from xarray_schema.base import SchemaError
 from ... import __version__ as version, config
 from ...data.cmip import get_gcm
 from ...data.observations import open_era5
-from ...utils import str_to_hash
+from ...utils import str_to_hash, blocking_to_zarr
 from .containers import RunParameters
 from .utils import (
     calc_auspicious_chunks_dict,
@@ -101,8 +101,9 @@ def get_obs(run_parameters: RunParameters) -> UPath:
 
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
     print(f'writing {target}', subset)
-    store = subset.pipe(set_zarr_encoding).to_zarr(target, mode='w', compute=False)
-    store.compute(retries=2)
+    subset = set_zarr_encoding(subset)
+    blocking_to_zarr(ds = subset, target=target, validate = True, write_empty_chunks = True)
+
     return target
 
 
@@ -156,7 +157,9 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
         subset[key].encoding = {}
 
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
-    subset.pipe(set_zarr_encoding).to_zarr(target, mode='w')
+
+    subset = set_zarr_encoding(subset)
+    blocking_to_zarr(ds = subset, target=target, validate = True, write_empty_chunks = True)
     return target
 
 
@@ -316,7 +319,8 @@ def time_summary(ds_path: UPath, freq: str) -> UPath:
     out_ds = resample_wrapper(ds, freq=freq)
 
     out_ds.attrs.update({'title': 'time_summary'}, **get_cf_global_attrs(version=version))
-    out_ds.pipe(set_zarr_encoding).to_zarr(target, mode='w')
+    out_ds = set_zarr_encoding(out_ds)
+    blocking_to_zarr(ds = out_ds, target=target, validate = True, write_empty_chunks = True)
 
     return target
 
@@ -439,7 +443,9 @@ def regrid(source_path: UPath, target_grid_path: UPath, weights_path: UPath = No
     regridded_ds.attrs.update(
         {'title': source_ds.attrs['title']}, **get_cf_global_attrs(version=version)
     )
-    regridded_ds.pipe(set_zarr_encoding).to_zarr(target, mode='w')
+    regridded_ds = set_zarr_encoding(regridded_ds)
+    blocking_to_zarr(ds = regridded_ds, target=target, validate = True, write_empty_chunks = True)
+
     return target
 
 
@@ -545,7 +551,10 @@ def pyramid(
     dta = _pyramid_postprocess(dta, levels=levels, other_chunks=other_chunks)
 
     # write to target
-    dta.to_zarr(target, mode='w')
+
+    blocking_to_zarr(ds = dta, target=target, validate = True, write_empty_chunks = True)
+    blocking_to_zarr(ds = dta, target=target, validate = True, write_empty_chunks = True)
+
     return target
 
 
