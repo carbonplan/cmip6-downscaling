@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import xesmf as xe
-import zarr
 from carbonplan_data.metadata import get_cf_global_attrs
 from prefect import task
 from scipy.special import cbrt
