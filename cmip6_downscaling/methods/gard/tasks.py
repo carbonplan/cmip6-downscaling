@@ -65,7 +65,7 @@ def coarsen_and_interpolate(fine_path: UPath, coarse_path: UPath) -> UPath:
         {'title': 'coarsen_and_interpolate'}, **get_cf_global_attrs(version=version)
     )
     interpolated_ds = set_zarr_encoding(interpolated_ds)
-    blocking_to_zarr(ds = interpolated_ds, target=target, validate = True, write_empty_chunks = True)
+    blocking_to_zarr(ds=interpolated_ds, target=target, validate=True, write_empty_chunks=True)
 
     return target
 
@@ -195,8 +195,7 @@ def fit_and_predict(
     # remove apply_land_mask after scikit-downscale#110 is merged
 
     out_ds = out.pipe(apply_land_mask).pipe(set_zarr_encoding)
-    blocking_to_zarr(ds = out_ds, target=target, validate = True, write_empty_chunks = True)
-
+    blocking_to_zarr(ds=out_ds, target=target, validate=True, write_empty_chunks=True)
 
     return target
 
@@ -264,6 +263,6 @@ def read_scrf(prediction_path: UPath, run_parameters: RunParameters):
 
     scrf = dask.optimize(scrf)[0]
     scrf = set_zarr_encoding(scrf)
-    blocking_to_zarr(ds = scrf, target=target, validate = True, write_empty_chunks = True)
+    blocking_to_zarr(ds=scrf, target=target, validate=True, write_empty_chunks=True)
 
     return target
