@@ -27,7 +27,7 @@ from xarray_schema.base import SchemaError
 from ... import __version__ as version, config
 from ...data.cmip import get_gcm
 from ...data.observations import open_era5
-from ...utils import str_to_hash, blocking_to_zarr
+from ...utils import str_to_hash
 from .containers import RunParameters
 from .utils import (
     calc_auspicious_chunks_dict,
@@ -35,6 +35,7 @@ from .utils import (
     set_zarr_encoding,
     subset_dataset,
     zmetadata_exists,
+    blocking_to_zarr
 )
 
 xr.set_options(keep_attrs=True)
