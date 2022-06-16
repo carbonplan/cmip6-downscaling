@@ -68,7 +68,7 @@ def blocking_to_zarr(
         target = f'az://flow-outputs{str(target)}'
 
     if write_empty_chunks:
-        if packaging.version.Version(xr.__version__) < packaging.version.Version('2022.06'):
+        if packaging.version.Version(xr.__version__) < packaging.version.Version('2022.6'):
             raise NotImplementedError(
                 f'`write_empty_chunks` not supported in xarray < 2022.06. Your xarray version is: {xr.__version__}'
             )

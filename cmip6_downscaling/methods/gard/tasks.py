@@ -108,7 +108,6 @@ def _fit_and_predict_wrapper(xtrain, ytrain, xpred, scrf, run_parameters, dim='t
 
     # model prediction
     downscaled = add_random_effects(out, scrf.scrf, run_parameters)
-
     return downscaled
 
 
