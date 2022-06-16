@@ -6,6 +6,7 @@ import re
 import fsspec
 import geopandas as gpd
 import numpy as np
+import packaging.version
 import regionmask
 import xarray as xr
 import zarr
@@ -53,7 +54,9 @@ def zmetadata_exists(path: UPath):
         return (UPath(path) / '.zmetadata').exists()
 
 
-def blocking_to_zarr(ds: xr.Dataset, target, validate: bool = True):
+def blocking_to_zarr(
+    ds: xr.Dataset, target, validate: bool = True, write_empty_chunks: bool = True
+):
     '''helper function to write a xarray Dataset to a zarr store.
 
     The function blocks until the write is complete then writes Zarr's consolidated metadata
@@ -64,6 +67,12 @@ def blocking_to_zarr(ds: xr.Dataset, target, validate: bool = True):
         print('fell back to using a string target')
         target = f'az://flow-outputs{str(target)}'
 
+    if write_empty_chunks:
+        if packaging.version.Version(xr.__version__) < packaging.version.Version('2022.06'):
+            raise NotImplementedError('write_empty_chunks not supported in xarray < 2022.06')
+
+        for variable in ds.data_vars:
+            ds[variable].encoding['write_empty_chunks'] = True
     t = ds.to_zarr(target, mode='w', compute=False)
     t.compute(retries=5)
     zarr.consolidate_metadata(target)
