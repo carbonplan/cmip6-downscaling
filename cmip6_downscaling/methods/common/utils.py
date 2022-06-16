@@ -33,7 +33,7 @@ def validate_zarr_store(target: str):
     errors = []
     for variable in variables:
         variable_array = store[variable]
-        if (variable_array.nchunks_initialized // variable_array.nchunks) != 1:
+        if (variable_array.nchunks_initialized == variable_array.nchunks):
             errors.append(
                 f'{variable} has {variable_array.nchunks - variable_array.nchunks_initialized} uninitialized chunks'
             )
