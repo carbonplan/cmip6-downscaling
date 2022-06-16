@@ -83,7 +83,7 @@ def _fit_and_predict_wrapper(xtrain, ytrain, xpred, scrf, run_parameters, dim='t
             bias_correct_gcm_by_method(
                 gcm_pred=xpred[feature],
                 method=run_parameters.bias_correction_method,
-                bc_kwargs=kws,
+                bc_kwargs=kws[feature],
                 obs=xtrain[feature],
             )
             .sel(variable='variable_0')
@@ -100,10 +100,7 @@ def _fit_and_predict_wrapper(xtrain, ytrain, xpred, scrf, run_parameters, dim='t
         xtrain['pr'] = cbrt(xtrain['pr'])
     if 'pr' == run_parameters.variable:
         ytrain['pr'] = cbrt(ytrain['pr'])
-    print(xtrain[run_parameters.features])
-    print(ytrain[run_parameters.variable])
     # TODO: at this point there is negative precip in some chunks - why?
-    print(bias_corrected_gcm_pred[run_parameters.features])
     # <xarray.Dataset>
     # Dimensions:  (time: 23376, lat: 5, lon: 48)
     # Coordinates:
