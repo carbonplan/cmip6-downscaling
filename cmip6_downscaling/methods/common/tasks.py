@@ -30,12 +30,12 @@ from ...data.observations import open_era5
 from ...utils import str_to_hash
 from .containers import RunParameters
 from .utils import (
+    blocking_to_zarr,
     calc_auspicious_chunks_dict,
     resample_wrapper,
     set_zarr_encoding,
     subset_dataset,
     zmetadata_exists,
-    blocking_to_zarr
 )
 
 xr.set_options(keep_attrs=True)
