@@ -35,6 +35,7 @@ from .utils import (
     resample_wrapper,
     set_zarr_encoding,
     subset_dataset,
+    validate_zarr_store,
     zmetadata_exists,
 )
 
@@ -278,8 +279,10 @@ def rechunk(
         max_mem=max_mem,
         target_store=target_store,
         temp_store=temp_store,
-        target_options={k: {'compressor': zarr.Blosc(clevel=1)} for k in chunks_dict},
-        temp_options={k: {'compressor': None} for k in chunks_dict},
+        target_options={
+            k: {'compressor': zarr.Blosc(clevel=1), 'write_empty_chunks': True} for k in chunks_dict
+        },
+        temp_options={k: {'compressor': None, 'write_empty_chunks': True} for k in chunks_dict},
         executor='dask',
     )
 
@@ -287,6 +290,8 @@ def rechunk(
 
     # consolidate_metadata here since when it comes out of rechunker it isn't consolidated.
     zarr.consolidate_metadata(target_store)
+    validate_zarr_store(target_store)
+
     temp_store.clear()
     return target
 
