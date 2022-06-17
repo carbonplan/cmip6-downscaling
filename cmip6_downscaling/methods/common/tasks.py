@@ -123,8 +123,14 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     """
     if time_subset == 'both':
         time_period = TimePeriod(
-            start=str(min(int(run_parameters.train_period.start), int(run_parameters.predict_period.start))),
-            stop=str(max(int(run_parameters.train_period.stop), int(run_parameters.predict_period.stop)))
+            start=str(
+                min(
+                    int(run_parameters.train_period.start), int(run_parameters.predict_period.start)
+                )
+            ),
+            stop=str(
+                max(int(run_parameters.train_period.stop), int(run_parameters.predict_period.stop))
+            ),
         )
     else:
         time_period = getattr(run_parameters, time_subset)
@@ -149,15 +155,17 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     ds_list = []
 
     for s in scenarios:
-        ds_list.append(get_gcm(
-            scenario=s,
-            member_id=run_parameters.member,
-            table_id=run_parameters.table_id,
-            grid_label=run_parameters.grid_label,
-            source_id=run_parameters.model,
-            variable=run_parameters.variable,
-            time_slice=time_period.time_slice,
-        ))
+        ds_list.append(
+            get_gcm(
+                scenario=s,
+                member_id=run_parameters.member,
+                table_id=run_parameters.table_id,
+                grid_label=run_parameters.grid_label,
+                source_id=run_parameters.model,
+                variable=run_parameters.variable,
+                time_slice=time_period.time_slice,
+            )
+        )
     ds = xr.concat(ds_list, dim='time')
 
     subset = subset_dataset(
