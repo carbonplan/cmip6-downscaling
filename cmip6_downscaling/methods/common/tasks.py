@@ -126,8 +126,14 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
 
     if time_subset == 'both':
         time_period = TimePeriod(
-            start=str(min(int(run_parameters.train_period.start), int(run_parameters.predict_period.start))),
-            stop=str(max(int(run_parameters.train_period.stop), int(run_parameters.predict_period.stop)))
+            start=str(
+                min(
+                    int(run_parameters.train_period.start), int(run_parameters.predict_period.start)
+                )
+            ),
+            stop=str(
+                max(int(run_parameters.train_period.stop), int(run_parameters.predict_period.stop))
+            ),
         )
     else:
         time_period = getattr(run_parameters, time_subset)
@@ -176,9 +182,7 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
         subset = subset.chunk({'time': 365})
         for key in subset.variables:
             subset[key].encoding = {}
-
         subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
-
         subset = set_zarr_encoding(subset)
         subset[[feature]].to_zarr(target, mode=mode)
         mode = 'a'

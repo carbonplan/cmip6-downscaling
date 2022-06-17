@@ -217,10 +217,12 @@ def bias_correction(
                 train_y,  # dataarray
             )
 
-            bc_data = bias_correction_model.predict(X=gcm_batch) 
+            bc_data = bias_correction_model.predict(X=gcm_batch)
             # needs the .compute here otherwise the code fails with errors
             # TODO: not sure if this is scalable
-            bc_result.append(bc_data.sel(time=bc_data.time.dt.dayofyear.isin(c)))  # JH: removed .compute() from this line
+            bc_result.append(
+                bc_data.sel(time=bc_data.time.dt.dayofyear.isin(c))
+            )  # JH: removed .compute() from this line
 
         ds_out[var] = xr.concat(bc_result, dim='time').sortby('time')
 
@@ -264,32 +266,50 @@ def construct_analogs(
     downscaled : xr.Dataset
         The downscaled dataset
     """
-    # make sure the input data is valid with the correct shape and dims
     for dim in ['time', 'lat', 'lon']:
         for ds in [ds_gcm, ds_obs_coarse, ds_obs_fine]:
             assert dim in ds.dims
-    assert len(ds_obs_coarse.time) == len(ds_obs_fine.time)
+    if len(ds_obs_coarse.time) != len(ds_obs_fine.time):
+        raise ValueError('ds_obs_coarse is not the same length as ds_obs_fine')
 
     # work with dataarrays instead of datasets
     ds_gcm = ds_gcm[label]
     ds_obs_coarse = ds_obs_coarse[label]
     ds_obs_fine = ds_obs_fine[label]
 
-    print('ds_gcm', ds_gcm)
-    print('ds_obs_coarse', ds_obs_coarse)
-    # print('ds_obs_fine', ds_obs_fine)
+    # initialize a regridder to interpolate the residuals from coarse to fine scale later
+    def _make_template(da):
+        temp = da.isel(time=0)
+        template = temp.to_dataset(name=da.name)
+        template['mask'] = temp.notnull()
+        return template
 
+    coarse_template = _make_template(ds_obs_coarse)
+    fine_template = _make_template(ds_obs_fine)
+
+    print('making regridder')
+    regridder = xe.Regridder(
+        coarse_template,
+        fine_template,
+        "bilinear",
+        extrap_method="nearest_s2d",
+    )
+
+    print('sizes')
     # get dimension sizes from input data
     domain_shape_coarse = (len(ds_obs_coarse.lat), len(ds_obs_coarse.lon))
     n_pixel_coarse = domain_shape_coarse[0] * domain_shape_coarse[1]
 
+    print('loading X and Y')
     # rename the time dimension to keep track of them
     X = ds_obs_coarse.rename({'time': 'ndays_in_obs'})  # coarse obs
     y = ds_gcm.rename({'time': 'ndays_in_gcm'})  # coarse gcm
 
     # get rmse between each GCM slices to be downscaled and each observation slices
     # will have the shape ndays_in_gcm x ndays_in_obs
-    rmse = np.sqrt(((X - y) ** 2).sum(dim=['lat', 'lon'])) / n_pixel_coarse
+    print('rmse')
+    rmse = (np.sqrt(((X - y) ** 2).sum(dim=['lat', 'lon'])) / n_pixel_coarse).load()
+    print('done with rmse')
 
     # get a day of year mask in the same shape of rmse according to the day range input
     mask = get_doy_mask(
@@ -300,95 +320,70 @@ def construct_analogs(
 
     # find the indices with the lowest rmse within the day of year constraint
     dim_order = ['ndays_in_gcm', 'ndays_in_obs']
-    print('rmse', rmse)
-    print('loading rmse')
-    rmse = rmse.load()
-    inds = rmse.where(mask).argsort(axis=rmse.get_axis_num('ndays_in_obs'))
-
-    # inds = (
-    #     xr.apply_ufunc(
-    #         np.argsort,
-    #         rmse.where(mask),
-    #         vectorize=True,
-    #         input_core_dims=[['ndays_in_obs']],
-    #         output_core_dims=[['ndays_in_obs']],
-    #         # dask='parallelized',
-    #         output_dtypes=['int'],
-    #         # dask_gufunc_kwargs={'allow_rechunk': True},
-    #     )
-    #     .isel(ndays_in_obs=slice(0, n_analogs))
-    #     .transpose(*dim_order)
-    #     # .compute()
-    # )
-
+    inds = rmse.where(mask).argsort(axis=rmse.get_axis_num('ndays_in_obs')).isel(ndays_in_obs=slice(0, n_analogs)).transpose(*dim_order)
     # rearrage the data into tabular format in order to train linear regression models to get coefficients
     X = X.stack(pixel_coarse=['lat', 'lon'])
+    X = X.where(X.notnull(), drop=True)
     y = y.stack(pixel_coarse=['lat', 'lon'])
+    y = y.where(y.notnull(), drop=True)
 
     # initialize models to be used
     lr_model = LinearRegression()
 
-    # TODO: check if the rechunk can be removed
-    # initialize a regridder to interpolate the residuals from coarse to fine scale later
-    coarse_template = ds_obs_coarse.isel(time=0).to_dataset(name=label)  #.chunk({'lat': -1, 'lon': -1})
-    fine_template = ds_obs_fine.isel(time=0).to_dataset(name=label)  #.chunk({'lat': -1, 'lon': -1})
-
-    print(coarse_template)
-    print(fine_template)
-
-    regridder = xe.Regridder(
-        coarse_template,
-        fine_template,
-        "bilinear",
-        extrap_method="nearest_s2d",
-    )
-
-    # initialize output
+    # initialize temporary variables
     downscaled = []
+    residuals = []
+    coefs = []
+    intercepts = []
+    obs_analogs = []
+
+    print('loading X and y')
+    X = X.load()
+    y = y.load()
+
     # train a linear regression model for each day in coarsen GCM dataset, where the features are each coarsened observation
     # analogs, and examples are each pixels within the coarsened domain
+    print('starting for loop')
     for i in range(len(y)):
+
         # get data from the GCM day being downscaled
-        yi = y.isel(ndays_in_gcm=i)
-        print('yi', yi.load())
+        yi = y.isel(ndays_in_gcm=i).load()
         # get data from the coarsened obs analogs
         ind = inds.isel(ndays_in_gcm=i).values
-        print('ind', ind)
-
+        
+        # save obs_analogs for later
+        obs_analogs.append(ds_obs_fine.isel(time=ind).rename({'time': 'analog'}).drop('analog'))
+        
         xi = X.isel(ndays_in_obs=ind).transpose('pixel_coarse', 'ndays_in_obs')
-        print('xi', xi.load())
 
         # fit model
-
-        x_valid_mask = ~np.isnan(xi)
-        y_valid_mask = ~np.isnan(yi)
-        np.testing.assert_equal(x_valid_mask, y_valid_mask)
-
-        lr_model.fit(
-            xi[x_valid_mask],
-            yi[y_valid_mask]
-        )
-        # save the residuals to be interpolated and included in the final prediction
+        lr_model.fit(xi, yi)
+        coefs.append(lr_model.coef_)
+        intercepts.append(lr_model.intercept_)
+        
         residual = yi - lr_model.predict(xi)
+        residual = residual.unstack('pixel_coarse')
 
-        # chunk so that residual is spatially contiguous before interpolation
-        # TODO: check if the rechunk can be removed
-        residual = residual.unstack('pixel_coarse').chunk({'lat': -1, 'lon': -1})
-        interpolated_residual = regridder(residual)
+        residuals.append(residual)
 
-        # construct fine scale prediction by combining the fine scale analogs with the coefficients found in the linear model
-        # then add the intercept and interpolated residuals
-        fine_pred = (
-            (ds_obs_fine.isel(time=ind).transpose('lat', 'lon', 'time') * lr_model.coef_).sum(
-                dim='time'
-            )
-            + lr_model.intercept_
-            + interpolated_residual
-        )
-        fine_pred = fine_pred.rename({'ndays_in_gcm': 'time'}).drop('dayofyear')
-        downscaled.append(fine_pred)
+    # reconstruct xarray objects from temporary lists
+    residuals = xr.concat(residuals, dim='ndays_in_gcm').rename({'ndays_in_gcm': 'time'})
+    coefs = xr.DataArray(coefs, dims=('time', 'analog'), coords={'time': residuals.time})
+    intercepts = xr.DataArray(intercepts, coords={'time': residuals.time})
+    obs_analogs = xr.concat(obs_analogs, dim='time')
 
-    downscaled = xr.concat(downscaled, dim='time').sortby('time')
-    downscaled = downscaled.to_dataset(name=label)
+    print('regridding residuals')
+    # interpolate residuals to fine grid
+    interpolated_residual = regridder(residuals)
+
+    # combine obs analogs with residuals
+    fine_pred = (
+        (obs_analogs * coefs).sum(dim='analog')
+        + intercepts
+        + interpolated_residual
+    )
+
+    downscaled = fine_pred.to_dataset(name=label)
+    print('done with everything')
 
     return downscaled
