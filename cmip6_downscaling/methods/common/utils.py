@@ -69,7 +69,7 @@ def blocking_to_zarr(
 
     if write_empty_chunks:
         if packaging.version.Version(
-            packaging.version.Version("2022.06.0.rc0").base_version
+            packaging.version.Version(xr.__version__).base_version
         ) >= packaging.version.Version("2022.06"):
             raise NotImplementedError(
                 f'`write_empty_chunks` not supported in xarray < 2022.06. Your xarray version is: {xr.__version__}'
