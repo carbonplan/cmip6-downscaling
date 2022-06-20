@@ -62,11 +62,6 @@ def blocking_to_zarr(
     The function blocks until the write is complete then writes Zarr's consolidated metadata
     '''
 
-    # testing a workaround
-    if str(target).startswith('/'):
-        print('fell back to using a string target')
-        target = f'az://flow-outputs{str(target)}'
-
     if write_empty_chunks:
         if packaging.version.Version(
             packaging.version.Version(xr.__version__).base_version
