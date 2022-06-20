@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import xesmf as xe
-import zarr
 from carbonplan_data.metadata import get_cf_global_attrs
 from prefect import task
 from scipy.special import cbrt
@@ -16,7 +15,7 @@ from upath import UPath
 from ... import __version__ as version, config
 from ..common.bias_correction import bias_correct_gcm_by_method
 from ..common.containers import RunParameters, str_to_hash
-from ..common.utils import apply_land_mask, set_zarr_encoding, zmetadata_exists
+from ..common.utils import apply_land_mask, blocking_to_zarr, set_zarr_encoding, zmetadata_exists
 from .utils import add_random_effects, get_gard_model
 
 xr.set_options(keep_attrs=True)
@@ -64,7 +63,9 @@ def coarsen_and_interpolate(fine_path: UPath, coarse_path: UPath) -> UPath:
     interpolated_ds.attrs.update(
         {'title': 'coarsen_and_interpolate'}, **get_cf_global_attrs(version=version)
     )
-    interpolated_ds.pipe(set_zarr_encoding).to_zarr(target, mode='w')
+    interpolated_ds = set_zarr_encoding(interpolated_ds)
+    blocking_to_zarr(ds=interpolated_ds, target=target, validate=True, write_empty_chunks=True)
+
     return target
 
 
@@ -107,7 +108,6 @@ def _fit_and_predict_wrapper(xtrain, ytrain, xpred, scrf, run_parameters, dim='t
 
     # model prediction
     downscaled = add_random_effects(out, scrf.scrf, run_parameters)
-
     return downscaled
 
 
@@ -191,14 +191,10 @@ def fit_and_predict(
     out.attrs.update({'title': 'gard_fit_and_predict'}, **get_cf_global_attrs(version=version))
     out = dask.optimize(out)[0]
     # remove apply_land_mask after scikit-downscale#110 is merged
-    t = (
-        out.pipe(apply_land_mask)
-        .pipe(set_zarr_encoding)
-        .to_zarr(target, compute=False, mode='w', consolidated=False)
-    )
-    t.compute(retries=2)
 
-    zarr.consolidate_metadata(target)
+    out_ds = out.pipe(apply_land_mask).pipe(set_zarr_encoding)
+    blocking_to_zarr(ds=out_ds, target=target, validate=True, write_empty_chunks=True)
+
     return target
 
 
@@ -264,8 +260,7 @@ def read_scrf(prediction_path: UPath, run_parameters: RunParameters):
     )
 
     scrf = dask.optimize(scrf)[0]
-    t = scrf.pipe(set_zarr_encoding).to_zarr(target, compute=False, mode='w', consolidated=False)
-    t.compute(retries=2)
-    zarr.consolidate_metadata(target)
+    scrf = set_zarr_encoding(scrf)
+    blocking_to_zarr(ds=scrf, target=target, validate=True, write_empty_chunks=True)
 
     return target

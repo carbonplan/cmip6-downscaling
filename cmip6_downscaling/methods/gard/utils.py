@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import numpy as np
 import xarray as xr
 from scipy.special import cbrt
 from scipy.stats import norm as norm
@@ -77,7 +78,7 @@ def add_random_effects(
             downscaled = model_output['pred'] + r_normal * model_output['prediction_error']
 
         # what do we do for thresholds like heat wave?
-        valids = xr.ufuncs.logical_or(mask, downscaled >= 0)
+        valids = np.logical_or(mask, downscaled >= 0)
         downscaled = downscaled.where(valids, 0)
         downscaled = downscaled.where(downscaled >= 0, 0)
 
