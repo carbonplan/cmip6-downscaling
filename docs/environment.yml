@@ -8,7 +8,7 @@ dependencies:
   - ipykernel
   - ipython
   - setuptools
-  - sphinx
+  - sphinx==4.5.0
   - numpydoc
   - myst-nb
   # this project's dependencies
