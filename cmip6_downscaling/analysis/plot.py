@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 import xarray as xr
-from carbonplan import styles
+
 
 def plot_cdfs(
     obs: xr.Dataset,
@@ -70,7 +70,7 @@ def plot_cdfs(
                 label=f'ERA5 ({train_period.start}-{train_period.stop})',
                 ax=ax,
                 color='#ebebec',  # chalk, carbon is '#1b1e23',
-                log_scale=log_transform
+                log_scale=log_transform,
             )
         )
         labels.append(f'ERA5 ({train_period.start}-{train_period.stop})')
@@ -81,8 +81,7 @@ def plot_cdfs(
                     label=f'Downscaled GCM ({train_period.start}-{train_period.stop})',
                     color='#8b9fd1',
                     ax=ax,
-                    log_scale=log_transform
-
+                    log_scale=log_transform,
                 )
             )
             labels.append(f'Downscaled GCM ({train_period.start}-{train_period.stop})')
@@ -93,8 +92,7 @@ def plot_cdfs(
                     label=f'Downscaled GCM ({predict_period.start}-{predict_period.stop})',
                     ax=ax,
                     color='#f16f71',
-                    log_scale=log_transform
-
+                    log_scale=log_transform,
                 )
             )
             labels.append(f'Downscaled GCM ({predict_period.start}-{predict_period.stop})')
@@ -106,7 +104,7 @@ def plot_cdfs(
                     ax=ax,
                     color='#8b9fd1',
                     linestyle='--',
-                    log_scale=log_transform
+                    log_scale=log_transform,
                 )
             )
             labels.append(f'Raw GCM ({train_period.start}-{train_period.stop})')
@@ -118,7 +116,7 @@ def plot_cdfs(
                     ax=ax,
                     color='#f16f71',
                     linestyle='--',
-                    log_scale=log_transform
+                    log_scale=log_transform,
                 )
             )
             labels.append(f'Raw GCM ({predict_period.start}-{predict_period.stop})')
@@ -137,7 +135,7 @@ def plot_cdfs(
 def plot_values_and_difference(
     ds1: xr.Dataset,
     ds2: xr.Dataset,
-    var_limits: tuple = (0,10),
+    var_limits: tuple = (0, 10),
     diff_limit: float = 10.0,
     cbar_kwargs: dict = {},
     title1: str = '',
@@ -148,7 +146,7 @@ def plot_values_and_difference(
     metric: str = 'mean',
     diff_method: str = 'absolute',
     cmap: str = 'fire_light',
-    cmap_diff: str = 'orangeblue_light_r'
+    cmap_diff: str = 'orangeblue_light_r',
 ) -> mpl.figure.Figure:
     """Plot two datasets and their difference
 
@@ -221,9 +219,9 @@ def plot_values_and_difference(
     if diff_limit:
         diff_limits = {variable: {metric: diff_limit}}
     if diff_method == 'absolute':
-        difference = (ds2 - ds1)
+        difference = ds2 - ds1
     elif diff_method == 'percent':
-        difference = ((ds2 - ds1)/ds1)*100
+        difference = ((ds2 - ds1) / ds1) * 100
     if city_coords is not None:
         plot1 = axarr[0].scatter(
             x=city_coords.lon,
@@ -231,7 +229,7 @@ def plot_values_and_difference(
             c=ds1,
             cmap="fire_light",
             transform=ccrs.PlateCarree(),
-            vmax=var_limit[variable][metric]
+            vmax=var_limit[variable][metric],
         )
         fig.colorbar(plot1, ax=axarr[0]).set_label(f'{variable}')
 
@@ -241,10 +239,10 @@ def plot_values_and_difference(
             c=ds2,
             cmap="fire_light",
             transform=ccrs.PlateCarree(),
-            vmax=var_limit[variable][metric]
+            vmax=var_limit[variable][metric],
         )
         fig.colorbar(plot2, ax=axarr[1]).set_label(f'{variable}')
-        diff = axarr[2].scatter(
+        difference_plot = axarr[2].scatter(
             x=city_coords.lon,
             y=city_coords.lat,
             c=difference,
@@ -253,14 +251,24 @@ def plot_values_and_difference(
             vmin=-diff_limits[variable][metric],
             vmax=diff_limits[variable][metric],
         )
-        fig.colorbar(difference, ax=axarr[2]).set_label(f'{variable}')
+        fig.colorbar(difference_plot, ax=axarr[2]).set_label(f'{variable}')
     else:
-        ds1.plot(ax=axarr[0], vmin=var_limit[variable][metric][0],
-        vmax=var_limit[variable][metric][1],
-                cmap=cmap,cbar_kwargs=cbar_kwargs, robust=True)
-        ds2.plot(ax=axarr[1], vmin=var_limit[variable][metric][0],
-        vmax=var_limit[variable][metric][1],
-        cmap=cmap,cbar_kwargs=cbar_kwargs, robust=True)
+        ds1.plot(
+            ax=axarr[0],
+            vmin=var_limit[variable][metric][0],
+            vmax=var_limit[variable][metric][1],
+            cmap=cmap,
+            cbar_kwargs=cbar_kwargs,
+            robust=True,
+        )
+        ds2.plot(
+            ax=axarr[1],
+            vmin=var_limit[variable][metric][0],
+            vmax=var_limit[variable][metric][1],
+            cmap=cmap,
+            cbar_kwargs=cbar_kwargs,
+            robust=True,
+        )
         difference.plot(
             ax=axarr[2],
             cmap=cmap_diff,
@@ -277,9 +285,12 @@ def plot_values_and_difference(
     # return fig
 
 
-def plot_seasonal(ds1: xr.Dataset, ds2: xr.Dataset,
+def plot_seasonal(
+    ds1: xr.Dataset,
+    ds2: xr.Dataset,
     cmap: str = 'fire_light',
-    cmap_diff: str = 'orangeblue_light_r') -> mpl.figure.Figure:
+    cmap_diff: str = 'orangeblue_light_r',
+) -> mpl.figure.Figure:
     """Plot the seasonality of two datasets and the difference between them
 
     Parameters
