@@ -11,6 +11,8 @@ from skdownscale.pointwise_models import (
 )
 from sklearn.preprocessing import QuantileTransformer, StandardScaler
 
+xr.set_options(keep_attrs=True)
+
 VALID_CORRECTIONS = ['absolute', 'relative']
 
 
@@ -33,7 +35,7 @@ def bias_correct_obs_by_method(
         sc.fit(da_obs)
         return sc.transform(da_obs)
 
-    elif method in ['quantile_map', 'detrended_quantile_map', 'none']:
+    elif method in {'quantile_map', 'detrended_quantile_map', 'none'}:
         return da_obs
 
     else:
@@ -54,15 +56,7 @@ def bias_correct_gcm_by_method(
     obs: xr.DataArray | xr.Dataset = None,
     gcm_hist: xr.DataArray | xr.Dataset = None,
 ):
-    if method == 'quantile_transform':
-        # transform gcm
-        if 'n_quantiles' not in bc_kwargs:
-            bc_kwargs['n_quantiles'] = len(obs.time)
-
-        qt = PointWiseDownscaler(model=QuantileTransformer(**bc_kwargs))
-        qt.fit(gcm_hist)
-        return qt.transform(gcm_pred)
-    elif method == 'cunnane_transform':
+    if method == 'cunnane_transform':
         return bc_kwargs['transformer_interp'].transform(gcm_pred)
 
     elif method == 'z_score':
@@ -71,7 +65,7 @@ def bias_correct_gcm_by_method(
         sc.fit(gcm_hist)
         return sc.transform(gcm_pred)
     elif method == 'quantile_mapper':
-        qm = PointWiseDownscaler(model=QuantileMapper(detrend=True), dim='time')
+        qm = PointWiseDownscaler(model=QuantileMapper(**bc_kwargs), dim='time')
         qm.fit(obs)
         return qm.transform(gcm_pred)
 
@@ -92,6 +86,14 @@ def bias_correct_gcm_by_method(
     elif method == 'none':
         return gcm_pred
 
+    elif method == 'quantile_transform':
+        # transform gcm
+        if 'n_quantiles' not in bc_kwargs:
+            bc_kwargs['n_quantiles'] = len(obs.time)
+
+        qt = PointWiseDownscaler(model=QuantileTransformer(**bc_kwargs))
+        qt.fit(gcm_hist)
+        return qt.transform(gcm_pred)
     else:
         available_methods = [
             'quantile_transform',

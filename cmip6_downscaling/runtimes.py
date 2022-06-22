@@ -5,7 +5,8 @@ from abc import abstractmethod
 from functools import cached_property
 
 import dask
-from dask_kubernetes import KubeCluster, make_pod_spec
+
+# from dask_kubernetes import KubeCluster, make_pod_spec
 from prefect.executors import DaskExecutor, Executor, LocalDaskExecutor, LocalExecutor
 from prefect.run_configs import KubernetesRun, LocalRun, RunConfig
 from prefect.storage import Azure, Local, Storage
@@ -87,24 +88,12 @@ class CloudRuntime(BaseRuntime):
     @cached_property
     def executor(self) -> Executor:
 
-        pod_spec = make_pod_spec(
-            image=config.get("runtime.cloud.image"),
-            memory_limit=config.get("runtime.cloud.pod_memory_limit"),
-            memory_request=config.get("runtime.cloud.pod_memory_request"),
-            threads_per_worker=config.get("runtime.cloud.pod_threads_per_worker"),
-            cpu_limit=config.get("runtime.cloud.pod_cpu_limit"),
-            cpu_request=config.get("runtime.cloud.pod_cpu_request"),
-            env=self._generate_env(),
-        )
-
         executor = DaskExecutor(
-            cluster_class=lambda: KubeCluster(
-                pod_spec, deploy_mode=config.get("runtime.cloud.deploy_mode")
-            ),
-            adapt_kwargs={
-                "minimum": config.get("runtime.cloud.adapt_min"),
-                "maximum": config.get("runtime.cloud.adapt_max"),
-            },
+            cluster_kwargs={
+                'resources': {'taskslots': 1},
+                'n_workers': config.get("runtime.cloud.n_workers"),
+                'threads_per_worker': config.get("runtime.cloud.threads_per_worker"),
+            }
         )
 
         return executor
@@ -163,53 +152,6 @@ class PangeoRuntime(LocalRuntime):
         return _threadsafe_env_vars
 
 
-class GatewayRuntime(PangeoRuntime):
-    def __init__(self):
-        from dask_gateway import Gateway
-
-        self._gateway = Gateway()
-
-        if config.get("runtime.gateway.cluster_name"):
-            # connect to an existing cluster
-            self._cluster = self._gateway.get_cluster(config.get("runtime.gateway.cluster_name"))
-        else:
-            # create a new cluster
-            options = self._gateway.cluster_options(use_local_defaults=False)
-            options['worker_cores'] = config.get("runtime.gateway.worker_cores")
-            options['worker_memory'] = config.get("runtime.gateway.worker_memory")
-            options['image'] = config.get("runtime.gateway.image")
-            options['environment'].update(self._generate_env())
-
-            self._cluster = self._gateway.new_cluster(
-                cluster_options=options, shutdown_on_close=True
-            )
-            self._cluster.adapt(
-                minimum=config.get("runtime.gateway.adapt_min"),
-                maximum=config.get("runtime.gateway.adapt_max"),
-            )
-
-    @cached_property
-    def executor(self) -> Executor:
-
-        print('cluster info:')
-        print(self._cluster)
-        print(self._cluster.name)
-        print(self._cluster.dashboard_link)
-
-        return DaskExecutor(
-            address=self._cluster.scheduler_address,
-            client_kwargs={"security": self._cluster.security},
-        )
-
-    def _generate_env(self):
-        env = {**_threadsafe_env_vars}
-        if config.get("runtime.gateway.extra_pip_packages"):
-            env['EXTRA_PIP_PACKAGES'] = config.get("runtime.gateway.extra_pip_packages")
-        if 'AZURE_STORAGE_CONNECTION_STRING' in os.environ:
-            env['AZURE_STORAGE_CONNECTION_STRING'] = os.environ['AZURE_STORAGE_CONNECTION_STRING']
-        return env
-
-
 def get_runtime():
     if config.get("run_options.runtime") == "ci":
         runtime = CIRuntime()
@@ -219,8 +161,6 @@ def get_runtime():
         runtime = CloudRuntime()
     elif config.get("run_options.runtime") == "pangeo":
         runtime = PangeoRuntime()
-    elif config.get("run_options.runtime") == "gateway":
-        runtime = GatewayRuntime()
     elif os.environ.get("CI") == "true":
         runtime = CIRuntime()
         print("CIRuntime selected from os.environ")

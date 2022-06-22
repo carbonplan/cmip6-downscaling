@@ -1,6 +1,9 @@
 import numpy as np
+import xarray as xr
 import xclim
 from xarray.core.types import T_Xarray
+
+xr.set_options(keep_attrs=True)
 
 
 def to_standard_calendar(obj: T_Xarray) -> T_Xarray:

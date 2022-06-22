@@ -3,6 +3,7 @@ from __future__ import annotations
 import warnings
 
 import dask
+import xarray as xr
 from prefect import Flow, Parameter
 from sklearn.utils.validation import DataConversionWarning
 
@@ -25,6 +26,7 @@ from cmip6_downscaling.methods.common.tasks import (  # run_analyses,; get_weigh
     time_summary,
 )
 
+xr.set_options(keep_attrs=True)
 dask.config.set({"array.slicing.split_large_chunks": False})
 warnings.filterwarnings(
     "ignore",
@@ -153,9 +155,9 @@ with Flow(
     if config.get('run_options.generate_pyramids'):
         p['pyramid_weights'] = get_pyramid_weights(run_parameters=run_parameters, levels=4)
 
-        p['daily_pyramid_path'] = pyramid(
-            p['final_bcsd_full_space_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
-        )
+        # p['daily_pyramid_path'] = pyramid(
+        #     p['final_bcsd_full_space_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
+        # )
         p['monthly_pyramid_path'] = pyramid(
             p['monthly_summary_full_space_path'],
             weights_pyramid_path=p['pyramid_weights'],

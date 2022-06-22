@@ -13,7 +13,7 @@
   "lonmin": "-180",
   "lonmax": "180",
   "bias_correction_method": "",
-  "bias_correction_kwargs": {},
+  "bias_correction_kwargs": { "detrend": "True" },
   "model_type": "",
   "model_params": {},
   "train_dates": ["1981", "2010"],
