@@ -1,6 +1,6 @@
 from prefect import Flow, Parameter, unmapped
 
-from cmip6_downscaling import runtimes
+from cmip6_downscaling import config, runtimes
 from cmip6_downscaling.methods.common.tasks import (  # run_analyses,
     finalize,
     finalize_on_failure,
@@ -58,7 +58,7 @@ with Flow(
     ## Step 1: Common Grid -- this step is skipped since it seems like an unnecessary extra step for convenience
 
     # input datasets
-    # p['gcm_to_obs_weights'] = get_weights(run_parameters=run_parameters, direction='gcm_to_obs')
+    p['gcm_to_obs_weights'] = get_weights(run_parameters=run_parameters, direction='gcm_to_obs')
     p['obs_to_gcm_weights'] = get_weights(run_parameters=run_parameters, direction='obs_to_gcm')
 
     # get original resolution observations
@@ -81,6 +81,9 @@ with Flow(
     p['coarse_epoch_trend_path'], p['detrended_data_path'] = epoch_trend(
         p['experiment_path'], run_parameters
     )
+    p['fine_epoch_trend_path'] = regrid(
+        p['coarse_epoch_trend_path'], p['obs_full_space_path'], weights_path=p['gcm_to_obs_weights']
+    )
 
     # get gcm
     # 1981-2100 extent time subset
@@ -99,26 +102,6 @@ with Flow(
         run_parameters=run_parameters,
     )
 
-    # do epoch adjustment again for multiplicative variables, see MACA v1 vs. v2 guide for details
-    # if label in ['pr', 'huss', 'vas', 'uas']:
-    #     coarse_epoch_trend_2 = epoch_trend_task(
-    #         data=bias_corrected_gcm,
-    #         train_period_start=train_period_start,
-    #         train_period_end=train_period_end,
-    #         day_rolling_window=epoch_adjustment_day_rolling_window,
-    #         year_rolling_window=epoch_adjustment_year_rolling_window,
-    #         gcm_identifier=f'{gcm_identifier}_2',
-    #     )
-
-    #     bias_corrected_gcm = remove_epoch_trend_task(
-    #         data=bias_corrected_gcm,
-    #         trend=coarse_epoch_trend_2,
-    #         day_rolling_window=epoch_adjustment_day_rolling_window,
-    #         year_rolling_window=epoch_adjustment_year_rolling_window,
-    #         gcm_identifier=f'{gcm_identifier}_2',
-    #     )
-
-    ## Step 4: Constructed Analogs
     # rechunk into full space and cache the output
     p['bias_corrected_gcm_full_space_path'] = rechunk(
         p['bias_corrected_gcm_full_time_path'], pattern='full_space'
@@ -128,86 +111,62 @@ with Flow(
     p['bias_corrected_gcm_region_paths'] = split_by_region(p['bias_corrected_gcm_full_space_path'])
     p['coarse_obs_region_paths'] = split_by_region(p['coarse_obs_full_space_path'])
     p['obs_region_paths'] = split_by_region(p['obs_full_space_path'])
+    p['find_trend_paths'] = split_by_region(p['coarse_epoch_trend_path'])
 
+    # Step 4: Constructed Analogs
+    # Step 5: Epoch Replacement
     p['constructed_analogs_region_paths'] = construct_analogs.map(
         gcm_path=p['bias_corrected_gcm_region_paths'],
         coarse_obs_path=p['coarse_obs_region_paths'],
         fine_obs_path=p['obs_region_paths'],
+        fine_trend_path=p['find_trend_paths'],
         run_parameters=unmapped(run_parameters),
     )
 
-    # ## Step 5: Epoch Replacement
-    # if label in ['pr', 'huss', 'vas', 'uas']:
-    #     combined_downscaled_output = maca_epoch_replacement_task(
-    #         ds_gcm_fine=combined_downscaled_output,
-    #         trend_coarse=coarse_epoch_trend_2,
-    #         day_rolling_window=epoch_adjustment_day_rolling_window,
-    #         year_rolling_window=epoch_adjustment_year_rolling_window,
-    #         gcm_identifier=f'{gcm_identifier}_2',
-    #     )
+    # Step 6: Fine Bias Correction
+    p['final_maca_regions_paths'] = bias_correction.map(
+        p['constructed_analogs_region_paths'], p['obs_region_paths'], run_parameters=run_parameters
+    )
 
-    # epoch_replaced_gcm = maca_epoch_replacement_task(
-    #     ds_gcm_fine=combined_downscaled_output,
-    #     trend_coarse=coarse_epoch_trend,
-    #     day_rolling_window=epoch_adjustment_day_rolling_window,
-    #     year_rolling_window=epoch_adjustment_year_rolling_window,
-    #     gcm_identifier=gcm_identifier,
-    # )
+    p['full_grid_detrended_path'] = combine_regions(
+        p['final_maca_regions_paths'], p['fine_obs_path']
+    )
 
-    # need to decide if this can be done on a region-by-region basis. Perhaps we need to fine-grain coarse_epoch_trend_path before this.
-    # p[
-    #     'epoch_replaced_region_paths'
-    # ] = 'TODO'  # epoch_replacement.map(p['constructed_analogs_region_paths'], p['coarse_epoch_trend_path'], parameters=run_parameters)
+    # temporary aggregations - these come out in full time
+    p['monthly_summary_path'] = time_summary(p['final_maca_full_time_path'], freq='1MS')
+    p['annual_summary_path'] = time_summary(p['final_maca_full_time_path'], freq='1AS')
 
-    # ## Step 6: Fine Bias Correction
-    # p['final_maca_regions_paths'] = bias_correction.map(
-    #     p['epoch_replaced_region_paths'], p['obs_region_paths'], run_parameters=run_parameters
-    # )
+    # analysis notebook
+    # analysis_location = run_analyses(p['final_maca_full_time_path'], run_parameters)
 
-    # p['full_grid_detrended_path'] = combine_regions(
-    #     p['final_maca_regions_paths'], p['fine_obs_path']
-    # )
+    if config.get('run_options.generate_pyramids'):
 
-    # final_output = maca_fine_bias_correction_task(
-    #     ds_gcm=epoch_replaced_gcm,
-    #     ds_obs=ds_obs_full_time,
-    #     train_period_start=train_period_start,
-    #     train_period_end=train_period_end,
-    #     variables=[label],
-    #     batch_size=bias_correction_batch_size,
-    #     buffer_size=bias_correction_buffer_size,
-    #     gcm_identifier=gcm_identifier,
-    # )
+        p['final_maca_full_space_path'] = rechunk(
+            p['final_maca_full_time_path'], pattern='full_space'
+        )
 
-    # # temporary aggregations - these come out in full time
-    # p['monthly_summary_path'] = time_summary(p['final_maca_full_time_path'], freq='1MS')
-    # p['annual_summary_path'] = time_summary(p['final_maca_full_time_path'], freq='1AS')
+        # make temporal summaries
+        p['monthly_summary_full_space_path'] = rechunk(
+            p['monthly_summary_path'], pattern='full_space'
+        )
+        p['annual_summary_full_space_path'] = rechunk(
+            p['annual_summary_path'], pattern='full_space'
+        )
 
-    # # analysis notebook
-    # # analysis_location = run_analyses(p['final_maca_full_time_path'], run_parameters)
+        # pyramids
+        p['pyramid_weights'] = get_pyramid_weights(run_parameters=run_parameters, levels=4)
 
-    # # since pyramids require full space we now rechunk everything into full
-    # # space before passing into pyramid step. we probably want to add a cleanup
-    # # to this step in particular since otherwise we will have an exact
-    # # duplicate of the daily, monthly, and annual datasets
-    # p['final_maca_full_space_path'] = rechunk(p['final_maca_full_time_path'], pattern='full_space')
-
-    # # make temporal summaries
-    # p['monthly_summary_full_space_path'] = rechunk(p['monthly_summary_path'], pattern='full_space')
-    # p['annual_summary_full_space_path'] = rechunk(p['annual_summary_path'], pattern='full_space')
-
-    # # pyramids
-    # p['pyramid_weights'] = get_pyramid_weights(run_parameters=run_parameters, levels=4)
-
-    # p['daily_pyramid_path'] = pyramid(
-    #     p['final_maca_full_space_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
-    # )
-    # p['monthly_pyramid_path'] = pyramid(
-    #     p['monthly_summary_full_space_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
-    # )
-    # p['annual_pyramid_path'] = pyramid(
-    #     p['annual_summary_full_space_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
-    # )
+        p['daily_pyramid_path'] = pyramid(
+            p['final_maca_full_space_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
+        )
+        p['monthly_pyramid_path'] = pyramid(
+            p['monthly_summary_full_space_path'],
+            weights_pyramid_path=p['pyramid_weights'],
+            levels=4,
+        )
+        p['annual_pyramid_path'] = pyramid(
+            p['annual_summary_full_space_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
+        )
 
     # finalize
     ref = finalize(run_parameters=run_parameters, **p)

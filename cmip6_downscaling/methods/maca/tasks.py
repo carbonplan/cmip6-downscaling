@@ -1,14 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple, Union
-
 from datetime import timedelta
 
 import dask
-import numpy as np
 import regionmask
 import xarray as xr
-import xesmf as xe
 from carbonplan_data.metadata import get_cf_global_attrs
 from prefect import task
 from upath import UPath
@@ -72,6 +68,8 @@ def epoch_trend(
         The long term average trend
     """
 
+    # TODO: figure out how this task should differ for ['pr', 'huss', 'vas', 'uas']
+
     ds_hash = str_to_hash(str(data_path) + run_parameters.run_id_hash)
     trend_target = intermediate_dir / 'epoch_trend' / ds_hash
     detrend_target = intermediate_dir / 'epoch_detrend' / ds_hash
@@ -84,10 +82,8 @@ def epoch_trend(
     # obtain a buffer period for both training and prediction period equal to half of the year_rolling_window
     y_offset = int((run_parameters.year_rolling_window - 1) / 2)
 
-    train_start = int(run_parameters.train_period.start) - y_offset
     train_end = int(run_parameters.train_period.stop) + y_offset
     predict_start = int(run_parameters.predict_period.start) - y_offset
-    predict_end = int(run_parameters.predict_period.stop) + y_offset
     # TODO: why do we do this step?
     # make sure there are no overlapping years
     if train_end > int(run_parameters.train_period.start):
@@ -100,7 +96,6 @@ def epoch_trend(
 
     # note that this is the non-buffered slice
     historical_period = run_parameters.train_period.time_slice
-    predict_period = run_parameters.predict_period.time_slice
     trend = maca_core.epoch_trend(
         data=ds_gcm_full_time,
         historical_period=historical_period,
@@ -125,16 +120,25 @@ def epoch_trend(
 
 @task(log_stdout=True, max_retries=5, retry_delay=timedelta(seconds=1))
 def construct_analogs(
-    gcm_path: UPath, coarse_obs_path: UPath, fine_obs_path: UPath, run_parameters: RunParameters
+    gcm_path: UPath,
+    coarse_obs_path: UPath,
+    fine_obs_path: UPath,
+    fine_trend_path: UPath,
+    run_parameters: RunParameters,
 ) -> UPath:
 
     print('construct_analogs')
     print('gcm_path', gcm_path)
     print('coarse_obs_path', coarse_obs_path)
     print('fine_obs_path', fine_obs_path)
+    print('fine_trend_path', fine_trend_path)
 
     ds_hash = str_to_hash(
-        str(gcm_path) + str(coarse_obs_path) + str(fine_obs_path) + run_parameters.run_id_hash
+        str(gcm_path)
+        + str(coarse_obs_path)
+        + str(fine_obs_path)
+        + fine_trend_path
+        + run_parameters.run_id_hash
     )
     target = intermediate_dir / 'construct_analogs' / ds_hash
 
@@ -146,12 +150,17 @@ def construct_analogs(
     ds_gcm = xr.open_zarr(gcm_path)
     ds_obs_coarse = xr.open_zarr(coarse_obs_path)
     ds_obs_fine = xr.open_zarr(fine_obs_path)
+    ds_fine_trend = xr.open_zarr(fine_trend_path)
 
     with dask.config.set(scheduler='threads'):
         print('constructing analogs now')
-        downscaled = maca_core.construct_analogs(
+        analogs = maca_core.construct_analogs(
             ds_gcm, ds_obs_coarse, ds_obs_fine, run_parameters.variable
         )
+
+    # replace epoch trend
+    # TODO: figure out how this should differ for ['pr', 'huss', 'vas', 'uas']
+    downscaled = analogs + ds_fine_trend
 
     downscaled = downscaled.chunk({'lat': -1, 'lon': -1, 'time': 1000})
     downscaled.attrs.update({'title': 'construct_analogs'}, **get_cf_global_attrs(version=version))
@@ -177,7 +186,9 @@ def split_by_region(data_path: UPath, region_def: str = 'ar6.land') -> list[UPat
     region_codes = regions.numbers
 
     target_paths = []
-    for region in region_codes:
+    for i, region in enumerate(region_codes):
+        if i > 3:
+            break  # for debugging only
         trend_target = (
             intermediate_dir
             / 'split_by_region'
@@ -186,7 +197,7 @@ def split_by_region(data_path: UPath, region_def: str = 'ar6.land') -> list[UPat
         target_paths.append(trend_target)
 
     if use_cache and all(zmetadata_exists(p) for p in target_paths):
-        print(f'found that all targets exist')
+        print('found that all targets exist')
         return target_paths
 
     ds = xr.open_zarr(data_path)
@@ -220,6 +231,7 @@ def combine_regions(
     # TODO: update with logic being worked out now
     mask = regions.mask(obs_ds)
     combined_ds = xr.Dataset()
+    combined_ds['mask'] = mask
 
     combined_ds.attrs.update({'title': 'combine_regions'}, **get_cf_global_attrs(version=version))
     combined_ds.to_zarr(target, mode='w')

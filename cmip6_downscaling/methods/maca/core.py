@@ -169,13 +169,6 @@ def bias_correction(
 
     out_chunks = ds_gcm.chunks
 
-    # print('loading')
-    # ds_gcm = ds_gcm.load()
-    # ds_obs = ds_obs.load()
-
-    print('ds_gcm', ds_gcm)
-    print('ds_obs', ds_obs)
-
     ds_out = xr.Dataset()
     for var in variables:
         if var in ['pr', 'huss', 'vas', 'uas']:
@@ -225,8 +218,6 @@ def bias_correction(
             )  # JH: removed .compute() from this line
 
         ds_out[var] = xr.concat(bc_result, dim='time').sortby('time')
-
-    print(ds_out)
 
     return ds_out.chunk(out_chunks)
 
@@ -287,7 +278,6 @@ def construct_analogs(
     coarse_template = _make_template(ds_obs_coarse)
     fine_template = _make_template(ds_obs_fine)
 
-    print('making regridder')
     regridder = xe.Regridder(
         coarse_template,
         fine_template,
@@ -295,21 +285,17 @@ def construct_analogs(
         extrap_method="nearest_s2d",
     )
 
-    print('sizes')
     # get dimension sizes from input data
     domain_shape_coarse = (len(ds_obs_coarse.lat), len(ds_obs_coarse.lon))
     n_pixel_coarse = domain_shape_coarse[0] * domain_shape_coarse[1]
 
-    print('loading X and Y')
     # rename the time dimension to keep track of them
     X = ds_obs_coarse.rename({'time': 'ndays_in_obs'})  # coarse obs
     y = ds_gcm.rename({'time': 'ndays_in_gcm'})  # coarse gcm
 
     # get rmse between each GCM slices to be downscaled and each observation slices
     # will have the shape ndays_in_gcm x ndays_in_obs
-    print('rmse')
     rmse = (np.sqrt(((X - y) ** 2).sum(dim=['lat', 'lon'])) / n_pixel_coarse).load()
-    print('done with rmse')
 
     # get a day of year mask in the same shape of rmse according to the day range input
     mask = get_doy_mask(
@@ -320,7 +306,12 @@ def construct_analogs(
 
     # find the indices with the lowest rmse within the day of year constraint
     dim_order = ['ndays_in_gcm', 'ndays_in_obs']
-    inds = rmse.where(mask).argsort(axis=rmse.get_axis_num('ndays_in_obs')).isel(ndays_in_obs=slice(0, n_analogs)).transpose(*dim_order)
+    inds = (
+        rmse.where(mask)
+        .argsort(axis=rmse.get_axis_num('ndays_in_obs'))
+        .isel(ndays_in_obs=slice(0, n_analogs))
+        .transpose(*dim_order)
+    )
     # rearrage the data into tabular format in order to train linear regression models to get coefficients
     X = X.stack(pixel_coarse=['lat', 'lon'])
     X = X.where(X.notnull(), drop=True)
@@ -337,30 +328,29 @@ def construct_analogs(
     intercepts = []
     obs_analogs = []
 
-    print('loading X and y')
+    # pre-load to speed up for loop (lots of indexing into x & y)
     X = X.load()
     y = y.load()
 
     # train a linear regression model for each day in coarsen GCM dataset, where the features are each coarsened observation
     # analogs, and examples are each pixels within the coarsened domain
-    print('starting for loop')
     for i in range(len(y)):
 
         # get data from the GCM day being downscaled
         yi = y.isel(ndays_in_gcm=i).load()
         # get data from the coarsened obs analogs
         ind = inds.isel(ndays_in_gcm=i).values
-        
+
         # save obs_analogs for later
         obs_analogs.append(ds_obs_fine.isel(time=ind).rename({'time': 'analog'}).drop('analog'))
-        
+
         xi = X.isel(ndays_in_obs=ind).transpose('pixel_coarse', 'ndays_in_obs')
 
         # fit model
         lr_model.fit(xi, yi)
         coefs.append(lr_model.coef_)
         intercepts.append(lr_model.intercept_)
-        
+
         residual = yi - lr_model.predict(xi)
         residual = residual.unstack('pixel_coarse')
 
@@ -372,18 +362,12 @@ def construct_analogs(
     intercepts = xr.DataArray(intercepts, coords={'time': residuals.time})
     obs_analogs = xr.concat(obs_analogs, dim='time')
 
-    print('regridding residuals')
     # interpolate residuals to fine grid
     interpolated_residual = regridder(residuals)
 
     # combine obs analogs with residuals
-    fine_pred = (
-        (obs_analogs * coefs).sum(dim='analog')
-        + intercepts
-        + interpolated_residual
-    )
+    fine_pred = (obs_analogs * coefs).sum(dim='analog') + intercepts + interpolated_residual
 
     downscaled = fine_pred.to_dataset(name=label)
-    print('done with everything')
 
     return downscaled
