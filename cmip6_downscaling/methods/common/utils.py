@@ -222,7 +222,7 @@ def _resample_func(ds, freq='1MS'):
     out_ds = xr.Dataset(attrs=ds.attrs)
 
     for v in ds.data_vars:
-        resampler = ds[v].resample(time=freq, keep_attrs=True)
+        resampler = ds[v].resample(time=freq)
         if v in ['tasmax', 'tasmin']:
             out_ds[v] = resampler.mean(dim='time')
         elif v in ['pr']:
