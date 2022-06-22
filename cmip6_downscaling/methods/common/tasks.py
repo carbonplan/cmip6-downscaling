@@ -558,7 +558,7 @@ def pyramid(
 
     # write to target
     for child in dta.children.values():
-        for variable in child.data_vars:
+        for variable in child.DataTree.data_vars:
             child[variable].encoding['write_empty_chunks'] = True
     dta.to_zarr(target, mode='w')
     validate_zarr_store(target)
