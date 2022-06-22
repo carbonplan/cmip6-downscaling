@@ -557,10 +557,11 @@ def pyramid(
     dta = _pyramid_postprocess(dta, levels=levels, other_chunks=other_chunks)
 
     # write to target
-
-    blocking_to_zarr(ds=dta, target=target, validate=True, write_empty_chunks=True)
-    blocking_to_zarr(ds=dta, target=target, validate=True, write_empty_chunks=True)
-
+    for child in dta.children.values():
+        for variable in child.data_vars:
+            child[variable].encoding['write_empty_chunks'] = True
+    dta.to_zarr(target, mode='w')
+    validate_zarr_store(target)
     return target
 
 
