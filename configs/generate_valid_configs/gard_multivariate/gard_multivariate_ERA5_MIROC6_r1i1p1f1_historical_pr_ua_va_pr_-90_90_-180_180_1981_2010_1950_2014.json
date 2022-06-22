@@ -6,8 +6,8 @@
   "grid_label": "gn",
   "table_id": "day",
   "scenario": "historical",
-  "features": ["ua", "uv", "psl", "tasmax"],
-  "variable": "tasmax",
+  "features": ["ua", "va", "pr"],
+  "variable": "pr",
   "latmin": "-90",
   "latmax": "90",
   "lonmin": "-180",
@@ -22,7 +22,7 @@
     "va": { "detrend": false }
   },
   "model_type": "PureRegression",
-  "model_params": {},
+  "model_params": { "thresh": 0 },
   "train_dates": ["1981", "2010"],
   "predict_dates": ["1950", "2014"]
 }
