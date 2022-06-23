@@ -61,7 +61,7 @@ _defaults = {
             "extra_pip_packages": "git+https://github.com/carbonplan/cmip6-downscaling.git@0.1.7 --no-deps",
             "kubernetes_cpu": 15,
             "kubernetes_memory": "224Gi",
-            "image": "carbonplan/cmip6-downscaling-prefect:2022.06.01",
+            "image": "carbonplan/cmip6-downscaling-prefect:2022.06.19",
             'n_workers': 16,
             'threads_per_worker': 1,
         },

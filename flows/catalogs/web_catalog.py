@@ -12,7 +12,7 @@ config.set(
     }
 )
 
-runtime = runtimes.PangeoRuntime()
+runtime = runtimes.CloudRuntime()
 
 
 def parse_cmip6(store, cdn):
@@ -193,6 +193,7 @@ def create_catalog(
     cmip6_downscaled_pyramids=None,
     era5_pyramids=None,
 ):
+    import datetime
     import json
 
     import fsspec
@@ -210,6 +211,7 @@ def create_catalog(
         "title": "CMIP6 downscaling catalog",
         "description": "",
         "history": "",
+        "last_updated": datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
         "datasets": datasets,
     }
 
@@ -231,7 +233,7 @@ with Flow(
     )
     downscaled_pyramids = Parameter(
         'downscaled-pyramids-path',
-        default='az://flow-outputs/results/0.1.[3,5]/runs/*/latest.json',
+        default=r'az://flow-outputs/results/0.1.[^\d+$]/runs/*/latest.json',
     )
 
     # https://cmip6downscaling.azureedge.net

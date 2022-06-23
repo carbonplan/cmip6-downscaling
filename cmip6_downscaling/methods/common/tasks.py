@@ -30,10 +30,12 @@ from ...data.observations import open_era5
 from ...utils import str_to_hash
 from .containers import RunParameters
 from .utils import (
+    blocking_to_zarr,
     calc_auspicious_chunks_dict,
     resample_wrapper,
     set_zarr_encoding,
     subset_dataset,
+    validate_zarr_store,
     zmetadata_exists,
 )
 
@@ -97,8 +99,9 @@ def get_obs(run_parameters: RunParameters) -> UPath:
 
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
     print(f'writing {target}', subset)
-    store = subset.pipe(set_zarr_encoding).to_zarr(target, mode='w', compute=False)
-    store.compute(retries=2)
+    subset = set_zarr_encoding(subset)
+    blocking_to_zarr(ds=subset, target=target, validate=True, write_empty_chunks=True)
+
     return target
 
 
@@ -154,7 +157,9 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
         subset[key].encoding = {}
 
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
-    subset.pipe(set_zarr_encoding).to_zarr(target, mode='w')
+
+    subset = set_zarr_encoding(subset)
+    blocking_to_zarr(ds=subset, target=target, validate=True, write_empty_chunks=True)
     return target
 
 
@@ -272,8 +277,10 @@ def rechunk(
         max_mem=max_mem,
         target_store=target_store,
         temp_store=temp_store,
-        target_options={k: {'compressor': zarr.Blosc(clevel=1)} for k in chunks_dict},
-        temp_options={k: {'compressor': None} for k in chunks_dict},
+        target_options={
+            k: {'compressor': zarr.Blosc(clevel=1), 'write_empty_chunks': True} for k in chunks_dict
+        },
+        temp_options={k: {'compressor': None, 'write_empty_chunks': True} for k in chunks_dict},
         executor='dask',
     )
 
@@ -281,6 +288,8 @@ def rechunk(
 
     # consolidate_metadata here since when it comes out of rechunker it isn't consolidated.
     zarr.consolidate_metadata(target_store)
+    validate_zarr_store(target_store)
+
     temp_store.clear()
     return target
 
@@ -314,7 +323,8 @@ def time_summary(ds_path: UPath, freq: str) -> UPath:
     out_ds = resample_wrapper(ds, freq=freq)
 
     out_ds.attrs.update({'title': 'time_summary'}, **get_cf_global_attrs(version=version))
-    out_ds.pipe(set_zarr_encoding).to_zarr(target, mode='w')
+    out_ds = set_zarr_encoding(out_ds)
+    blocking_to_zarr(ds=out_ds, target=target, validate=True, write_empty_chunks=True)
 
     return target
 
@@ -437,7 +447,9 @@ def regrid(source_path: UPath, target_grid_path: UPath, weights_path: UPath = No
     regridded_ds.attrs.update(
         {'title': source_ds.attrs['title']}, **get_cf_global_attrs(version=version)
     )
-    regridded_ds.pipe(set_zarr_encoding).to_zarr(target, mode='w')
+    regridded_ds = set_zarr_encoding(regridded_ds)
+    blocking_to_zarr(ds=regridded_ds, target=target, validate=True, write_empty_chunks=True)
+
     return target
 
 
@@ -543,7 +555,12 @@ def pyramid(
     dta = _pyramid_postprocess(dta, levels=levels, other_chunks=other_chunks)
 
     # write to target
+    for child in dta.children.values():
+        for variable in child.ds.data_vars:
+            child[variable].encoding['write_empty_chunks'] = True
+
     dta.to_zarr(target, mode='w')
+    validate_zarr_store(target)
     return target
 
 

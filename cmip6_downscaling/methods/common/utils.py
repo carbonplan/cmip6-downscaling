@@ -3,7 +3,10 @@ from __future__ import annotations
 import pathlib
 import re
 
+import fsspec
+import geopandas as gpd
 import numpy as np
+import packaging.version
 import regionmask
 import xarray as xr
 import zarr
@@ -14,6 +17,38 @@ from xarray_schema.base import SchemaError
 from . import containers
 
 xr.set_options(keep_attrs=True)
+
+
+def validate_zarr_store(target: str):
+    """Validate a zarr store.
+
+    Parameters
+    ----------
+    target : str
+        Path to zarr store.
+
+    """
+    errors = []
+
+    store = zarr.open_consolidated(target)
+    groups = list(store.groups())
+    # if groups is empty (not a datatree)
+    if not groups:
+        groups = [("root", store["/"])]
+
+    for key, group in groups:
+        data_group = group
+
+        variables = list(data_group.keys())
+        for variable in variables:
+            variable_array = data_group[variable]
+            if variable_array.nchunks_initialized != variable_array.nchunks:
+                errors.append(
+                    f'{variable} has {variable_array.nchunks - variable_array.nchunks_initialized} uninitialized chunks'
+                )
+
+    if errors:
+        raise ValueError(f'Found {len(errors)} errors: {errors}')
 
 
 def zmetadata_exists(path: UPath):
@@ -27,20 +62,30 @@ def zmetadata_exists(path: UPath):
         return (UPath(path) / '.zmetadata').exists()
 
 
-def blocking_to_zarr(ds: xr.Dataset, target):
+def blocking_to_zarr(
+    ds: xr.Dataset, target, validate: bool = True, write_empty_chunks: bool = True
+):
     '''helper function to write a xarray Dataset to a zarr store.
 
     The function blocks until the write is complete then writes Zarr's consolidated metadata
     '''
 
-    # testing a workaround
-    if str(target).startswith('/'):
-        print('fell back to using a string target')
-        target = f'az://flow-outputs{str(target)}'
+    if write_empty_chunks:
+        if packaging.version.Version(
+            packaging.version.Version(xr.__version__).base_version
+        ) < packaging.version.Version("2022.03"):
+            raise NotImplementedError(
+                f'`write_empty_chunks` not supported in xarray < 2022.06. Your xarray version is: {xr.__version__}'
+            )
 
+        for variable in ds.data_vars:
+            ds[variable].encoding['write_empty_chunks'] = True
     t = ds.to_zarr(target, mode='w', compute=False)
     t.compute(retries=5)
     zarr.consolidate_metadata(target)
+
+    if validate:
+        validate_zarr_store(target)
 
 
 def subset_dataset(
@@ -90,7 +135,19 @@ def subset_dataset(
 
 def apply_land_mask(ds: xr.Dataset) -> xr.Dataset:
     """
-    Apply a land mask to a dataset with lat/lon coordinates
+    Apply a land mask to a dataset with lat/lon coordinates.
+
+    Notes
+    --------
+    # Regenerate buffer file
+    import regionmask
+    import geopandas as gpd
+
+    land = regionmask.defined_regions.natural_earth_v5_0_0.land_10.to_geodataframe()
+    buffer = land.buffer(1)
+
+    buffer_gpd = gpd.GeoDataFrame(geometry=gpd.GeoSeries(buffer))
+    buffer_gpd.to_file('2deg_buffer_gdf.gpkg', driver="GPKG")
 
     Parameters
     ----------
@@ -101,8 +158,11 @@ def apply_land_mask(ds: xr.Dataset) -> xr.Dataset:
     -------
     xr.Dataset
     """
-
-    mask = regionmask.defined_regions.natural_earth_v5_0_0.land_10.mask(ds)
+    with fsspec.open(
+        'https://cmip6downscaling.blob.core.windows.net/static/1deg_buffer_gdf.gpkg'
+    ) as file:
+        gdf = gpd.read_file(file)
+    mask = regionmask.from_geopandas(gdf).mask(ds, wrap_lon=False)
     return ds.where(mask == 0)
 
 
@@ -174,7 +234,7 @@ def _resample_func(ds, freq='1MS'):
     out_ds = xr.Dataset(attrs=ds.attrs)
 
     for v in ds.data_vars:
-        resampler = ds[v].resample(time=freq, keep_attrs=True)
+        resampler = ds[v].resample(time=freq)
         if v in ['tasmax', 'tasmin']:
             out_ds[v] = resampler.mean(dim='time')
         elif v in ['pr']:
