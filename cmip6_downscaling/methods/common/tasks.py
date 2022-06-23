@@ -440,13 +440,19 @@ def regrid(source_path: UPath, target_grid_path: UPath, weights_path: UPath = No
 
     ds_hash = str_to_hash(str(source_path) + str(target_grid_path))
     target = intermediate_dir / 'regrid' / ds_hash
-    print(target)
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
         return target
+
+    print(f'regrid {source_path}->{target_grid_path}')
+    print(f'target path: {target}')
+
     source_ds = xr.open_zarr(source_path)
     target_grid_ds = xr.open_zarr(target_grid_path)
+
+    print('source_ds', source_ds)
+    print('target_grid_ds', target_grid_ds)
     if weights_path:
         from ndpyramid.regrid import _reconstruct_xesmf_weights
 
@@ -474,9 +480,9 @@ def regrid(source_path: UPath, target_grid_path: UPath, weights_path: UPath = No
     regridded_ds.attrs.update(
         {'title': source_ds.attrs['title']}, **get_cf_global_attrs(version=version)
     )
+
     regridded_ds = set_zarr_encoding(regridded_ds)
     blocking_to_zarr(ds=regridded_ds, target=target, validate=True, write_empty_chunks=True)
-
     return target
 
 

@@ -32,8 +32,11 @@ def bias_correction(x_path: UPath, y_path: UPath, run_parameters: RunParameters)
 
     print('x_path', x_path)
 
-    x_ds = xr.open_zarr(x_path)
-    y_ds = xr.open_zarr(y_path)
+    x_ds = xr.open_zarr(x_path).chunk({'time': -1, 'lat': 48, 'lon': 48})
+    y_ds = xr.open_zarr(y_path).chunk({'time': -1, 'lat': 48, 'lon': 48})
+
+    print('x_ds', x_ds)
+    print('y_ds', y_ds)
 
     bc_ds = maca_core.bias_correction(x_ds, y_ds, variables=[run_parameters.variable])
 
@@ -137,7 +140,7 @@ def construct_analogs(
         str(gcm_path)
         + str(coarse_obs_path)
         + str(fine_obs_path)
-        + fine_trend_path
+        + str(fine_trend_path)
         + run_parameters.run_id_hash
     )
     target = intermediate_dir / 'construct_analogs' / ds_hash
@@ -151,6 +154,8 @@ def construct_analogs(
     ds_obs_coarse = xr.open_zarr(coarse_obs_path)
     ds_obs_fine = xr.open_zarr(fine_obs_path)
     ds_fine_trend = xr.open_zarr(fine_trend_path)
+    print('ds_fine_trend')
+    print(ds_fine_trend)
 
     with dask.config.set(scheduler='threads'):
         print('constructing analogs now')
@@ -158,9 +163,11 @@ def construct_analogs(
             ds_gcm, ds_obs_coarse, ds_obs_fine, run_parameters.variable
         )
 
+    print('analogs')
+    print(analogs)
     # replace epoch trend
     # TODO: figure out how this should differ for ['pr', 'huss', 'vas', 'uas']
-    downscaled = analogs + ds_fine_trend
+    downscaled = analogs + ds_fine_trend  # .drop('dayofyear')
 
     downscaled = downscaled.chunk({'lat': -1, 'lon': -1, 'time': 1000})
     downscaled.attrs.update({'title': 'construct_analogs'}, **get_cf_global_attrs(version=version))
@@ -202,10 +209,15 @@ def split_by_region(data_path: UPath, region_def: str = 'ar6.land') -> list[UPat
 
     ds = xr.open_zarr(data_path)
 
+    # can we move this to the epoch task?
+    if 'dayofyear' in ds.variables:
+        ds = ds.drop('dayofyear')
+
     print('splitting regions')
     mask = regions.mask(ds)
     for target, (key, group) in zip(target_paths, ds.groupby(mask)):
         ds = group.unstack('stacked_lat_lon').sortby(['lon', 'lat'])
+        ds = ds.chunk({'lat': -1, 'lon': -1, 'time': 1000})
         ds.attrs.update({'title': f'region {key}'}, **get_cf_global_attrs(version=version))
         ds.to_zarr(target, mode='w')
 

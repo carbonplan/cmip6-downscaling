@@ -81,8 +81,15 @@ with Flow(
     p['coarse_epoch_trend_path'], p['detrended_data_path'] = epoch_trend(
         p['experiment_path'], run_parameters
     )
+
+    p['coarse_epoch_trend_full_space_path'] = rechunk(
+        p['coarse_epoch_trend_path'], pattern='full_space'
+    )
+
     p['fine_epoch_trend_path'] = regrid(
-        p['coarse_epoch_trend_path'], p['obs_full_space_path'], weights_path=p['gcm_to_obs_weights']
+        p['coarse_epoch_trend_full_space_path'],
+        p['obs_full_space_path'],
+        weights_path=p['gcm_to_obs_weights'],
     )
 
     # get gcm
@@ -111,7 +118,7 @@ with Flow(
     p['bias_corrected_gcm_region_paths'] = split_by_region(p['bias_corrected_gcm_full_space_path'])
     p['coarse_obs_region_paths'] = split_by_region(p['coarse_obs_full_space_path'])
     p['obs_region_paths'] = split_by_region(p['obs_full_space_path'])
-    p['find_trend_paths'] = split_by_region(p['coarse_epoch_trend_path'])
+    p['find_trend_paths'] = split_by_region(p['fine_epoch_trend_path'])
 
     # Step 4: Constructed Analogs
     # Step 5: Epoch Replacement
@@ -125,12 +132,14 @@ with Flow(
 
     # Step 6: Fine Bias Correction
     p['final_maca_regions_paths'] = bias_correction.map(
-        p['constructed_analogs_region_paths'], p['obs_region_paths'], run_parameters=run_parameters
+        p['constructed_analogs_region_paths'],
+        p['obs_region_paths'],
+        run_parameters=unmapped(run_parameters),
     )
 
-    p['full_grid_detrended_path'] = combine_regions(
-        p['final_maca_regions_paths'], p['fine_obs_path']
-    )
+    p['final_maca_full_space_path'] = combine_regions(p['final_maca_regions_paths'], p['obs_path'])
+
+    p['final_maca_full_time_path'] = rechunk(p['final_maca_full_space_path'], pattern='full_time')
 
     # temporary aggregations - these come out in full time
     p['monthly_summary_path'] = time_summary(p['final_maca_full_time_path'], freq='1MS')
@@ -140,10 +149,6 @@ with Flow(
     # analysis_location = run_analyses(p['final_maca_full_time_path'], run_parameters)
 
     if config.get('run_options.generate_pyramids'):
-
-        p['final_maca_full_space_path'] = rechunk(
-            p['final_maca_full_time_path'], pattern='full_space'
-        )
 
         # make temporal summaries
         p['monthly_summary_full_space_path'] = rechunk(
