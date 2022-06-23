@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import xarray as xr
 
-from ..constants import APHYSICAL_TEMP_HIGH, APHYSICAL_TEMP_LOW
+from ..constants import (
+    APHYSICAL_PRECIP_HIGH,
+    APHYSICAL_PRECIP_LOW,
+    APHYSICAL_TEMP_HIGH,
+    APHYSICAL_TEMP_LOW,
+)
 
 
 def check_is_bad_data(ds: xr.Dataset, type: str) -> xr.Dataset:
@@ -26,11 +31,17 @@ def check_is_bad_data(ds: xr.Dataset, type: str) -> xr.Dataset:
         ds = ds > APHYSICAL_TEMP_HIGH
     elif type == 'aphysical_low_temp':
         ds = ds < APHYSICAL_TEMP_LOW
+    elif type == 'aphysical_low_precip':
+        ds = ds < APHYSICAL_PRECIP_LOW
+    elif type == 'aphysical_high_precip':
+        ds = ds > APHYSICAL_PRECIP_HIGH
+    else:
+        raise TypeError('metric unavailable')
     return ds
 
 
 def make_qaqc_ds(
-    ds: xr.Dataset, qaqc_checks: list = ['nulls', 'aphysical_high_temp', 'aphysical_low_temp']
+    ds: xr.Dataset, checks: list = ['nulls', 'aphysical_high_temp', 'aphysical_low_temp']
 ) -> xr.Dataset:
     """Compile qaqc checks into one dataset
 
@@ -38,7 +49,7 @@ def make_qaqc_ds(
     ----------
     ds : xr.Dataset
         any dataset
-    qaqc_checks : list, optional
+    checks : list, optional
         which bad data checks you want to do, by default ['nulls', 'aphysical_high_temp', 'aphysical_low_temp']
 
     Returns
@@ -49,8 +60,8 @@ def make_qaqc_ds(
     qaqc_ds = xr.Dataset()
     ds_list = []
 
-    for qaqc_check in qaqc_checks:
-        ds_list.append(check_is_bad_data(ds, qaqc_check))
+    for check in checks:
+        ds_list.append(check_is_bad_data(ds, check))
     qaqc_ds = xr.concat(ds_list, dim='qaqc_check')
-    qaqc_ds = qaqc_ds.assign_coords({'qaqc_check': qaqc_checks})
+    qaqc_ds = qaqc_ds.assign_coords({'qaqc_check': checks})
     return qaqc_ds

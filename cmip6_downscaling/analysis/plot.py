@@ -6,38 +6,37 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 import xarray as xr
-from carbonplan import styles
-
-styles.mpl.set_theme(style='carbonplan_light')
 
 
 def plot_cdfs(
-    obs_ds: xr.Dataset,
-    historical_downscaled: xr.Dataset,
-    future_downscaled: xr.Dataset,
+    obs: xr.Dataset,
     top_cities: pd.DataFrame,
-    training_period: slice,
-    future_period: slice,
+    train_period: slice,
+    predict_period: slice,
+    historical_downscaled: xr.Dataset = None,
+    future_downscaled: xr.Dataset = None,
     historical_gcm: xr.Dataset = None,
     future_gcm: xr.Dataset = None,
     ncols: int = 4,
     sharex: bool = True,
+    log_transform: bool = False,
+    var_limits: list = None,
 ) -> mpl.figure.Figure:
     """Plot cdfs of individual pixels
 
     Parameters
     ----------
-    obs_ds : xr.Dataset
+    obs : xr.Dataset
         observed dataset with dimensions ('time', 'city')
     historical_downscaled : xr.Dataset
-        historical dataset with dimensions ('time', 'city')
+        historical dataset with dimensions ('time', 'city'), by default None
     future_downscaled : xr.Dataset
-        future downscaled dataset with dimensions ('time', 'city')
+        future downscaled dataset with dimensions ('time', 'city'), by default None
     top_cities : pd.DataFrame
         dataframe with cities and their locations ('lat', 'lng')
-    training_period : slice
+    train_period : slice
         training period, likely something like slice('1980', '2010')
-    future_period : slice
+    predict_period : slice
         future period, likely something like slice('1980', '2010')
     historical_gcm : xr.Dataset, optional
         raw historical gcm with dimensions ('time', 'city'), by default None
@@ -57,57 +56,86 @@ def plot_cdfs(
     """
     fig, axarr = plt.subplots(
         ncols=ncols,
-        nrows=(int(len(obs_ds.cities) / ncols)) + 1,
-        figsize=(15, 60),
+        nrows=(int(len(obs.cities) / ncols)) + 1,
+        figsize=(15, 50),
         sharey=True,
         sharex=sharex,
     )
     for i, city in enumerate(top_cities.city.values):
+        plots, labels = [], []
         ax = axarr.reshape(-1)[i]
-        sns.ecdfplot(
-            data=obs_ds.isel(cities=i),
-            label=f'ERA5 ({training_period.start}-{training_period.stop})',
-            ax=ax,
-            color='#1b1e23',
+        plots.append(
+            sns.ecdfplot(
+                data=obs.isel(cities=i),
+                label=f'ERA5 ({train_period.start}-{train_period.stop})',
+                ax=ax,
+                color='#ebebec',  # chalk, carbon is '#1b1e23',
+                log_scale=log_transform,
+            )
         )
-        sns.ecdfplot(
-            data=historical_downscaled.isel(cities=i),
-            label=f'Downscaled GCM ({training_period.start}-{training_period.stop})',
-            color='#8b9fd1',
-            ax=ax,
-        )
-        sns.ecdfplot(
-            data=future_downscaled.isel(cities=i),
-            label=f'Downscaled GCM ({future_period.start}-{future_period.stop})',
-            ax=ax,
-            color='#f16f71',
-        )
+        labels.append(f'ERA5 ({train_period.start}-{train_period.stop})')
+        if historical_downscaled is not None:
+            plots.append(
+                sns.ecdfplot(
+                    data=historical_downscaled.isel(cities=i),
+                    label=f'Downscaled GCM ({train_period.start}-{train_period.stop})',
+                    color='#8b9fd1',
+                    ax=ax,
+                    log_scale=log_transform,
+                )
+            )
+            labels.append(f'Downscaled GCM ({train_period.start}-{train_period.stop})')
+        if future_downscaled is not None:
+            plots.append(
+                sns.ecdfplot(
+                    data=future_downscaled.isel(cities=i),
+                    label=f'Downscaled GCM ({predict_period.start}-{predict_period.stop})',
+                    ax=ax,
+                    color='#f16f71',
+                    log_scale=log_transform,
+                )
+            )
+            labels.append(f'Downscaled GCM ({predict_period.start}-{predict_period.stop})')
         if historical_gcm is not None:
-            sns.ecdfplot(
-                data=historical_gcm.isel(cities=i),
-                label=f'Raw GCM ({training_period.start}-{training_period.stop})',
-                ax=ax,
-                color='#8b9fd1',
-                linestyle='--',
+            plots.append(
+                sns.ecdfplot(
+                    data=historical_gcm.isel(cities=i),
+                    label=f'Raw GCM ({train_period.start}-{train_period.stop})',
+                    ax=ax,
+                    color='#8b9fd1',
+                    linestyle='--',
+                    log_scale=log_transform,
+                )
             )
+            labels.append(f'Raw GCM ({train_period.start}-{train_period.stop})')
         if future_gcm is not None:
-            sns.ecdfplot(
-                data=future_gcm.isel(cities=i),
-                label=f'Raw GCM ({future_period.start}-{future_period.stop})',
-                ax=ax,
-                color='#f16f71',
-                linestyle='--',
+            plots.append(
+                sns.ecdfplot(
+                    data=future_gcm.isel(cities=i),
+                    label=f'Raw GCM ({predict_period.start}-{predict_period.stop})',
+                    ax=ax,
+                    color='#f16f71',
+                    linestyle='--',
+                    log_scale=log_transform,
+                )
             )
+            labels.append(f'Raw GCM ({predict_period.start}-{predict_period.stop})')
 
         ax.set_title(city)
-    plt.legend()
-    plt.close()
-    return fig
+
+        if var_limits is not None:
+            ax.set_xlim(var_limits[0], var_limits[1])
+        if i == 0:
+            fig.legend()
+    plt.tight_layout()
+    # fig.legend(labels, plots)
+    # return fig, axarr
 
 
 def plot_values_and_difference(
     ds1: xr.Dataset,
     ds2: xr.Dataset,
+    var_limits: tuple = (0, 10),
     diff_limit: float = 10.0,
     cbar_kwargs: dict = {},
     title1: str = '',
@@ -116,6 +144,9 @@ def plot_values_and_difference(
     city_coords: pd.DataFrame = None,
     variable: str = '',
     metric: str = 'mean',
+    diff_method: str = 'absolute',
+    cmap: str = 'fire_light',
+    cmap_diff: str = 'orangeblue_light_r',
 ) -> mpl.figure.Figure:
     """Plot two datasets and their difference
 
@@ -152,15 +183,45 @@ def plot_values_and_difference(
     )
     var_limit = {
         'tasmax': {
-            'mean': 0.25,
-            'std': 1,
-            'percentile1': 1,
-            'percentile5': 1,
+            'mean': 0.1,
+            'median': 2,
+            'std': 3,
+            'percentile1': 5,
+            'percentile5': 2,
             'percentile95': 2,
-            'percentile99': 2,
-        }
+            'percentile99': 5,
+            'daysover30': 10,
+            'daysover40': 10,
+        },
+        'tasmin': {
+            'mean': 0.1,
+            'median': 2,
+            'std': 3,
+            'percentile1': 5,
+            'percentile5': 2,
+            'percentile95': 2,
+            'percentile99': 5,
+            'daysover30': 10,
+            'daysover40': 10,
+        },
+        'pr': {
+            'mean': 25,
+            'median': 25,
+            'std': 25,
+            'percentile1': 10,
+            'percentile5': 10,
+            'percentile95': 10,
+            'percentile99': 10,
+        },
     }
-
+    if var_limits:
+        var_limit[variable][metric] = var_limits
+    if diff_limit:
+        diff_limits = {variable: {metric: diff_limit}}
+    if diff_method == 'absolute':
+        difference = ds2 - ds1
+    elif diff_method == 'percent':
+        difference = ((ds2 - ds1) / ds1) * 100
     if city_coords is not None:
         plot1 = axarr[0].scatter(
             x=city_coords.lon,
@@ -168,6 +229,7 @@ def plot_values_and_difference(
             c=ds1,
             cmap="fire_light",
             transform=ccrs.PlateCarree(),
+            vmax=var_limit[variable][metric],
         )
         fig.colorbar(plot1, ax=axarr[0]).set_label(f'{variable}')
 
@@ -177,27 +239,41 @@ def plot_values_and_difference(
             c=ds2,
             cmap="fire_light",
             transform=ccrs.PlateCarree(),
-        )
-        fig.colorbar(plot2, ax=axarr[1]).set_label(f'{variable}')
-
-        diff = axarr[2].scatter(
-            x=city_coords.lon,
-            y=city_coords.lat,
-            c=(ds2 - ds1),
-            cmap="orangeblue_light_r",
-            transform=ccrs.PlateCarree(),
-            vmin=-var_limit[variable][metric],
             vmax=var_limit[variable][metric],
         )
-        fig.colorbar(diff, ax=axarr[2]).set_label(f'{variable}')
+        fig.colorbar(plot2, ax=axarr[1]).set_label(f'{variable}')
+        difference_plot = axarr[2].scatter(
+            x=city_coords.lon,
+            y=city_coords.lat,
+            c=difference,
+            cmap="orangeblue_light_r",
+            transform=ccrs.PlateCarree(),
+            vmin=-diff_limits[variable][metric],
+            vmax=diff_limits[variable][metric],
+        )
+        fig.colorbar(difference_plot, ax=axarr[2]).set_label(f'{variable}')
     else:
-        ds1.plot(ax=axarr[0], cmap='fire_light', cbar_kwargs=cbar_kwargs)
-        ds2.plot(ax=axarr[1], cmap='fire_light', cbar_kwargs=cbar_kwargs)
-        (ds2 - ds1).plot(
+        ds1.plot(
+            ax=axarr[0],
+            vmin=var_limit[variable][metric][0],
+            vmax=var_limit[variable][metric][1],
+            cmap=cmap,
+            cbar_kwargs=cbar_kwargs,
+            robust=True,
+        )
+        ds2.plot(
+            ax=axarr[1],
+            vmin=var_limit[variable][metric][0],
+            vmax=var_limit[variable][metric][1],
+            cmap=cmap,
+            cbar_kwargs=cbar_kwargs,
+            robust=True,
+        )
+        difference.plot(
             ax=axarr[2],
-            cmap='orangeblue_light_r',
-            vmin=-diff_limit,
-            vmax=diff_limit,
+            cmap=cmap_diff,
+            vmin=-diff_limits[variable][metric],
+            vmax=diff_limits[variable][metric],
             cbar_kwargs={'label': 'Difference (middle - left)'},
         )
 
@@ -206,10 +282,15 @@ def plot_values_and_difference(
 
     for ax in axarr:
         ax.coastlines()
-    return fig
+    # return fig
 
 
-def plot_seasonal(ds1: xr.Dataset, ds2: xr.Dataset) -> mpl.figure.Figure:
+def plot_seasonal(
+    ds1: xr.Dataset,
+    ds2: xr.Dataset,
+    cmap: str = 'fire_light',
+    cmap_diff: str = 'orangeblue_light_r',
+) -> mpl.figure.Figure:
     """Plot the seasonality of two datasets and the difference between them
 
     Parameters
@@ -225,16 +306,16 @@ def plot_seasonal(ds1: xr.Dataset, ds2: xr.Dataset) -> mpl.figure.Figure:
         Figure
     """
     fig, axarr = plt.subplots(
-        ncols=4, nrows=3, subplot_kw={'projection': ccrs.PlateCarree()}, figsize=(10, 6)
+        ncols=4, nrows=3, subplot_kw={'projection': ccrs.PlateCarree()}, figsize=(16, 10)
     )
     seasons = ['DJF', 'JJA', 'MAM', 'SON']
     col_ds_list = [ds1, ds2, ds2 - ds1]
-    cmaps = ['fire_light', 'fire_light', 'orangeblue_light_r']
+    cmaps = [cmap, cmap, cmap_diff]
 
     for j, ds in enumerate(col_ds_list):
         for i, season in enumerate(seasons):
-            ds.sel(season=season).plot(ax=axarr[j, i], cmap=cmaps[j])
+            ds.sel(season=season).plot(ax=axarr[j, i], cmap=cmaps[j], robust=True)
             axarr[j, i].coastlines()
-    plt.tight_layout()
+    # plt.tight_layout()
     plt.close()
     return fig
