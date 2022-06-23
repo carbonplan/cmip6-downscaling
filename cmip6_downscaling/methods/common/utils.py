@@ -28,16 +28,24 @@ def validate_zarr_store(target: str):
         Path to zarr store.
 
     """
+    errors = []
 
     store = zarr.open_consolidated(target)
-    variables = list(store.keys())
-    errors = []
-    for variable in variables:
-        variable_array = store[variable]
-        if variable_array.nchunks_initialized != variable_array.nchunks:
-            errors.append(
-                f'{variable} has {variable_array.nchunks - variable_array.nchunks_initialized} uninitialized chunks'
-            )
+    groups = list(store.groups())
+    # if groups is empty (not a datatree)
+    if not groups:
+        groups = [("root", store["/"])]
+
+    for key, group in groups:
+        data_group = group
+
+        variables = list(data_group.keys())
+        for variable in variables:
+            variable_array = data_group[variable]
+            if variable_array.nchunks_initialized != variable_array.nchunks:
+                errors.append(
+                    f'{variable} has {variable_array.nchunks - variable_array.nchunks_initialized} uninitialized chunks'
+                )
 
     if errors:
         raise ValueError(f'Found {len(errors)} errors: {errors}')
