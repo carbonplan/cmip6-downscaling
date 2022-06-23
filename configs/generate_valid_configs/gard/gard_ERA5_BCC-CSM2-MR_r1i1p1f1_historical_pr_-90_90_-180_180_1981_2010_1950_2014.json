@@ -13,7 +13,7 @@
   "lonmin": "-180",
   "lonmax": "180",
   "bias_correction_method": "quantile_mapper",
-  "bias_correction_kwargs": { "detrend": "False" },
+  "bias_correction_kwargs": { "detrend": false },
   "model_type": "PureRegression",
   "model_params": { "thresh": 0 },
   "train_dates": ["1981", "2010"],
