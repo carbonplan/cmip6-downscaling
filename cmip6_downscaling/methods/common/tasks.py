@@ -84,7 +84,7 @@ def get_obs(run_parameters: RunParameters) -> UPath:
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
         return target
-
+    print(run_parameters)
     ds = open_era5(run_parameters.features, run_parameters.train_period)
     subset = subset_dataset(
         ds,
@@ -137,29 +137,30 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
         print(f'found existing target: {target}')
         return target
 
-    ds = get_gcm(
-        scenario=run_parameters.scenario,
-        member_id=run_parameters.member,
-        table_id=run_parameters.table_id,
-        grid_label=run_parameters.grid_label,
-        source_id=run_parameters.model,
-        variable=run_parameters.features,
-        time_slice=time_period.time_slice,
-    )
+    # The for loop is a workaround for github issue: https://github.com/pydata/xarray/issues/6709
+    mode = 'w'
+    for feature in run_parameters.features:
+        ds = get_gcm(
+            scenario=run_parameters.scenario,
+            member_id=run_parameters.member,
+            table_id=run_parameters.table_id,
+            grid_label=run_parameters.grid_label,
+            source_id=run_parameters.model,
+            variable=feature,
+            time_slice=time_period.time_slice,
+        )
+        subset = subset_dataset(ds, feature, time_period.time_slice, run_parameters.bbox)
+        # Note: dataset is chunked into time:365 chunks to standardize leap-year chunking.
+        subset = subset.chunk({'time': 365})
+        for key in subset.variables:
+            subset[key].encoding = {}
 
-    subset = subset_dataset(
-        ds, run_parameters.features, time_period.time_slice, run_parameters.bbox
-    )
+        subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
 
-    # Note: dataset is chunked into time:365 chunks to standardize leap-year chunking.
-    subset = subset.chunk({'time': 365})
-    for key in subset.variables:
-        subset[key].encoding = {}
+        subset = set_zarr_encoding(subset)
+        subset[[feature]].to_zarr(target, mode=mode)
+        mode = 'a'
 
-    subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
-
-    subset = set_zarr_encoding(subset)
-    blocking_to_zarr(ds=subset, target=target, validate=True, write_empty_chunks=True)
     return target
 
 

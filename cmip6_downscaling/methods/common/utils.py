@@ -3,6 +3,7 @@ from __future__ import annotations
 import pathlib
 import re
 
+import dask
 import fsspec
 import geopandas as gpd
 import numpy as np
@@ -80,6 +81,7 @@ def blocking_to_zarr(
 
         for variable in ds.data_vars:
             ds[variable].encoding['write_empty_chunks'] = True
+    ds = dask.optimize(ds)[0]
     t = ds.to_zarr(target, mode='w', compute=False)
     t.compute(retries=5)
     zarr.consolidate_metadata(target)
