@@ -418,7 +418,12 @@ def get_pyramid_weights(*, run_parameters, levels: int, regrid_method: str = "bi
 
 
 @task(log_stdout=True)
-def regrid(source_path: UPath, target_grid_path: UPath, weights_path: UPath = None) -> UPath:
+def regrid(
+    source_path: UPath,
+    target_grid_path: UPath,
+    weights_path: UPath = None,
+    pre_chunk_def: dict = None,
+) -> UPath:
     """Task to regrid a dataset to target grid.
 
     Parameters
@@ -450,6 +455,9 @@ def regrid(source_path: UPath, target_grid_path: UPath, weights_path: UPath = No
 
     source_ds = xr.open_zarr(source_path)
     target_grid_ds = xr.open_zarr(target_grid_path)
+
+    if pre_chunk_def is not None:
+        source_ds = source_ds.chunk(**pre_chunk_def)
 
     print('source_ds', source_ds)
     print('target_grid_ds', target_grid_ds)

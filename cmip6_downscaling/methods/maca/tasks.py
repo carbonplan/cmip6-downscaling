@@ -11,7 +11,7 @@ from upath import UPath
 
 from cmip6_downscaling import __version__ as version, config
 from cmip6_downscaling.methods.common.containers import RunParameters
-from cmip6_downscaling.methods.common.utils import zmetadata_exists
+from cmip6_downscaling.methods.common.utils import blocking_to_zarr, zmetadata_exists
 from cmip6_downscaling.methods.maca import core as maca_core
 from cmip6_downscaling.utils import str_to_hash
 
@@ -32,8 +32,8 @@ def bias_correction(x_path: UPath, y_path: UPath, run_parameters: RunParameters)
 
     print('x_path', x_path)
 
-    x_ds = xr.open_zarr(x_path).chunk({'time': -1, 'lat': 48, 'lon': 48})
-    y_ds = xr.open_zarr(y_path).chunk({'time': -1, 'lat': 48, 'lon': 48})
+    x_ds = xr.open_zarr(x_path)
+    y_ds = xr.open_zarr(y_path)
 
     print('x_ds', x_ds)
     print('y_ds', y_ds)
@@ -43,7 +43,8 @@ def bias_correction(x_path: UPath, y_path: UPath, run_parameters: RunParameters)
     print('bc_ds', bc_ds)
 
     bc_ds.attrs.update({'title': 'bias_correction'}, **get_cf_global_attrs(version=version))
-    bc_ds.to_zarr(target, mode='w')
+
+    blocking_to_zarr(ds=bc_ds, target=target, validate=True, write_empty_chunks=True)
 
     return target
 
@@ -108,7 +109,7 @@ def epoch_trend(
 
     trend = trend.chunk({'lat': 48, 'lon': 48})
     trend.attrs.update({'title': 'epoch_trend'}, **get_cf_global_attrs(version=version))
-    trend.to_zarr(trend_target, mode='w')
+    blocking_to_zarr(ds=trend, target=trend_target, validate=True, write_empty_chunks=True)
 
     detrended_data = ds_gcm_full_time - trend
     detrended_data = detrended_data.chunk({'time': -1, 'lat': 48, 'lon': 48})
@@ -116,7 +117,9 @@ def epoch_trend(
     detrended_data.attrs.update(
         {'title': 'epoch_trend - detrended'}, **get_cf_global_attrs(version=version)
     )
-    detrended_data.to_zarr(detrend_target, mode='w')
+    blocking_to_zarr(
+        ds=detrended_data, target=detrend_target, validate=True, write_empty_chunks=True
+    )
 
     return trend_target, detrend_target
 
@@ -167,11 +170,11 @@ def construct_analogs(
     print(analogs)
     # replace epoch trend
     # TODO: figure out how this should differ for ['pr', 'huss', 'vas', 'uas']
-    downscaled = analogs + ds_fine_trend  # .drop('dayofyear')
+    downscaled = analogs + ds_fine_trend
 
-    downscaled = downscaled.chunk({'lat': -1, 'lon': -1, 'time': 1000})
+    downscaled = downscaled.chunk({'lat': 48, 'lon': -1, 'time': -1})
     downscaled.attrs.update({'title': 'construct_analogs'}, **get_cf_global_attrs(version=version))
-    downscaled.to_zarr(target, mode='w')
+    blocking_to_zarr(ds=downscaled, target=target, validate=True, write_empty_chunks=True)
 
     return target
 
@@ -219,7 +222,7 @@ def split_by_region(data_path: UPath, region_def: str = 'ar6.land') -> list[UPat
         ds = group.unstack('stacked_lat_lon').sortby(['lon', 'lat'])
         ds = ds.chunk({'lat': -1, 'lon': -1, 'time': 1000})
         ds.attrs.update({'title': f'region {key}'}, **get_cf_global_attrs(version=version))
-        ds.to_zarr(target, mode='w')
+        blocking_to_zarr(ds=ds, target=target, validate=True, write_empty_chunks=True)
 
     return target_paths
 
@@ -246,6 +249,6 @@ def combine_regions(
     combined_ds['mask'] = mask
 
     combined_ds.attrs.update({'title': 'combine_regions'}, **get_cf_global_attrs(version=version))
-    combined_ds.to_zarr(target, mode='w')
+    blocking_to_zarr(ds=combined_ds, target=target, validate=True, write_empty_chunks=True)
 
     return target

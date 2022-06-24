@@ -63,6 +63,7 @@ with Flow(
 
     # get original resolution observations
     p['obs_path'] = get_obs(run_parameters)
+    p['obs_full_time_path'] = rechunk(path=p['obs_path'], pattern='full_time')
 
     p['obs_full_space_path'] = rechunk(path=p['obs_path'], pattern='full_space')
     p['experiment_path'] = get_experiment(run_parameters, time_subset='both')
@@ -90,6 +91,7 @@ with Flow(
         p['coarse_epoch_trend_full_space_path'],
         p['obs_full_space_path'],
         weights_path=p['gcm_to_obs_weights'],
+        pre_chunk_def={'time': 30},
     )
 
     # get gcm
@@ -130,14 +132,19 @@ with Flow(
         run_parameters=unmapped(run_parameters),
     )
 
-    # Step 6: Fine Bias Correction
-    p['final_maca_regions_paths'] = bias_correction.map(
-        p['constructed_analogs_region_paths'],
-        p['obs_region_paths'],
-        run_parameters=unmapped(run_parameters),
+    p['final_maca_full_space_path'] = combine_regions(
+        p['constructed_analogs_region_paths'], p['obs_full_space_path']
+    )
+    p['final_maca_full_time_path'] = rechunk(
+        p['final_maca_full_space_path'], pattern='full_time', template=p['obs_full_time_path']
     )
 
-    p['final_maca_full_space_path'] = combine_regions(p['final_maca_regions_paths'], p['obs_path'])
+    # Step 6: Fine Bias Correction
+    p['final_maca_regions_paths'] = bias_correction.map(
+        p['final_maca_full_time_path'],
+        p['obs_full_time_path'],
+        run_parameters=unmapped(run_parameters),
+    )
 
     p['final_maca_full_time_path'] = rechunk(p['final_maca_full_space_path'], pattern='full_time')
 
