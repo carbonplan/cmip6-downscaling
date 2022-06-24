@@ -8,7 +8,6 @@ import warnings
 from dataclasses import asdict
 from pathlib import PosixPath
 
-import datatree
 import datatree as dt
 import fsspec
 import pandas as pd
@@ -509,7 +508,7 @@ def _pyramid_postprocess(dt: dt.DataTree, levels: int, other_chunks: dict = None
 
 @task(log_stdout=True)
 def pyramid(
-    ds_path: UPath, weights_pyramid_path: str, levels: int = 2, other_chunks: dict = None
+    ds_path: UPath, weights_pyramid_path: str = None, levels: int = 2, other_chunks: dict = None
 ) -> UPath:
     '''Task to create a data pyramid from an xarray Dataset
 
@@ -544,7 +543,10 @@ def pyramid(
 
     ds.attrs.update({'title': ds.attrs['title']}, **get_cf_global_attrs(version=version))
     target_pyramid = dt.open_datatree('az://static/target-pyramid', engine='zarr')
-    weights_pyramid = datatree.open_datatree(weights_pyramid_path, engine='zarr')
+    if weights_pyramid_path is not None:
+        weights_pyramid = dt.open_datatree(weights_pyramid_path, engine='zarr')
+    else:
+        weights_pyramid = None
     # create pyramid
     dta = pyramid_regrid(
         ds,
