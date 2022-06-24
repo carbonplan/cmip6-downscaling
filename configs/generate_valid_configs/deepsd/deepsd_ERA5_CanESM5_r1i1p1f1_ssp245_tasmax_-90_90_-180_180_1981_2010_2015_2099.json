@@ -1,0 +1,21 @@
+{
+  "method": "deepsd",
+  "obs": "ERA5",
+  "model": "CanESM5",
+  "member": "r1i1p1f1",
+  "grid_label": "gn",
+  "table_id": "day",
+  "scenario": "ssp245",
+  "features": ["tasmax"],
+  "variable": "tasmax",
+  "latmin": "-90",
+  "latmax": "90",
+  "lonmin": "-180",
+  "lonmax": "180",
+  "bias_correction_method": "quantile_mapper",
+  "bias_correction_kwargs": { "detrend": true },
+  "model_type": "",
+  "model_params": {},
+  "train_dates": ["1981", "2010"],
+  "predict_dates": ["2015", "2099"]
+}
