@@ -295,7 +295,9 @@ def construct_analogs(
 
     # get rmse between each GCM slices to be downscaled and each observation slices
     # will have the shape ndays_in_gcm x ndays_in_obs
-    rmse = (np.sqrt(((X - y) ** 2).sum(dim=['lat', 'lon'])) / n_pixel_coarse).load()
+    rmse = (np.sqrt(((X - y) ** 2).sum(dim=['lat', 'lon'])) / n_pixel_coarse)
+    print('rmse', rmse)
+    rmse = rmse.load()
 
     # get a day of year mask in the same shape of rmse according to the day range input
     mask = get_doy_mask(

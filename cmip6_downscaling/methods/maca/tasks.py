@@ -152,29 +152,28 @@ def construct_analogs(
         print(f"found existing target: {target}")
         return target
 
-    # Q: should we just do the region subsetting here?
-    ds_gcm = xr.open_zarr(gcm_path)
-    ds_obs_coarse = xr.open_zarr(coarse_obs_path)
-    ds_obs_fine = xr.open_zarr(fine_obs_path)
-    ds_fine_trend = xr.open_zarr(fine_trend_path)
-    print('ds_fine_trend')
-    print(ds_fine_trend)
-
     with dask.config.set(scheduler='threads'):
+        ds_gcm = xr.open_zarr(gcm_path)
+        ds_obs_coarse = xr.open_zarr(coarse_obs_path)
+        ds_obs_fine = xr.open_zarr(fine_obs_path)
+        ds_fine_trend = xr.open_zarr(fine_trend_path)
+        print('ds_fine_trend')
+        print(ds_fine_trend)
+
         print('constructing analogs now')
         analogs = maca_core.construct_analogs(
             ds_gcm, ds_obs_coarse, ds_obs_fine, run_parameters.variable
         )
 
-    print('analogs')
-    print(analogs)
-    # replace epoch trend
-    # TODO: figure out how this should differ for ['pr', 'huss', 'vas', 'uas']
-    downscaled = analogs + ds_fine_trend
+        print('analogs')
+        print(analogs)
+        # replace epoch trend
+        # TODO: figure out how this should differ for ['pr', 'huss', 'vas', 'uas']
+        downscaled = analogs + ds_fine_trend
 
-    downscaled = downscaled.chunk({'lat': 48, 'lon': -1, 'time': -1})
-    downscaled.attrs.update({'title': 'construct_analogs'}, **get_cf_global_attrs(version=version))
-    blocking_to_zarr(ds=downscaled, target=target, validate=True, write_empty_chunks=True)
+        downscaled = downscaled.chunk({'lat': 48, 'lon': -1, 'time': -1})
+        downscaled.attrs.update({'title': 'construct_analogs'}, **get_cf_global_attrs(version=version))
+        blocking_to_zarr(ds=downscaled, target=target, validate=True, write_empty_chunks=True)
 
     return target
 
@@ -197,8 +196,8 @@ def split_by_region(data_path: UPath, region_def: str = 'ar6.land') -> list[UPat
 
     target_paths = []
     for i, region in enumerate(region_codes):
-        if i > 3:
-            break  # for debugging only
+        # if i > 3:
+        #     break  # for debugging only
         trend_target = (
             intermediate_dir
             / 'split_by_region'
@@ -217,12 +216,14 @@ def split_by_region(data_path: UPath, region_def: str = 'ar6.land') -> list[UPat
         ds = ds.drop('dayofyear')
 
     print('splitting regions')
-    mask = regions.mask(ds)
-    for target, (key, group) in zip(target_paths, ds.groupby(mask)):
-        ds = group.unstack('stacked_lat_lon').sortby(['lon', 'lat'])
-        ds = ds.chunk({'lat': -1, 'lon': -1, 'time': 1000})
-        ds.attrs.update({'title': f'region {key}'}, **get_cf_global_attrs(version=version))
-        blocking_to_zarr(ds=ds, target=target, validate=True, write_empty_chunks=True)
+    with dask.config.set(**{'array.slicing.split_large_chunks': False}):
+        mask = regions.mask(ds)
+        for target, (key, group) in zip(target_paths, ds.groupby(mask)):
+            ds = group.unstack('stacked_lat_lon').sortby(['lon', 'lat'])
+            ds = ds.chunk({'lat': -1, 'lon': -1, 'time': 1000})
+            ds.attrs.update({'title': f'region {key}'}, **get_cf_global_attrs(version=version))
+            print(f'writing region {key}: {target}')
+            blocking_to_zarr(ds=ds, target=target, validate=True, write_empty_chunks=True)
 
     return target_paths
 
