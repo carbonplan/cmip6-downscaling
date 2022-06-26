@@ -255,7 +255,7 @@ def inference(gcm_path: UPath, run_parameters: RunParameters) -> UPath:
     UPath
         Path to dataset containing model predictions.
     """
-    import tensorflow_io
+    import tensorflow_io # noqa
 
     # # Check that GPU is available
     # print(tf.config.list_physical_devices('GPU'))
