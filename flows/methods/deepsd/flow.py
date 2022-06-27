@@ -116,9 +116,9 @@ with Flow(
         # space before passing into pyramid step. we probably want to add a cleanup
         # to this step in particular since otherwise we will have an exact
         # duplicate of the daily, monthly, and annual datasets
-        p['full_space_model_output_path'] = rechunk(
-            p['shifted_model_output_path'], pattern='full_space'
-        )
+        # p['full_space_model_output_path'] = rechunk(
+        #     p['shifted_model_output_path'], pattern='full_space'
+        # )
 
         # make temporal summaries
         p['monthly_summary_full_space_path'] = rechunk(
