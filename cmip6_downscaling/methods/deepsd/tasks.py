@@ -12,7 +12,13 @@ from ...data.observations import open_era5
 from ...data.utils import lon_to_180
 from ..common.bias_correction import bias_correct_gcm_by_method
 from ..common.containers import RunParameters, str_to_hash
-from ..common.utils import set_zarr_encoding, subset_dataset, zmetadata_exists
+from ..common.utils import (
+    apply_land_mask,
+    blocking_to_zarr,
+    set_zarr_encoding,
+    subset_dataset,
+    zmetadata_exists,
+)
 from .utils import (
     EPSILON,
     INFERENCE_BATCH_SIZE,
@@ -74,7 +80,8 @@ def shift(path: UPath, path_type: str, run_parameters: RunParameters) -> UPath:
     shifted_ds = bilinear_interpolate(ds=orig_ds, output_degree=output_degree)
     shifted_ds.attrs.update({'title': 'shift'}, **get_cf_global_attrs(version=version))
     print(f'writing shifted dataset to {target}')
-    shifted_ds.pipe(set_zarr_encoding).to_zarr(target, mode='w')
+    shifted_ds = set_zarr_encoding(shifted_ds)
+    blocking_to_zarr(ds=shifted_ds, target=target, validate=True, write_empty_chunks=True)
     return target
 
 
@@ -109,7 +116,8 @@ def coarsen_obs(path: UPath, output_degree: float) -> UPath:
     coarse_ds = conservative_interpolate(ds=orig_ds, output_degree=output_degree)
     coarse_ds.attrs.update({'title': 'coarsen_interpolate'}, **get_cf_global_attrs(version=version))
     print(f'writing coarsened dataset to {target}')
-    coarse_ds.pipe(set_zarr_encoding).to_zarr(target, mode='w')
+    coarse_ds = set_zarr_encoding(coarse_ds)
+    blocking_to_zarr(ds=coarse_ds, target=target, validate=True, write_empty_chunks=True)
     return target
 
 
@@ -149,7 +157,8 @@ def coarsen_and_interpolate(path: UPath, output_degree: float) -> UPath:
         {'title': 'coarsen_interpolate'}, **get_cf_global_attrs(version=version)
     )
     print(f'writing interpolated dataset to {target}')
-    interpolated_ds.pipe(set_zarr_encoding).to_zarr(target, mode='w')
+    interpolated_ds = set_zarr_encoding(interpolated_ds)
+    blocking_to_zarr(ds=interpolated_ds, target=target, validate=True, write_empty_chunks=True)
     return target
 
 
@@ -193,7 +202,8 @@ def rescale(source_path: UPath, obs_path: UPath, run_parameters: RunParameters) 
         rescaled_ds = rescaled_ds.clip(min=0)
     rescaled_ds.attrs.update({'title': 'deepsd_output'}, **get_cf_global_attrs(version=version))
     print(f'writing rescaled dataset to {target}')
-    rescaled_ds.pipe(set_zarr_encoding).to_zarr(target, mode='w')
+    rescaled_ds = rescaled_ds.pipe(apply_land_mask).pipe(set_zarr_encoding)
+    blocking_to_zarr(ds=rescaled_ds, target=target, validate=True, write_empty_chunks=True)
     return target
 
 
@@ -235,7 +245,8 @@ def normalize_gcm(predict_path: UPath, historical_path: UPath) -> UPath:
 
     norm_ds.attrs.update({'title': 'normalize'}, **get_cf_global_attrs(version=version))
     print(f'writing normalized predict dataset to {target}')
-    norm_ds.pipe(set_zarr_encoding).to_zarr(target, mode='w')
+    norm_ds = set_zarr_encoding(norm_ds)
+    blocking_to_zarr(ds=norm_ds, target=target, validate=True, write_empty_chunks=True)
 
     return target
 
@@ -255,7 +266,7 @@ def inference(gcm_path: UPath, run_parameters: RunParameters) -> UPath:
     UPath
         Path to dataset containing model predictions.
     """
-    import tensorflow_io # noqa
+    import tensorflow_io  # noqa
 
     # # Check that GPU is available
     # print(tf.config.list_physical_devices('GPU'))
@@ -332,7 +343,7 @@ def inference(gcm_path: UPath, run_parameters: RunParameters) -> UPath:
         times=gcm_norm.time.values,
         output_path=target,
         var=run_parameters.variable,
-        chunks={'time': batch_size},
+        chunks={'time': batch_size, 'lat': 48, 'lon': 48},
         attrs=attrs,
     )
 
@@ -370,11 +381,15 @@ def inference(gcm_path: UPath, run_parameters: RunParameters) -> UPath:
 
         print("saving to zarr store")
 
-        task = downscaled_batch.to_dataset(name=run_parameters.variable).to_zarr(
-            target,
-            mode="a",
-            region=region,
-            compute=False,
+        task = (
+            downscaled_batch.to_dataset(name=run_parameters.variable)
+            .chunk({'time': -1, 'lat': 48, 'lon': 48})
+            .to_zarr(
+                target,
+                mode="a",
+                region=region,
+                compute=False,
+            )
         )
         task.compute(retries=10)
 
@@ -411,6 +426,7 @@ def bias_correction(
         return target
 
     obs_ds = xr.open_zarr(obs_path)
+    obs_ds = apply_land_mask(obs_ds)
     downscaled_ds = xr.open_zarr(downscaled_path)
     bc_output = bias_correct_gcm_by_method(
         gcm_pred=downscaled_ds,
@@ -422,7 +438,8 @@ def bias_correction(
         {'title': 'deepsd_output_bias_corrected'}, **get_cf_global_attrs(version=version)
     )
     print(f'writing bias corrected dataset to {target}')
-    bc_output.pipe(set_zarr_encoding).to_zarr(target, mode='w')
+    bc_output = set_zarr_encoding(bc_output)
+    blocking_to_zarr(ds=bc_output, target=target, validate=True, write_empty_chunks=True)
     return target
 
 
