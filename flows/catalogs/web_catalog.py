@@ -17,7 +17,7 @@ config.set(
 )
 
 
-def get_license(source_id: str) -> dict:
+def get_license(source_id: str, derived_product: bool = False) -> dict:
 
     LICENSE_MAPPING = {
         'ACCESS-CM2': '',
@@ -77,6 +77,13 @@ def get_license(source_id: str) -> dict:
     }
 
     license = LICENSE_MAPPING.get(source_id)
+
+    if derived_product and license in {'CC0-1.0', 'CC-BY-4.0'}:
+        # For derived products (pyramids, and downscaled data) generated
+        # from CMIP6 data with permissive licenses,
+        # we promote the license to CC-BY-4.0
+        license = 'CC-BY-4.0'
+
     if license:
         licences = {
             'CC-BY-4.0': {
@@ -184,7 +191,9 @@ def get_cmip6_pyramids(paths: list[str], cdn: str, root_path: str) -> list[dict]
     return builder.df.to_dict(orient='records')
 
 
-def parse_cmip6_downscaled_pyramid(data, cdn: str, root_path: str) -> list[dict]:
+def parse_cmip6_downscaled_pyramid(
+    data, cdn: str, root_path: str, derived_product: bool = True
+) -> list[dict]:
 
     parameters = data['parameters']
     datasets = data['datasets']
@@ -205,7 +214,11 @@ def parse_cmip6_downscaled_pyramid(data, cdn: str, root_path: str) -> list[dict]
         query['activity_id'] = entry['activity_id']
         query['original_dataset_uris'] = [f"{root_path}/{str(entry['zstore']).split('//')[-1]}"]
 
-    template = {**query, 'method': parameters['method'], 'license': get_license(query['source_id'])}
+    template = {
+        **query,
+        'method': parameters['method'],
+        'license': get_license(query['source_id'], derived_product=derived_product),
+    }
     results = []
     if 'daily_pyramid_path' in datasets:
         daily_pyramid_attrs = {
