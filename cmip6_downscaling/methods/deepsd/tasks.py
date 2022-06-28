@@ -1,3 +1,4 @@
+import functools
 from dataclasses import asdict
 
 import numpy as np
@@ -17,7 +18,7 @@ from ..common.utils import (
     blocking_to_zarr,
     set_zarr_encoding,
     subset_dataset,
-    zmetadata_exists,
+    validate_zarr_store,
 )
 from .utils import (
     EPSILON,
@@ -39,6 +40,8 @@ results_dir = UPath(config.get("storage.results.uri")) / version
 use_cache = config.get('run_options.use_cache')
 
 xr.set_options(keep_attrs=True)
+
+is_cached = functools.partial(validate_zarr_store, raise_on_error=False)
 
 
 @task(log_stdout=True)
@@ -69,7 +72,7 @@ def shift(path: UPath, path_type: str, run_parameters: RunParameters) -> UPath:
     ds_hash = str_to_hash(str(path) + str(output_degree))
     target = intermediate_dir / 'shift' / ds_hash
 
-    if use_cache and zmetadata_exists(target):
+    if use_cache and is_cached(target):
         print(f'found existing target: {target}')
         shifted_ds = xr.open_zarr(target)
         return target
@@ -105,7 +108,7 @@ def coarsen_obs(path: UPath, output_degree: float) -> UPath:
     ds_hash = str_to_hash(str(path) + str(output_degree))
     target = intermediate_dir / 'coarsen' / ds_hash
 
-    if use_cache and zmetadata_exists(target):
+    if use_cache and is_cached(target):
         print(f'found existing target: {target}')
         coarse_ds = xr.open_zarr(target)
         return target
@@ -142,7 +145,7 @@ def coarsen_and_interpolate(path: UPath, output_degree: float) -> UPath:
     ds_hash = str_to_hash(str(path) + str(output_degree))
     target = intermediate_dir / 'coarsen_interpolate' / ds_hash
 
-    if use_cache and zmetadata_exists(target):
+    if use_cache and is_cached(target):
         print(f'found existing target: {target}')
         interpolated_ds = xr.open_zarr(target)
         return target
@@ -182,7 +185,7 @@ def rescale(source_path: UPath, obs_path: UPath, run_parameters: RunParameters) 
     ds_hash = str_to_hash(str(source_path) + str(obs_path))
     target = results_dir / 'deepsd_rescale' / ds_hash
 
-    if use_cache and zmetadata_exists(target):
+    if use_cache and is_cached(target):
         print(f'found existing target: {target}')
         rescaled_ds = xr.open_zarr(target)
         return target
@@ -227,7 +230,7 @@ def normalize_gcm(predict_path: UPath, historical_path: UPath) -> UPath:
     target = intermediate_dir / 'normalize' / ds_hash
 
     # Skip step if output file already exists when using cache
-    if use_cache and zmetadata_exists(target):
+    if use_cache and is_cached(target):
         print(f'found existing target: {target}')
         norm_ds = xr.open_zarr(target)
         return target
@@ -278,7 +281,7 @@ def inference(gcm_path: UPath, run_parameters: RunParameters) -> UPath:
     target = intermediate_dir / 'inference' / ds_hash
 
     # Skip step if output file already exists when using cache
-    if use_cache and zmetadata_exists(target):
+    if use_cache and is_cached(target):
         print(f'found existing target: {target}')
         downscaled_batch = xr.open_zarr(target)
         return target
@@ -420,7 +423,7 @@ def bias_correction(
     target = results_dir / 'deepsd_bias_correction' / ds_hash
 
     # Skip step if output file already exists when using cache
-    if use_cache and zmetadata_exists(target):
+    if use_cache and is_cached(target):
         print(f'found existing target: {target}')
         bc_output = xr.open_zarr(target)
         return target
@@ -428,12 +431,16 @@ def bias_correction(
     obs_ds = xr.open_zarr(obs_path)
     obs_ds = apply_land_mask(obs_ds)
     downscaled_ds = xr.open_zarr(downscaled_path)
-    bc_output = bias_correct_gcm_by_method(
-        gcm_pred=downscaled_ds,
-        method=run_parameters.bias_correction_method,
-        bc_kwargs=run_parameters.bias_correction_kwargs,
-        obs=obs_ds,
-    ).to_dataset(name=run_parameters.variable)
+    bc_output = (
+        bias_correct_gcm_by_method(
+            gcm_pred=downscaled_ds[run_parameters.variable],
+            method=run_parameters.bias_correction_method,
+            bc_kwargs=run_parameters.bias_correction_kwargs,
+            obs=obs_ds[run_parameters.variable],
+        )
+        .to_dataset(dim='variable')
+        .rename({'variable_0': run_parameters.variable})
+    )
     bc_output.attrs.update(
         {'title': 'deepsd_output_bias_corrected'}, **get_cf_global_attrs(version=version)
     )
@@ -468,7 +475,7 @@ def get_validation(run_parameters: RunParameters) -> UPath:
     )
     target = intermediate_dir / 'get_validation' / ds_hash
 
-    if use_cache and zmetadata_exists(target):
+    if use_cache and is_cached(target):
         print(f'found existing target: {target}')
         return target
 
