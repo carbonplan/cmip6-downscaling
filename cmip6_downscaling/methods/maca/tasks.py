@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple, Union
-
+from dataclasses import asdict
 from datetime import timedelta
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import dask
 import numpy as np
 import regionmask
 import xarray as xr
 import xesmf as xe
+import zarr
 from carbonplan_data.metadata import get_cf_global_attrs
 from prefect import task
 from upath import UPath
@@ -17,6 +18,11 @@ from cmip6_downscaling import __version__ as version, config
 from cmip6_downscaling.methods.common.containers import RunParameters
 from cmip6_downscaling.methods.common.utils import zmetadata_exists
 from cmip6_downscaling.methods.maca import core as maca_core
+from cmip6_downscaling.methods.maca.utils import (
+    initialize_out_store,
+    make_regions_mask,
+    merge_block_to_zarr,
+)
 from cmip6_downscaling.utils import str_to_hash
 
 intermediate_dir = UPath(config.get("storage.intermediate.uri")) / version
@@ -186,7 +192,7 @@ def split_by_region(data_path: UPath, region_def: str = 'ar6.land') -> list[UPat
         target_paths.append(trend_target)
 
     if use_cache and all(zmetadata_exists(p) for p in target_paths):
-        print(f'found that all targets exist')
+        print('found that all targets exist')
         return target_paths
 
     ds = xr.open_zarr(data_path)
@@ -203,25 +209,54 @@ def split_by_region(data_path: UPath, region_def: str = 'ar6.land') -> list[UPat
 
 @task(log_stdout=True)
 def combine_regions(
-    region_paths: list[str], obs_path: UPath, region_def: str = 'ar6.land'
+    region_paths: list(UPath), out_path: UPath, run_parameters: RunParameters
 ) -> UPath:
 
-    ds_hash = str_to_hash(str(region_paths) + str(obs_path))
-    target = intermediate_dir / 'combine_regions' / ds_hash
+    ds_hash = str_to_hash(
+        "{gcm}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{predict_dates[0]}_{predict_dates[1]}".format(
+            **asdict(run_parameters)
+        )
+    )
+    target = results_dir / 'maca' / ds_hash
 
     if use_cache and zmetadata_exists(target):
         print(f"found existing target: {target}")
         return target
 
-    obs_ds = xr.open_zarr(obs_path)
+    n_chunk_per_block = 3
+    chunk_size = 48
 
-    regions = _get_regions(region_def)
+    out_time_index = xr.open_zarr(region_paths[0]).time.values
+    template = initialize_out_store(
+        target, out_time_index, run_parameters.variable, chunk_size=chunk_size
+    )
 
-    # TODO: update with logic being worked out now
-    mask = regions.mask(obs_ds)
-    combined_ds = xr.Dataset()
+    mask = make_regions_mask(template.isel(time=0), chunk_size=chunk_size)
 
-    combined_ds.attrs.update({'title': 'combine_regions'}, **get_cf_global_attrs(version=version))
-    combined_ds.to_zarr(target, mode='w')
-
+    block_size = chunk_size * n_chunk_per_block
+    # Iterate over chunks and merge pieces within each chunk
+    total = []
+    for ilon in range(0, mask.sizes['lon'], block_size):
+        if ilon <= mask.sizes['lon'] - block_size:
+            xslice = slice(ilon, ilon + block_size)
+        else:
+            xslice = slice(ilon, mask.sizes['lon'])
+        for ilat in range(0, mask.sizes['lat'], block_size):
+            print(f'{ilon}, {ilat}')
+            if ilat <= mask.sizes['lat'] - block_size:
+                yslice = slice(ilat, ilat + block_size)
+            else:
+                yslice = slice(ilat, mask.sizes['lat'])
+            total.append(
+                merge_block_to_zarr(
+                    mask.isel(lon=xslice, lat=yslice),
+                    region_paths,
+                    target,
+                    xslice=xslice,
+                    yslice=yslice,
+                )
+            )
+    # TODO - confirm the right specs for this call
+    result = dask.compute(*total, scheduler='threads')
+    zarr.consolidate_metadata(target)
     return target

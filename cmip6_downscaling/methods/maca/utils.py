@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import dask
 import numpy as np
 import pandas as pd
+import regionmask
 import xarray as xr
+from carbonplan_data.metadata import get_cf_global_attrs
+
+from ... import __version__ as version, config
 
 
 def add_circular_temporal_pad(data: xr.Dataset, offset: int, timeunit: str = 'D') -> xr.Dataset:
@@ -143,3 +148,104 @@ def generate_batches(
         batches.append(batch)
 
     return batches, cores
+
+
+def initialize_out_store(
+    out_path: str, time_index: xr.DataArray, variable: str, chunk_size: int = 48
+) -> xr.Dataset:
+    """Write the empty zarr store where you'll write your final outputs chunk-by-chunk.
+
+    Parameters
+    ----------
+    out_path : str
+        Path where you want the final output store to exist
+    time_index : xr.DataArray
+        Time index to apply to the output store
+    variable : str
+        Variable the dataset will include (can only be one variable at a time currently)
+    chunk_size : int, optional
+        Length and width of chunk size spatially (will be full time), by default 48
+
+    Returns
+    -------
+    xr.Dataset
+        Template dataset
+    """
+    lon = np.arange(-180, 180, 0.25)
+    lat = np.flip(np.arange(-90, 90.25, 0.25))
+
+    template = xr.Dataset(
+        {
+            variable: (
+                ('time', 'lat', 'lon'),
+                np.full((len(time_index), len(lat), len(lon)), fill_value=np.nan, dtype=np.float32),
+            )
+        },
+        coords={
+            "lat": lat,
+            "lon": lon,
+            "time": time_index,
+        },
+    )
+    template = template.chunk({'lon': chunk_size, 'lat': chunk_size, 'time': -1})
+
+    template.attrs.update({'title': 'combine_regions'}, **get_cf_global_attrs(version=version))
+
+    template.to_zarr(
+        out_path,
+        compute=False,
+        mode="w",
+        encoding={variable: {"chunks": [-1, chunk_size, chunk_size]}},
+    )
+    return template
+
+
+def make_regions_mask(template_one_timeslice: xr.DataArray, chunk_size=48) -> xr.Dataset:
+    """Make the categorical mask showing which region each pixel is assigned to.
+
+    Parameters
+    ----------
+    template_one_timeslice : xr.DataArray
+        Example time slice of the final output dataset.
+    chunk_size : int, optional
+        Width and length of chunk that will be written (will be full-time), by default 48
+
+    Returns
+    -------
+    xr.Dataset
+        Integer mask with pixels numbered according to each region number.
+    """
+    mask = (
+        regionmask.defined_regions.ar6.land.mask(template_one_timeslice).fillna(46).astype(np.byte)
+    )
+    mask = mask.chunk({'lon': chunk_size, 'lat': chunk_size})
+    return mask
+
+
+@dask.delayed()
+def merge_block_to_zarr(mask, split_region_paths, out_path, *, xslice, yslice):
+    """
+    Find ar6 regions in each block, merge and reindex, write to zarr
+    """
+    components = pd.unique(mask.values.ravel())
+    components = components[components <= 45]
+    if components.size > 0:
+        merged = (
+            xr.merge(
+                xr.open_zarr(
+                    split_region_paths[ind]
+                )  # Add .0 because subsets were created with mask as float dtypes
+                .where(mask.isin(ind), drop=True)
+                .sortby(["lon", "lat"])
+                for ind in components
+            )
+            .reindex_like(mask)
+            .sortby("lat", ascending=False)
+        ).compute()
+        for variable in merged.data_vars:
+            merged[variable].encoding['write_empty_chunks'] = True
+        return merged.to_zarr(
+            out_path,
+            region={'lat': yslice, 'lon': xslice, 'time': slice(0, merged.sizes['time'])},
+            mode="r+",
+        )
