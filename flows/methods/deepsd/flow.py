@@ -110,6 +110,13 @@ with Flow(
     p['monthly_summary_path'] = time_summary(p['shifted_model_output_path'], freq='1MS')
     p['annual_summary_path'] = time_summary(p['shifted_model_output_path'], freq='1AS')
 
+    p['bias_corrected_monthly_summary_path'] = time_summary(
+        p['bias_corrected_shifted_model_output_path'], freq='1MS'
+    )
+    p['bias_corrected_annual_summary_path'] = time_summary(
+        p['bias_corrected_shifted_model_output_path'], freq='1AS'
+    )
+
     if config.get('run_options.generate_pyramids'):
 
         # since pyramids require full space we now rechunk everything into full
@@ -129,11 +136,27 @@ with Flow(
         )
 
         # pyramids
-        p['monthly_pyramid_path'] = pyramid(
-            p['monthly_summary_full_space_path'],
+        p['monthly_pyramid_path'] = pyramid(p['monthly_summary_full_space_path'], levels=4)
+        p['annual_pyramid_path'] = pyramid(p['annual_summary_full_space_path'], levels=4)
+
+        # repeat for bias corrected output
+
+        # make temporal summaries
+        p['bias_corrected_monthly_summary_full_space_path'] = rechunk(
+            p['bias_corrected_monthly_summary_path'], pattern='full_space'
+        )
+        p['bias_corrected_annual_summary_full_space_path'] = rechunk(
+            p['bias_corrected_annual_summary_path'], pattern='full_space'
+        )
+
+        # pyramids
+        p['bias_corrected_monthly_pyramid_path'] = pyramid(
+            p['bias_corrected_monthly_summary_full_space_path'],
             levels=4,
         )
-        p['annual_pyramid_path'] = pyramid(p['annual_summary_full_space_path'], levels=4)
+        p['bias_corrected_annual_pyramid_path'] = pyramid(
+            p['bias_corrected_annual_summary_full_space_path'], levels=4
+        )
 
     # finalize
     finalize(run_parameters=run_parameters, **p)
