@@ -204,9 +204,8 @@ def parse_cmip6_downscaled_pyramid(data, cdn: str, root_path: str) -> list[dict]
         query['institution_id'] = entry['institution_id']
         query['activity_id'] = entry['activity_id']
         query['original_dataset_uris'] = [f"{root_path}/{str(entry['zstore']).split('//')[-1]}"]
-        query['license'] = get_license(query['source_id'])
 
-    template = {**query, 'method': parameters['method'], 'license': ''}
+    template = {**query, 'method': parameters['method'], 'license': get_license(query['source_id'])}
     results = []
     if 'daily_pyramid_path' in datasets:
         daily_pyramid_attrs = {
