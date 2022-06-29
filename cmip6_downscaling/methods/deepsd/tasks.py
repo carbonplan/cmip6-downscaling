@@ -1,9 +1,11 @@
 import functools
 from dataclasses import asdict
 
+import fsspec
 import numpy as np
 import tensorflow as tf
 import xarray as xr
+import zarr
 from carbonplan_data.metadata import get_cf_global_attrs
 from prefect import task
 from upath import UPath
@@ -400,6 +402,35 @@ def inference(gcm_path: UPath, run_parameters: RunParameters) -> UPath:
 
 
 @task(log_stdout=True)
+def update_var_attrs(
+    target_path: UPath, source_path: UPath, run_parameters: RunParameters
+) -> UPath:
+    """Update attrs for a DataArray in a zarr store.
+
+    Parameters
+    ----------
+    target_path : UPath
+        Store to add DataArray attrs to.
+    source_path : UPath
+        Store to get DataArray attrs from.
+    run_parameters : RunParameters
+        Parameters for run set-up and model specs.
+    Returns
+    -------
+    UPath
+        Path to dataset containing corrected attrs.
+    """
+
+    target_attrs = f'{target_path}/{run_parameters.variable}/.zattrs'
+    source_attrs = f'{source_path}/{run_parameters.variable}/.zattrs'
+    print(f'copying attrs from {source_attrs} to {target_attrs}')
+    fs = fsspec.filesystem('az', account_name='cmip6downscaling')
+    fs.copy(source_attrs, target_attrs)
+    zarr.consolidate_metadata(target_path)
+    return target_path
+
+
+@task(log_stdout=True)
 def bias_correction(
     downscaled_path: UPath, obs_path: UPath, run_parameters: RunParameters
 ) -> UPath:
@@ -427,7 +458,7 @@ def bias_correction(
         print(f'found existing target: {target}')
         bc_output = xr.open_zarr(target)
         return target
-
+    # TO-DO: Retain attrs during bias correction
     obs_ds = xr.open_zarr(obs_path)
     obs_ds = apply_land_mask(obs_ds)
     downscaled_ds = xr.open_zarr(downscaled_path)
