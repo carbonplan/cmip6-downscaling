@@ -19,36 +19,50 @@ from . import containers
 xr.set_options(keep_attrs=True)
 
 
-def validate_zarr_store(target: str):
+def validate_zarr_store(target: str, raise_on_error=True) -> bool:
     """Validate a zarr store.
 
     Parameters
     ----------
     target : str
         Path to zarr store.
+    raise_on_error : bool
+        Flag to turn on/off raising when the store is not valid. If `False`, the function will return
+        `True` when the store is valid (complete) and `False` when the store is not valid.
 
+    Returns
+    -------
+    valid : bool
     """
     errors = []
 
-    store = zarr.open_consolidated(target)
-    groups = list(store.groups())
-    # if groups is empty (not a datatree)
-    if not groups:
-        groups = [("root", store["/"])]
+    try:
+        store = zarr.open_consolidated(target)
+    except:
+        errors.append('error opening zarr store')
 
-    for key, group in groups:
-        data_group = group
+    if not errors:
+        groups = list(store.groups())
+        # if groups is empty (not a datatree)
+        if not groups:
+            groups = [("root", store["/"])]
 
-        variables = list(data_group.keys())
-        for variable in variables:
-            variable_array = data_group[variable]
-            if variable_array.nchunks_initialized != variable_array.nchunks:
-                errors.append(
-                    f'{variable} has {variable_array.nchunks - variable_array.nchunks_initialized} uninitialized chunks'
-                )
+        for key, group in groups:
+            data_group = group
+
+            variables = list(data_group.keys())
+            for variable in variables:
+                variable_array = data_group[variable]
+                if variable_array.nchunks_initialized != variable_array.nchunks:
+                    errors.append(
+                        f'{variable} has {variable_array.nchunks - variable_array.nchunks_initialized} uninitialized chunks'
+                    )
 
     if errors:
-        raise ValueError(f'Found {len(errors)} errors: {errors}')
+        if raise_on_error:
+            raise ValueError(f'Found {len(errors)} errors: {errors}')
+        return False
+    return True
 
 
 def zmetadata_exists(path: UPath):
