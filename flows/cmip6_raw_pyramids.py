@@ -13,7 +13,6 @@ from upath import UPath
 from cmip6_downscaling import __version__ as version, config, runtimes
 from cmip6_downscaling.data.cmip import postprocess
 from cmip6_downscaling.methods.common.tasks import _pyramid_postprocess
-from cmip6_downscaling.methods.common.utils import apply_land_mask
 from cmip6_downscaling.utils import write
 
 config.set(
@@ -148,7 +147,7 @@ def compute_pyramids(results: dict[str, list[str]], levels: int) -> dict[str, li
             grid_label = parts[5]
             target = results_dir / name
             with xr.set_options(keep_attrs=True):
-                ds = xr.open_zarr(store).pipe(_load_coords).pipe(apply_land_mask)
+                ds = xr.open_zarr(store).pipe(_load_coords)
                 ds.coords['date_str'] = ds['time'].dt.strftime('%Y-%m-%d').astype('S10')
                 ds.attrs.update(
                     {'title': ds.attrs['title']}, **get_cf_global_attrs(version=version)
