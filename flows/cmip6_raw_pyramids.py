@@ -12,6 +12,8 @@ from upath import UPath
 
 from cmip6_downscaling import __version__ as version, config, runtimes
 from cmip6_downscaling.data.cmip import postprocess
+from cmip6_downscaling.methods.common.tasks import _pyramid_postprocess
+from cmip6_downscaling.methods.common.utils import apply_land_mask
 from cmip6_downscaling.utils import write
 
 config.set(
@@ -31,6 +33,7 @@ runtime = runtimes.CloudRuntime()
 
 @task(log_stdout=True)
 def get_assets(
+    *,
     cat_url: str,
     source_id: list[str] | str,
     variable_id: list[str] | str,
@@ -145,7 +148,7 @@ def compute_pyramids(results: dict[str, list[str]], levels: int) -> dict[str, li
             grid_label = parts[5]
             target = results_dir / name
             with xr.set_options(keep_attrs=True):
-                ds = xr.open_zarr(store).pipe(_load_coords)
+                ds = xr.open_zarr(store).pipe(_load_coords).pipe(apply_land_mask)
                 ds.coords['date_str'] = ds['time'].dt.strftime('%Y-%m-%d').astype('S10')
                 ds.attrs.update(
                     {'title': ds.attrs['title']}, **get_cf_global_attrs(version=version)
@@ -165,7 +168,9 @@ def compute_pyramids(results: dict[str, list[str]], levels: int) -> dict[str, li
                     weights_pyramid=weights_pyramid,
                     regridder_kws={'ignore_degenerate': True, 'extrap_method': "nearest_s2d"},
                 )
-                write(dta, target)
+
+                dta = _pyramid_postprocess(dta, levels=levels)
+                write(dta, target, use_cache=False)
                 successes.append(target)
         except Exception:
             failures.append(store)
@@ -202,10 +207,14 @@ with Flow(
     cat_url = Parameter(
         "catalog", default="https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.json"
     )
-    source_id = Parameter("source_id", default=["MIROC6", "AWI-CM-1-1-M", "BCC-CSM2-MR"])
+
+    source_ids = ["MRI-ESM2-0", "NorESM2-LM", "CanESM5", "MIROC6", "BCC-CSM2-MR"]
+    source_id = Parameter("source_id", default=source_ids)
     variable_id = Parameter("variable_id", default=["tasmax", "tasmin", "pr"])
     experiment_id = Parameter("experiment_id", default=["historical", "ssp245", "ssp370", "ssp585"])
-    assets = get_assets()
+    assets = get_assets(
+        cat_url=cat_url, source_id=source_id, variable_id=variable_id, experiment_id=experiment_id
+    )
     results = compute_summary(assets)
     report(results)
     pyramids_results = compute_pyramids(results, levels)
