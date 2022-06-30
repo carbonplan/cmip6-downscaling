@@ -68,6 +68,20 @@
    deepsd.utils.normalize
 ```
 
+### MACA
+
+```{eval-rst}
+.. autosummary::
+   :toctree: generated/
+
+   maca.tasks.bias_correction
+   maca.tasks.epoch_trend
+   maca.tasks.construct_analogs
+   maca.tasks.split_by_region
+   maca.tasks.combine_regions
+   maca.tasks.replace_epoch_trend
+```
+
 ### Common Tasks
 
 ```{eval-rst}
