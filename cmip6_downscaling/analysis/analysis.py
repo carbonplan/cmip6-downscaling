@@ -30,7 +30,7 @@ def qaqc_checks(ds: xr.Dataset, checks: list) -> tuple[xr.Dataset, xr.Dataset]:
     return annual_qaqc_ts, qaqc_maps
 
 
-def load_top_cities(
+def load_big_cities(
     num_cities: int = 100, plot: bool = False, add_additional_cities: bool = True
 ) -> pd.DataFrame:
     """Load in the biggest (by population) `num_cities` (default 100) cities in the world,
@@ -58,7 +58,7 @@ def load_top_cities(
     """
 
     cities = pd.read_csv('https://cmip6downscaling.blob.core.windows.net/static/worldcities.csv')
-    top_cities = (
+    big_cities = (
         cities.sort_values('population', ascending=False)
         .groupby('country')
         .first()
@@ -71,25 +71,25 @@ def load_top_cities(
             'Denver',
             'Chicago',
             'Anchorage',
-            'Perth',
             'Paramaribo',
             'Fortaleza',
         ]
         for additional_city in additional_cities:
-            top_cities = top_cities.append(
-                cities[cities['city'] == additional_city][['city', 'lat', 'lng']]
+            big_cities = pd.concat(
+                [big_cities, cities[cities['city'] == additional_city][['city', 'lat', 'lng']]]
             )
+
     if plot:
         ax = plt.axes(projection=ccrs.PlateCarree())
         ax.stock_img()
-        for (lat, lon) in top_cities[['lat', 'lng']].values:
+        for (lat, lon) in big_cities[['lat', 'lng']].values:
             plt.plot(
                 lon,
                 lat,
                 color='blue',
                 marker='o',
             )
-    return top_cities
+    return big_cities
 
 
 def select_points(ds: xr.Dataset, top_cities: pd.DataFrame) -> xr.Dataset:
@@ -120,7 +120,7 @@ def select_points(ds: xr.Dataset, top_cities: pd.DataFrame) -> xr.Dataset:
     return cities
 
 
-def grab_top_city_data(ds_list: list, top_cities: pd.DataFrame) -> list:
+def grab_big_city_data(ds_list: list, big_cities: pd.DataFrame) -> list:
     """Given a list of datasets, perform the `select_points` operation on each of them.
 
     Parameters
@@ -137,7 +137,7 @@ def grab_top_city_data(ds_list: list, top_cities: pd.DataFrame) -> list:
     """
     city_ds_list = []
     for ds in ds_list:
-        city_ds_list.append(select_points(ds, top_cities).compute())
+        city_ds_list.append(select_points(ds, big_cities).compute())
     return city_ds_list
 
 
