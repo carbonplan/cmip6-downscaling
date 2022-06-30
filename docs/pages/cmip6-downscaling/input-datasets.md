@@ -30,7 +30,7 @@ cat = intake.open_esm_datastore("https://cmip6downscaling.blob.core.windows.net/
 
 The ERA5 data [transfering](https://github.com/carbonplan/cmip6-downscaling/blob/4bf65c61f7192908cca81fe94cda3b94931586f0/flows/ERA5/ERA5_transfer.py) and [processing](https://github.com/carbonplan/cmip6-downscaling/blob/4bf65c61f7192908cca81fe94cda3b94931586f0/flows/ERA5/ERA5_resample.py) scripts can be found on [Github](https://github.com/carbonplan/cmip6-downscaling).
 
-The ECMWF ERA5 dataset was produced by the European Centre for Medium-Range Weather Forecasts (ECMWF) and is licencesed under Creative Commons Attribution 4.0 International (CC BY 4.0).
+The ECMWF ERA5 dataset was produced by the European Centre for Medium-Range Weather Forecasts (ECMWF) and is licensed under Creative Commons Attribution 4.0 International (CC BY 4.0).
 https://apps.ecmwf.int/datasets/licences/general/
 
 ## CMIP6 raw datasets
