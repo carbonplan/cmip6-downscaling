@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import datetime
+import functools
 import json
 import os
 import warnings
@@ -51,6 +52,8 @@ intermediate_dir = UPath(config.get("storage.intermediate.uri")) / version
 results_dir = UPath(config.get("storage.results.uri")) / version
 use_cache = config.get('run_options.use_cache')
 
+is_cached = functools.partial(validate_zarr_store, raise_on_error=False)
+
 
 @task(log_stdout=True)
 def make_run_parameters(**kwargs) -> RunParameters:
@@ -72,26 +75,22 @@ def get_obs(run_parameters: RunParameters) -> UPath:
     UPath
         Path to subset observation dataset.
     """
-
-    title = "obs ds: {obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}".format(
-        **asdict(run_parameters)
+    feature_string = '_'.join(run_parameters.features)
+    frmt_str = "{obs}_{feature_string}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}".format(
+        **asdict(run_parameters), feature_string=feature_string
     )
-    ds_hash = str_to_hash(
-        "{obs}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{train_dates[0]}_{train_dates[1]}".format(
-            **asdict(run_parameters)
-        )
-    )
+    title = f"obs ds: {frmt_str}"
+    ds_hash = str_to_hash(frmt_str)
     target = intermediate_dir / 'get_obs' / ds_hash
 
     if use_cache and zmetadata_exists(target):
         print(f'found existing target: {target}')
         return target
-
-    ds = open_era5(run_parameters.variable, run_parameters.train_period)
-
+    print(run_parameters)
+    ds = open_era5(run_parameters.features, run_parameters.train_period)
     subset = subset_dataset(
         ds,
-        run_parameters.variable,
+        run_parameters.features,
         run_parameters.train_period.time_slice,
         run_parameters.bbox,
         chunking_schema={'time': 365, 'lat': 150, 'lon': 150},
@@ -125,8 +124,10 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
         UPath to experiment dataset.
     """
     time_period = getattr(run_parameters, time_subset)
-    frmt_str = "{model}_{member}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{time_period.start}_{time_period.stop}".format(
-        time_period=time_period, **asdict(run_parameters)
+    feature_string = '_'.join(run_parameters.features)
+
+    frmt_str = "{model}_{member}_{scenario}_{feature_string}_{latmin}_{latmax}_{lonmin}_{lonmax}_{time_period.start}_{time_period.stop}".format(
+        time_period=time_period, **asdict(run_parameters), feature_string=feature_string
     )
 
     title = f"experiment ds: {frmt_str}"
@@ -134,33 +135,34 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     target = intermediate_dir / 'get_experiment' / ds_hash
 
     print(target)
-    if use_cache and zmetadata_exists(target):
+    if use_cache and is_cached(target):
         print(f'found existing target: {target}')
         return target
 
-    ds = get_gcm(
-        scenario=run_parameters.scenario,
-        member_id=run_parameters.member,
-        table_id=run_parameters.table_id,
-        grid_label=run_parameters.grid_label,
-        source_id=run_parameters.model,
-        variable=run_parameters.variable,
-        time_slice=time_period.time_slice,
-    )
+    # The for loop is a workaround for github issue: https://github.com/pydata/xarray/issues/6709
+    mode = 'w'
+    for feature in run_parameters.features:
+        ds = get_gcm(
+            scenario=run_parameters.scenario,
+            member_id=run_parameters.member,
+            table_id=run_parameters.table_id,
+            grid_label=run_parameters.grid_label,
+            source_id=run_parameters.model,
+            variable=feature,
+            time_slice=time_period.time_slice,
+        )
+        subset = subset_dataset(ds, feature, time_period.time_slice, run_parameters.bbox)
+        # Note: dataset is chunked into time:365 chunks to standardize leap-year chunking.
+        subset = subset.chunk({'time': 365})
+        for key in subset.variables:
+            subset[key].encoding = {}
 
-    subset = subset_dataset(
-        ds, run_parameters.variable, time_period.time_slice, run_parameters.bbox
-    )
+        subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
 
-    # Note: dataset is chunked into time:365 chunks to standardize leap-year chunking.
-    subset = subset.chunk({'time': 365})
-    for key in subset.variables:
-        subset[key].encoding = {}
+        subset = set_zarr_encoding(subset)
+        subset[[feature]].to_zarr(target, mode=mode)
+        mode = 'a'
 
-    subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
-
-    subset = set_zarr_encoding(subset)
-    blocking_to_zarr(ds=subset, target=target, validate=True, write_empty_chunks=True)
     return target
 
 
@@ -209,7 +211,7 @@ def rechunk(
     target_store = fsspec.get_mapper(str(target))
     temp_store = fsspec.get_mapper(str(path_tmp))
 
-    if use_cache and zmetadata_exists(target):
+    if use_cache and is_cached(target):
         print(f'found existing target: {target}')
         # if we wanted to check that it was chunked correctly we could put this down below where
         # the target_schema is validated. but that requires us going through the development
@@ -315,7 +317,7 @@ def time_summary(ds_path: UPath, freq: str) -> UPath:
     ds_hash = str_to_hash(str(ds_path) + freq)
     target = results_dir / 'time_summary' / ds_hash
     print(target)
-    if use_cache and zmetadata_exists(target):
+    if use_cache and is_cached(target):
         print(f'found existing target: {target}')
         return target
 
@@ -533,7 +535,7 @@ def pyramid(
     ds_hash = str_to_hash(str(ds_path) + str(levels) + str(other_chunks))
     target = results_dir / 'pyramid' / ds_hash
 
-    if use_cache and zmetadata_exists(target):
+    if use_cache and is_cached(target):
         print(f'found existing target: {target}')
         return target
 

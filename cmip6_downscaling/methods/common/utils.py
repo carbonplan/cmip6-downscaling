@@ -3,6 +3,7 @@ from __future__ import annotations
 import pathlib
 import re
 
+import dask
 import fsspec
 import geopandas as gpd
 import numpy as np
@@ -11,7 +12,7 @@ import regionmask
 import xarray as xr
 import zarr
 from upath import UPath
-from xarray_schema import DataArraySchema
+from xarray_schema import DataArraySchema, DatasetSchema
 from xarray_schema.base import SchemaError
 
 from . import containers
@@ -19,36 +20,50 @@ from . import containers
 xr.set_options(keep_attrs=True)
 
 
-def validate_zarr_store(target: str):
+def validate_zarr_store(target: str, raise_on_error=True) -> bool:
     """Validate a zarr store.
 
     Parameters
     ----------
     target : str
         Path to zarr store.
+    raise_on_error : bool
+        Flag to turn on/off raising when the store is not valid. If `False`, the function will return
+        `True` when the store is valid (complete) and `False` when the store is not valid.
 
+    Returns
+    -------
+    valid : bool
     """
     errors = []
 
-    store = zarr.open_consolidated(target)
-    groups = list(store.groups())
-    # if groups is empty (not a datatree)
-    if not groups:
-        groups = [("root", store["/"])]
+    try:
+        store = zarr.open_consolidated(target)
+    except:
+        errors.append('error opening zarr store')
 
-    for key, group in groups:
-        data_group = group
+    if not errors:
+        groups = list(store.groups())
+        # if groups is empty (not a datatree)
+        if not groups:
+            groups = [("root", store["/"])]
 
-        variables = list(data_group.keys())
-        for variable in variables:
-            variable_array = data_group[variable]
-            if variable_array.nchunks_initialized != variable_array.nchunks:
-                errors.append(
-                    f'{variable} has {variable_array.nchunks - variable_array.nchunks_initialized} uninitialized chunks'
-                )
+        for key, group in groups:
+            data_group = group
+
+            variables = list(data_group.keys())
+            for variable in variables:
+                variable_array = data_group[variable]
+                if variable_array.nchunks_initialized != variable_array.nchunks:
+                    errors.append(
+                        f'{variable} has {variable_array.nchunks - variable_array.nchunks_initialized} uninitialized chunks'
+                    )
 
     if errors:
-        raise ValueError(f'Found {len(errors)} errors: {errors}')
+        if raise_on_error:
+            raise ValueError(f'Found {len(errors)} errors: {errors}')
+        return False
+    return True
 
 
 def zmetadata_exists(path: UPath):
@@ -80,6 +95,7 @@ def blocking_to_zarr(
 
         for variable in ds.data_vars:
             ds[variable].encoding['write_empty_chunks'] = True
+    ds = dask.optimize(ds)[0]
     t = ds.to_zarr(target, mode='w', compute=False)
     t.compute(retries=5)
     zarr.consolidate_metadata(target)
@@ -90,7 +106,7 @@ def blocking_to_zarr(
 
 def subset_dataset(
     ds: xr.Dataset,
-    variable: str,
+    features: str | list,
     time_period: slice,
     bbox: containers.BBox,
     chunking_schema: dict = None,
@@ -120,9 +136,13 @@ def subset_dataset(
         lat=bbox.lat_slice,
     )
     if chunking_schema is not None:
-        target_schema = DataArraySchema(chunks=chunking_schema)
+        target_schema_array = DataArraySchema(chunks=chunking_schema)
+        schema_dict = {}
+        for feature in features:
+            schema_dict[feature] = target_schema_array
+        target_schema_dataset = DatasetSchema(schema_dict)
         try:
-            target_schema.validate(subset_ds[variable])
+            target_schema_dataset.validate(subset_ds[features])
         except SchemaError:
             subset_ds = subset_ds.chunk(chunking_schema)
 

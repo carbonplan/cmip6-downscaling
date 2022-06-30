@@ -33,8 +33,19 @@ def open_era5(variables: str | list[str], time_period: slice) -> xr.Dataset:
         variables = [variables]
 
     years = range(int(time_period.start), int(time_period.stop) + 1)
-
-    ds = xr.concat([cat.era5(year=year).to_dask()[variables] for year in years], dim='time')
+    wind_vars, non_wind_vars = [], []
+    for variable in variables:
+        if variable in ['ua', 'va']:
+            wind_vars.append(variable)
+        else:
+            non_wind_vars.append(variable)
+    ds = xr.concat([cat.era5(year=year).to_dask()[non_wind_vars] for year in years], dim='time')
+    for wind_var in wind_vars:
+        era5_winds = xr.open_zarr('az://training/ERA5_daily_winds').rename(
+            {'latitude': 'lat', 'longitude': 'lon'}
+        )
+        name_dict = {'ua': 'U', 'va': 'V'}
+        ds[wind_var] = era5_winds[name_dict[wind_var]].drop('level')
 
     if 'pr' in variables:
         # convert to mm/day - helpful to prevent rounding errors from very tiny numbers
@@ -73,6 +84,7 @@ def open_era5(variables: str | list[str], time_period: slice) -> xr.Dataset:
             'nameCDM': 'Maximum_temperature_at_2_metres_since_previous_post-processing_surface_1_Hour_2',
             'product_type': 'forecast',
         }
+    # TODO adjust attrs of other variables
 
     ds = lon_to_180(ds)
 

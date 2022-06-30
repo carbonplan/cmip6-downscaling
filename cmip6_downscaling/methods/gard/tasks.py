@@ -78,35 +78,46 @@ def _fit_and_predict_wrapper(xtrain, ytrain, xpred, scrf, run_parameters, dim='t
     # transformed gcm is the interpolated GCM for the prediction period transformed
     # w.r.t. the interpolated obs used in the training (because that transformation
     # is essentially part of the model)
-    bias_corrected_gcm_pred = (
-        bias_correct_gcm_by_method(
-            gcm_pred=xpred[run_parameters.variable],
-            method=run_parameters.bias_correction_method,
-            bc_kwargs=kws,
-            obs=xtrain[run_parameters.variable],
+    bias_corrected_gcm_pred = xr.Dataset()
+    for feature in run_parameters.features:
+        bias_corrected_gcm_pred[feature] = (
+            bias_correct_gcm_by_method(
+                gcm_pred=xpred[feature],
+                method=run_parameters.bias_correction_method,
+                bc_kwargs=kws[feature],
+                obs=xtrain[feature],
+            )
+            .sel(variable='variable_0')
+            .drop('variable')
         )
-        .to_dataset(dim='variable')
-        .rename({'variable_0': run_parameters.variable})
-    )
     # model definition
     model = PointWiseDownscaler(
         model=get_gard_model(run_parameters.model_type, run_parameters.model_params), dim=dim
     )
     # model fitting
-    if run_parameters.variable == 'pr':
-        model.fit(cbrt(xtrain[run_parameters.variable]), cbrt(ytrain[run_parameters.variable]))
-        out = model.predict(cbrt(bias_corrected_gcm_pred[run_parameters.variable])).to_dataset(
-            dim='variable'
-        )
+    # # TODO need to fix this to only transform some variables
+    if 'pr' in run_parameters.features:
+        bias_corrected_gcm_pred['pr'] = cbrt(bias_corrected_gcm_pred['pr'])
+        xtrain['pr'] = cbrt(xtrain['pr'])
+    if 'pr' == run_parameters.variable:
+        ytrain['pr'] = cbrt(ytrain['pr'])
+    # TODO: at this point there is negative precip in some chunks - why?
+    # <xarray.Dataset>
+    # Dimensions:  (time: 23376, lat: 5, lon: 48)
+    # Coordinates:
+    #   * lat      (lat) float32 49.0 49.25 49.5 49.75 50.0
+    #   * lon      (lon) float32 -113.0 -112.8 -112.5 -112.2 ... -101.8 -101.5 -101.2
+    #   * time     (time) datetime64[ns] 1950-01-01 1950-01-02 ... 2013-12-31
+    # Data variables:
+    #     pr       (time, lat, lon) float32 0.4851 0.2508 0.1828 ... -0.5607 -0.5607
+    #     tasmax   (time, lat, lon) float32 270.3 270.3 270.1 ... 257.0 256.3 256.3
+    #     tasmin   (time, lat, lon) float32 261.5 261.3 261.1 ... 254.1 253.4 253.4
+    model.fit(xtrain[run_parameters.features], ytrain[run_parameters.variable])
+    out = model.predict(bias_corrected_gcm_pred[run_parameters.features]).to_dataset(dim='variable')
+    if 'pr' == run_parameters.variable:
         out['pred'] = out['pred'] ** 3
 
-    else:
-        model.fit(xtrain[run_parameters.variable], ytrain[run_parameters.variable])
-        out = model.predict(bias_corrected_gcm_pred[run_parameters.variable]).to_dataset(
-            dim='variable'
-        )
-
-    # model prediction
+    # # model prediction
     downscaled = add_random_effects(out, scrf.scrf, run_parameters)
     return downscaled
 
@@ -258,7 +269,8 @@ def read_scrf(prediction_path: UPath, run_parameters: RunParameters):
     scrf = scrf.assign_coords(
         {'lat': prediction_ds.lat, 'lon': prediction_ds.lon, 'time': prediction_ds.time}
     )
-
+    if (scrf.chunks['lon'][0] != 48) or (scrf.chunks['lat'][0] != 48):
+        scrf = scrf.chunk({'lon': 48, 'lat': 48, 'time': 3652})
     scrf = dask.optimize(scrf)[0]
     scrf = set_zarr_encoding(scrf)
     blocking_to_zarr(ds=scrf, target=target, validate=True, write_empty_chunks=True)
