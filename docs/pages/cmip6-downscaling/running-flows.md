@@ -1,8 +1,6 @@
 import Section from '../../components/section'
 
-# Running Prefect Flows
-
-## Why Prefect
+# Running Flows
 
 In this project each downscaling method [BCSD, GARD, MACA] has it's own workflow for generating results. These data production workflows are handled by the python library, prefect, which encapsulates the data processing steps into individual tasks, which are organized into a 'Flow'.
 
@@ -12,23 +10,21 @@ Prefect allows us to run these downscaling flows with many different parameter c
 
 Prefect has the ability to run flows with different `runtimes`. Choosing the correct runtime can be crucial to help with scaling multiple flows or debugging a single issue.
 
-Pre-configured runtimes are stored in [`runtimes.py`](https://github.com/carbonplan/cmip6-downscaling/blob/main/cmip6_downscaling/runtimes.py)
+Pre-configured runtimes are stored in [`cmip6_downscaling.runtimes.py`](https://github.com/carbonplan/cmip6-downscaling/blob/main/cmip6_downscaling/runtimes.py)
 
 The current runtime options are:
 
-[`cloud`](https://github.com/carbonplan/cmip6-downscaling/blob/a0379110c33b557f959a1d6fa53e9f93891a45b3/cmip6_downscaling/runtimes.py#L57) `executor: dask-distrubted` - Runtime for queing multiple flows on prefect cloud.
+[`cloud`](https://github.com/carbonplan/cmip6-downscaling/blob/a0379110c33b557f959a1d6fa53e9f93891a45b3/cmip6_downscaling/runtimes.py#L57) `executor: dask-distrubted` - Runtime for queuing multiple flows on prefect cloud.
 
 [`local`](https://github.com/carbonplan/cmip6-downscaling/blob/a0379110c33b557f959a1d6fa53e9f93891a45b3/cmip6_downscaling/runtimes.py#L113) `executor: local` - Runtime for developing on local machine
 
 [`CI`](https://github.com/carbonplan/cmip6-downscaling/blob/a0379110c33b557f959a1d6fa53e9f93891a45b3/cmip6_downscaling/runtimes.py#L130) `executor: local` - Runtime used for Continuous Integration
 
-[`pangeo`](https://github.com/carbonplan/cmip6-downscaling/blob/a0379110c33b557f959a1d6fa53e9f93891a45b3/cmip6_downscaling/runtimes.py#L140) `executor: dask-distrubted` - Runtime for processesing on jupyter-hub
-
-[`gateway`](https://github.com/carbonplan/cmip6-downscaling/blob/a0379110c33b557f959a1d6fa53e9f93891a45b3/cmip6_downscaling/runtimes.py#L165) `executor: dask-distrubted` - Runtime used for scaling with a dask-gateway cluser
+[`pangeo`](https://github.com/carbonplan/cmip6-downscaling/blob/a0379110c33b557f959a1d6fa53e9f93891a45b3/cmip6_downscaling/runtimes.py#L140) `executor: dask-distrubted` - Runtime for processing on jupyter-hub
 
 ## Modifying Flow Config
 
-Project level configuration settings are in [`config.py`](https://github.com/carbonplan/cmip6-downscaling/blob/main/cmip6_downscaling/config.py) and configured using the python package [`donfig`](https://donfig.readthedocs.io/en/latest/). Default configuration options can be overwritten in multiple ways with donfig. Below are two options for specifying use of the cloud runtime.
+Project level configuration settings are in [`cmip6_downscaling.config.py`](https://github.com/carbonplan/cmip6-downscaling/blob/main/cmip6_downscaling/config.py) and configured using the python package [`donfig`](https://donfig.readthedocs.io/en/latest/). Default configuration options can be overwritten in multiple ways with donfig. Below are two options for specifying use of the cloud runtime. Note: any `connection_strings` or other sensitive information is best stored in a local .yaml or as an environment variable.
 
 #### Python Context
 
@@ -58,6 +54,43 @@ Config options can also be set with specifically formatted environment variables
 
 [environment variables](https://donfig.readthedocs.io/en/latest/configuration.html#environment-variables)
 
+## Parameter Files
+
+All downscaling flows require run parameters to be passed in as a `.json file`. These parameter files contain arguments to the flows, specifying which downscaling method, which variable etc. Example config files can be found in `cmip6_downscaling.configs.generate_valid_configs.<method>`. Future configs can be generated manually or using the notebook template [generate_valid_json_parameters.ipynb](https://github.com/carbonplan/cmip6-downscaling/blob/main/configs/generate_valid_configs/generate_valid_json_parameters.ipynb).
+
+Example config file:
+
+```json
+{
+  "method": "gard",
+  "obs": "ERA5",
+  "model": "BCC-CSM2-MR",
+  "member": "r1i1p1f1",
+  "grid_label": "gn",
+  "table_id": "day",
+  "scenario": "historical",
+  "features": ["pr"],
+  "variable": "pr",
+  "latmin": "-90",
+  "latmax": "90",
+  "lonmin": "-180",
+  "lonmax": "180",
+  "bias_correction_method": "quantile_mapper",
+  "bias_correction_kwargs": {
+    "pr": { "detrend": false },
+    "tasmin": { "detrend": true },
+    "tasmax": { "detrend": true },
+    "psl": { "detrend": false },
+    "ua": { "detrend": false },
+    "va": { "detrend": false }
+  },
+  "model_type": "PureRegression",
+  "model_params": { "thresh": 0 },
+  "train_dates": ["1981", "2010"],
+  "predict_dates": ["1950", "2014"]
+}
+```
+
 ## Runtimes
 
 ### Cloud
@@ -72,7 +105,7 @@ While this runtime excels at resource scaling and parallel runs, debugging with 
 
 #### Registering a Flow
 
-With the prefect cloud runtime selected, flows can be registered and ran with the prefect [CLI](https://docs.prefect.io/orchestration/concepts/cli.html).
+With the prefect cloud runtime selected, flows can be registered and run with the prefect [CLI](https://docs.prefect.io/orchestration/concepts/cli.html).
 
 To register a flow:
 
