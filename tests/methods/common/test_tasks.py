@@ -47,6 +47,8 @@ params = [
         "bias_correction_kwargs": {"detrend": "True"},
         "model_type": "PureRegression",
         "model_params": {},
+        "day_rolling_window": None,
+        "year_rolling_window": None,
     },
     {
         'method': 'gard',
@@ -68,6 +70,8 @@ params = [
         "bias_correction_kwargs": {"detrend": "True"},
         "model_type": "PureRegression",
         "model_params": {},
+        "day_rolling_window": None,
+        "year_rolling_window": None,
     },
 ]
 

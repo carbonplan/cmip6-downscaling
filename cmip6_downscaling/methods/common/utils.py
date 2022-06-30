@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import pathlib
 import re
 
@@ -64,6 +65,9 @@ def validate_zarr_store(target: str, raise_on_error=True) -> bool:
             raise ValueError(f'Found {len(errors)} errors: {errors}')
         return False
     return True
+
+
+is_cached = functools.partial(validate_zarr_store, raise_on_error=False)
 
 
 def zmetadata_exists(path: UPath):
