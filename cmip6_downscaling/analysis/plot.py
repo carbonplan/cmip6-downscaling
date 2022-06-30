@@ -3,6 +3,7 @@ from __future__ import annotations
 import cartopy.crs as ccrs
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
 import xarray as xr
@@ -130,6 +131,42 @@ def plot_cdfs(
     plt.tight_layout()
     # fig.legend(labels, plots)
     # return fig, axarr
+
+
+def plot_city_data(downscaled_cities, aggregation='annual', time_slices=None, ncols=5, ylabel=None):
+    nrows = (int(len(downscaled_cities.cities) / ncols)) + 1
+    fig, axarr = plt.subplots(
+        ncols=ncols,
+        nrows=nrows,
+        figsize=(15, 50),
+        sharey=False,
+        sharex=False,
+    )
+    num_subplots = len(axarr.reshape(-1))
+
+    for i, city in enumerate(downscaled_cities.cities.values):
+        ax = axarr.reshape(-1)[i]
+        if aggregation == 'seasonal_cycle':
+            for label, time_slice in time_slices.items():
+                downscaled_cities.sel(cities=city).sel(time=time_slice).groupby(
+                    'time.month'
+                ).mean().plot(label=label, ax=ax)
+                ax.set_xticks(np.arange(1, 13))
+                month_labels = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D']
+                ax.set_xticklabels(month_labels)
+                ax.set_xlabel('')
+        elif aggregation == 'annual':
+            downscaled_cities.sel(cities=city).groupby('time.year').mean().plot(ax=ax)
+        ax.set_title(city)
+        if ylabel is not None:
+            ax.set_ylabel(ylabel)
+
+    # delete the subplots that are empty
+    for subplot_num in range(num_subplots):
+        if subplot_num >= len(downscaled_cities.cities.values):
+            fig.delaxes(axarr.reshape(-1)[subplot_num])
+    plt.legend()
+    plt.tight_layout()
 
 
 def plot_values_and_difference(
