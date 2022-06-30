@@ -53,7 +53,13 @@ _defaults = {
         },
         'gcm_obs_weights': {'uri': 'az://static/xesmf_weights/gcm_obs/weights.csv'},
     },
-    'run_options': {'runtime': "pangeo", 'use_cache': False, 'generate_pyramids': False},
+    'run_options': {
+        'runtime': "pangeo",
+        'use_cache': True,
+        'generate_pyramids': False,
+        'construct_analogs': True,
+        'combine_regions': False,
+    },
     "runtime": {
         "cloud": {
             "storage_prefix": "az://",

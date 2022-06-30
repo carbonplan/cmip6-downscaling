@@ -1,0 +1,18 @@
+{
+  "method": "maca",
+  "obs": "ERA5",
+  "model": "MPI-ESM1-2-HR",
+  "member": "r1i1p1f1",
+  "grid_label": "gn",
+  "table_id": "day",
+  "scenario": "ssp370",
+  "variable": "pr",
+  "train_dates": ["1981", "2010"],
+  "predict_dates": ["1950", "2099"],
+  "latmin": "-90",
+  "latmax": "90",
+  "lonmin": "-180",
+  "lonmax": "180",
+  "year_rolling_window": 31,
+  "day_rolling_window": 21
+}

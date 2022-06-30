@@ -161,13 +161,16 @@ def bias_correction(
     --------
     https://climate.northwestknowledge.net/MACA/MACAmethod.php
     """
+
+    # map_blocks work around
+    if 't2' in ds_obs.coords:
+        ds_obs = ds_obs.rename({'t2': 'time'})
+
     if isinstance(variables, str):
         variables = [variables]
 
     doy_gcm = ds_gcm.time.dt.dayofyear
     doy_obs = ds_obs.time.dt.dayofyear
-
-    out_chunks = ds_gcm.chunks
 
     ds_out = xr.Dataset()
     for var in variables:
@@ -192,34 +195,16 @@ def bias_correction(
             gcm_batch = ds_gcm.sel(time=doy_gcm.isin(b))
             obs_batch = ds_obs.sel(time=doy_obs.isin(b))
 
-            train_x = gcm_batch[[var]]  # JH: not needed anymore? .sel(time=historical_period)
-            train_y = obs_batch[var]  # JH: not needed anymore? .sel(time=historical_period)
-
             train_x, train_y = xr.align(gcm_batch[[var]], obs_batch[var], join='inner', copy=True)
 
-            # # TODO: this is a total hack to get around the different calendars of observation dataset and GCM
-            # # should be able to remove once we unify all calendars
-            # if len(train_x.time) > len(train_y.time):
-            #     train_x = train_x.isel(time=slice(0, len(train_y.time)))
-            # elif len(train_x.time) < len(train_y.time):
-            #     train_y = train_y.isel(time=slice(0, len(train_x.time)))
-            # train_x = train_x.assign_coords({'time': train_y.time})
-
-            bias_correction_model.fit(
-                train_x,  # dataset
-                train_y,  # dataarray
-            )
+            bias_correction_model.fit(train_x, train_y)
 
             bc_data = bias_correction_model.predict(X=gcm_batch)
-            # needs the .compute here otherwise the code fails with errors
-            # TODO: not sure if this is scalable
-            bc_result.append(
-                bc_data.sel(time=bc_data.time.dt.dayofyear.isin(c))
-            )  # JH: removed .compute() from this line
+            bc_result.append(bc_data.sel(time=bc_data.time.dt.dayofyear.isin(c)))
 
         ds_out[var] = xr.concat(bc_result, dim='time').sortby('time')
 
-    return ds_out.chunk(out_chunks)
+    return ds_out
 
 
 def construct_analogs(
@@ -264,9 +249,9 @@ def construct_analogs(
         raise ValueError('ds_obs_coarse is not the same length as ds_obs_fine')
 
     # work with dataarrays instead of datasets
-    ds_gcm = ds_gcm[label]
-    ds_obs_coarse = ds_obs_coarse[label]
-    ds_obs_fine = ds_obs_fine[label]
+    da_gcm = ds_gcm[label]
+    da_obs_coarse = ds_obs_coarse[label]
+    da_obs_fine = ds_obs_fine[label]
 
     # initialize a regridder to interpolate the residuals from coarse to fine scale later
     def _make_template(da):
@@ -275,8 +260,8 @@ def construct_analogs(
         template['mask'] = temp.notnull()
         return template
 
-    coarse_template = _make_template(ds_obs_coarse)
-    fine_template = _make_template(ds_obs_fine)
+    coarse_template = _make_template(da_obs_coarse)
+    fine_template = _make_template(da_obs_fine)
 
     regridder = xe.Regridder(
         coarse_template,
@@ -286,17 +271,16 @@ def construct_analogs(
     )
 
     # get dimension sizes from input data
-    domain_shape_coarse = (len(ds_obs_coarse.lat), len(ds_obs_coarse.lon))
+    domain_shape_coarse = (len(da_obs_coarse.lat), len(da_obs_coarse.lon))
     n_pixel_coarse = domain_shape_coarse[0] * domain_shape_coarse[1]
 
     # rename the time dimension to keep track of them
-    X = ds_obs_coarse.rename({'time': 'ndays_in_obs'})  # coarse obs
-    y = ds_gcm.rename({'time': 'ndays_in_gcm'})  # coarse gcm
+    X = da_obs_coarse.rename({'time': 'ndays_in_obs'})  # coarse obs
+    y = da_gcm.rename({'time': 'ndays_in_gcm'})  # coarse gcm
 
     # get rmse between each GCM slices to be downscaled and each observation slices
     # will have the shape ndays_in_gcm x ndays_in_obs
-    rmse = (np.sqrt(((X - y) ** 2).sum(dim=['lat', 'lon'])) / n_pixel_coarse)
-    print('rmse', rmse)
+    rmse = np.sqrt(((X - y) ** 2).sum(dim=['lat', 'lon'])) / n_pixel_coarse
     rmse = rmse.load()
 
     # get a day of year mask in the same shape of rmse according to the day range input
@@ -339,21 +323,21 @@ def construct_analogs(
     for i in range(len(y)):
 
         # get data from the GCM day being downscaled
-        yi = y.isel(ndays_in_gcm=i).load()
+        yi = y.isel(ndays_in_gcm=i)
         # get data from the coarsened obs analogs
         ind = inds.isel(ndays_in_gcm=i).values
 
         # save obs_analogs for later
-        obs_analogs.append(ds_obs_fine.isel(time=ind).rename({'time': 'analog'}).drop('analog'))
+        obs_analogs.append(da_obs_fine.isel(time=ind).rename({'time': 'analog'}).drop('analog'))
 
         xi = X.isel(ndays_in_obs=ind).transpose('pixel_coarse', 'ndays_in_obs')
 
         # fit model
-        lr_model.fit(xi, yi)
+        lr_model.fit(xi.data, yi.data)
         coefs.append(lr_model.coef_)
         intercepts.append(lr_model.intercept_)
 
-        residual = yi - lr_model.predict(xi)
+        residual = yi - lr_model.predict(xi.data)
         residual = residual.unstack('pixel_coarse')
 
         residuals.append(residual)

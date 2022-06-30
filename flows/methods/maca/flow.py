@@ -19,6 +19,8 @@ from cmip6_downscaling.methods.maca.tasks import (
     combine_regions,
     construct_analogs,
     epoch_trend,
+    get_region_numbers,
+    replace_epoch_trend,
     split_by_region,
 )
 
@@ -85,14 +87,16 @@ with Flow(
         p['coarse_epoch_trend_path'], pattern='full_space'
     )
 
-    p['fine_epoch_trend_path'] = regrid(
+    p['fine_epoch_trend_full_space_path'] = regrid(
         p['coarse_epoch_trend_full_space_path'],
         p['obs_full_space_path'],
         weights_path=p['gcm_to_obs_weights'],
         pre_chunk_def={'time': 30},
     )
 
-    p['coarse_obs_full_time_path'] = rechunk(p['coarse_obs_full_space_path'], pattern='full_time', template=p['detrended_data_path'])
+    p['coarse_obs_full_time_path'] = rechunk(
+        p['coarse_obs_full_space_path'], pattern='full_time', template=p['detrended_data_path']
+    )
 
     # get gcm
     # 1981-2100 extent time subset
@@ -101,84 +105,107 @@ with Flow(
     ## Step 3: Coarse Bias Correction
     # rechunk to make detrended data match the coarse obs
     p['detrend_gcm_full_time'] = rechunk(
-        p['detrended_data_path'], template=p['coarse_obs_full_time_path']
+        p['detrended_data_path'],
+        template=p[
+            'coarse_obs_full_time_path'
+        ],  # this is not working. time is chunked to match coarse obs
     )
 
     # inputs should be in full-time
     p['bias_corrected_gcm_full_time_path'] = bias_correction(
-        x_path=p['detrended_data_path'],
+        x_path=p['detrend_gcm_full_time'],
         y_path=p['coarse_obs_full_time_path'],
         run_parameters=run_parameters,
     )
 
     # rechunk into full space and cache the output
-    p['bias_corrected_gcm_full_space_path'] = rechunk(
-        p['bias_corrected_gcm_full_time_path'], pattern='full_space'
-    )
+    # p['bias_corrected_gcm_full_space_path'] = rechunk(
+    #     p['bias_corrected_gcm_full_time_path'], pattern='full_space'
+    # )
 
-    # # everything should be rechunked to full space and then subset
-    p['bias_corrected_gcm_region_paths'] = split_by_region(p['bias_corrected_gcm_full_space_path'])
-    p['coarse_obs_region_paths'] = split_by_region(p['coarse_obs_full_space_path'])
-    p['obs_region_paths'] = split_by_region(p['obs_full_space_path'])
-    p['find_trend_paths'] = split_by_region(p['fine_epoch_trend_path'])
+    p['region_numbers'] = get_region_numbers()
+
+    p['bias_corrected_gcm_region_paths'] = split_by_region.map(
+        p['region_numbers'], unmapped(p['bias_corrected_gcm_full_time_path'])
+    )
+    p['coarse_obs_region_paths'] = split_by_region.map(
+        p['region_numbers'], unmapped(p['coarse_obs_full_time_path'])
+    )
+    p['obs_region_paths'] = split_by_region.map(
+        p['region_numbers'], unmapped(p['obs_full_time_path'])
+    )
 
     # Step 4: Constructed Analogs
-    # Step 5: Epoch Replacement
-    p['constructed_analogs_region_paths'] = construct_analogs.map(
-        gcm_path=p['bias_corrected_gcm_region_paths'],
-        coarse_obs_path=p['coarse_obs_region_paths'],
-        fine_obs_path=p['obs_region_paths'],
-        fine_trend_path=p['find_trend_paths'],
-        run_parameters=unmapped(run_parameters),
-    )
+    # Note: This is option was added to allow this step to be run on the local executor while the rest of the steps can be run with
+    # The dask executor
+    if config.get('run_options.construct_analogs'):
+        p['constructed_analogs_region_paths'] = construct_analogs.map(
+            gcm_path=p['bias_corrected_gcm_region_paths'],
+            coarse_obs_path=p['coarse_obs_region_paths'],
+            fine_obs_path=p['obs_region_paths'],
+            run_parameters=unmapped(run_parameters),
+        )
 
-    # p['final_maca_full_space_path'] = combine_regions(
-    #     p['constructed_analogs_region_paths'], p['obs_full_space_path']
-    # )
-    # p['final_maca_full_time_path'] = rechunk(
-    #     p['final_maca_full_space_path'], pattern='full_time', template=p['obs_full_time_path']
-    # )
+        if config.get('run_options.combine_regions'):
 
-    # # Step 6: Fine Bias Correction
-    # p['final_maca_regions_paths'] = bias_correction(
-    #     p['final_maca_full_time_path'],
-    #     p['obs_full_time_path'],
-    #     run_parameters=run_parameters,
-    # )
+            p['combined_analogs_full_time_path'] = combine_regions(
+                regions=p['region_numbers'],
+                region_paths=p['constructed_analogs_region_paths'],
+                template_path=p['fine_epoch_trend_full_space_path'],
+            )
 
-    # p['final_maca_full_time_path'] = rechunk(p['final_maca_full_space_path'], pattern='full_time')
+            p['fine_epoch_trend_full_time_path'] = rechunk(
+                p['fine_epoch_trend_full_space_path'],
+                pattern='full_time',
+                template=p['combined_analogs_full_time_path'],
+            )
 
-    # # temporary aggregations - these come out in full time
-    # p['monthly_summary_path'] = time_summary(p['final_maca_full_time_path'], freq='1MS')
-    # p['annual_summary_path'] = time_summary(p['final_maca_full_time_path'], freq='1AS')
+            # Step 5: Epoch Replacement
+            p['epoch_replaced_full_time_path'] = replace_epoch_trend(
+                p['combined_analogs_full_time_path'], p['fine_epoch_trend_full_time_path']
+            )
 
-    # # analysis notebook
-    # # analysis_location = run_analyses(p['final_maca_full_time_path'], run_parameters)
+            # Step 6: Fine Bias Correction
+            p['final_bias_corrected_full_time_path'] = bias_correction(
+                p['epoch_replaced_full_time_path'],
+                p['obs_full_time_path'],
+                run_parameters=run_parameters,
+            )
 
-    # if config.get('run_options.generate_pyramids'):
+            # temporary aggregations - these come out in full time
+            p['monthly_summary_path'] = time_summary(
+                p['final_bias_corrected_full_time_path'], freq='1MS'
+            )
+            p['annual_summary_path'] = time_summary(
+                p['final_bias_corrected_full_time_path'], freq='1AS'
+            )
 
-    #     # make temporal summaries
-    #     p['monthly_summary_full_space_path'] = rechunk(
-    #         p['monthly_summary_path'], pattern='full_space'
-    #     )
-    #     p['annual_summary_full_space_path'] = rechunk(
-    #         p['annual_summary_path'], pattern='full_space'
-    #     )
+            # analysis notebook
+            # analysis_location = run_analyses(p['final_bias_corrected_full_time_path'], run_parameters)
 
-    #     # pyramids
-    #     p['pyramid_weights'] = get_pyramid_weights(run_parameters=run_parameters, levels=4)
+            if config.get('run_options.generate_pyramids'):
 
-    #     p['daily_pyramid_path'] = pyramid(
-    #         p['final_maca_full_space_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
-    #     )
-    #     p['monthly_pyramid_path'] = pyramid(
-    #         p['monthly_summary_full_space_path'],
-    #         weights_pyramid_path=p['pyramid_weights'],
-    #         levels=4,
-    #     )
-    #     p['annual_pyramid_path'] = pyramid(
-    #         p['annual_summary_full_space_path'], weights_pyramid_path=p['pyramid_weights'], levels=4
-    #     )
+                # make temporal summaries
+                p['monthly_summary_full_space_path'] = rechunk(
+                    p['monthly_summary_path'], pattern='full_space'
+                )
+                p['annual_summary_full_space_path'] = rechunk(
+                    p['annual_summary_path'], pattern='full_space'
+                )
+
+                # pyramids
+                p['pyramid_weights'] = get_pyramid_weights(run_parameters=run_parameters, levels=4)
+
+                p['monthly_pyramid_path'] = pyramid(
+                    p['monthly_summary_full_space_path'],
+                    weights_pyramid_path=p['pyramid_weights'],
+                    levels=4,
+                )
+                p['annual_pyramid_path'] = pyramid(
+                    p['annual_summary_full_space_path'],
+                    weights_pyramid_path=p['pyramid_weights'],
+                    levels=4,
+                )
 
     # finalize
     ref = finalize(run_parameters=run_parameters, **p)

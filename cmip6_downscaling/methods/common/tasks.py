@@ -32,11 +32,11 @@ from .containers import RunParameters, TimePeriod
 from .utils import (
     blocking_to_zarr,
     calc_auspicious_chunks_dict,
+    is_cached,
     resample_wrapper,
     set_zarr_encoding,
     subset_dataset,
     validate_zarr_store,
-    zmetadata_exists,
 )
 
 xr.set_options(keep_attrs=True)
@@ -83,7 +83,7 @@ def get_obs(run_parameters: RunParameters) -> UPath:
     ds_hash = str_to_hash(frmt_str)
     target = intermediate_dir / 'get_obs' / ds_hash
 
-    if use_cache and zmetadata_exists(target):
+    if use_cache and is_cached(target):
         print(f'found existing target: {target}')
         return target
     print(run_parameters)
@@ -100,7 +100,6 @@ def get_obs(run_parameters: RunParameters) -> UPath:
         subset[key].encoding = {}
 
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
-    print(f'writing {target}', subset)
     subset = set_zarr_encoding(subset)
     blocking_to_zarr(ds=subset, target=target, validate=True, write_empty_chunks=True)
 
@@ -230,8 +229,7 @@ def rechunk(
     task_hash = str_to_hash(str(path) + pattern_string + str(template) + max_mem)
     target = intermediate_dir / 'rechunk' / task_hash
     path_tmp = scratch_dir / 'rechunk' / task_hash
-    print(f'writing rechunked dataset to {target}')
-    print(target)
+
     target_store = fsspec.get_mapper(str(target))
     temp_store = fsspec.get_mapper(str(path_tmp))
 
@@ -267,7 +265,6 @@ def rechunk(
             chunk_dims = config.get(f"chunk_dims.{pattern}")
             for dim in chunk_def:
                 if dim not in chunk_dims:
-                    print('correcting dim')
                     # override the chunksize of those unchunked dimensions to be the complete length (like passing chunksize=-1
                     chunk_def[dim] = len(ds[dim])
     elif pattern is not None:
@@ -340,7 +337,7 @@ def time_summary(ds_path: UPath, freq: str) -> UPath:
 
     ds_hash = str_to_hash(str(ds_path) + freq)
     target = results_dir / 'time_summary' / ds_hash
-    print(target)
+
     if use_cache and is_cached(target):
         print(f'found existing target: {target}')
         return target
@@ -386,7 +383,6 @@ def get_weights(*, run_parameters, direction, regrid_method="bilinear"):
         .iloc[0]
         .path
     )
-    print(path)
     return path
 
 
@@ -409,11 +405,9 @@ def get_pyramid_weights(*, run_parameters, levels: int, regrid_method: str = "bi
         Path to pyramid weights file.
     """
     weights = pd.read_csv(config.get('weights.downscaled_pyramid_weights.uri'))
-    print(weights)
     path = (
         weights[(weights.regrid_method == regrid_method) & (weights.levels == levels)].iloc[0].path
     )
-    print(path)
     return path
 
 
@@ -446,12 +440,9 @@ def regrid(
     ds_hash = str_to_hash(str(source_path) + str(target_grid_path))
     target = intermediate_dir / 'regrid' / ds_hash
 
-    if use_cache and zmetadata_exists(target):
+    if use_cache and is_cached(target):
         print(f'found existing target: {target}')
         return target
-
-    print(f'regrid {source_path}->{target_grid_path}')
-    print(f'target path: {target}')
 
     source_ds = xr.open_zarr(source_path)
     target_grid_ds = xr.open_zarr(target_grid_path)
@@ -459,13 +450,10 @@ def regrid(
     if pre_chunk_def is not None:
         source_ds = source_ds.chunk(**pre_chunk_def)
 
-    print('source_ds', source_ds)
-    print('target_grid_ds', target_grid_ds)
     if weights_path:
         from ndpyramid.regrid import _reconstruct_xesmf_weights
 
         weights = _reconstruct_xesmf_weights(xr.open_zarr(weights_path))
-        print(weights_path)
         regridder = xe.Regridder(
             source_ds,
             target_grid_ds,
