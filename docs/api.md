@@ -52,6 +52,22 @@
 
 ```
 
+### DEEPSD
+
+```{eval-rst}
+.. autosummary::
+   :toctree: generated/
+
+   deepsd.tasks.shift
+   deepsd.tasks.normalize_gcm
+   deepsd.tasks.inference
+   deepsd.tasks.rescale
+   deepsd.tasks.bias_correction
+   deepsd.utils.bilinear_interpolate
+   deepsd.utils.conservative_interpolate
+   deepsd.utils.normalize
+```
+
 ### Common Tasks
 
 ```{eval-rst}

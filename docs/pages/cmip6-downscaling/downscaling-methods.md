@@ -19,3 +19,5 @@ The GARD-MV (multi-variate) implementation follows the same process as the GARD-
 ### DeepSD
 
 DeepSD uses a computer vision approach to learn spatial patterns at multiple resolutions [Vandal et al., 2017](https://dl.acm.org/doi/10.1145/3097983.3098004). Specifically, DeepSD is a stacked super-resolution convolutional neural network. We adapted the [open-source DeepSD implementation](https://github.com/tjvandal/deepsd) for downscaling global ensembles by updating the source code for Python 3 and TensorFlow2, removing the batch normalization layer, normalizing based on historical observations, training models for temperature and precipitation, and training on a global reanalysis product (ERA5). In addition, we trained the model for fewer iterations than in Vandal et al., 2017 and clipped aphysical precipitation values at 0. Our dataset includes an additional bias-corrected product (DeepSD-BC). Given its origin in deep learning, this method is the most different from those included here, and is an experimental contribution to our dataset.
+
+export default ({ children }) => <Section name='Downscaling Methods'>{children}</Section>

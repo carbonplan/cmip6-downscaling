@@ -2,7 +2,7 @@ import Section from '../../components/section'
 
 # Running Flows
 
-In this project each downscaling method [BCSD, GARD, MACA] has it's own workflow for generating results. These data production workflows are handled by the python library, prefect, which encapsulates the data processing steps into individual tasks, which are organized into a 'Flow'.
+In this project each downscaling method [BCSD, GARD, MACA, DEEPSD] has it's own workflow for generating results. These data production workflows are handled by the python library, prefect, which encapsulates the data processing steps into individual tasks, which are organized into a 'Flow'.
 
 Prefect allows us to run these downscaling flows with many different parameter combinations (gcms, observations, training period, prediction period) without modifying the specific downscaling method script.
 
