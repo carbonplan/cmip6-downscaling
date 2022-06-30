@@ -1,6 +1,6 @@
 import Section from '../../components/section'
 
-## Downscaling methods
+# Downscaling methods
 
 We implemented four downscaling methods globally. Descriptions of these implementations are below, along with references to further information. Our [explainer article](https://carbonplan.org/research/cmip6-downscaling-explainer) discusses the importance of downscaling, and describes some of the key methodological differences, in more detail.
 
