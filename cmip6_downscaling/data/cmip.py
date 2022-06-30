@@ -45,7 +45,6 @@ def postprocess(ds: xr.Dataset, to_standard_calendar: bool = True) -> xr.Dataset
         # drop height variable
         if 'height' in ds:
             ds = ds.drop('height')
-
         # squeeze length 1 dimensions
         ds = ds.squeeze(drop=True)
 
@@ -121,14 +120,17 @@ def load_cmip(
             grid_label=grid_labels,
             variable_id=variable_ids,
         )
-
         keys = list(col_subset.keys())
         if len(keys) != 1:
             raise ValueError(f'intake-esm search returned {len(keys)}, expected exactly 1.')
-
         ds = col_subset[keys[0]]().to_dask()
+
         if time_slice:
             ds = ds.sel(time=time_slice)
+
+        if 'plev' in ds.coords:
+            # select the 500 mb level for winds
+            ds = ds.sel(plev=50000.0, method='nearest').drop('plev')
         ds = ds.pipe(postprocess)
 
         # convert to mm/day - helpful to prevent rounding errors from very tiny numbers
@@ -147,7 +149,7 @@ def get_gcm(
     table_id: str,
     grid_label: str,
     source_id: str,
-    variable: str,
+    variable: str | list[str],
     time_slice: slice,
 ) -> xr.Dataset:
     """
