@@ -117,20 +117,20 @@ with Flow(
     p['raw_monthly_summary_path'] = time_summary(p['shifted_model_output_path'], freq='1MS')
     p['raw_annual_summary_path'] = time_summary(p['shifted_model_output_path'], freq='1AS')
 
-    p['monthly_summary_path'] = time_summary(
+    p['bias_corrected_monthly_summary_path'] = time_summary(
         p['bias_corrected_shifted_model_output_path'], freq='1MS'
     )
-    p['annual_summary_path'] = time_summary(
+    p['bias_corrected_annual_summary_path'] = time_summary(
         p['bias_corrected_shifted_model_output_path'], freq='1AS'
     )
     # Add attrs from rescaled product to bias corrected product
-    p['monthly_summary_path'] = update_var_attrs(
-        target_path=p['monthly_summary_path'],
-        source_path=p['raw_monthly_summary_path'],
+    p['bias_corrected_monthly_summary_path'] = update_var_attrs(
+        target_path=p['bias_corrected_monthly_summary_path'],
+        source_path=p['raw_annual_summary_path'],
         run_parameters=run_parameters,
     )
-    p['annual_summary_path'] = update_var_attrs(
-        target_path=p['annual_summary_path'],
+    p['bias_corrected_annual_summary_path'] = update_var_attrs(
+        target_path=p['bias_corrected_annual_summary_path'],
         source_path=p['raw_annual_summary_path'],
         run_parameters=run_parameters,
     )
@@ -146,11 +146,11 @@ with Flow(
         # )
 
         # make temporal summaries
-        p['monthly_summary_full_space_path'] = rechunk(
-            p['monthly_summary_path'], pattern='full_space'
+        p['bias_corrected_monthly_summary_full_space_path'] = rechunk(
+            p['bias_corrected_monthly_summary_path'], pattern='full_space'
         )
-        p['annual_summary_full_space_path'] = rechunk(
-            p['annual_summary_path'], pattern='full_space'
+        p['bias_corrected_annual_summary_full_space_path'] = rechunk(
+            p['bias_corrected_annual_summary_path'], pattern='full_space'
         )
 
         p['raw_monthly_summary_full_space_path'] = rechunk(
@@ -160,20 +160,27 @@ with Flow(
             p['raw_annual_summary_path'], pattern='full_space'
         )
         # Add attrs from rescaled product to bias corrected product
-        p['monthly_summary_full_space_path'] = update_var_attrs(
-            target_path=p['monthly_summary_full_space_path'],
+        p['bias_corrected_monthly_summary_full_space_path'] = update_var_attrs(
+            target_path=p['bias_corrected_monthly_summary_full_space_path'],
             source_path=p['raw_monthly_summary_full_space_path'],
             run_parameters=run_parameters,
         )
-        p['annual_summary_full_space_path'] = update_var_attrs(
-            target_path=p['annual_summary_full_space_path'],
+        p['bias_corrected_annual_summary_full_space_path'] = update_var_attrs(
+            target_path=p['bias_corrected_annual_summary_full_space_path'],
             source_path=p['raw_annual_summary_full_space_path'],
             run_parameters=run_parameters,
         )
 
         # pyramids
-        p['monthly_pyramid_path'] = pyramid(p['monthly_summary_full_space_path'], levels=4)
-        p['annual_pyramid_path'] = pyramid(p['annual_summary_full_space_path'], levels=4)
+        p['bias_corrected_monthly_pyramid_path'] = pyramid(
+            p['bias_corrected_monthly_summary_full_space_path'], levels=4
+        )
+        p['bias_corrected_annual_pyramid_path'] = pyramid(
+            p['bias_corrected_annual_summary_full_space_path'], levels=4
+        )
+
+        p['raw_monthly_pyramid_path'] = pyramid(p['raw_monthly_summary_full_space_path'], levels=4)
+        p['raw_annual_pyramid_path'] = pyramid(p['raw_annual_summary_full_space_path'], levels=4)
 
     # finalize
     finalize(run_parameters=run_parameters, **p)
