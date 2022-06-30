@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import contextlib
 import datetime
-import functools
 import json
 import os
 import warnings
@@ -51,8 +50,6 @@ scratch_dir = UPath(config.get("storage.scratch.uri"))
 intermediate_dir = UPath(config.get("storage.intermediate.uri")) / version
 results_dir = UPath(config.get("storage.results.uri")) / version
 use_cache = config.get('run_options.use_cache')
-
-is_cached = functools.partial(validate_zarr_store, raise_on_error=False)
 
 
 @task(log_stdout=True)
@@ -136,16 +133,18 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
         )
     else:
         time_period = getattr(run_parameters, time_subset)
-    
+
     features = getattr(run_parameters, 'features')
     if features:
         feature_string = '_'.join(features)
         frmt_str = "{model}_{member}_{scenario}_{feature_string}_{latmin}_{latmax}_{lonmin}_{lonmax}_{time_period.start}_{time_period.stop}".format(
-            time_period=time_period, **asdict(run_parameters), feature_string=feature_string)
+            time_period=time_period, **asdict(run_parameters), feature_string=feature_string
+        )
 
     else:
         frmt_str = "{model}_{member}_{scenario}_{variable}_{latmin}_{latmax}_{lonmin}_{lonmax}_{time_period.start}_{time_period.stop}".format(
-            time_period=time_period, **asdict(run_parameters))
+            time_period=time_period, **asdict(run_parameters)
+        )
 
     if int(time_period.start) < 2015 and run_parameters.scenario != 'historical':
         scenarios = ['historical', run_parameters.scenario]
@@ -165,16 +164,16 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
         ds_list = []
         for s in scenarios:
             ds_list.append(
-                    get_gcm(
-                        scenario=s,
-                        member_id=run_parameters.member,
-                        table_id=run_parameters.table_id,
-                        grid_label=run_parameters.grid_label,
-                        source_id=run_parameters.model,
-                        variable=feature,
-                        time_slice=time_period.time_slice,
-                    )
+                get_gcm(
+                    scenario=s,
+                    member_id=run_parameters.member,
+                    table_id=run_parameters.table_id,
+                    grid_label=run_parameters.grid_label,
+                    source_id=run_parameters.model,
+                    variable=feature,
+                    time_slice=time_period.time_slice,
                 )
+            )
         ds = xr.concat(ds_list, dim='time')
         subset = subset_dataset(ds, feature, time_period.time_slice, run_parameters.bbox)
         # Note: dataset is chunked into time:365 chunks to standardize leap-year chunking.
