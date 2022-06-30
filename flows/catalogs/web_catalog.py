@@ -231,7 +231,6 @@ def construct_destination_name_and_path(
     source_id: str,
     experiment_id: str,
     member_id: str,
-    timescale: str,
     variable_id: str,
     downscaling_method: str,
     root_path: str,
@@ -241,8 +240,8 @@ def construct_destination_name_and_path(
 
     """
 
-    destination_name = f'{activity_id}.{institution_id}.{source_id}.{experiment_id}.{member_id}.{timescale}.{downscaling_method}.{variable_id}'
-    destination_path = f'az://version1/{downscaling_method}/{destination_name}.zarr'
+    destination_name = f'{activity_id}.{institution_id}.{source_id}.{experiment_id}.{member_id}.day.{downscaling_method}.{variable_id}'
+    destination_path = f'az://version1/data/{downscaling_method}/{destination_name}.zarr'
 
     return {
         'destination_name': destination_name,
@@ -391,10 +390,11 @@ def parse_cmip6_downscaled_pyramid(
             member_id=attrs['member_id'],
             variable_id=attrs['variable_id'],
             downscaling_method=attrs['method'],
-            timescale=attrs['timescale'],
             root_path=root_path,
         )
-        attrs['name'] = targets['destination_name']
+        attrs[
+            'name'
+        ] = f"{targets['destination_name']}.{attrs['timescale']}"  # make sure the name is unique
         attrs['destination_path'] = targets['destination_path']
         attrs['source_path'] = from_az_to_https(attrs['daily_downscaled_data_uri'], root_path)
 
@@ -583,7 +583,7 @@ def create_catalog(
         datasets += era5_pyramids
 
     catalog = {
-        "version": "1.0.0",
+        "version": "v1.0.0",
         "title": "CMIP6 downscaling catalog",
         "description": "",
         "history": "",
@@ -607,7 +607,7 @@ with Flow(
     paths = Parameter('paths', default=['az://flow-outputs/results/cmip6-pyramids-raw'])
     web_catalog_path = Parameter(
         'web-catalog-path',
-        default='az://flow-outputs/results/pyramids/combined-cmip6-era5-pyramids-catalog-web.json',
+        default='az://scratch/results/pyramids/combined-cmip6-era5-pyramids-catalog-web.json',
     )
     downscaled_pyramids_path = Parameter(
         'downscaled-pyramids-path',
