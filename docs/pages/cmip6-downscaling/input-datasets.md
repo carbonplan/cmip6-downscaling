@@ -2,17 +2,9 @@ import Section from '../../components/section'
 
 # Input Datasets
 
-..# Methods
-
 ## CMIP6 raw datasets
 
 The downscaled datasets shown here are derived from results from the [Coupled Model Intercomparison Project Phase 6](https://doi.org/10.5194/gmd-9-1937-2016). Raw datasets are also available in the web catalog (labeled “Raw”). GCMs are run at different spatial resolutions, and the data presented here are displayed in their original spatial resolution. The raw CMIP6 datasets were accessed via the Pangeo data catalog.
-
-## Reference dataset
-
-All downscaled datasets here were trained on the [ERA5](https://doi.org/10.1002/qj.3803) global reanalysis product at the 0.25 degree (~25 km) spatial resolution. All downscaling methods used daily temperature maxima and minima and precipitation for the period 1981-2010. One algorithm (GARD-MV) also used wind.
-
-## Reference dataset
 
 ### ERA5 Reanalysis
 
