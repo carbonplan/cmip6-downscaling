@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 _defaults = {
+    'auth': {
+        "tf_azure_storage_key": "$TF_AZURE_STORAGE_KEY",
+    },
     'chunk_dims': {'full_space': ('time',), 'full_time': ('lat', 'lon')},
     'storage': {
         'top_level': {

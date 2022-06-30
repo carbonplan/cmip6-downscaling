@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import datetime
+import functools
 import json
 import os
 import warnings
@@ -50,6 +51,8 @@ scratch_dir = UPath(config.get("storage.scratch.uri"))
 intermediate_dir = UPath(config.get("storage.intermediate.uri")) / version
 results_dir = UPath(config.get("storage.results.uri")) / version
 use_cache = config.get('run_options.use_cache')
+
+is_cached = functools.partial(validate_zarr_store, raise_on_error=False)
 
 
 @task(log_stdout=True)
@@ -132,7 +135,7 @@ def get_experiment(run_parameters: RunParameters, time_subset: str) -> UPath:
     target = intermediate_dir / 'get_experiment' / ds_hash
 
     print(target)
-    if use_cache and zmetadata_exists(target):
+    if use_cache and is_cached(target):
         print(f'found existing target: {target}')
         return target
 
@@ -208,7 +211,7 @@ def rechunk(
     target_store = fsspec.get_mapper(str(target))
     temp_store = fsspec.get_mapper(str(path_tmp))
 
-    if use_cache and zmetadata_exists(target):
+    if use_cache and is_cached(target):
         print(f'found existing target: {target}')
         # if we wanted to check that it was chunked correctly we could put this down below where
         # the target_schema is validated. but that requires us going through the development
@@ -314,7 +317,7 @@ def time_summary(ds_path: UPath, freq: str) -> UPath:
     ds_hash = str_to_hash(str(ds_path) + freq)
     target = results_dir / 'time_summary' / ds_hash
     print(target)
-    if use_cache and zmetadata_exists(target):
+    if use_cache and is_cached(target):
         print(f'found existing target: {target}')
         return target
 
@@ -532,7 +535,7 @@ def pyramid(
     ds_hash = str_to_hash(str(ds_path) + str(levels) + str(other_chunks))
     target = results_dir / 'pyramid' / ds_hash
 
-    if use_cache and zmetadata_exists(target):
+    if use_cache and is_cached(target):
         print(f'found existing target: {target}')
         return target
 
