@@ -10,7 +10,6 @@ intake-esm
 intake-xarray
 ndpyramid == 0.0.6
 pandas
-pangeo-xesmf == 0.6.2
 prefect == 0.15.13
 rechunker
 regionmask
