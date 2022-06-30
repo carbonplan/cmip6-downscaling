@@ -138,7 +138,7 @@ def plot_city_data(downscaled_cities, aggregation='annual', time_slices=None, nc
     fig, axarr = plt.subplots(
         ncols=ncols,
         nrows=nrows,
-        figsize=(15, 50),
+        figsize=(20, 15),
         sharey=False,
         sharex=False,
     )
@@ -154,18 +154,20 @@ def plot_city_data(downscaled_cities, aggregation='annual', time_slices=None, nc
                 ax.set_xticks(np.arange(1, 13))
                 month_labels = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D']
                 ax.set_xticklabels(month_labels)
-                ax.set_xlabel('')
         elif aggregation == 'annual':
             downscaled_cities.sel(cities=city).groupby('time.year').mean().plot(ax=ax)
         ax.set_title(city)
-        if ylabel is not None:
-            ax.set_ylabel(ylabel)
-
+        ax.set_xlabel('')
+        ax.set_ylabel('')
+        # if ylabel is not None:
+        #     ax.set_ylabel(ylabel)
+    fig.text(-0.03, 0.6, ylabel, va='center', rotation='vertical', fontsize=20)
     # delete the subplots that are empty
     for subplot_num in range(num_subplots):
         if subplot_num >= len(downscaled_cities.cities.values):
             fig.delaxes(axarr.reshape(-1)[subplot_num])
-    plt.legend()
+    if aggregation == 'seasonal_cycle':
+        plt.legend()
     plt.tight_layout()
 
 
