@@ -36,7 +36,7 @@ from cmip6_downscaling.methods import ...
 
 ## data access
 
-There are two ways to access the data using Python. 
+There are two ways to access the data using Python.
 
 First, the entire collection of datasets at daily timescales is available through an `intake` catalog using the following code snippet.
 
