@@ -2,6 +2,7 @@ import datetime
 import functools
 import itertools
 import json
+import random
 import traceback
 
 import fsspec
@@ -17,6 +18,8 @@ config.set(
         'runtime.cloud.extra_pip_packages': 'git+https://github.com/carbonplan/cmip6-downscaling.git git+https://github.com/intake/intake-esm.git git+https://github.com/ncar-xdev/ecgtools.git'
     }
 )
+
+runtime = runtimes.CloudRuntime()
 
 
 def get_license(source_id: str, derived_product: bool = False) -> dict:
@@ -121,9 +124,6 @@ def get_license(source_id: str, derived_product: bool = False) -> dict:
         return {}
 
 
-runtime = runtimes.CloudRuntime()
-
-
 def parse_cmip6(store: str, root_path: str) -> dict[str, str]:
 
     from ecgtools.builder import INVALID_ASSET, TRACEBACK
@@ -184,7 +184,7 @@ def parse_cmip6(store: str, root_path: str) -> dict[str, str]:
             'aggregation': aggregation,
             'uri': uri,
             'original_dataset_uris': original_dataset_uris,
-            'method': 'raw',
+            'method': 'Raw',
             'license': get_license(source_id),
         }
 
@@ -224,6 +224,39 @@ def get_cmip6_pyramids(paths: list[str], cdn: str, root_path: str) -> list[dict]
     return builder.df.to_dict(orient='records')
 
 
+def construct_destination_name_and_path(
+    *,
+    activity_id: str,
+    institution_id: str,
+    source_id: str,
+    experiment_id: str,
+    member_id: str,
+    variable_id: str,
+    downscaling_method: str,
+    root_path: str,
+) -> dict:
+    """
+    Construct the destination name and path for the CMIP6 pyramids.
+
+    """
+
+    destination_name = f'{activity_id}.{institution_id}.{source_id}.{experiment_id}.{member_id}.day.{downscaling_method}.{variable_id}'
+    destination_path = f'az://version1/data/{downscaling_method}/{destination_name}.zarr'
+
+    return {
+        'destination_name': destination_name,
+        'destination_path': from_az_to_https(destination_path, root_path),
+    }
+
+
+def from_az_to_https(uri: str, root: str) -> str:
+    """
+    Convert an Azure blob URI to a HTTPS URI.
+
+    """
+    return f"{root}/{uri.split('//')[-1]}" if uri else None
+
+
 def parse_cmip6_downscaled_pyramid(
     data, cdn: str, root_path: str, derived_product: bool = True
 ) -> list[dict]:
@@ -254,56 +287,93 @@ def parse_cmip6_downscaled_pyramid(
     query = {
         'source_id': parameters['model'],
         'member_id': parameters['member'],
-        'experiment_id': parameters['scenario'],
+        'experiment_id': 'historical'
+        if parameters['scenario'] == 'hist'
+        else parameters['scenario'],
         'variable_id': parameters['variable'],
     }
 
     cat_url = "https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.json"
     cat = intake.open_esm_datastore(cat_url).search(table_id='day', **query)
     records = cat.df.to_dict(orient='records')
-    if records and len(records) == 1:
+    if records:
         entry = records[0]
         query['institution_id'] = entry['institution_id']
         query['activity_id'] = entry['activity_id']
-        query['original_dataset_uris'] = [f"{root_path}/{str(entry['zstore']).split('//')[-1]}"]
+        query['original_dataset_uris'] = [
+            f"{from_az_to_https(str(entry['zstore']), root_path)}" for entry in records
+        ]
+
+    method_mapping = {
+        'deepsd': 'DeepSD',
+        'raw': 'Raw',
+        'maca': 'MACA',
+        'gard': 'GARD-SV',
+        'gard_multivariate': 'GARD-MV',
+    }
+
+    method = method_mapping[parameters['method']]
 
     template = {
         **query,
-        'method': parameters['method'],
+        'method': method,
         'license': get_license(query['source_id'], derived_product=derived_product),
-        'cmip6-downscaling-version': data.get('attrs', {}).get('version'),
+        'cmip6_downscaling_version': data.get('attrs', {}).get('version'),
     }
+
+    if parameters['method'] == 'maca':
+        template['daily_downscaled_data_uri'] = datasets.get('final_bias_corrected_full_time_path')
+
+    elif parameters['method'] in {'gard', 'gard_multivariate'}:
+        template['daily_downscaled_data_uri'] = datasets.get('model_output_path')
+
     results = []
-    if 'daily_pyramid_path' in datasets:
-        daily_pyramid_attrs = {
-            **template,
-            **{
-                'timescale': 'day',
-                'uri': f"{cdn}/{str(datasets['daily_pyramid_path']).split('//')[-1]}",
-                'name': UPath(datasets['daily_pyramid_path']).name,
-            },
-        }
-        results.append(daily_pyramid_attrs)
-    if 'monthly_pyramid_path' in datasets:
-        monthly_pyramid_attrs = {
-            **template,
-            **{
-                'timescale': 'month',
-                'uri': f"{cdn}/{str(datasets['monthly_pyramid_path']).split('//')[-1]}",
-                'name': UPath(datasets['monthly_pyramid_path']).name,
-            },
-        }
-        results.append(monthly_pyramid_attrs)
-    if 'annual_pyramid_path' in datasets:
-        yearly_pyramid_attrs = {
-            **template,
-            **{
-                'timescale': 'year',
-                'uri': f"{cdn}/{str(datasets['annual_pyramid_path']).split('//')[-1]}",
-                'name': UPath(datasets['annual_pyramid_path']).name,
-            },
-        }
-        results.append(yearly_pyramid_attrs)
+    if parameters['method'] != 'deepsd':
+        options = {'daily', 'monthly', 'annual'}
+        timescales = {'daily': 'day', 'monthly': 'month', 'annual': 'year'}
+        for option in options:
+            key = f'{option}_pyramid_path'
+            if key in datasets:
+                template['timescale'] = timescales[option]
+                attributes = {
+                    **template,
+                    **{
+                        'uri': f"{from_az_to_https(str(datasets[key]), cdn)}",
+                        'name': UPath(datasets[key]).name,
+                    },
+                }
+                results.append(attributes)
+
+    else:
+        _methods = ['raw', 'bias_corrected']
+        _pyramids = ['monthly_pyramid_path', 'annual_pyramid_path']
+        _options = itertools.product(_methods, _pyramids)
+        _options = ['_'.join(option) for option in _options]
+
+        for option in _options:
+            if option in datasets:
+                if 'bias_corrected' in option:
+                    template['method'] = f'{method}-BC'
+                    template['daily_downscaled_data_uri'] = datasets.get(
+                        'bias_corrected_shifted_model_output_path'
+                    )
+                else:
+                    template['daily_downscaled_data_uri'] = datasets.get(
+                        'shifted_model_output_path'
+                    )
+
+                if 'month' in option:
+                    template['timescale'] = 'month'
+                elif 'annual' in option:
+                    template['timescale'] = 'year'
+                pyramid_attrs = {
+                    **template,
+                    **{
+                        'uri': f"{from_az_to_https(str(datasets[option]), cdn)}",
+                        'name': UPath(datasets[option]).name,
+                    },
+                }
+                results.append(pyramid_attrs)
 
     for attrs in results:
         if attrs['timescale'] in {'year', 'month'}:
@@ -311,6 +381,23 @@ def parse_cmip6_downscaled_pyramid(
                 attrs['aggregation'] = 'mean'
             elif attrs['variable_id'] in {'pr'}:
                 attrs['aggregation'] = 'sum'
+
+        targets = construct_destination_name_and_path(
+            activity_id=attrs['activity_id'],
+            institution_id=attrs['institution_id'],
+            source_id=attrs['source_id'],
+            experiment_id=attrs['experiment_id'],
+            member_id=attrs['member_id'],
+            variable_id=attrs['variable_id'],
+            downscaling_method=attrs['method'],
+            root_path=root_path,
+        )
+        attrs[
+            'name'
+        ] = f"{targets['destination_name']}.{attrs['timescale']}"  # make sure the name is unique
+        attrs['destination_path'] = targets['destination_path']
+        attrs['source_path'] = from_az_to_https(attrs['daily_downscaled_data_uri'], root_path)
+
     return results
 
 
@@ -373,11 +460,13 @@ def filter_version_results(
         maximum_version = packaging.version.Version(maximum_version)
 
     valid_results = []
+    invalid_results = []
 
     for result in results:
         version = result.split("/")[-4]
         print(f"Checking version {version}")
         version = packaging.version.Version(version)
+
         if (
             (maximum_version is None or version <= maximum_version)
             and version >= minimum_version
@@ -385,6 +474,15 @@ def filter_version_results(
         ):
             valid_results.append(result)
 
+        else:
+            invalid_results.append(result)
+
+    print(f"{len(valid_results)} of {len(results)} results are kept")
+    print(f"{len(invalid_results)} of {len(results)} results are discarded")
+    print("\n***** Invalid results: *****\n")
+    for item in sorted(random.sample(invalid_results, 10)):
+        print(item)
+    print("\n***** End of invalid results *****\n")
     return valid_results
 
 
@@ -433,18 +531,18 @@ def get_cmip6_downscaled_pyramids(
         exclude_local_version=exclude_local_version,
         results=latest_runs,
     )
-    print(f"Found {len(latest_runs)} runs")
     latest_runs = pick_latest_version(latest_runs)
     datasets = []
-    for run in latest_runs:
+    for run in sorted(latest_runs):
+        print(f"Processing {run}")
         with fs.open(run) as f:
             data = json.load(f)
-
-        if any(
-            data['datasets'].get(arg) is not None
-            for arg in ['daily_pyramid_path', 'monthly_pyramid_path', 'annual_pyramid_path']
-        ):
+        try:
             datasets += parse_cmip6_downscaled_pyramid(data, cdn, root_path)
+
+        except Exception as e:
+            print(f"Error parsing {run}: {e}")
+            continue
     return datasets
 
 
@@ -485,7 +583,7 @@ def create_catalog(
         datasets += era5_pyramids
 
     catalog = {
-        "version": "1.0.0",
+        "version": "v1.0.0",
         "title": "CMIP6 downscaling catalog",
         "description": "",
         "history": "",
@@ -499,7 +597,7 @@ def create_catalog(
 
     print(f'web-catalog located at: {catalog_path}')
     print(f'{len(datasets)} datasets are included')
-    print(f'Sample datasets: {datasets[:5]}')
+    print(f'Sample datasets: {random.sample(datasets, 2)}')
 
 
 with Flow(
@@ -509,7 +607,7 @@ with Flow(
     paths = Parameter('paths', default=['az://flow-outputs/results/cmip6-pyramids-raw'])
     web_catalog_path = Parameter(
         'web-catalog-path',
-        default='az://flow-outputs/results/pyramids/combined-cmip6-era5-pyramids-catalog-web.json',
+        default='az://scratch/results/pyramids/combined-cmip6-era5-pyramids-catalog-web.json',
     )
     downscaled_pyramids_path = Parameter(
         'downscaled-pyramids-path',
@@ -522,9 +620,9 @@ with Flow(
     root_path = Parameter('root-path', 'https://cmip6downscaling.blob.core.windows.net')
 
     cmip6_raw_pyramids = get_cmip6_pyramids(paths, cdn, root_path)
-    minimum_version = Parameter('minimum-version', default='0.1.9')
+    minimum_version = Parameter('minimum-version', default='0.1.8')
     maximum_version = Parameter('maximum-version', default=None)
-    exclude_local_version = Parameter('exclude-local-version', default=True)
+    exclude_local_version = Parameter('exclude-local-version', default=False)
 
     cmip6_downscaled_pyramids = get_cmip6_downscaled_pyramids(
         path=downscaled_pyramids_path,

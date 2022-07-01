@@ -12,6 +12,7 @@ from upath import UPath
 
 from cmip6_downscaling import __version__ as version, config, runtimes
 from cmip6_downscaling.data.cmip import postprocess
+from cmip6_downscaling.methods.common.tasks import _pyramid_postprocess
 from cmip6_downscaling.utils import write
 
 config.set(
@@ -31,6 +32,7 @@ runtime = runtimes.CloudRuntime()
 
 @task(log_stdout=True)
 def get_assets(
+    *,
     cat_url: str,
     source_id: list[str] | str,
     variable_id: list[str] | str,
@@ -165,7 +167,9 @@ def compute_pyramids(results: dict[str, list[str]], levels: int) -> dict[str, li
                     weights_pyramid=weights_pyramid,
                     regridder_kws={'ignore_degenerate': True, 'extrap_method': "nearest_s2d"},
                 )
-                write(dta, target)
+
+                dta = _pyramid_postprocess(dta, levels=levels)
+                write(dta, target, use_cache=False)
                 successes.append(target)
         except Exception:
             failures.append(store)
@@ -202,10 +206,14 @@ with Flow(
     cat_url = Parameter(
         "catalog", default="https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.json"
     )
-    source_id = Parameter("source_id", default=["MIROC6", "AWI-CM-1-1-M", "BCC-CSM2-MR"])
+
+    source_ids = ["MRI-ESM2-0", "NorESM2-LM", "CanESM5", "MIROC6", "BCC-CSM2-MR"]
+    source_id = Parameter("source_id", default=source_ids)
     variable_id = Parameter("variable_id", default=["tasmax", "tasmin", "pr"])
     experiment_id = Parameter("experiment_id", default=["historical", "ssp245", "ssp370", "ssp585"])
-    assets = get_assets()
+    assets = get_assets(
+        cat_url=cat_url, source_id=source_id, variable_id=variable_id, experiment_id=experiment_id
+    )
     results = compute_summary(assets)
     report(results)
     pyramids_results = compute_pyramids(results, levels)
