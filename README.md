@@ -49,7 +49,7 @@ cat = intake.open_esm_datastore(
 
 You can check out this example [Jupyter notebook](https://github.com/carbonplan/cmip6-downscaling/blob/main/notebooks/accessing_data_example.ipynb) to see how to access the data, perform some simple analysis, and download subsets.
 
-You can also access the data by using the URL of an individual dataset. See [the datasets page] for a table of all available datasets in this collection with storage locations and other metadata. A code snippet showing how to use the URL is shown below:
+You can also access the data by using the URL of an individual dataset. See [the datasets page](datasets.md) for a table of all available datasets in this collection with storage locations and other metadata. A code snippet showing how to use the URL is shown below:
 
 ```
 import xarray as xr
