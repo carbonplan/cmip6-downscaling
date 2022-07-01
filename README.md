@@ -7,7 +7,7 @@
 
 **climate downnscaling using cmip6 data**
 
-_Note: This project is under active development. We expect to make many breaking changes to the utilities and APIs included in this repository. Feel free to look around, but use at your own risk._
+_Note: This project is under active development. We expect to make breaking changes until reaching version 1.0.0._
 
 [![GitHub][github-badge]][github]
 [![Build Status]][actions]
@@ -19,7 +19,8 @@ _Note: This project is under active development. We expect to make many breaking
 [actions]: https://github.com/carbonplan/cmip6-downscaling/actions/workflows/main.yaml
 [mit license]: https://badgen.net/badge/license/MIT/blue
 
-This repository includes our tools/scripts/models/etc for mapping forest carbon potential and risks.
+This repository includes our tools/scripts/models/etc for climate downscaling. This work is described in more detail in a [web article](https://carbonplan.org/research/cmip6-downscaling-explainer) with
+a companion [map tool](https://carbonplan.org/research/cmip6-downscaling) to explore the data.
 
 ## install
 
@@ -31,6 +32,28 @@ pip install -e .
 
 ```python
 from cmip6_downscaling.methods import ...
+```
+
+## data access
+
+There are two ways to access the data using Python.
+
+First, the entire collection of datasets at daily timescales is available through an `intake` catalog using the following code snippet.
+
+```
+import intake
+cat = intake.open_esm_datastore(
+  'https://cmip6downscaling.blob.core.windows.net/version1/catalogs/global-downscaled-cmip6.json'
+)
+```
+
+You can check out this example [Jupyter notebook](https://github.com/carbonplan/cmip6-downscaling/blob/main/notebooks/accessing_data_example.ipynb) to see how to access the data, perform some simple analysis, and download subsets.
+
+You can also access the data by using the URL of an individual dataset. See [the datasets page](datasets.md) for a table of all available datasets in this collection with storage locations and other metadata. A code snippet showing how to use the URL is shown below:
+
+```
+import xarray as xr
+xr.open_zarr(‘https://cmip6downscaling.blob.core.windows.net/version1/data/DeepSD/ScenarioMIP.CCCma.CanESM5.ssp245.r1i1p1f1.day.DeepSD.pr.zarr’)
 ```
 
 ## license
