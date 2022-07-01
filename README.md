@@ -53,7 +53,7 @@ You can also access the data by using the URL of an individual dataset. See [the
 
 ```
 import xarray as xr
-xr.open_zarr(‘https://cmip6downscaling.blob.core.windows.net/version1/data/DeepSD/ScenarioMIP.CCCma.CanESM5.ssp245.r1i1p1f1.day.DeepSD.pr.zarr’)
+xr.open_zarr('https://cmip6downscaling.blob.core.windows.net/version1/data/DeepSD/ScenarioMIP.CCCma.CanESM5.ssp245.r1i1p1f1.day.DeepSD.pr.zarr')
 ```
 
 ## license
