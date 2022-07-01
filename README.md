@@ -7,7 +7,7 @@
 
 **climate downnscaling using cmip6 data**
 
-_Note: This project is under active development. We expect to make breaking changes until reaching version 1.0.0. We encourage you to reach out if you are interested in using the code or datasets._
+_Note: This project is under active development. We expect to make breaking changes until reaching version 1.0.0._
 
 [![GitHub][github-badge]][github]
 [![Build Status]][actions]
