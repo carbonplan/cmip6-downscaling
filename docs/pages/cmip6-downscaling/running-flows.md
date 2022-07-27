@@ -1,10 +1,10 @@
 import Section from '../../components/section'
+
 # Running Flows
 
 In this project each downscaling method [BCSD, GARD, MACA, DEEPSD] has it's own workflow for generating results. These data production workflows are handled by the python library, prefect, which encapsulates the data processing steps into individual tasks, which are organized into a 'Flow'.
 
 Prefect allows us to run these downscaling flows with many different parameter combinations (gcms, observations, training period, prediction period) without modifying the specific downscaling method script.
-
 
 ## Choosing a Runtime
 
@@ -24,7 +24,7 @@ The current runtime options are:
 
 ## Infrastructure
 
-These flows were ran on a machine ~32 CPU and ~256GB RAM.  The `pangeo` runtime and the `cloud` runtime both used similar spec machines.  Using `Dask` for multi-threading, the 256GB was distributed over the number of workers (max 32). The ideal number of workers seemed to be 8, giving each worker over 32GB of ram each. If you are getting `killed worker` errors from dask, try reducing the number of workers. The tradeoff of this is the increase in flow processing time. The number of workers can be set in `config.py`, modifying the line: `'n_workers': 8`.
+These flows were ran on a machine ~32 CPU and ~256GB RAM. The `pangeo` runtime and the `cloud` runtime both used similar spec machines. Using `Dask` for multi-threading, the 256GB was distributed over the number of workers (max 32). The ideal number of workers seemed to be 8, giving each worker over 32GB of ram each. If you are getting `killed worker` errors from dask, try reducing the number of workers. The tradeoff of this is the increase in flow processing time. The number of workers can be set in `config.py`, modifying the line: `'n_workers': 8`.
 
 ## Modifying Flow Config
 
