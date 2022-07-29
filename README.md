@@ -20,7 +20,7 @@ _Note: This project is under active development. We expect to make breaking chan
 [mit license]: https://badgen.net/badge/license/MIT/blue
 
 This repository includes our tools/scripts/models/etc for climate downscaling. This work is described in more detail in a [web article](https://carbonplan.org/research/cmip6-downscaling-explainer) with
-a companion [map tool](https://carbonplan.org/research/cmip6-downscaling) to explore the data.
+a companion [map tool](https://carbonplan.org/research/cmip6-downscaling) to explore the data. We encourage you to reach out if you are interested in using the code or datasets by [opening an issue](https://github.com/carbonplan/cmip6-downscaling/issues/new) or [sending us an email](mailto:hello@carbonplan.org).
 
 ## install
 
