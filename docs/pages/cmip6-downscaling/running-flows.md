@@ -24,7 +24,7 @@ The current runtime options are:
 
 ## Infrastructure
 
-These flows were ran on a machine ~32 CPU and ~256GB RAM. The `pangeo` runtime and the `cloud` runtime both used similar spec machines. Using `Dask` for multi-threading, the 256GB was distributed over the number of workers (max 32). The ideal number of workers seemed to be 8, giving each worker over 32GB of ram each. If you are getting `killed worker` errors from dask, try reducing the number of workers. The tradeoff of this is the increase in flow processing time. The number of workers can be set in `config.py`, modifying the line: `'n_workers': 8`.
+These flows were ran on a machine ~32 CPU and ~256GB RAM. The `pangeo` runtime and the `cloud` runtime both used similar spec machines. Using Dask's `LocalCluster` for parallel processing, the 256GB RAM was distributed over the number of workers (max 32). The ideal number of workers for most flows seemed to be 8, giving each worker over 32GB of RAM each. If you are getting `KilledWorker` errors from Dask, try reducing the number of workers. The tradeoff of this is the increase in flow processing time. The number of workers can be set in `config.py`, modifying the line: `'n_workers': 8`.
 
 ## Modifying Flow Config
 
