@@ -22,6 +22,10 @@ The current runtime options are:
 
 [`pangeo`](https://github.com/carbonplan/cmip6-downscaling/blob/a0379110c33b557f959a1d6fa53e9f93891a45b3/cmip6_downscaling/runtimes.py#L140) `executor: dask-distrubted` - Runtime for processing on jupyter-hub
 
+## Infrastructure
+
+These flows were ran on a machine ~32 CPU and ~256GB RAM. The `pangeo` runtime and the `cloud` runtime both used similar spec machines. Using Dask's `LocalCluster` for parallel processing, the 256GB RAM was distributed over the number of workers (max 32). The ideal number of workers for most flows seemed to be 8, giving each worker over 32GB of RAM each. If you are getting `KilledWorker` errors from Dask, try reducing the number of workers. The tradeoff of this is the increase in flow processing time. The number of workers can be set in `config.py`, modifying the line: `'n_workers': 8`.
+
 ## Modifying Flow Config
 
 Project level configuration settings are in [`cmip6_downscaling.config.py`](https://github.com/carbonplan/cmip6-downscaling/blob/main/cmip6_downscaling/config.py) and configured using the python package [`donfig`](https://donfig.readthedocs.io/en/latest/). Default configuration options can be overwritten in multiple ways with donfig. Below are two options for specifying use of the cloud runtime. Note: any `connection_strings` or other sensitive information is best stored in a local .yaml or as an environment variable.
