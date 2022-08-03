@@ -10,7 +10,7 @@ intake-esm
 intake-xarray
 ndpyramid == 0.0.6
 pandas
-prefect == 0.15.13
+prefect == 2.0.2
 rechunker
 regionmask
 scikit-downscale >= 0.1.2
