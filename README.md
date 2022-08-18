@@ -3,9 +3,12 @@
   height='48'
 />
 
-# carbonplan / cmip6-downscaling
 
 **climate downnscaling using cmip6 data**
+
+
+# carbonplan / cmip6-downscaling
+
 
 _Note: This project is under active development. We expect to make breaking changes until reaching version 1.0.0._
 
@@ -18,6 +21,11 @@ _Note: This project is under active development. We expect to make breaking chan
 [build status]: https://github.com/carbonplan/cmip6-downscaling/actions/workflows/main.yaml/badge.svg
 [actions]: https://github.com/carbonplan/cmip6-downscaling/actions/workflows/main.yaml
 [mit license]: https://badgen.net/badge/license/MIT/blue
+
+<img
+src='https://images.carbonplan.org/highlights/cmip6-downscaling-dark.png'
+/>
+
 
 This repository includes our tools/scripts/models/etc for climate downscaling. This work is described in more detail in a [web article](https://carbonplan.org/research/cmip6-downscaling-explainer) with
 a companion [map tool](https://carbonplan.org/research/cmip6-downscaling) to explore the data. We encourage you to reach out if you are interested in using the code or datasets by [opening an issue](https://github.com/carbonplan/cmip6-downscaling/issues/new) or [sending us an email](mailto:hello@carbonplan.org).
