@@ -3,43 +3,41 @@ from __future__ import annotations
 
 _defaults = {
     'auth': {
-        "tf_azure_storage_key": "$TF_AZURE_STORAGE_KEY",
+        "tf_azure_storage_key": "$TF_AZURE_STORAGE_KEY",  # this will fail on azure
     },
     'chunk_dims': {'full_space': ('time',), 'full_time': ('lat', 'lon')},
     'storage': {
         'top_level': {
-            'uri': 'az://',
-            'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
+            'uri': 's3://',
+            'storage_options': {},
         },
         'intermediate': {
-            'uri': 'az://scratch/intermediates',
-            'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
+            'uri': 's3://carbonplan-scratch/cmip6-downscaling/intermediates',
+            'storage_options': {},
         },
         'results': {
-            'uri': 'az://flow-outputs/results',
-            'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
+            'uri': 's3://carbonplan-cmip6/flow-outputs/results',
+            'storage_options': {},
         },
         'temporary': {
-            'uri': 'az://flow-outputs/temporary',
-            'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
+            'uri': 's3://carbonplan-cmip6/flow-outputs/temporary',
+            'storage_options': {},
         },
         'static': {
-            'uri': 'az://static',
-            'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
+            'uri': 's3://carbonplan-cmip6/static',
+            'storage_options': {},
         },
         'scratch': {
-            'uri': 'az://scratch',
-            'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
+            'uri': 's3://carbonplan-scratch/cmip6-downscaling',
         },
         'web_results': {
-            'blob': 'analysis_notebooks',
-            'storage_options': {"connection_string": "$AZURE_STORAGE_CONNECTION_STRING"},
+            'blob': 'analysis_notebooks',  # this will fail on s3
+            'storage_options': {},
         },
     },
     "data_catalog": {
         "cmip": {
-            'uri': "https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.json",
-            'storage_options': {"account_name": "cmip6downscaling"},
+            'uri': "https://cmip6-pds.s3.amazonaws.com/pangeo-cmip6.json",
         },
         "era5": {
             'uri': "https://cmip6downscaling.blob.core.windows.net/cmip6/ERA5_daily/",
@@ -62,7 +60,7 @@ _defaults = {
     },
     "runtime": {
         "cloud": {
-            "storage_prefix": "az://",
+            "storage_prefix": "s3://carbonplan-cmip6",
             "storage_options": {
                 'container': 'prefect',
             },
@@ -80,7 +78,7 @@ _defaults = {
             "storage_options": {'directory': './'},
         },
         "pangeo": {
-            "storage_prefix": "az://",
+            "storage_prefix": "s3://carbonplan-cmip6/",
             "storage_options": {'directory': './'},
             'n_workers': 8,
             'threads_per_worker': 1,
