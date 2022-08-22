@@ -51,7 +51,7 @@ First, the entire collection of datasets at daily timescales is available throug
 ```
 import intake
 cat = intake.open_esm_datastore(
-  'https://cmip6downscaling.blob.core.windows.net/version1/catalogs/global-downscaled-cmip6.json'
+  'https://cpdataeuwest.blob.core.windows.net/cp-cmip/version1/catalogs/global-downscaled-cmip6.json'
 )
 ```
 
@@ -61,8 +61,9 @@ You can also access the data by using the URL of an individual dataset. See [the
 
 ```
 import xarray as xr
-xr.open_zarr('https://cmip6downscaling.blob.core.windows.net/version1/data/DeepSD/ScenarioMIP.CCCma.CanESM5.ssp245.r1i1p1f1.day.DeepSD.pr.zarr')
+xr.open_zarr('https://cpdataeuwest.blob.core.windows.net/cp-cmip/version1/data/DeepSD/ScenarioMIP.CCCma.CanESM5.ssp245.r1i1p1f1.day.DeepSD.pr.zarr')
 ```
+
 
 ## license
 
