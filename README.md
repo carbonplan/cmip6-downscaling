@@ -3,12 +3,9 @@
   height='48'
 />
 
-
 **climate downnscaling using cmip6 data**
 
-
 # carbonplan / cmip6-downscaling
-
 
 _Note: This project is under active development. We expect to make breaking changes until reaching version 1.0.0._
 
@@ -25,7 +22,6 @@ _Note: This project is under active development. We expect to make breaking chan
 <img
 src='https://images.carbonplan.org/highlights/cmip6-downscaling-dark.png'
 />
-
 
 This repository includes our tools/scripts/models/etc for climate downscaling. This work is described in more detail in a [web article](https://carbonplan.org/research/cmip6-downscaling-explainer) with
 a companion [map tool](https://carbonplan.org/research/cmip6-downscaling) to explore the data. We encourage you to reach out if you are interested in using the code or datasets by [opening an issue](https://github.com/carbonplan/cmip6-downscaling/issues/new) or [sending us an email](mailto:hello@carbonplan.org).
@@ -63,7 +59,6 @@ You can also access the data by using the URL of an individual dataset. See [the
 import xarray as xr
 xr.open_zarr('https://cpdataeuwest.blob.core.windows.net/cp-cmip/version1/data/DeepSD/ScenarioMIP.CCCma.CanESM5.ssp245.r1i1p1f1.day.DeepSD.pr.zarr')
 ```
-
 
 ## license
 
