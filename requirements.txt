@@ -1,5 +1,6 @@
 adlfs >= 2022.2.0
 carbonplan_data
+carbonplan[styles]
 cmip6_preprocessing
 dask[complete]
 dask-kubernetes
