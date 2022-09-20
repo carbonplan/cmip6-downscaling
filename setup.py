@@ -27,7 +27,7 @@ setup(
     include_package_data=True,
     python_requires=PYTHON_REQUIRES,
     install_requires=INSTALL_REQUIRES,
-    extras_require={"deepsd": ["tensorflow", "tensorflow-io"], "analysis": ["cartopy", "seaborn", carbonplan[styles]]},
+    extras_require={"deepsd": ["tensorflow", "tensorflow-io"], "analysis": ["cartopy", "seaborn", "carbonplan[styles]"]},
     license="MIT",
     keywords="carbon, data, climate",
     use_scm_version={"version_scheme": "post-release", "local_scheme": "dirty-tag"},
