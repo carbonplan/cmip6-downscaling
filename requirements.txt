@@ -17,8 +17,6 @@ regionmask
 scikit-downscale >= 0.1.2
 scikit-learn
 scipy
-tensorflow
-tensorflow-io
 universal-pathlib >= 0.0.12
 xarray >= 2022.3.0
 xarray-datatree == 0.0.6
