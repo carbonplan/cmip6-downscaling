@@ -4,6 +4,7 @@ import intake
 import xarray as xr
 
 from .utils import lon_to_180
+from .. import config
 
 xr.set_options(keep_attrs=True)
 
@@ -29,9 +30,8 @@ def open_era5(variables: str | list[str], time_period: slice) -> xr.Dataset:
     xarray.Dataset
         A daily dataset for one variable.
     """
-    cat = intake.open_esm_datastore(
-        'https://cpdataeuwest.blob.core.windows.net/cp-cmip/training/ERA5-daily-azure.json'
-    )
+
+    cat = intake.open_esm_datastore(config.get("data_catalog.era5_daily.json"))
 
     if isinstance(variables, str):
         variables = [variables]
@@ -51,8 +51,7 @@ def open_era5(variables: str | list[str], time_period: slice) -> xr.Dataset:
     )[variables]
 
     for wind_var in wind_vars:
-        # Note: needs update to path/catalog
-        era5_winds = xr.open_zarr('az://training/ERA5_daily_winds').rename(
+        era5_winds = xr.open_zarr(config.get("data_catalog.era5_daily_winds.uri")).rename(
             {'latitude': 'lat', 'longitude': 'lon'}
         )
         name_dict = {'ua': 'U', 'va': 'V'}
