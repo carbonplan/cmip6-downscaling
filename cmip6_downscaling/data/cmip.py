@@ -4,7 +4,6 @@ import dask
 import intake
 import pandas as pd
 import xarray as xr
-import intake 
 
 from .. import config
 from .utils import lon_to_180, to_standard_calendar as convert_to_standard_calendar

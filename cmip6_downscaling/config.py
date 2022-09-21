@@ -39,7 +39,7 @@ _defaults = {
     "data_catalog": {
         "cmip": {
             'uri': "https://cpdataeuwest.blob.core.windows.net/cp-cmip/cmip6/",
-            'json': "https://cpdataeuwest.blob.core.windows.net/cp-cmip/cmip6/pangeo-cmip6.json"
+            'json': "https://cpdataeuwest.blob.core.windows.net/cp-cmip/cmip6/pangeo-cmip6.json",
         },
         "era5": {
             'uri': "https://cpdataeuwest.blob.core.windows.net/cp-cmip/training/ERA5",
@@ -51,7 +51,7 @@ _defaults = {
         },
         "era5_daily_winds": {
             'uri': "https://cmip6downscaling.blob.core.windows.net/cmip6/ERA5_daily_winds/",
-        },      
+        },
     },
     'weights': {
         'gcm_pyramid_weights': {'uri': 'az://static/xesmf_weights/cmip6_pyramids/weights.csv'},

@@ -3,8 +3,8 @@ from __future__ import annotations
 import intake
 import xarray as xr
 
-from .utils import lon_to_180
 from .. import config
+from .utils import lon_to_180
 
 xr.set_options(keep_attrs=True)
 
