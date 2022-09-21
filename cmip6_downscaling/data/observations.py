@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import intake
 import xarray as xr
 
-from . import cat
 from .utils import lon_to_180
 
 xr.set_options(keep_attrs=True)
@@ -29,6 +29,10 @@ def open_era5(variables: str | list[str], time_period: slice) -> xr.Dataset:
     xarray.Dataset
         A daily dataset for one variable.
     """
+    cat = intake.open_esm_datastore(
+        'https://cpdataeuwest.blob.core.windows.net/cp-cmip/training/ERA5-daily-azure.json'
+    )
+
     if isinstance(variables, str):
         variables = [variables]
 
@@ -39,8 +43,15 @@ def open_era5(variables: str | list[str], time_period: slice) -> xr.Dataset:
             wind_vars.append(variable)
         else:
             non_wind_vars.append(variable)
-    ds = xr.concat([cat.era5(year=year).to_dask()[non_wind_vars] for year in years], dim='time')
+
+    # Note: hardcoded tasmax is intended. The zarr store is built to include all variables per year, so variables are subset after concat.
+    ds = xr.concat(
+        list(cat.search(year=years, cf_variable_name=['tasmax']).to_dataset_dict().values()),
+        dim='time',
+    )[variables]
+
     for wind_var in wind_vars:
+        # Note: needs update to path/catalog
         era5_winds = xr.open_zarr('az://training/ERA5_daily_winds').rename(
             {'latitude': 'lat', 'longitude': 'lon'}
         )

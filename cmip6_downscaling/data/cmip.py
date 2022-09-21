@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import dask
+import intake
 import pandas as pd
 import xarray as xr
 
-from . import cat
 from .utils import lon_to_180, to_standard_calendar as convert_to_standard_calendar
 
 xr.set_options(keep_attrs=True)
@@ -109,8 +109,10 @@ def load_cmip(
         Dataset or zarr group with CMIP data
     """
     with dask.config.set(**{'array.slicing.split_large_chunks': False}):
-
-        col = cat.cmip6()
+        # Azure MSFT Planetary Computer cmip6 intake catalog
+        col = intake.open_esm_datastore(
+            'https://cpdataeuwest.blob.core.windows.net/cp-cmip/cmip6/pangeo-cmip6.json'
+        )
         col_subset = col.search(
             activity_id=activity_ids,
             experiment_id=experiment_ids,
