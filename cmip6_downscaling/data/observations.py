@@ -33,7 +33,6 @@ def open_era5(variables: str | list[str], time_period: slice) -> xr.Dataset:
 
     cat = intake.open_esm_datastore(config.get("data_catalog.era5_daily.json"))
 
-    print(cat)
     if isinstance(variables, str):
         variables = [variables]
 
@@ -46,10 +45,7 @@ def open_era5(variables: str | list[str], time_period: slice) -> xr.Dataset:
             non_wind_vars.append(variable)
 
     # Note: hardcoded tasmax is intended. The zarr store is built to include all variables per year, so variables are subset after concat.
-    years = [2000, 2001]
-    variables = ['pr']
-    print(years)
-    print(variables)
+
     ds = xr.concat(
         list(cat.search(year=years, cf_variable_name=['tasmax']).to_dataset_dict().values()),
         dim='time',
