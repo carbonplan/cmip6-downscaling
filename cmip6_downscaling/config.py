@@ -38,12 +38,19 @@ _defaults = {
     },
     "data_catalog": {
         "cmip": {
-            'uri': "https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.json",
-            'storage_options': {"account_name": "cmip6downscaling"},
+            'uri': "https://cpdataeuwest.blob.core.windows.net/cp-cmip/cmip6/",
+            'json': "https://cpdataeuwest.blob.core.windows.net/cp-cmip/cmip6/pangeo-cmip6.json",
         },
         "era5": {
-            'uri': "https://cmip6downscaling.blob.core.windows.net/cmip6/ERA5_daily/",
-            'storage_options': {"account_name": "cmip6downscaling"},
+            'uri': "https://cpdataeuwest.blob.core.windows.net/cp-cmip/training/ERA5",
+            'json': "https://cpdataeuwest.blob.core.windows.net/cp-cmip/training/ERA5-azure.json",
+        },
+        "era5_daily": {
+            'uri': "https://cpdataeuwest.blob.core.windows.net/cp-cmip/training/ERA5_daily",
+            'json': "https://cpdataeuwest.blob.core.windows.net/cp-cmip/training/ERA5-daily-azure.json",
+        },
+        "era5_daily_winds": {
+            'uri': "https://cmip6downscaling.blob.core.windows.net/cmip6/ERA5_daily_winds/",
         },
     },
     'weights': {

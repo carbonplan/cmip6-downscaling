@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import intake
 import xarray as xr
 
-from . import cat
+from .. import config
 from .utils import lon_to_180
 
 xr.set_options(keep_attrs=True)
@@ -29,19 +30,29 @@ def open_era5(variables: str | list[str], time_period: slice) -> xr.Dataset:
     xarray.Dataset
         A daily dataset for one variable.
     """
+
+    cat = intake.open_esm_datastore(config.get("data_catalog.era5_daily.json"))
+
     if isinstance(variables, str):
         variables = [variables]
 
-    years = range(int(time_period.start), int(time_period.stop) + 1)
+    years = list(range(int(time_period.start), int(time_period.stop) + 1))
     wind_vars, non_wind_vars = [], []
     for variable in variables:
         if variable in ['ua', 'va']:
             wind_vars.append(variable)
         else:
             non_wind_vars.append(variable)
-    ds = xr.concat([cat.era5(year=year).to_dask()[non_wind_vars] for year in years], dim='time')
+
+    # Note: hardcoded tasmax is intended. The zarr store is built to include all variables per year, so variables are subset after concat.
+
+    ds = xr.concat(
+        list(cat.search(year=years, cf_variable_name=['tasmax']).to_dataset_dict().values()),
+        dim='time',
+    )[variables]
+
     for wind_var in wind_vars:
-        era5_winds = xr.open_zarr('az://training/ERA5_daily_winds').rename(
+        era5_winds = xr.open_zarr(config.get("data_catalog.era5_daily_winds.uri")).rename(
             {'latitude': 'lat', 'longitude': 'lon'}
         )
         name_dict = {'ua': 'U', 'va': 'V'}
