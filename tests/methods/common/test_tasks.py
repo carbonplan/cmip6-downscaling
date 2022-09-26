@@ -103,11 +103,10 @@ def check_global_attrs(ds):
 
 
 def test_get_obs(run_parameters):
-
     obs_path = get_obs.run(run_parameters)
-
+    print(obs_path)
     ds = xr.open_zarr(obs_path)
-
+    print(ds)
     check_global_attrs(ds)
     schema = DatasetSchema(
         {

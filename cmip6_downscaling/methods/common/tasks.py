@@ -83,8 +83,9 @@ def get_obs(run_parameters: RunParameters) -> UPath:
     if use_cache and is_cached(target):
         print(f'found existing target: {target}')
         return target
-    print(run_parameters)
+
     ds = open_era5(run_parameters.features, run_parameters.train_period)
+
     subset = subset_dataset(
         ds,
         run_parameters.features,
@@ -92,14 +93,13 @@ def get_obs(run_parameters: RunParameters) -> UPath:
         run_parameters.bbox,
         chunking_schema={'time': 365, 'lat': 150, 'lon': 150},
     )
-
+    subset = ds.chunk({'time': 365, 'lat': 150, 'lon': 150})
     for key in subset.variables:
         subset[key].encoding = {}
 
     subset.attrs.update({'title': title}, **get_cf_global_attrs(version=version))
     subset = set_zarr_encoding(subset)
     blocking_to_zarr(ds=subset, target=target, validate=True, write_empty_chunks=True)
-
     return target
 
 

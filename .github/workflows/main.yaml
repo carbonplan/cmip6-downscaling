@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     container:
-      image: carbonplan/cmip6-downscaling-prefect:2022.06.19
+      image: carbonplan/cmip6-downscaling-single-user:latest
       options: --user root
     steps:
       - uses: actions/checkout@v3
@@ -24,6 +24,7 @@ jobs:
         run: |
           git config --global --add safe.directory /__w/cmip6-downscaling/cmip6-downscaling
           python -m pip install --no-deps -e .
+          python -m pip install -U intake intake-esm cf-xarray
           python -m pip list
       - name: Running Tests
         run: |
