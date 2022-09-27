@@ -50,7 +50,7 @@ _defaults = {
             'json': "https://cpdataeuwest.blob.core.windows.net/cp-cmip/training/ERA5-daily-azure.json",
         },
         "era5_daily_winds": {
-            'uri': "https://cmip6downscaling.blob.core.windows.net/cmip6/ERA5_daily_winds/",
+            'uri': "https://cpdataeuwest.blob.core.windows.net/cp-cmip/training/ERA5_daily_winds/",
         },
     },
     'weights': {
