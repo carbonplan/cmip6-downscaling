@@ -23,7 +23,8 @@ jobs:
       - name: Install
         run: |
           git config --global --add safe.directory /__w/cmip6-downscaling/cmip6-downscaling
-          python -m pip install -e .
+          python -m pip install --no-deps -e .
+          python -m pip install -U cf-xarray
           python -m pip list
       - name: Running Tests
         run: |
