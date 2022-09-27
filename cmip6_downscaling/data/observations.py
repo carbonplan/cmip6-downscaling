@@ -49,7 +49,7 @@ def open_era5(variables: str | list[str], time_period: slice) -> xr.Dataset:
     ds = xr.concat(
         list(cat.search(year=years, cf_variable_name=['tasmax']).to_dataset_dict().values()),
         dim='time',
-    )[variables]
+    )[non_wind_vars]
 
     for wind_var in wind_vars:
         era5_winds = xr.open_zarr(config.get("data_catalog.era5_daily_winds.uri")).rename(
