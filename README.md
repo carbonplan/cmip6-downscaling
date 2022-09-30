@@ -29,7 +29,7 @@ a companion [map tool](https://carbonplan.org/research/cmip6-downscaling) to exp
 ## install
 
 ```shell
-pip install -e .
+pip install cmip6_downscaling
 ```
 
 ## usage
