@@ -14,28 +14,16 @@ LONG_DESCRIPTION = pathlib.Path("README.md").read_text()
 PYTHON_REQUIRES = ">=3.8"
 
 description = "climate downscaling using cmip6 data"
-maintainers = [
-    "Oriana Chegwidden",
-    "Raphael Hagen",
-    "Joe Hamman",
-    "Anderson Banihirwe",
-    "Max Jones",
-]
-maintainer_emails = [
-    "oriana@carbonplan.org",
-    "raphael@carbonplan.org",
-    "joe@carbonplan.org",
-    "anderson@carbonplan.org",
-    "max@carbonplan.org",
-]
+maintainer = "CarbonPlan"
+maintainer_email = "tech@carbonplan.org"
 
 setup(
     name="cmip6-downscaling",
     description=description,
     long_description=LONG_DESCRIPTION,
     long_description_content_type="text/markdown",
-    maintainer=maintainers,
-    maintainer_emails="joe@carbonplan.org",
+    maintainer=maintainer,
+    maintainer_email=maintainer_email,
     url="https://github.com/carbonplan/cmip6-downscaling",
     packages=find_packages(),
     include_package_data=True,
