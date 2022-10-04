@@ -44,7 +44,7 @@
   ],
   "upload_type": "software",
   "keywords": ["downscaling", "CMIP6", "bias-correction", "climate"],
-  "grants": [{ "id": "Microsoft AI for Earth" }],
+  "notes": "The development of this project was funded, in part, through a grant from the Microsoft AI for Earth program to CarbonPlan.",
 
   "description": "The codebase here was used by <a href=\"https://carbonplan.org\">Carbonplan</a> to develop a collection of datasets featuring climate projections from the Coupled Model Intercomparison Project Phase 6, bias-corrected and downscaled to the 0.25 degree resolution. The datasets include daily maximum and minimum temperatures and daily precipitation spanning the entire globe over the time period 1950-2100. Notably, the dataset collection includes results from multiple downscaling methods, allowing users to better evaluate the effects of downscaling for their specific application of interest. More details on the project are available in CarbonPlan's <a href=\"https://carbonplan.org/research/cmip6-downscaling-explainer\">explainer article</a>. Also, you can interactively explore the data through a <a href=\"https://carbonplan.org/research/cmip6-downscaling\">web tool</a> and access the data via an <a href=\"https://github.com/carbonplan/cmip6-downscaling/blob/main/notebooks/accessing_data_example.ipynb\">example Jupyter notebook</a>."
 }
