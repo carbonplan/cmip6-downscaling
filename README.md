@@ -7,8 +7,6 @@
 
 # carbonplan / cmip6-downscaling
 
-_Note: This project is under active development. We expect to make breaking changes until reaching version 1.0.0._
-
 [![GitHub][github-badge]][github]
 [![Build Status]][actions]
 ![MIT License][]
