@@ -12,12 +12,18 @@ _Note: This project is under active development. We expect to make breaking chan
 [![GitHub][github-badge]][github]
 [![Build Status]][actions]
 ![MIT License][]
+[![pre-commit.ci-badge]][pre-commit.ci-link]
+[![pypi-badge]][pypi-link]
 
 [github]: https://github.com/carbonplan/cmip6-downscaling
 [github-badge]: https://badgen.net/badge/-/github?icon=github&label
 [build status]: https://github.com/carbonplan/cmip6-downscaling/actions/workflows/main.yaml/badge.svg
 [actions]: https://github.com/carbonplan/cmip6-downscaling/actions/workflows/main.yaml
 [mit license]: https://badgen.net/badge/license/MIT/blue
+[pre-commit.ci-badge]: https://results.pre-commit.ci/badge/github/carbonplan/cmip6-downscaling/main.svg
+[pre-commit.ci-link]: https://results.pre-commit.ci/latest/github/carbonplan/cmip6-downscaling/main
+[pypi-badge]: https://img.shields.io/pypi/v/cmip6-downscaling?logo=pypi
+[pypi-link]: https://pypi.org/project/cmip6-downscaling
 
 <img
 src='https://images.carbonplan.org/highlights/cmip6-downscaling-dark.png'
@@ -29,7 +35,7 @@ a companion [map tool](https://carbonplan.org/research/cmip6-downscaling) to exp
 ## install
 
 ```shell
-pip install cmip6_downscaling
+python -m pip install cmip6_downscaling
 ```
 
 ## usage
