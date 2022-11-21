@@ -1,4 +1,4 @@
-# Current available datasets
+# Currently available datasets
 
 See below for a table of all available datasets in this collection with storage locations and other metadata.
 
