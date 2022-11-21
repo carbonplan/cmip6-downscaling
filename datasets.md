@@ -3,7 +3,10 @@
 See below for a table of all available datasets in this collection with storage locations and other metadata.
 
 > **Note**
+
 > The `CSV download` column contains timeseries of climate data at **107 cities** around the globe in CSV format.
+
+---
 
 
 | GCM           | Scenario   | Time frequency | Method    | Variable | License   | Store                                                                                                                                             | CSV download                                                                                                                                               |
