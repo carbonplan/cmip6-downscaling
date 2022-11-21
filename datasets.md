@@ -8,7 +8,6 @@ See below for a table of all available datasets in this collection with storage 
 
 ---
 
-
 | GCM           | Scenario   | Time frequency | Method    | Variable | License   | Store                                                                                                                                             | CSV download                                                                                                                                               |
 | ------------- | ---------- | -------------- | --------- | -------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | BCC-CSM2-MR   | historical | day            | GARD-SV   | tasmax   | CC-BY-4.0 | https://cpdataeuwest.blob.core.windows.net/cp-cmip/version1/data/GARD-SV/CMIP.BCC.BCC-CSM2-MR.historical.r1i1p1f1.day.GARD-SV.tasmax.zarr         | https://carbonplan-share.s3.us-west-2.amazonaws.com/datasette/cmip6-downscaling/CMIP.BCC.BCC-CSM2-MR.historical.r1i1p1f1.day.GARD-SV.tasmax.csv.gz         |
