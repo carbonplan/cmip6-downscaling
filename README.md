@@ -1,7 +1,6 @@
 <p align="left" >
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://carbonplan-assets.s3.amazonaws.com/monogram/light-small.png">
-  <source media="(prefers-color-scheme: light)" srcset="https://carbonplan-assets.s3.amazonaws.com/monogram/dark-small.png">
   <img alt="CarbonPlan monogram." height="48" src="https://carbonplan-assets.s3.amazonaws.com/monogram/dark-small.png">
 </picture>
 </p>
