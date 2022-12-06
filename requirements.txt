@@ -12,7 +12,7 @@ intake-esm >= 2022.9.18
 intake-xarray
 ndpyramid == 0.0.6
 pandas
-prefect == 0.15.13
+prefect == 1.4.1
 rechunker
 regionmask
 scikit-downscale >= 0.1.2
