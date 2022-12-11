@@ -35,6 +35,6 @@ dependencies:
   - xpersist
   - zarr
   - pip:
-      - git+https://github.com/carbonplan/xarray-schema
+      - git+https://github.com/xarray-contrib/xarray-schema
       - carbonplan-data
       - -e ..
