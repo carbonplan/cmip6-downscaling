@@ -5,7 +5,7 @@
 </picture>
 </p>
 
-**climate downnscaling using cmip6 data**
+**climate downscaling using cmip6 data**
 
 # carbonplan / cmip6-downscaling
 
