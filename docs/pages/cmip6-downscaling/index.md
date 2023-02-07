@@ -2,6 +2,8 @@ import Section from '../../components/section'
 
 # CMIP6-Downscaling
 
+TODO: remove me
+
 This project implements a collection of statistical climate downscaling methods and provides workflows to generate downscaled climate data.
 
 Statistical climate downscaling refers to a collection of algorithms that, when applied to raw climate model output, correct for systemic biases and generate data at higher spatial resolutions. These methods are an important part of many analytical workflows in climate impacts and climate mitigation.
