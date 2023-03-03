@@ -10,7 +10,7 @@ fsspec
 intake
 intake-esm >= 2022.9.18
 intake-xarray
-ndpyramid == 0.0.6
+ndpyramid == 0.0.7
 pandas
 prefect == 0.15.13
 rechunker
