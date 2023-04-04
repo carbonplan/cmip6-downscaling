@@ -36,7 +36,6 @@ with Flow(
     run_config=runtime.run_config,
     executor=runtime.executor,
 ) as flow:
-
     nums = range(4)
     my_task.map(nums)
 

@@ -43,7 +43,6 @@ class TimePeriod:
 
 @dataclass
 class CMIP6Experiment:
-
     model: str
     scenario: str
     member: str

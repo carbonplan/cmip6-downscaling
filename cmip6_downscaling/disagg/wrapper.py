@@ -91,7 +91,6 @@ def run_terraclimate_model(ds_in: xr.Dataset) -> xr.Dataset:
     )
 
     with dask.config.set(scheduler='single-threaded'):
-
         for index, mask_val in np.ndenumerate(ds_in['mask'].values):
             if not mask_val:
                 # skip values outside the mask

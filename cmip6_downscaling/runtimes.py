@@ -87,7 +87,6 @@ class CloudRuntime(BaseRuntime):
 
     @cached_property
     def executor(self) -> Executor:
-
         executor = DaskExecutor(
             cluster_kwargs={
                 'resources': {'taskslots': 1},

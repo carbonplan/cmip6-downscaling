@@ -135,7 +135,6 @@ def test_get_experiment(run_parameters):
 
 
 def test_regrid(tmp_path):
-
     pytest.importorskip('xesmf')
 
     ds = xr.tutorial.open_dataset('air_temperature').chunk({'time': 10, 'lat': -1, 'lon': -1})

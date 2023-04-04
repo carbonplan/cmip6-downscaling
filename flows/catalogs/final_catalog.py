@@ -22,7 +22,6 @@ config.set(
 
 
 def parse_store(store: str):
-
     from ecgtools.builder import INVALID_ASSET, TRACEBACK
 
     try:
@@ -54,13 +53,11 @@ def parse_store(store: str):
         }
 
     except Exception:
-
         return {INVALID_ASSET: path, TRACEBACK: traceback.format_exc()}
 
 
 @task(log_stdout=True)
 def generate_intake_esm_catalog(*, intake_esm_catalog_bucket: str):
-
     import ecgtools
 
     builder = ecgtools.Builder(
@@ -102,7 +99,6 @@ def generate_intake_esm_catalog(*, intake_esm_catalog_bucket: str):
 def generate_minified_web_catalog(
     *, parent_catalog: str, web_catalog: str, cdn: str = None
 ) -> None:
-
     with fsspec.open(parent_catalog) as f:
         data = json.load(f)
 
@@ -146,7 +142,6 @@ with Flow(
     storage=runtime.storage,
     run_config=runtime.run_config,
 ) as flow:
-
     parent_catalog = Parameter(
         'parent-catalog',
         default="az://scratch/results/pyramids/combined-cmip6-era5-pyramids-catalog-web.json",

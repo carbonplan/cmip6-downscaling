@@ -61,7 +61,6 @@ def parse_era5(path):
 
 @task(log_stdout=True)
 def build_catalog(*, name: str, bucket: str) -> None:
-
     import ecgtools
 
     print(ecgtools.__version__)

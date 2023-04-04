@@ -321,7 +321,6 @@ def construct_analogs(
     # train a linear regression model for each day in coarsen GCM dataset, where the features are each coarsened observation
     # analogs, and examples are each pixels within the coarsened domain
     for i in range(len(y)):
-
         # get data from the GCM day being downscaled
         yi = y.isel(ndays_in_gcm=i)
         # get data from the coarsened obs analogs

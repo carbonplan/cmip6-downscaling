@@ -46,7 +46,6 @@ def test_lon_to_180(shift):
 
 
 def test_to_standard_calendar(da_noleap):
-
     da_std = to_standard_calendar(da_noleap)
     assert da_noleap.sizes['time'] == 365
     assert da_std.sizes['time'] == 366
