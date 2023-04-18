@@ -1,5 +1,3 @@
-import Section from '../../components/section'
-
 # Input Datasets
 
 ## CMIP6 raw datasets
@@ -30,5 +28,3 @@ https://apps.ecmwf.int/datasets/licences/general/
 The downscaled datasets shown here are derived from results from the [Coupled Model Intercomparison Project Phase 6](https://doi.org/10.5194/gmd-9-1937-2016). Raw datasets are also available in the web catalog (labeled “Raw”). GCMs are run at different spatial resolutions, and the data presented here are displayed in their original spatial resolution. The raw CMIP6 datasets were accessed via the Pangeo data catalog.
 
 The transfer script can be found [here](https://github.com/carbonplan/cmip6-downscaling/blob/main/flows/cmip6_transfer.py)
-
-export default ({ children }) => <Section name='Input Datasets'>{children}</Section>

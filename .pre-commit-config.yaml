@@ -50,7 +50,6 @@ repos:
     rev: v3.0.0-alpha.4
     hooks:
       - id: prettier
-        language_version: system
         additional_dependencies:
           - prettier
           - '@carbonplan/prettier'

@@ -1,5 +1,3 @@
-import Section from '../../components/section'
-
 # Quick start
 
 ## Dependencies
@@ -25,10 +23,8 @@ python -m pip install git+https://github.com/carbonplan/cmip6-dowscaling
 
 ## Usage
 
-The `cmip6-downscaling` package provides a number of downscaling implementations. See the [API docs](/api) for a complete listing of functions and utilities or the [How-to Guides](/how-to-guide) for detailed example on how to use the `cmip6-downscaling` package for specific tasks.
+The `cmip6-downscaling` package provides a number of downscaling implementations. See the [API docs](/api) for a complete listing of functions and utilities or the [Running Flows Guide](/running-flows) for detailed example on how to use the `cmip6-downscaling` package for specific tasks.
 
 ```python
 import cmip6_downscaling
 ```
-
-export default ({ children }) => <Section name='Quick Start'>{children}</Section>

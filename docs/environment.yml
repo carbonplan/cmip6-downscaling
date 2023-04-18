@@ -4,37 +4,9 @@ channels:
   - nodefaults
 dependencies:
   - python=3.9
+  - pre-commit
   - pip
-  - ipykernel
-  - ipython
-  - setuptools
-  - sphinx==4.5.0
+  - sphinx>=5.0
+  - sphinx-book-theme >= 0.3.0
   - numpydoc
   - myst-nb
-  # this project's dependencies
-  - adlfs
-  - dask
-  - dask-kubernetes
-  - donfig
-  - fsspec
-  - gcsfs
-  - intake-esm
-  - intake-xarray
-  - ndpyramid
-  - numpy
-  - pandas
-  - prefect
-  - rechunker
-  - regionmask
-  - scikit-downscale
-  - scikit-learn
-  - scipy
-  - universal_pathlib
-  - xclim
-  - xesmf
-  - xpersist
-  - zarr
-  - pip:
-      - git+https://github.com/carbonplan/xarray-schema
-      - carbonplan-data
-      - -e ..
