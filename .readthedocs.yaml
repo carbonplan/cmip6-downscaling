@@ -11,11 +11,11 @@ build:
     python: 'mambaforge-4.10'
   jobs:
     pre_build: # Generate api stub files before building
-      - make -C doc api
+      - make -C docs api
 
 # Build documentation in the doc/ directory with Sphinx
 sphinx:
-  configuration: doc/conf.py
+  configuration: docs/conf.py
 
 # If using Sphinx, optionally build your docs in additional formats such as PDF
 # formats:
