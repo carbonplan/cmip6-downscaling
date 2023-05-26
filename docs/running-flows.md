@@ -1,5 +1,3 @@
-import Section from '../../components/section'
-
 # Running Flows
 
 In this project each downscaling method [BCSD, GARD, MACA, DEEPSD] has it's own workflow for generating results. These data production workflows are handled by the python library, prefect, which encapsulates the data processing steps into individual tasks, which are organized into a 'Flow'.
@@ -14,13 +12,10 @@ Pre-configured runtimes are stored in [`cmip6_downscaling.runtimes.py`](https://
 
 The current runtime options are:
 
-[`cloud`](https://github.com/carbonplan/cmip6-downscaling/blob/a0379110c33b557f959a1d6fa53e9f93891a45b3/cmip6_downscaling/runtimes.py#L57) `executor: dask-distrubted` - Runtime for queuing multiple flows on prefect cloud.
-
-[`local`](https://github.com/carbonplan/cmip6-downscaling/blob/a0379110c33b557f959a1d6fa53e9f93891a45b3/cmip6_downscaling/runtimes.py#L113) `executor: local` - Runtime for developing on local machine
-
-[`CI`](https://github.com/carbonplan/cmip6-downscaling/blob/a0379110c33b557f959a1d6fa53e9f93891a45b3/cmip6_downscaling/runtimes.py#L130) `executor: local` - Runtime used for Continuous Integration
-
-[`pangeo`](https://github.com/carbonplan/cmip6-downscaling/blob/a0379110c33b557f959a1d6fa53e9f93891a45b3/cmip6_downscaling/runtimes.py#L140) `executor: dask-distrubted` - Runtime for processing on jupyter-hub
+- [`cloud`](https://github.com/carbonplan/cmip6-downscaling/blob/a0379110c33b557f959a1d6fa53e9f93891a45b3/cmip6_downscaling/runtimes.py#L57) `executor: dask-distrubted` - Runtime for queuing multiple flows on prefect cloud.
+- [`local`](https://github.com/carbonplan/cmip6-downscaling/blob/a0379110c33b557f959a1d6fa53e9f93891a45b3/cmip6_downscaling/runtimes.py#L113) `executor: local` - Runtime for developing on local machine
+- [`CI`](https://github.com/carbonplan/cmip6-downscaling/blob/a0379110c33b557f959a1d6fa53e9f93891a45b3/cmip6_downscaling/runtimes.py#L130) `executor: local` - Runtime used for Continuous Integration
+- [`pangeo`](https://github.com/carbonplan/cmip6-downscaling/blob/a0379110c33b557f959a1d6fa53e9f93891a45b3/cmip6_downscaling/runtimes.py#L140) `executor: dask-distrubted` - Runtime for processing on jupyter-hub
 
 ## Infrastructure
 
@@ -30,7 +25,7 @@ These flows were ran on a machine ~32 CPU and ~256GB RAM. The `pangeo` runtime a
 
 Project level configuration settings are in [`cmip6_downscaling.config.py`](https://github.com/carbonplan/cmip6-downscaling/blob/main/cmip6_downscaling/config.py) and configured using the python package [`donfig`](https://donfig.readthedocs.io/en/latest/). Default configuration options can be overwritten in multiple ways with donfig. Below are two options for specifying use of the cloud runtime. Note: any `connection_strings` or other sensitive information is best stored in a local .yaml or as an environment variable.
 
-#### Python Context
+### Python Context
 
 [donfig python context configuration options](https://donfig.readthedocs.io/en/latest/configuration.html#directly-within-python)
 
@@ -42,7 +37,7 @@ config.set({'runtime': 'cloud'})
 
 ```
 
-#### yaml
+### yaml
 
 [donfig yaml configuration options](https://donfig.readthedocs.io/en/latest/configuration.html#specify-configuration). Default config options can be overwritten with a top-level yaml file. Details on setup are provided in the donfig docs above.
 
@@ -52,7 +47,7 @@ run_options:
 runtime: 'cloud'
 ```
 
-#### Environment Variables
+### Environment Variables
 
 Config options can also be set with specifically formatted environment variables. Details can be found below.
 
@@ -196,5 +191,3 @@ Note: This url is specific to username, jupyter-hub name and port.
 ex:
 
 `https://prod.azure.carbonplan.2i2c.cloud/user/norlandrhagen/bcsd/proxy/8787/status`
-
-export default ({ children }) => <Section name='Running Prefect Flows'>{children}</Section>

@@ -43,11 +43,15 @@ autosummary_generate = True
 numpydoc_class_members_toctree = False
 numpydoc_show_class_members = False
 
-# The suffix of source filenames.
-source_suffix = ".rst"
+autodoc_mock_imports = ["xesmf", "tensorflow"]
 
-# The master toctree document.
-master_doc = "api"
+
+# Sphinx project configuration
+source_suffix = ".rst"
+needs_sphinx = "1.8"
+# The encoding of source files.
+source_encoding = "utf-8-sig"
+root_doc = "index"
 
 # General information about the project.
 project = "cmip6_downscaling"
@@ -68,7 +72,7 @@ language = "Python"
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-exclude_patterns = ["_build", "node_modules"]
+exclude_patterns = ["_build", "**.ipynb_checkpoints"]
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = "sphinx"
@@ -80,3 +84,19 @@ intersphinx_mapping = {
     "python": ("https://docs.python.org/3/", None),
     "scipy": ("https://docs.scipy.org/doc/scipy", None),
 }
+
+# -- Options for HTML output ----------------------------------------------
+# The theme to use for HTML and HTML Help pages.  See the documentation for
+# a list of builtin themes.
+
+html_title = "CMIP6-Downscaling"
+html_theme_options = {
+    "logo": {
+        "image_light": "_static/monogram-dark-cropped.png",
+        "image_dark": "_static/monogram-light-cropped.png",
+    }
+}
+html_theme = "sphinx_book_theme"
+html_title = ""
+repository = "carbonplan/cmip6-downscaling"
+repository_url = "https://github.com/carbonplan/cmip6-downscaling"

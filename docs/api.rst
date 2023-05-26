@@ -1,12 +1,15 @@
-# API
+.. _api:
 
-```{eval-rst}
+API
+===
+
+.. automodule:: cmip6_downscaling
+
 .. currentmodule:: cmip6_downscaling
-```
 
-## Data
+Data
+----
 
-```{eval-rst}
 .. autosummary::
    :toctree: generated/
 
@@ -18,17 +21,16 @@
 
    data.utils.to_standard_calendar
    data.utils.lon_to_180
-```
 
-## Downscaling Methods
+Downscaling Methods
+-------------------
 
-```{eval-rst}
 .. currentmodule:: cmip6_downscaling.methods
-```
 
-### BCSD
 
-```{eval-rst}
+BCSD
+----
+
 .. autosummary::
    :toctree: generated/
 
@@ -36,11 +38,10 @@
    bcsd.tasks.fit_and_predict
    bcsd.tasks.postprocess_bcsd
    bcsd.utils.reconstruct_finescale
-```
 
-### GARD
+GARD
+----
 
-```{eval-rst}
 .. autosummary::
    :toctree: generated/
 
@@ -50,11 +51,9 @@
    gard.utils.get_gard_model
    gard.utils.add_random_effects
 
-```
+DEEPSD
+------
 
-### DEEPSD
-
-```{eval-rst}
 .. autosummary::
    :toctree: generated/
 
@@ -66,11 +65,10 @@
    deepsd.utils.bilinear_interpolate
    deepsd.utils.conservative_interpolate
    deepsd.utils.normalize
-```
 
-### MACA
+MACA
+----
 
-```{eval-rst}
 .. autosummary::
    :toctree: generated/
 
@@ -80,11 +78,10 @@
    maca.tasks.split_by_region
    maca.tasks.combine_regions
    maca.tasks.replace_epoch_trend
-```
 
-### Common Tasks
+Common Tasks
+------------
 
-```{eval-rst}
 .. autosummary::
    :toctree: generated/
 
@@ -99,4 +96,3 @@
    common.tasks.pyramid
    common.tasks.run_analyses
    common.tasks.finalize
-```
