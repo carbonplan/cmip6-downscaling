@@ -90,7 +90,12 @@ intersphinx_mapping = {
 # a list of builtin themes.
 
 html_title = "CMIP6-Downscaling"
-
+html_theme_options = {
+    "logo": {
+        "image_light": "_static/monogram-dark-cropped.png",
+        "image_dark": "_static/monogram-light-cropped.png",
+    }
+}
 html_theme = "sphinx_book_theme"
 html_title = ""
 repository = "carbonplan/cmip6-downscaling"
