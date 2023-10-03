@@ -82,7 +82,7 @@ def load_big_cities(
     if plot:
         ax = plt.axes(projection=ccrs.PlateCarree())
         ax.stock_img()
-        for (lat, lon) in big_cities[['lat', 'lng']].values:
+        for lat, lon in big_cities[['lat', 'lng']].values:
             plt.plot(
                 lon,
                 lat,

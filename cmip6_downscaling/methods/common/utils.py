@@ -288,7 +288,6 @@ def resample_wrapper(ds, freq='1MS'):
 
 
 def set_zarr_encoding(ds: xr.Dataset):
-
     for da in ds.data_vars.values():
         da.encoding = {'compressor': zarr.Blosc(clevel=1)}
 

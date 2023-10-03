@@ -70,7 +70,6 @@ def coarsen_and_interpolate(fine_path: UPath, coarse_path: UPath) -> UPath:
 
 
 def _fit_and_predict_wrapper(xtrain, ytrain, xpred, scrf, run_parameters, dim='time'):
-
     xpred = xpred.rename({'t2': 'time'})
     scrf = scrf.rename({'t2': 'time'})
     kws = default_none_kwargs(run_parameters.bias_correction_kwargs, copy=True)

@@ -57,7 +57,6 @@ def postprocess(ds: xr.Dataset, to_standard_calendar: bool = True) -> xr.Dataset
             ds = ds.reindex({"lat": ds.lat[::-1]})
 
         if to_standard_calendar:
-
             # checks calendar
             ds = convert_to_standard_calendar(ds)
 
@@ -110,7 +109,6 @@ def load_cmip(
         Dataset or zarr group with CMIP data
     """
     with dask.config.set(**{'array.slicing.split_large_chunks': False}):
-
         col = intake.open_esm_datastore(config.get("data_catalog.cmip.json"))
 
         col_subset = col.search(

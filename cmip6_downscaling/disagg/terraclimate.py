@@ -437,7 +437,6 @@ def model(
         soil_prev = awc
 
     for i, row in df.iterrows():
-
         radiation = row['srad'] * MGM2D_PER_WM2
 
         # run snow routine

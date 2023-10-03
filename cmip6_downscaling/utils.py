@@ -13,7 +13,6 @@ def str_to_hash(s: str) -> str:
 
 
 def write(ds: xr.Dataset | datatree.DataTree, target, use_cache: bool = True) -> str:
-
     from .methods.common.utils import zmetadata_exists
 
     if use_cache and zmetadata_exists(target):

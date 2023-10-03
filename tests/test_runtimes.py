@@ -11,7 +11,6 @@ from cmip6_downscaling.runtimes import (
 
 @pytest.mark.parametrize('runtime', [LocalRuntime, CIRuntime, PangeoRuntime])
 def test_runtimes(runtime):
-
     _runtime = runtime()
     assert isinstance(_runtime, BaseRuntime)
 

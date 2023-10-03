@@ -26,7 +26,6 @@ def get_datasets_keys(*, catalog_path: str, start: int, stop: int):
 
 @task(log_stdout=True)
 def resample_to_daily(*, catalog_path: str, key: str):
-
     import dask
     import intake
     import xarray as xr

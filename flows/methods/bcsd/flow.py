@@ -45,7 +45,6 @@ print(runtime)
 with Flow(
     name="bcsd", storage=runtime.storage, run_config=runtime.run_config, executor=runtime.executor
 ) as flow:
-
     run_parameters = make_run_parameters(
         method=Parameter("method"),
         obs=Parameter("obs"),

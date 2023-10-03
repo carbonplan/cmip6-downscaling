@@ -41,7 +41,6 @@ print(runtime)
 with Flow(
     name="gard", storage=runtime.storage, run_config=runtime.run_config, executor=runtime.executor
 ) as flow:
-
     run_parameters = make_run_parameters(
         method=Parameter("method"),
         obs=Parameter("obs"),
@@ -126,7 +125,6 @@ with Flow(
     # analysis_location = run_analyses(model_output_path, run_parameters)
 
     if config.get('run_options.generate_pyramids'):
-
         # since pyramids require full space we now rechunk everything into full
         # space before passing into pyramid step. we probably want to add a cleanup
         # to this step in particular since otherwise we will have an exact
