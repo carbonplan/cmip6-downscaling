@@ -58,7 +58,6 @@ def generate_weights(stores: list[dict[str, str]], method: str = 'bilinear') -> 
         print(ds_out)
 
         for store in stores:
-
             target_prefix = (
                 static_dir / store['source_id'] / store['table_id'] / store['grid_label'] / method
             )
@@ -128,7 +127,6 @@ with Flow(
     run_config=runtime.run_config,
     executor=runtime.executor,
 ) as flow:
-
     cat_url = Parameter(
         'cat_url', default='https://cmip6downscaling.blob.core.windows.net/cmip6/pangeo-cmip6.json'
     )

@@ -125,13 +125,11 @@ def get_license(source_id: str, derived_product: bool = False) -> dict:
 
 
 def parse_cmip6(store: str, root_path: str) -> dict[str, str]:
-
     from ecgtools.builder import INVALID_ASSET, TRACEBACK
 
     from cmip6_downscaling.methods.common.utils import zmetadata_exists
 
     try:
-
         path = UPath(store)
         if not zmetadata_exists(path):
             raise ValueError(f'{path} not a valid zarr store')
@@ -260,7 +258,6 @@ def from_az_to_https(uri: str, root: str) -> str:
 def parse_cmip6_downscaled_pyramid(
     data, cdn: str, root_path: str, derived_product: bool = True
 ) -> list[dict]:
-
     """
     Parse metadata for given CMIP6 downscaled pyramid.
 
@@ -435,7 +432,6 @@ def pick_latest_version(results: list[str]) -> list[str]:
 def filter_version_results(
     *, minimum_version: str, maximum_version: str, exclude_local_version: bool, results: list[str]
 ) -> list[str]:
-
     """
     Filter the results by version.
 
@@ -496,7 +492,6 @@ def get_cmip6_downscaled_pyramids(
     maximum_version: str = None,
     exclude_local_version: bool = True,
 ):
-
     """
     Get CMIP6 downscaled pyramids.
 
@@ -554,7 +549,6 @@ def create_catalog(
     cmip6_downscaled_pyramids: list[dict] = None,
     era5_pyramids: list[dict] = None,
 ):
-
     """
     Create catalog.
 
@@ -603,7 +597,6 @@ def create_catalog(
 with Flow(
     'web-catalog', executor=runtime.executor, run_config=runtime.run_config, storage=runtime.storage
 ) as flow:
-
     paths = Parameter('paths', default=['az://flow-outputs/results/cmip6-pyramids-raw'])
     web_catalog_path = Parameter(
         'web-catalog-path',

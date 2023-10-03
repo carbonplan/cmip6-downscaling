@@ -41,7 +41,6 @@ def get_assets(
     grid_label: list[str] | str = 'gn',
     member_id: list[str] | str = 'r1i1p1f1',
 ) -> list[tuple(str, str)]:
-
     import intake
 
     cat = intake.open_esm_datastore(cat_url).search(

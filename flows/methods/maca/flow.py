@@ -147,7 +147,6 @@ with Flow(
         )
 
         if config.get('run_options.combine_regions'):
-
             p['combined_analogs_full_time_path'] = combine_regions(
                 regions=p['region_numbers'],
                 region_paths=p['constructed_analogs_region_paths'],
@@ -184,7 +183,6 @@ with Flow(
             # analysis_location = run_analyses(p['final_bias_corrected_full_time_path'], run_parameters)
 
             if config.get('run_options.generate_pyramids'):
-
                 # make temporal summaries
                 p['monthly_summary_full_space_path'] = rechunk(
                     p['monthly_summary_path'], pattern='full_space'
