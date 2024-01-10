@@ -1,29 +1,19 @@
 <p align="left" >
+<a href='https://carbonplan.org'>
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://carbonplan-assets.s3.amazonaws.com/monogram/light-small.png">
   <img alt="CarbonPlan monogram." height="48" src="https://carbonplan-assets.s3.amazonaws.com/monogram/dark-small.png">
 </picture>
+</a>
 </p>
-
-**climate downscaling using cmip6 data**
 
 # carbonplan / cmip6-downscaling
 
-[![GitHub][github-badge]][github]
-[![Build Status]][actions]
-![MIT License][]
-[![pre-commit.ci-badge]][pre-commit.ci-link]
-[![pypi-badge]][pypi-link]
+**climate downscaling using cmip6 data**
 
-[github]: https://github.com/carbonplan/cmip6-downscaling
-[github-badge]: https://badgen.net/badge/-/github?icon=github&label
-[build status]: https://github.com/carbonplan/cmip6-downscaling/actions/workflows/main.yaml/badge.svg
-[actions]: https://github.com/carbonplan/cmip6-downscaling/actions/workflows/main.yaml
-[mit license]: https://badgen.net/badge/license/MIT/blue
-[pre-commit.ci-badge]: https://results.pre-commit.ci/badge/github/carbonplan/cmip6-downscaling/main.svg
-[pre-commit.ci-link]: https://results.pre-commit.ci/latest/github/carbonplan/cmip6-downscaling/main
-[pypi-badge]: https://img.shields.io/pypi/v/cmip6-downscaling?logo=pypi
-[pypi-link]: https://pypi.org/project/cmip6-downscaling
+[![CI](https://github.com/carbonplan/cmip6-downscaling/actions/workflows/main.yaml/badge.svg)](https://github.com/carbonplan/cmip6-downscaling/actions/workflows/main.yaml)
+![PyPI](https://img.shields.io/pypi/v/cmip6-downscaling)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 <img
 src='https://images.carbonplan.org/highlights/cmip6-downscaling-dark.png'
@@ -68,8 +58,8 @@ xr.open_zarr('https://cpdataeuwest.blob.core.windows.net/cp-cmip/version1/data/D
 
 ## license
 
-All the code in this repository is [MIT](https://choosealicense.com/licenses/mit/) licensed. Some of the data provided by this API is sourced from content made available under a [CC-BY-4.0](https://choosealicense.com/licenses/cc-by-4.0/) license. We include attribution for this content, and we please request that you also maintain that attribution if using this data.
+All the code in this repository is [MIT](https://choosealicense.com/licenses/mit/)-licensed. Some of the data provided by this API is sourced from content made available under a [CC-BY-4.0](https://choosealicense.com/licenses/cc-by-4.0/) license. We include attribution for this content, and we please request that you also maintain that attribution if using this data.
 
 ## about us
 
-CarbonPlan is a non-profit organization that uses data and science for climate action. We aim to improve the transparency and scientific integrity of climate solutions with open data and tools. Find out more at [carbonplan.org](https://carbonplan.org/) or get in touch by [opening an issue](https://github.com/carbonplan/cmip6-downscaling/issues/new) or [sending us an email](mailto:hello@carbonplan.org).
+CarbonPlan is a nonprofit organization that uses data and science for climate action. We aim to improve the transparency and scientific integrity of climate solutions with open data and tools. Find out more at [carbonplan.org](https://carbonplan.org/) or get in touch by [opening an issue](https://github.com/carbonplan/cmip6-downscaling/issues/new) or [sending us an email](mailto:hello@carbonplan.org).
