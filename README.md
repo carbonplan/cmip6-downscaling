@@ -12,7 +12,7 @@
 **climate downscaling using cmip6 data**
 
 [![CI](https://github.com/carbonplan/cmip6-downscaling/actions/workflows/main.yaml/badge.svg)](https://github.com/carbonplan/cmip6-downscaling/actions/workflows/main.yaml)
-![PyPI](https://img.shields.io/pypi/v/cmip6-downscaling)
+[![PyPI](https://img.shields.io/pypi/v/cmip6-downscaling)](https://pypi.org/project/cmip6-downscaling)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 <img
