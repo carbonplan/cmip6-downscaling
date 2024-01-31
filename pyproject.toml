@@ -48,6 +48,7 @@ dependencies = [
 "xarray-datatree == 0.0.6",
 "xarray_schema >= 0.0.3",
 "xclim",
+"xesmf",
 "zarr >= 2.11.3"
 ]
 
