@@ -32,24 +32,13 @@ repos:
     hooks:
       - id: blackdoc
 
-  - repo: https://github.com/PyCQA/flake8
-    rev: 6.1.0
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: 'v0.0.276'
     hooks:
-      - id: flake8
-
-  - repo: https://github.com/asottile/seed-isort-config
-    rev: v2.2.0
-    hooks:
-      - id: seed-isort-config
-  - repo: https://github.com/PyCQA/isort
-    rev: 5.12.0
-    hooks:
-      - id: isort
+      - id: ruff
+        args: ['--fix']
 
   - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v3.0.3
+    rev: v3.0.0-alpha.9-for-vscode
     hooks:
       - id: prettier
-        additional_dependencies:
-          - prettier
-          - '@carbonplan/prettier'

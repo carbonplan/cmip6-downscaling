@@ -1,14 +1,129 @@
-[project]
-name = 'cmip6-downscaling'
-version = '0.1.11'
-description = 'README.md'
+[build-system]
+requires = ["setuptools>=64", "setuptools-scm[toml]>=6.2", "wheel"]
+build-backend = "setuptools.build_meta"
 
+[project]
+name = "cmip6-downscaling"
+description = "Climate downscaling using cmip6 data"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "CarbonPlan", email = "tech@carbonplan.org" }]
+requires-python = ">=3.9"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Scientific/Engineering",
+]
+dynamic = ["version"]
+
+dependencies = [
+"adlfs >= 2022.2.0",
+"carbonplan_data",
+"carbonplan[styles]",
+"cf-xarray>=0.7.3",
+"cmip6_preprocessing",
+"dask[complete]",
+"dask-kubernetes",
+"donfig >= 0.7.0",
+"fsspec",
+"intake",
+"intake-esm >= 2022.9.18",
+"intake-xarray",
+"ndpyramid == 0.0.6",
+"pandas",
+"prefect == 0.15.13",
+"rechunker",
+"regionmask",
+"scikit-downscale >= 0.1.2",
+"scikit-learn",
+"scipy",
+"universal-pathlib >= 0.0.12",
+"xarray >= 2022.3.0",
+"xarray-datatree == 0.0.6",
+"xarray_schema >= 0.0.3",
+"xclim",
+"xesmf",
+"zarr >= 2.11.3"
+]
+
+[project.optional-dependencies]
+dev = ["pytest","pytest-sugar","pytest-cov"]
+deepsd = ["tensorflow", "tensorflow-io"]
+analysis = ["cartopy", "seaborn", "carbonplan[styles]"]
+
+
+[project.urls]
+repository = "https://github.com/carbonplan/cmip6-downscaling"
+
+[tool.setuptools.packages.find]
+include = ["cmip6_downscaling*"]
+
+[tool.setuptools_scm]
+local_scheme = "node-and-date"
+fallback_version = "999"
 
 [tool.black]
 line-length = 100
-target-version = ['py38']
+target-version = ['py39']
 skip-string-normalization = true
 
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+builtins = ["ellipsis"]
 
-[build-system]
-requires = ["setuptools>=30.3.0", "wheel", "setuptools_scm"]
+# Exclude a variety of commonly ignored directories.
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+]
+per-file-ignores = {}
+# E402: module level import not at top of file
+# E501: line too long - let black worry about that
+# E731: do not assign a lambda expression, use a def
+ignore = ["E402", "E501", "E731"]
+select = [
+    # Pyflakes
+    "F",
+    # Pycodestyle
+    "E",
+    "W",
+    # isort
+    "I",
+    # Pyupgrade
+    "UP",
+]
+
+
+[tool.ruff.mccabe]
+max-complexity = 18
+
+[tool.ruff.isort]
+known-first-party = ["cmip6_downscaling"]
+
+[tool.pytest.ini_options]
+console_output_style = "count"
+addopts = "--cov=./ --cov-report=xml --verbose"

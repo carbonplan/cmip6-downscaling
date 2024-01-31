@@ -23,7 +23,8 @@ from upath import UPath
 from xarray_schema import DataArraySchema, DatasetSchema
 from xarray_schema.base import SchemaError
 
-from ... import __version__ as version, config
+from ... import __version__ as version
+from ... import config
 from ...data.cmip import get_gcm
 from ...data.observations import open_era5
 from ...utils import str_to_hash

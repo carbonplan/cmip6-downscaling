@@ -1,7 +1,6 @@
 # Imports -----------------------------------------------------------
 import json
 import os
-from typing import Dict, List
 
 import fsspec  # type: ignore
 import pandas as pd  # type: ignore
@@ -106,7 +105,7 @@ def map_and_open_zarr_link(file_loc_str: str) -> xr.Dataset:
     return ds
 
 
-def create_formatted_links() -> List:
+def create_formatted_links() -> list:
     """Create list of tuples representing all year/month/variable combinations
 
     Returns
@@ -141,7 +140,7 @@ def create_formatted_links() -> List:
     return file_pattern_list
 
 
-def open_json_catalog() -> Dict:
+def open_json_catalog() -> dict:
     """Loads local CMIP6 JSON intake catalog
 
     Returns
