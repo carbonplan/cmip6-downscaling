@@ -17,7 +17,6 @@ on:
 
 jobs:
   test:
-    if: github.repository == 'carbonplan/cmip6_downscaling'
     name: ${{ matrix.python-version }}-build
     runs-on: ubuntu-latest
     strategy:
