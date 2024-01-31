@@ -40,14 +40,14 @@ def validate_zarr_store(target: str, raise_on_error=True) -> bool:
 
     try:
         store = zarr.open_consolidated(target)
-    except:
+    except Exception:
         errors.append('error opening zarr store')
 
     if not errors:
         groups = list(store.groups())
         # if groups is empty (not a datatree)
         if not groups:
-            groups = [("root", store["/"])]
+            groups = [('root', store['/'])]
 
         for key, group in groups:
             data_group = group
@@ -92,7 +92,7 @@ def blocking_to_zarr(
     if write_empty_chunks:
         if packaging.version.Version(
             packaging.version.Version(xr.__version__).base_version
-        ) < packaging.version.Version("2022.03"):
+        ) < packaging.version.Version('2022.03'):
             raise NotImplementedError(
                 f'`write_empty_chunks` not supported in xarray < 2022.06. Your xarray version is: {xr.__version__}'
             )
@@ -188,7 +188,7 @@ def apply_land_mask(ds: xr.Dataset) -> xr.Dataset:
 
 def calc_auspicious_chunks_dict(
     da: xr.DataArray,
-    chunk_dims: tuple = ("lat", "lon"),
+    chunk_dims: tuple = ('lat', 'lon'),
 ) -> dict:
     """Figure out a chunk size that, given the size of the dataset, the dimension(s) you want to chunk on
     and the data type, will fit under the target_size. Currently only works for 100mb which
@@ -210,7 +210,7 @@ def calc_auspicious_chunks_dict(
     """
     if not isinstance(chunk_dims, tuple):
         raise TypeError(
-            "Your chunk_dims likely includes one string but needs a comma after it! to be a tuple!"
+            'Your chunk_dims likely includes one string but needs a comma after it! to be a tuple!'
         )
     # setting target_size_bytes to the 100mb chunksize recommended by dask. could modify in future.
     target_size_bytes = 100e6
@@ -228,7 +228,7 @@ def calc_auspicious_chunks_dict(
             # so we'll always just give it the full length of the dimension
             chunks_dict[dim] = dim_sizes[dim]
     # calculate the bytesize given the dtype bitsize and divide by 8
-    data_bytesize = int(re.findall(r"\d+", str(da.dtype))[0]) / 8
+    data_bytesize = int(re.findall(r'\d+', str(da.dtype))[0]) / 8
     # calculate the size of the smallest minimum chunk based upon dtype and the
     # length of the unchunked dim(s). chunks_dict currently only has unchunked dims right now
     smallest_size_one_chunk = data_bytesize * np.prod([dim_sizes[dim] for dim in chunks_dict])
