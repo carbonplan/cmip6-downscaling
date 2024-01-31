@@ -10,9 +10,9 @@ on:
   schedule:
     - cron: '0 0 * * 0' # Weekly “At 00:00”
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+# concurrency:
+#   group: ${{ github.workflow }}-${{ github.ref }}
+#   cancel-in-progress: true
 
 # Note: This CI used to run off of the image:
 # carbonplan/cmip6-downscaling-single-user:2022.06.19
