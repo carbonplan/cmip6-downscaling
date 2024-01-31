@@ -63,6 +63,10 @@ repository = "https://github.com/carbonplan/cmip6-downscaling"
 [tool.setuptools.packages.find]
 include = ["cmip6_downscaling*"]
 
+[tool.setuptools_scm]
+local_scheme = "node-and-date"
+fallback_version = "999"
+
 [tool.black]
 line-length = 100
 target-version = ['py39']
