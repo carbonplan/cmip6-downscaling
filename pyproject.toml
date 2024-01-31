@@ -31,7 +31,6 @@ dependencies = [
 "dask[complete]",
 "dask-kubernetes",
 "donfig >= 0.7.0",
-"esmf",
 "fsspec",
 "intake",
 "intake-esm >= 2022.9.18",
