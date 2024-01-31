@@ -5,26 +5,53 @@ on:
     branches:
       - main
   pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 0' # Weekly “At 00:00”
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Note: This CI used to run off of the image:
+# carbonplan/cmip6-downscaling-single-user:2022.06.19
+
 jobs:
   test:
-    name: build-and-test
+    if: github.repository == 'carbonplan/cmip6_downscaling'
+    name: ${{ matrix.python-version }}-build
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9', '3.10'] #TODO: add 3.11 once sparse/numba support it
     timeout-minutes: 20
-    container:
-      image: carbonplan/cmip6-downscaling-single-user:2022.06.19
-      options: --user root
+    defaults:
+      run:
+        shell: bash -l {0}
     steps:
-      - uses: actions/checkout@v3
-      - name: Install
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Conda environment from environment.yml
+        uses: mamba-org/setup-micromamba@v1
+        with:
+          # environment-file is not assumed anymore
+          environment-file: ci/environment.yml
+          create-args: >-
+            python=${{ matrix.python-version }}
+          # now called cache-environment
+          cache-environment: true
+
+      - name: Install package
         run: |
-          git config --global --add safe.directory /__w/cmip6-downscaling/cmip6-downscaling
-          python -m pip install -e .
-          python -m pip list
-      - name: Running Tests
+          python -m pip install -e . --no-deps
+      - name: Conda list information
         run: |
-          python -m pytest --verbose
+          conda env list
+          conda list
+      - name: Run tests
+        run: |
+          python -m pytest
