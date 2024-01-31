@@ -1,7 +1,1 @@
-from importlib.metadata import PackageNotFoundError, version
-
-try:
-    __version__ = version("cmip6-downscaling")
-except PackageNotFoundError:
-    # package is not installed
-    __version__ = 'unknown'
+__version__ = "1.0.post19+g9693dd4.d20240131"

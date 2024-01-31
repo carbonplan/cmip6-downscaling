@@ -1,4 +1,0 @@
-pytest
-pytest-sugar
-pytest-cov
--r requirements.txt
