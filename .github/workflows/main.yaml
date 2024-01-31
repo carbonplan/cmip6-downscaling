@@ -1,11 +1,11 @@
-name: CI
 
+
+name: CI
 on:
   push:
-    branches:
-      - main
+    branches: [ "main" ]
   pull_request:
-
+    branches: [ "main" ]
   workflow_dispatch:
   schedule:
     - cron: '0 0 * * 0' # Weekly “At 00:00”
