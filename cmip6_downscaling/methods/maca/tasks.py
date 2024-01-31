@@ -10,7 +10,8 @@ from carbonplan_data.metadata import get_cf_global_attrs
 from prefect import task
 from upath import UPath
 
-from cmip6_downscaling import __version__ as version, config
+from cmip6_downscaling import __version__ as version
+from cmip6_downscaling import config
 from cmip6_downscaling.methods.common.containers import RunParameters
 from cmip6_downscaling.methods.common.utils import blocking_to_zarr, is_cached
 from cmip6_downscaling.methods.maca import core as maca_core

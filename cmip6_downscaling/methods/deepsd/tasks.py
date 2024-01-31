@@ -10,7 +10,8 @@ from carbonplan_data.metadata import get_cf_global_attrs
 from prefect import task
 from upath import UPath
 
-from ... import __version__ as version, config
+from ... import __version__ as version
+from ... import config
 from ...data.observations import open_era5
 from ...data.utils import lon_to_180
 from ..common.bias_correction import bias_correct_gcm_by_method
