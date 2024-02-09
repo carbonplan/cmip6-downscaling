@@ -3,7 +3,6 @@ channels:
   - conda-forge
   - nodefaults
 dependencies:
-  - python=3.9
   - xesmf=0.8.2
   - esmf=8.2.0
   - pytest
