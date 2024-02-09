@@ -40,7 +40,7 @@ jobs:
             python=${{ matrix.python-version }}
           # now called cache-environment
           cache-environment: true
-          post-cleanup: 'all'
+          post-cleanup: 'none'
           cache-downloads: false
 
       - name: Install package
