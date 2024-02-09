@@ -1,0 +1,13 @@
+name: cmip6-downscaling
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - xesmf=0.8.2
+  - esmf=8.2.0
+  - pytest
+  - pytest-cov
+  - pip
+  - pip:
+      # relative to this file. Needs to be editable to be accepted.
+      - -e ../
