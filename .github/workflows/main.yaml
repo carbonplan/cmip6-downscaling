@@ -34,11 +34,7 @@ jobs:
       - name: Setup Micromamba
         uses: mamba-org/setup-micromamba@v1.8.0
         with:
-          environment-name: cmip6-downscaling
-          condarc: |
-            channels:
-              - conda-forge
-              - nodefaults
+          environment-file: ci/environment.yml
           cache-downloads: false
           cache-environment: true
           create-args: >-

@@ -32,7 +32,7 @@ dependencies = [
 "dask-kubernetes",
 "donfig >= 0.7.0",
 "fsspec",
-"intake",
+"intake <= 0.7.0 ",
 "intake-esm >= 2022.9.18",
 "intake-xarray",
 "ndpyramid == 0.0.6",
