@@ -1,12 +1,12 @@
 name: CI
 on:
   push:
-    branches: ['main']
+    branches: ["main"]
   pull_request:
-    branches: ['main']
+    branches: ["main"]
   workflow_dispatch:
   schedule:
-    - cron: '0 0 * * 0' # Weekly “At 00:00”
+    - cron: "0 0 * * 0" # Weekly “At 00:00”
 
 # concurrency:
 #   group: ${{ github.workflow }}-${{ github.ref }}
@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.9', '3.10'] #TODO: add 3.11 once sparse/numba support it
+        python-version: ["3.9", "3.10"] #TODO: add 3.11 once sparse/numba support it
     timeout-minutes: 20
     defaults:
       run:
