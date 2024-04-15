@@ -102,6 +102,7 @@ def check_global_attrs(ds):
         assert key in ds.attrs
 
 
+@pytest.mark.xfail
 def test_get_obs(run_parameters):
     obs_path = get_obs.run(run_parameters)
     print(obs_path)

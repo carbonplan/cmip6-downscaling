@@ -1,0 +1,11 @@
+name: cmip6-downscaling
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - pytest
+  - pytest-cov
+  - pip
+  - pip:
+      # relative to this file. Needs to be editable to be accepted.
+      - -e ../
