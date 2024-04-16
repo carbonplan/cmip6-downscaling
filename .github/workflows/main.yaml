@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.9', '3.10'] #TODO: add 3.11 once sparse/numba support it
+        python-version: ['3.9', '3.10', '3.11']
     timeout-minutes: 20
     defaults:
       run:
