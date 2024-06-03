@@ -43,7 +43,7 @@ First, the entire collection of datasets at daily timescales is available throug
 ```
 import intake
 cat = intake.open_esm_datastore(
-  'https://cpdataeuwest.blob.core.windows.net/cp-cmip/version1/catalogs/global-downscaled-cmip6.json'
+  'https://rice1.osn.mghpcc.org/carbonplan/cp-cmip/version1/catalog/osn-rechunked-global-downscaled-cmip6.json'
 )
 ```
 
@@ -51,10 +51,9 @@ You can check out this example [Jupyter notebook](https://github.com/carbonplan/
 
 You can also access the data by using the URL of an individual dataset. See [the datasets page](https://github.com/carbonplan/cmip6-downscaling/blob/main/datasets.md) for a table of all available datasets in this collection with storage locations and other metadata. A code snippet showing how to use the URL is shown below:
 
-```
+````
 import xarray as xr
-xr.open_zarr('https://cpdataeuwest.blob.core.windows.net/cp-cmip/version1/data/DeepSD/ScenarioMIP.CCCma.CanESM5.ssp245.r1i1p1f1.day.DeepSD.pr.zarr')
-```
+xr.open_zarr('https://rice1.osn.mghpcc.org/carbonplan/cp-cmip/version1/rechunked_data/DeepSD/ScenarioMIP.CCCma.CanESM5.ssp245.r1i1p1f1.day.DeepSD.pr.zarr',chunks={})```
 
 ## license
 
@@ -63,3 +62,4 @@ All the code in this repository is [MIT](https://choosealicense.com/licenses/mit
 ## about us
 
 CarbonPlan is a nonprofit organization that uses data and science for climate action. We aim to improve the transparency and scientific integrity of climate solutions with open data and tools. Find out more at [carbonplan.org](https://carbonplan.org/) or get in touch by [opening an issue](https://github.com/carbonplan/cmip6-downscaling/issues/new) or [sending us an email](mailto:hello@carbonplan.org).
+````
