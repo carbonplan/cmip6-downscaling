@@ -40,10 +40,10 @@ There are two ways to access the data using Python.
 
 First, the entire collection of datasets at daily timescales is available through an `intake` catalog using the following code snippet.
 
-```
+```python
 import intake
 cat = intake.open_esm_datastore(
-  'https://cpdataeuwest.blob.core.windows.net/cp-cmip/version1/catalogs/global-downscaled-cmip6.json'
+  'https://rice1.osn.mghpcc.org/carbonplan/cp-cmip/version1/catalog/osn-rechunked-global-downscaled-cmip6.json'
 )
 ```
 
@@ -51,10 +51,10 @@ You can check out this example [Jupyter notebook](https://github.com/carbonplan/
 
 You can also access the data by using the URL of an individual dataset. See [the datasets page](https://github.com/carbonplan/cmip6-downscaling/blob/main/datasets.md) for a table of all available datasets in this collection with storage locations and other metadata. A code snippet showing how to use the URL is shown below:
 
-```
+````python
 import xarray as xr
-xr.open_zarr('https://cpdataeuwest.blob.core.windows.net/cp-cmip/version1/data/DeepSD/ScenarioMIP.CCCma.CanESM5.ssp245.r1i1p1f1.day.DeepSD.pr.zarr')
-```
+xr.open_zarr('https://rice1.osn.mghpcc.org/carbonplan/cp-cmip/version1/rechunked_data/DeepSD/ScenarioMIP.CCCma.CanESM5.ssp245.r1i1p1f1.day.DeepSD.pr.zarr',chunks={})```
+````
 
 ## license
 
