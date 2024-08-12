@@ -51,10 +51,10 @@ You can check out this example [Jupyter notebook](https://github.com/carbonplan/
 
 You can also access the data by using the URL of an individual dataset. See [the datasets page](https://github.com/carbonplan/cmip6-downscaling/blob/main/datasets.md) for a table of all available datasets in this collection with storage locations and other metadata. A code snippet showing how to use the URL is shown below:
 
-````python
+```python
 import xarray as xr
 xr.open_zarr('https://rice1.osn.mghpcc.org/carbonplan/cp-cmip/version1/rechunked_data/DeepSD/ScenarioMIP.CCCma.CanESM5.ssp245.r1i1p1f1.day.DeepSD.pr.zarr',chunks={})
-````
+```
 
 ## license
 
