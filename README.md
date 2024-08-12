@@ -53,7 +53,7 @@ You can also access the data by using the URL of an individual dataset. See [the
 
 ````python
 import xarray as xr
-xr.open_zarr('https://rice1.osn.mghpcc.org/carbonplan/cp-cmip/version1/rechunked_data/DeepSD/ScenarioMIP.CCCma.CanESM5.ssp245.r1i1p1f1.day.DeepSD.pr.zarr',chunks={})```
+xr.open_zarr('https://rice1.osn.mghpcc.org/carbonplan/cp-cmip/version1/rechunked_data/DeepSD/ScenarioMIP.CCCma.CanESM5.ssp245.r1i1p1f1.day.DeepSD.pr.zarr',chunks={})
 ````
 
 ## license
