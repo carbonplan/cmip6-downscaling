@@ -44,7 +44,7 @@ config.set({'runtime': 'cloud'})
 ```yaml
 run_options:
 
-runtime: 'cloud'
+runtime: "cloud"
 ```
 
 ### Environment Variables
