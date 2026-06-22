@@ -8,7 +8,7 @@ description = "Climate downscaling using cmip6 data"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "CarbonPlan", email = "tech@carbonplan.org" }]
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 classifiers = [
     "Development Status :: 4 - Beta",
     "License :: OSI Approved :: MIT License",
@@ -23,33 +23,11 @@ classifiers = [
 dynamic = ["version"]
 
 dependencies = [
-"adlfs >= 2022.2.0",
-"carbonplan_data",
-"carbonplan[styles]",
-"cf-xarray>=0.7.3",
-"cmip6_preprocessing",
-"dask[complete]",
-"dask-kubernetes",
-"donfig >= 0.7.0",
-"fsspec",
-"intake <= 0.7.0",
-"intake-esm >= 2022.9.18",
-"intake-xarray",
-"ndpyramid == 0.0.6",
-"pandas",
-"prefect == 0.15.13",
-"rechunker",
-"regionmask",
-"scikit-downscale >= 0.1.2",
-"scikit-learn",
-"scipy",
-"universal-pathlib >= 0.0.12",
-"xarray >= 2022.3.0",
-"xarray-datatree == 0.0.6",
-"xarray_schema >= 0.0.3",
-"xclim",
-"xesmf",
-"zarr >= 2.11.3"
+    "icechunk>=2.0.6",
+    "obstore>=0.10.1",
+    "requests>=2.32.5",
+    "xarray>=2026.4.0",
+    "zarr>=3.2.1",
 ]
 
 [project.optional-dependencies]
