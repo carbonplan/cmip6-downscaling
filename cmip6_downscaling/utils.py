@@ -3,7 +3,6 @@ from __future__ import annotations
 from hashlib import blake2b
 
 import dask
-import datatree
 import xarray as xr
 import zarr
 
@@ -12,7 +11,7 @@ def str_to_hash(s: str) -> str:
     return blake2b(s.encode(), digest_size=8).hexdigest()
 
 
-def write(ds: xr.Dataset | datatree.DataTree, target, use_cache: bool = True) -> str:
+def write(ds: xr.Dataset | xr.DataTree, target, use_cache: bool = True) -> str:
     from .methods.common.utils import zmetadata_exists
 
     if use_cache and zmetadata_exists(target):

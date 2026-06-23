@@ -22,12 +22,6 @@ src='https://images.carbonplan.org/highlights/cmip6-downscaling-dark.png'
 This repository includes our tools/scripts/models/etc for climate downscaling. This work is described in more detail in a [web article](https://carbonplan.org/research/cmip6-downscaling-explainer) with
 a companion [map tool](https://carbonplan.org/research/cmip6-downscaling) to explore the data. We encourage you to reach out if you are interested in using the code or datasets by [opening an issue](https://github.com/carbonplan/cmip6-downscaling/issues/new) or [sending us an email](mailto:hello@carbonplan.org).
 
-## install
-
-```shell
-python -m pip install cmip6_downscaling
-```
-
 ## development
 
 Requires [pixi](https://pixi.sh). Clone the repo, then:
@@ -37,12 +31,6 @@ pixi install -e dev
 pixi run -e dev pytest tests
 ```
 
-## usage
-
-```python
-from cmip6_downscaling.methods import ...
-```
-
 ## data access
 
 There are three ways to access the data using Python.
@@ -50,6 +38,15 @@ There are three ways to access the data using Python.
 First, the entire collection of datasets at daily timescales is available through an `intake` catalog using the following code snippet.
 
 ```python
+# /// script
+# dependencies = [
+#   "xarray",
+#   "aiohttp",
+#   "intake-esm",
+#   "dask",
+# ]
+# ///
+#
 import intake
 cat = intake.open_esm_datastore(
   'https://rice1.osn.mghpcc.org/carbonplan/cp-cmip/version1/catalog/osn-rechunked-global-downscaled-cmip6.json'

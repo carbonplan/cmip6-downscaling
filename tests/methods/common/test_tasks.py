@@ -1,7 +1,10 @@
+import pytest
+
+pytest.importorskip("prefect.executors", reason="requires Prefect v1")
+
 from dataclasses import asdict
 
 import numpy as np
-import pytest
 import xarray as xr
 from upath import UPath
 from xarray_schema import DataArraySchema, DatasetSchema

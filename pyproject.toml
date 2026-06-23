@@ -23,10 +23,17 @@ classifiers = [
 dynamic = ["version"]
 
 dependencies = [
+    "dask",
+    "geopandas",
+    "regionmask",
     "icechunk>=2.0.6",
     "obstore>=0.10.1",
+    "prefect",
     "requests>=2.32.5",
+    "universal_pathlib",
     "xarray>=2026.4.0",
+    "xarray-schema",
+    "xclim",
     "zarr>=3.2.1",
 ]
 
@@ -111,6 +118,7 @@ platforms = ["linux-64", "osx-arm64"]
 
 [tool.pixi.dependencies]
 python = ">=3.12,<3.14"
+setuptools = "<75"
 
 [tool.pixi.pypi-dependencies]
 cmip6-downscaling = { path = ".", editable = true }
