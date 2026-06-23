@@ -124,6 +124,7 @@ setuptools = "<75"
 cmip6-downscaling = { path = ".", editable = true }
 
 [tool.pixi.feature.dev.pypi-dependencies]
+prek = "*"
 pytest = "*"
 pytest-sugar = "*"
 pytest-cov = "*"

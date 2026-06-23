@@ -14,11 +14,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: prefix-dev/setup-pixi@v0.8.5
         with:
-          python-version: '3.13'
-      - run: pip install prek
-      - run: prek run --all-files
+          pixi-version: v0.62.2
+          environments: dev
+          cache: true
+      - run: pixi run -e dev prek run --all-files
 
   test:
     name: test
