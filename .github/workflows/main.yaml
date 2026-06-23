@@ -21,21 +21,15 @@ jobs:
       - run: prek run --all-files
 
   test:
-    name: ${{ matrix.python-version }}-build
+    name: test
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ['3.12', '3.13']
     timeout-minutes: 20
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup pixi
-        uses: prefix-dev/setup-pixi@v0.8.5
+      - uses: prefix-dev/setup-pixi@v0.8.5
         with:
-          pixi-version: v0.47.0
+          pixi-version: v0.62.2
           environments: dev
           cache: true
 
