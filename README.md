@@ -28,6 +28,15 @@ a companion [map tool](https://carbonplan.org/research/cmip6-downscaling) to exp
 python -m pip install cmip6_downscaling
 ```
 
+## development
+
+Requires [pixi](https://pixi.sh). Clone the repo, then:
+
+```shell
+pixi install -e dev
+pixi run -e dev pytest tests
+```
+
 ## usage
 
 ```python
@@ -36,7 +45,7 @@ from cmip6_downscaling.methods import ...
 
 ## data access
 
-There are two ways to access the data using Python.
+There are three ways to access the data using Python.
 
 First, the entire collection of datasets at daily timescales is available through an `intake` catalog using the following code snippet.
 
@@ -55,6 +64,26 @@ You can also access the data by using the URL of an individual dataset. See [the
 import xarray as xr
 xr.open_zarr('https://rice1.osn.mghpcc.org/carbonplan/cp-cmip/version1/data/DeepSD/ScenarioMIP.CCCma.CanESM5.ssp245.r1i1p1f1.day.DeepSD.pr.zarr',chunks={})
 ```
+
+The datasets are also available as [Icechunk](https://icechunk.io) stores, which use zarr v3 sharding for efficient cloud-native access. These stores are anonymously readable and can be opened with xarray as follows:
+
+```python
+import icechunk
+import xarray as xr
+
+storage = icechunk.s3_storage(
+    bucket="carbonplan",
+    prefix="cp-cmip/version1/icechunk_data/DeepSD/ScenarioMIP.CCCma.CanESM5.ssp245.r1i1p1f1.day.DeepSD.pr.zarr",
+    endpoint_url="https://rice1.osn.mghpcc.org",
+    force_path_style=True,
+    anonymous=True,
+)
+repo = icechunk.Repository.open(storage)
+session = repo.readonly_session("main")
+ds = xr.open_zarr(session.store, chunks={})
+```
+
+The prefix follows the pattern `cp-cmip/version1/icechunk_data/{method}/{store_name}` where `method` and `store_name` match the values in the intake catalog.
 
 ## license
 

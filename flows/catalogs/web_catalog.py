@@ -284,9 +284,9 @@ def parse_cmip6_downscaled_pyramid(
     query = {
         'source_id': parameters['model'],
         'member_id': parameters['member'],
-        'experiment_id': 'historical'
-        if parameters['scenario'] == 'hist'
-        else parameters['scenario'],
+        'experiment_id': (
+            'historical' if parameters['scenario'] == 'hist' else parameters['scenario']
+        ),
         'variable_id': parameters['variable'],
     }
 
@@ -389,9 +389,9 @@ def parse_cmip6_downscaled_pyramid(
             downscaling_method=attrs['method'],
             root_path=root_path,
         )
-        attrs[
-            'name'
-        ] = f"{targets['destination_name']}.{attrs['timescale']}"  # make sure the name is unique
+        attrs['name'] = (
+            f"{targets['destination_name']}.{attrs['timescale']}"  # make sure the name is unique
+        )
         attrs['destination_path'] = targets['destination_path']
         attrs['source_path'] = from_az_to_https(attrs['daily_downscaled_data_uri'], root_path)
 
@@ -581,7 +581,7 @@ def create_catalog(
         "title": "CMIP6 downscaling catalog",
         "description": "",
         "history": "",
-        "last_updated": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+        "last_updated": datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S"),
         "datasets": datasets,
     }
 

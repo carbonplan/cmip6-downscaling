@@ -307,7 +307,7 @@ def inference(gcm_path: UPath, run_parameters: RunParameters) -> UPath:
         elev_norm = normalize(ds=elev, dims=["lat", "lon"], epsilon=EPSILON).elevation.values
         elevs.append(tf.constant(elev_norm[np.newaxis, :, :, np.newaxis].astype(np.float32)))
 
-    input_map = {"elev_%i" % i: elevs[i] for i in range(len(output_resolutions))}
+    input_map = {f"elev_{i}": elevs[i] for i in range(len(output_resolutions))}
 
     # now read in the frozen graph of the stacked model, set placeholder for x, constant for elevs
     x = tf.compat.v1.placeholder(tf.float32, shape=(None, None, None, 1))

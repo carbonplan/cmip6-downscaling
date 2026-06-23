@@ -93,8 +93,9 @@ def preprocess(ds) -> xr.Dataset:
 def _compute_summary_helper(path, freq, chunks):
     import xarray as xr
 
-    with xr.set_options(keep_attrs=True), dask.config.set(
-        **{'array.slicing.split_large_chunks': False}
+    with (
+        xr.set_options(keep_attrs=True),
+        dask.config.set(**{'array.slicing.split_large_chunks': False}),
     ):
         ds = xr.open_zarr(path).pipe(preprocess)
         if ds.attrs['variable_id'] in {'tasmax', 'tasmin'}:

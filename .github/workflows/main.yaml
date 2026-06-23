@@ -6,50 +6,38 @@ on:
     branches: ['main']
   workflow_dispatch:
   schedule:
-    - cron: '0 0 * * 0' # Weekly “At 00:00”
-
-# concurrency:
-#   group: ${{ github.workflow }}-${{ github.ref }}
-#   cancel-in-progress: true
-
-# Note: This CI used to run off of the image:
-# carbonplan/cmip6-downscaling-single-user:2022.06.19
+    - cron: '0 0 * * 0' # Weekly "At 00:00"
 
 jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install prek
+      - run: prek run --all-files
+
   test:
     name: ${{ matrix.python-version }}-build
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.9', '3.10', '3.11']
+        python-version: ['3.12', '3.13']
     timeout-minutes: 20
-    defaults:
-      run:
-        shell: bash -l {0}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Conda environment from environment.yml
-        uses: mamba-org/setup-micromamba@v1
+      - name: Setup pixi
+        uses: prefix-dev/setup-pixi@v0.8.5
         with:
-          # environment-file is not assumed anymore
-          environment-file: ci/environment.yaml
-          create-args: >-
-            python=${{ matrix.python-version }}
-          # now called cache-environment
-          cache-environment: true
-          post-cleanup: 'none'
-          cache-downloads: false
+          pixi-version: v0.47.0
+          environments: dev
+          cache: true
 
-      - name: Install package
-        run: |
-          python -m pip install -e .[dev]
-      - name: Conda list information
-        run: |
-          conda env list
-          conda list
       - name: Run tests
-        run: |
-          python -m pytest tests
+        run: pixi run -e dev pytest tests

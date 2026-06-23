@@ -2,23 +2,22 @@
 
 ## Dependencies
 
-- Python 3.8 or later
-- numpy
-- scipy
-- pandas
+- Python 3.12 or later
 
 ## Install
 
-The `cmip6-downscaling` package can be installed using `pip` package installer from [PyPI](https://pypi.org/project/cmip6-downscaling/):
+The `cmip6-downscaling` package can be installed using `pip` from [PyPI](https://pypi.org/project/cmip6-downscaling/):
 
 ```
 python -m pip install cmip6-downscaling
 ```
 
-or from source:
+or from source using [pixi](https://pixi.sh):
 
 ```
-python -m pip install git+https://github.com/carbonplan/cmip6-dowscaling
+git clone https://github.com/carbonplan/cmip6-downscaling
+cd cmip6-downscaling
+pixi install -e dev
 ```
 
 ## Usage

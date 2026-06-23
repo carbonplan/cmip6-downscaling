@@ -1,4 +1,5 @@
 """Config file used by donfig"""
+
 from __future__ import annotations
 
 _defaults = {
