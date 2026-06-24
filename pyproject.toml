@@ -8,7 +8,7 @@ description = "Climate downscaling using cmip6 data"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "CarbonPlan", email = "tech@carbonplan.org" }]
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 classifiers = [
     "Development Status :: 4 - Beta",
     "License :: OSI Approved :: MIT License",
@@ -16,40 +16,25 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering",
 ]
 dynamic = ["version"]
 
 dependencies = [
-"adlfs >= 2022.2.0",
-"carbonplan_data",
-"carbonplan[styles]",
-"cf-xarray>=0.7.3",
-"cmip6_preprocessing",
-"dask[complete]",
-"dask-kubernetes",
-"donfig >= 0.7.0",
-"fsspec",
-"intake <= 0.7.0",
-"intake-esm >= 2022.9.18",
-"intake-xarray",
-"ndpyramid == 0.0.6",
-"pandas",
-"prefect == 0.15.13",
-"rechunker",
-"regionmask",
-"scikit-downscale >= 0.1.2",
-"scikit-learn",
-"scipy",
-"universal-pathlib >= 0.0.12",
-"xarray >= 2022.3.0",
-"xarray-datatree == 0.0.6",
-"xarray_schema >= 0.0.3",
-"xclim",
-"xesmf",
-"zarr >= 2.11.3"
+    "dask",
+    "geopandas",
+    "regionmask",
+    "icechunk>=2.0.6",
+    "obstore>=0.10.1",
+    "prefect",
+    "requests>=2.32.5",
+    "universal_pathlib",
+    "xarray>=2026.4.0",
+    "xarray-schema",
+    "xclim",
+    "zarr>=3.2.1",
 ]
 
 [project.optional-dependencies]
@@ -68,17 +53,11 @@ include = ["cmip6_downscaling*"]
 local_scheme = "node-and-date"
 fallback_version = "999"
 
-[tool.black]
-line-length = 100
-target-version = ['py39']
-skip-string-normalization = true
-
 [tool.ruff]
 line-length = 100
-target-version = "py39"
+target-version = "py312"
 builtins = ["ellipsis"]
 
-# Exclude a variety of commonly ignored directories.
 exclude = [
     ".bzr",
     ".direnv",
@@ -99,10 +78,12 @@ exclude = [
     "dist",
     "node_modules",
     "venv",
+    "*.ipynb",
 ]
-per-file-ignores = {}
+
+[tool.ruff.lint]
 # E402: module level import not at top of file
-# E501: line too long - let black worry about that
+# E501: line too long - let ruff format worry about that
 # E731: do not assign a lambda expression, use a def
 ignore = ["E402", "E501", "E731"]
 select = [
@@ -117,13 +98,36 @@ select = [
     "UP",
 ]
 
-
-[tool.ruff.mccabe]
+[tool.ruff.lint.mccabe]
 max-complexity = 18
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = ["cmip6_downscaling"]
+
+[tool.ruff.format]
+quote-style = "preserve"
 
 [tool.pytest.ini_options]
 console_output_style = "count"
 addopts = "--cov=./ --cov-report=xml --verbose"
+
+[tool.pixi.workspace]
+name = "cmip6-downscaling"
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-arm64"]
+
+[tool.pixi.dependencies]
+python = ">=3.12,<3.14"
+setuptools = "<75"
+
+[tool.pixi.pypi-dependencies]
+cmip6-downscaling = { path = ".", editable = true }
+
+[tool.pixi.feature.dev.pypi-dependencies]
+prek = "*"
+pytest = "*"
+pytest-sugar = "*"
+pytest-cov = "*"
+
+[tool.pixi.environments]
+dev = { features = ["dev"], solve-group = "default" }

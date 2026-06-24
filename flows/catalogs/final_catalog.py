@@ -126,7 +126,7 @@ def generate_minified_web_catalog(
         "title": "CMIP6 downscaling catalog",
         "description": "Global downscaled climate projections from CMIP6",
         "history": "",
-        "last_updated": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+        "last_updated": datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S"),
         "datasets": df.to_dict(orient='records'),
     }
 

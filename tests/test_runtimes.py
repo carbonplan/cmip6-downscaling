@@ -1,5 +1,7 @@
 import pytest
 
+pytest.importorskip("prefect.executors", reason="requires Prefect v1")
+
 from cmip6_downscaling.runtimes import (
     BaseRuntime,
     CIRuntime,

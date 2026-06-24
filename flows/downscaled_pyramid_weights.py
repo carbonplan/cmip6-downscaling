@@ -17,7 +17,7 @@ scratch_dir = UPath(config.get('storage.static.uri')) / folder
 runtime = PangeoRuntime()
 
 filter_results = FilterTask(
-    filter_func=lambda x: not isinstance(x, (BaseException, SKIP, type(None)))
+    filter_func=lambda x: not isinstance(x, BaseException | SKIP | type(None))
 )
 
 

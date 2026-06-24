@@ -1,6 +1,5 @@
 import numpy as np
 import xarray as xr
-import xclim
 from xarray.core.types import T_Xarray
 
 xr.set_options(keep_attrs=True)
@@ -37,16 +36,13 @@ def to_standard_calendar(obj: T_Xarray) -> T_Xarray:
 
     # reindex / interpolate -- Note: .chunk was added to fix dask error
     obj_new = (
-        xclim.core.calendar.convert_calendar(obj, "standard", missing=np.nan)
+        xr.coding.calendar_ops.convert_calendar(obj, "standard", missing=np.nan)
         .chunk({'time': -1})
         .interpolate_na(dim="time", method="linear")
     )
 
     # reset encoding
     obj_new["time"].encoding["calendar"] = "standard"
-
-    # sets time to datetimeindex
-    obj_new['time'] = obj_new.indexes['time'].to_datetimeindex()
 
     return obj_new
 

@@ -181,7 +181,8 @@ def bias_correction(
 
         bias_correction_model = PointWiseDownscaler(
             EquidistantCdfMatcher(
-                kind=kind, extrapolate=None  # cdf in maca implementation spans [0, 1]
+                kind=kind,
+                extrapolate=None,  # cdf in maca implementation spans [0, 1]
             )
         )
 

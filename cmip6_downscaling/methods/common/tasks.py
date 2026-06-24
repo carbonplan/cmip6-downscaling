@@ -8,7 +8,6 @@ import warnings
 from dataclasses import asdict
 from pathlib import PosixPath
 
-import datatree as dt
 import fsspec
 import pandas as pd
 import rechunker
@@ -489,14 +488,14 @@ def _load_coords(ds: xr.Dataset) -> xr.Dataset:
     return ds
 
 
-def _pyramid_postprocess(dt: dt.DataTree, levels: int, other_chunks: dict = None) -> dt.DataTree:
+def _pyramid_postprocess(dt: xr.DataTree, levels: int, other_chunks: dict = None) -> xr.DataTree:
     '''Postprocess data pyramid
 
     Adds multiscales metadata and sets Zarr encoding
 
     Parameters
     ----------
-    dt : dt.DataTree
+    dt : xr.DataTree
         Input data pyramid
     levels : int
         Number of levels in pyramid
@@ -505,7 +504,7 @@ def _pyramid_postprocess(dt: dt.DataTree, levels: int, other_chunks: dict = None
 
     Returns
     -------
-    dt.DataTree
+    xr.DataTree
         Updated data pyramid with metadata / encoding set
     '''
     chunks = {"x": PIXELS_PER_TILE, "y": PIXELS_PER_TILE}
@@ -570,9 +569,9 @@ def pyramid(
     ds.coords['date_str'] = ds['time'].dt.strftime('%Y-%m-%d').astype('S10')
 
     ds.attrs.update({'title': ds.attrs['title']}, **get_cf_global_attrs(version=version))
-    target_pyramid = dt.open_datatree('az://static/target-pyramid', engine='zarr')
+    target_pyramid = xr.open_datatree('az://static/target-pyramid', engine='zarr')
     if weights_pyramid_path is not None:
-        weights_pyramid = dt.open_datatree(weights_pyramid_path, engine='zarr')
+        weights_pyramid = xr.open_datatree(weights_pyramid_path, engine='zarr')
     else:
         weights_pyramid = None
     # create pyramid

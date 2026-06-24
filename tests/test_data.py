@@ -1,5 +1,8 @@
-import numpy as np
 import pytest
+
+pytest.importorskip("intake", reason="requires intake")
+
+import numpy as np
 from xarray_schema import DataArraySchema, DatasetSchema
 
 from cmip6_downscaling.data.observations import open_era5
